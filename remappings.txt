@@ -1,0 +1,4 @@
+@chainlink/contracts=lib/chainlink/contracts
+@openzeppelin/contracts=lib/openzeppelin-contracts/contracts
+@aave/core-v3/contracts=lib/aave-v3-core/contracts
+@chainlink-local=lib/chainlink-local
