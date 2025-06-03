@@ -291,6 +291,36 @@ abstract contract YieldPeer is CCIPReceiver, Ownable, IERC677Receiver, IYieldPee
         _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
     }
 
+    function _handleCCIPRebalanceOldStrategy(bytes memory data) internal {
+        /// @dev withdraw from the old strategy
+        address oldStrategyPool = _getStrategyPool();
+        uint256 totalValue = _getTotalValueFromStrategy(oldStrategyPool);
+        _withdrawFromStrategy(oldStrategyPool, totalValue);
+
+        /// @dev update strategy pool to either protocol on this chain or address(0) if on a different chain
+        Strategy memory newStrategy = abi.decode(data, (Strategy));
+        address newStrategyPool = _updateStrategyPool(newStrategy.chainSelector, newStrategy.protocol);
+
+        // if the new strategy is this chain, but different protocol, then we need to withdraw from the old strategy and deposit to the new strategy
+        if (newStrategy.chainSelector == i_thisChainSelector) {
+            _depositToStrategy(newStrategyPool, i_usdc.balanceOf(address(this)));
+        }
+        // if the new strategy is a different chain, then we need to send the usdc we just withdrew to the new strategy
+        else {
+            _sendRebalanceMessage(
+                newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, data, i_usdc.balanceOf(address(this))
+            );
+        }
+    }
+
+    function _handleCCIPRebalanceNewStrategy(bytes memory data) internal {
+        /// @dev update strategy pool to either protocol on this chain or address(0) if on a different chain
+        Strategy memory newStrategy = abi.decode(data, (Strategy));
+        address newStrategyPool = _updateStrategyPool(newStrategy.chainSelector, newStrategy.protocol);
+        /// @dev deposit to the new strategy
+        _depositToStrategy(newStrategyPool, i_usdc.balanceOf(address(this)));
+    }
+
     /*//////////////////////////////////////////////////////////////
                              INTERNAL VIEW
     //////////////////////////////////////////////////////////////*/
@@ -336,7 +366,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable, IERC677Receiver, IYieldPee
         if (msg.sender != address(i_share)) revert YieldPeer__OnlyShare();
     }
 
-    function _getStrategyPool(IYieldPeer.Protocol protocol) internal view returns (address) {
+    function _getStrategyPoolFromProtocol(IYieldPeer.Protocol protocol) internal view returns (address) {
         if (protocol == IYieldPeer.Protocol.Aave) return address(i_aavePoolAddressesProvider);
         else if (protocol == IYieldPeer.Protocol.Compound) return address(i_comet);
         // else revert YieldPeer__InvalidProtocol(protocol);
@@ -412,7 +442,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable, IERC677Receiver, IYieldPee
     function _updateStrategyPool(uint64 chainSelector, Protocol protocol) internal returns (address) {
         address strategyPool;
         if (chainSelector == i_thisChainSelector) {
-            strategyPool = _getStrategyPool(protocol);
+            strategyPool = _getStrategyPoolFromProtocol(protocol);
             s_strategyPool = strategyPool;
         } else {
             s_strategyPool = address(0);

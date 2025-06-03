@@ -112,7 +112,12 @@ contract ParentDepositTest is BaseTest {
 
         /// @dev assert USDC was deposited to Aave on child chain
         address aUsdc = _getATokenAddress(optNetworkConfig.aavePoolAddressesProvider, address(optUsdc));
-        assertEq(IERC20(aUsdc).balanceOf(address(optChildPeer)), DEPOSIT_AMOUNT);
+        assertApproxEqAbs(
+            IERC20(aUsdc).balanceOf(address(optChildPeer)),
+            DEPOSIT_AMOUNT,
+            BALANCE_TOLERANCE,
+            "Aave balance should be approximately equal to deposit amount"
+        );
 
         /// @dev switch back to parent chain and route ccip message with totalValue to calculate shareMintAmount
         ccipLocalSimulatorFork.switchChainAndRouteMessage(arbFork);

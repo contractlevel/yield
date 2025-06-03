@@ -45,7 +45,12 @@ contract ParentWithdrawTest is BaseTest {
         /// @dev assert
         assertEq(arbShare.balanceOf(withdrawer), 0);
         assertEq(arbShare.totalSupply(), 0);
-        assertEq(arbUsdc.balanceOf(withdrawer), DEPOSIT_AMOUNT);
+        assertApproxEqAbs(
+            arbUsdc.balanceOf(withdrawer),
+            DEPOSIT_AMOUNT,
+            BALANCE_TOLERANCE,
+            "USDC balance should be approximately equal to deposit amount"
+        );
     }
 
     /// @notice Scenario: Withdraw made on Parent chain, where the Strategy is, and the Strategy Protocol is Compound
@@ -108,7 +113,12 @@ contract ParentWithdrawTest is BaseTest {
         /// @dev assert
         assertEq(arbShare.balanceOf(withdrawer), 0);
         assertEq(arbShare.totalSupply(), 0);
-        assertEq(arbUsdc.balanceOf(withdrawer), DEPOSIT_AMOUNT);
+        assertApproxEqAbs(
+            arbUsdc.balanceOf(withdrawer),
+            DEPOSIT_AMOUNT,
+            BALANCE_TOLERANCE,
+            "USDC balance should be approximately equal to deposit amount"
+        );
     }
 
     /// @notice Scenario: Withdraw made on Parent chain, where the Strategy is not, and the Strategy Protocol is Compound

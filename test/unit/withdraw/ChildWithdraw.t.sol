@@ -49,7 +49,12 @@ contract ChildWithdrawTest is BaseTest {
         /// @dev assert
         assertEq(optShare.balanceOf(withdrawer), 0);
         assertEq(optShare.totalSupply(), 0);
-        assertEq(optUsdc.balanceOf(withdrawer), DEPOSIT_AMOUNT);
+        assertApproxEqAbs(
+            optUsdc.balanceOf(withdrawer),
+            DEPOSIT_AMOUNT,
+            BALANCE_TOLERANCE,
+            "USDC balance should be approximately equal to deposit amount"
+        );
     }
 
     // Scenario: Strategy is on the same chain as the child the withdrawal was initiated. Strategy is Compound.

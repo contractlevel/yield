@@ -133,8 +133,8 @@ contract ParentPeer is YieldPeer {
         if (txType == CcipTxType.DepositCallbackParent) _handleDepositCallbackParent(data);
         if (txType == CcipTxType.WithdrawCallback) _handleCCIPWithdrawCallback(message.destTokenAmounts, data);
         if (txType == CcipTxType.WithdrawToParent) _handleWithdrawToParent(data);
-
-        // rebalance tx type handling
+        if (txType == CcipTxType.RebalanceOldStrategy) _handleCCIPRebalanceOldStrategy(data);
+        if (txType == CcipTxType.RebalanceNewStrategy) _handleCCIPRebalanceNewStrategy(data);
     }
 
     /// @notice This function handles a deposit from a child to this parent and the 3 strategy cases:
@@ -232,6 +232,10 @@ contract ParentPeer is YieldPeer {
         }
     }
 
+    function _rebalance(Strategy memory newStrategy) internal {
+        _setStrategy(newStrategy.chainSelector, newStrategy.protocol);
+    }
+
     /// @notice This function sets the strategy on the parent
     /// @notice This function uses ccipSend to send the rebalance message to the old strategy
     /// @notice Rebalances funds from the old strategy to the new strategy
@@ -247,7 +251,6 @@ contract ParentPeer is YieldPeer {
         if (!_updateStrategy(newStrategy, oldStrategy)) {
             return;
         }
-
         // Handle strategy changes on the same chain
         if (
             chainSelector == i_thisChainSelector && oldStrategy.chainSelector == i_thisChainSelector
@@ -260,7 +263,7 @@ contract ParentPeer is YieldPeer {
             _handleStrategyMoveToNewChain(oldStrategy, newStrategy);
         }
         // Handle rebalancing from a different chain
-        else if (oldStrategy.chainSelector != chainSelector) {
+        else {
             _handleRebalanceFromDifferentChain(oldStrategy, newStrategy);
         }
     }
@@ -347,5 +350,10 @@ contract ParentPeer is YieldPeer {
     function setStrategy(uint64 chainSelector, Protocol protocol) external {
         _updateStrategyPool(chainSelector, protocol);
         s_strategy = Strategy({chainSelector: chainSelector, protocol: protocol});
+    }
+
+    // @review REMOVE THIS AND REPLACE WITH CLF CALL
+    function rebalance(Strategy memory newStrategy) external {
+        _rebalance(newStrategy);
     }
 }

@@ -20,6 +20,8 @@ import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
 import {DataTypes} from "@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol";
 import {USDCTokenPool} from "@chainlink/contracts/src/v0.8/ccip/pools/USDC/USDCTokenPool.sol";
 import {IMessageTransmitter} from "../src/interfaces/IMessageTransmitter.sol";
+import {IYieldPeer} from "../src/interfaces/IYieldPeer.sol";
+import {IComet} from "../src/interfaces/IComet.sol";
 
 contract BaseTest is Test {
     /*//////////////////////////////////////////////////////////////
