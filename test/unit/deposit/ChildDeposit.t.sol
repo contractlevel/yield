@@ -38,7 +38,7 @@ contract ChildDepositTest is BaseTest {
         assertEq(usdcBalanceAfter, usdcBalanceBefore - DEPOSIT_AMOUNT);
 
         /// @dev assert USDC was deposited to Aave
-        address aUsdc = _getATokenAddress(optNetworkConfig.aavePoolAddressesProvider, address(optUsdc));
+        address aUsdc = _getATokenAddress(optNetworkConfig.protocols.aavePoolAddressesProvider, address(optUsdc));
         assertApproxEqAbs(
             IERC20(aUsdc).balanceOf(address(optChildPeer)),
             DEPOSIT_AMOUNT,
@@ -47,9 +47,9 @@ contract ChildDepositTest is BaseTest {
         );
 
         /// @dev switch to parent chain and route ccip message with totalValue and amount deposited to calculate shareMintAmount
-        ccipLocalSimulatorFork.switchChainAndRouteMessage(arbFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
         uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
-        assertEq(arbParentPeer.getTotalShares(), expectedShareMintAmount);
+        assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
 
         /// @dev switch back to child chain and route ccip message with shareMintAmount to mint shares
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
@@ -73,7 +73,7 @@ contract ChildDepositTest is BaseTest {
         assertEq(usdcBalanceAfter, usdcBalanceBefore - DEPOSIT_AMOUNT);
 
         /// @dev assert USDC was deposited to Compound
-        uint256 compoundBalance = IComet(optNetworkConfig.comet).balanceOf(address(optChildPeer));
+        uint256 compoundBalance = IComet(optNetworkConfig.protocols.comet).balanceOf(address(optChildPeer));
         assertApproxEqAbs(
             compoundBalance,
             DEPOSIT_AMOUNT,
@@ -82,9 +82,9 @@ contract ChildDepositTest is BaseTest {
         );
 
         /// @dev switch to parent chain and route ccip message with totalValue and amount deposited to calculate shareMintAmount
-        ccipLocalSimulatorFork.switchChainAndRouteMessage(arbFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
         uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
-        assertEq(arbParentPeer.getTotalShares(), expectedShareMintAmount);
+        assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
 
         /// @dev switch back to child chain and route ccip message with shareMintAmount to mint shares
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
@@ -101,7 +101,7 @@ contract ChildDepositTest is BaseTest {
     function test_yield_child_deposit_strategyIsParent_aave() public {
         // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
         _selectFork(optFork);
-        optChildPeer.setStrategy(arbChainSelector, IYieldPeer.Protocol.Aave);
+        optChildPeer.setStrategy(baseChainSelector, IYieldPeer.Protocol.Aave);
 
         uint256 usdcBalanceBefore = optUsdc.balanceOf(depositor);
 
@@ -114,19 +114,19 @@ contract ChildDepositTest is BaseTest {
 
         /// @dev switch to parent chain and route ccip message with USDC to deposit to strategy
         /// and calculate shareMintAmount
-        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(arbFork, attesters, attesterPks);
+        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
 
         /// @dev assert USDC was deposited to Aave
-        address aUsdc = _getATokenAddress(arbNetworkConfig.aavePoolAddressesProvider, address(arbUsdc));
+        address aUsdc = _getATokenAddress(baseNetworkConfig.protocols.aavePoolAddressesProvider, address(baseUsdc));
         assertApproxEqAbs(
-            IERC20(aUsdc).balanceOf(address(arbParentPeer)),
+            IERC20(aUsdc).balanceOf(address(baseParentPeer)),
             DEPOSIT_AMOUNT,
             BALANCE_TOLERANCE,
             "Aave balance should be approximately equal to deposit amount"
         );
 
         uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
-        assertEq(arbParentPeer.getTotalShares(), expectedShareMintAmount);
+        assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
 
         /// @dev switch back to child chain and route ccip message with shareMintAmount to mint shares
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
@@ -138,10 +138,10 @@ contract ChildDepositTest is BaseTest {
 
     function test_yield_child_deposit_strategyIsParent_compound() public {
         // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
-        _selectFork(arbFork);
-        arbParentPeer.setStrategy(arbChainSelector, IYieldPeer.Protocol.Compound);
+        _selectFork(baseFork);
+        baseParentPeer.setStrategy(baseChainSelector, IYieldPeer.Protocol.Compound);
         _selectFork(optFork);
-        optChildPeer.setStrategy(arbChainSelector, IYieldPeer.Protocol.Compound);
+        optChildPeer.setStrategy(baseChainSelector, IYieldPeer.Protocol.Compound);
 
         uint256 usdcBalanceBefore = optUsdc.balanceOf(depositor);
 
@@ -154,10 +154,10 @@ contract ChildDepositTest is BaseTest {
 
         /// @dev switch to parent chain and route ccip message with USDC to deposit to strategy
         /// and calculate shareMintAmount
-        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(arbFork, attesters, attesterPks);
+        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
 
         /// @dev assert USDC was deposited to Compound
-        uint256 compoundBalance = IComet(arbNetworkConfig.comet).balanceOf(address(arbParentPeer));
+        uint256 compoundBalance = IComet(baseNetworkConfig.protocols.comet).balanceOf(address(baseParentPeer));
         assertApproxEqAbs(
             compoundBalance,
             DEPOSIT_AMOUNT,
@@ -166,7 +166,7 @@ contract ChildDepositTest is BaseTest {
         );
 
         uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
-        assertEq(arbParentPeer.getTotalShares(), expectedShareMintAmount);
+        assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
 
         /// @dev switch back to child chain and route ccip message with shareMintAmount to mint shares
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
@@ -185,8 +185,8 @@ contract ChildDepositTest is BaseTest {
         // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
         _selectFork(ethFork);
         ethChildPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Aave);
-        _selectFork(arbFork);
-        arbParentPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Aave);
+        _selectFork(baseFork);
+        baseParentPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Aave);
         _selectFork(optFork);
         optChildPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Aave);
 
@@ -200,12 +200,12 @@ contract ChildDepositTest is BaseTest {
         assertEq(usdcBalanceAfter, usdcBalanceBefore - DEPOSIT_AMOUNT);
 
         /// @dev switch to parent chain and route ccip message with USDC to deposit to strategy
-        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(arbFork, attesters, attesterPks);
+        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
         /// @dev switch to third chain and route ccip message with USDC to deposit to strategy
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(ethFork, attesters, attesterPks);
 
         /// @dev assert USDC was deposited to Aave
-        address aUsdc = _getATokenAddress(ethNetworkConfig.aavePoolAddressesProvider, address(ethUsdc));
+        address aUsdc = _getATokenAddress(ethNetworkConfig.protocols.aavePoolAddressesProvider, address(ethUsdc));
         assertApproxEqAbs(
             IERC20(aUsdc).balanceOf(address(ethChildPeer)),
             DEPOSIT_AMOUNT,
@@ -214,9 +214,9 @@ contract ChildDepositTest is BaseTest {
         );
 
         /// @dev switch to parent chain and route ccip message with totalValue and amount deposited to calculate shareMintAmount
-        ccipLocalSimulatorFork.switchChainAndRouteMessage(arbFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
         uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
-        assertEq(arbParentPeer.getTotalShares(), expectedShareMintAmount);
+        assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
 
         /// @dev switch back to deposit child chain and route ccip message with shareMintAmount to mint shares
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
@@ -230,8 +230,8 @@ contract ChildDepositTest is BaseTest {
         // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
         _selectFork(ethFork);
         ethChildPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Compound);
-        _selectFork(arbFork);
-        arbParentPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Compound);
+        _selectFork(baseFork);
+        baseParentPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Compound);
         _selectFork(optFork);
         optChildPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Compound);
 
@@ -245,12 +245,12 @@ contract ChildDepositTest is BaseTest {
         assertEq(usdcBalanceAfter, usdcBalanceBefore - DEPOSIT_AMOUNT);
 
         /// @dev switch to parent chain and route ccip message with USDC to deposit to strategy
-        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(arbFork, attesters, attesterPks);
+        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
         /// @dev switch to third chain and route ccip message with USDC to deposit to strategy
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(ethFork, attesters, attesterPks);
 
         /// @dev assert USDC was deposited to Compound
-        uint256 compoundBalance = IComet(ethNetworkConfig.comet).balanceOf(address(ethChildPeer));
+        uint256 compoundBalance = IComet(ethNetworkConfig.protocols.comet).balanceOf(address(ethChildPeer));
         assertApproxEqAbs(
             compoundBalance,
             DEPOSIT_AMOUNT,
@@ -259,10 +259,10 @@ contract ChildDepositTest is BaseTest {
         );
 
         /// @dev switch to parent chain and route ccip message with totalValue and amount deposited to calculate shareMintAmount
-        ccipLocalSimulatorFork.switchChainAndRouteMessage(arbFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
         /// @dev assert total shares is the expected amount
         uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
-        assertEq(arbParentPeer.getTotalShares(), expectedShareMintAmount);
+        assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
 
         /// @dev switch back to deposit child chain and route ccip message with shareMintAmount to mint shares
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);

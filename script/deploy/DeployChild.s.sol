@@ -13,31 +13,21 @@ contract DeployChild is Script {
     //////////////////////////////////////////////////////////////*/
     function run() public returns (Share, SharePool, ChildPeer, HelperConfig) {
         HelperConfig config = new HelperConfig();
-        (
-            address ccipRouter,
-            address link,
-            uint64 thisChainSelector,
-            address usdc,
-            address aavePoolAddressesProvider,
-            address comet,
-            , // address share
-            uint64 parentChainSelector,
-            address rmnProxy,
-            ,
-        ) = config.activeNetworkConfig();
+        HelperConfig.NetworkConfig memory networkConfig = config.getActiveNetworkConfig();
 
         vm.startBroadcast();
         Share share = new Share();
-        SharePool sharePool = new SharePool(share, new address[](0), rmnProxy, ccipRouter);
+        SharePool sharePool =
+            new SharePool(share, new address[](0), networkConfig.ccip.rmnProxy, networkConfig.ccip.ccipRouter);
         ChildPeer childPeer = new ChildPeer(
-            ccipRouter,
-            link,
-            thisChainSelector,
-            usdc,
-            aavePoolAddressesProvider,
-            comet,
+            networkConfig.ccip.ccipRouter,
+            networkConfig.tokens.link,
+            networkConfig.ccip.thisChainSelector,
+            networkConfig.tokens.usdc,
+            networkConfig.protocols.aavePoolAddressesProvider,
+            networkConfig.protocols.comet,
             address(share),
-            parentChainSelector
+            networkConfig.ccip.parentChainSelector
         );
         share.grantMintAndBurnRoles(address(sharePool));
         share.grantMintAndBurnRoles(address(childPeer));

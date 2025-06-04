@@ -5,7 +5,7 @@ import {LinkTokenInterface} from "@chainlink/contracts/src/v0.8/shared/interface
 import {CCIPReceiver} from "@chainlink/contracts/src/v0.8/ccip/applications/CCIPReceiver.sol";
 import {IRouterClient, Client} from "@chainlink/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
 import {IERC677Receiver} from "@chainlink/contracts/src/v0.8/shared/interfaces/IERC677Receiver.sol";
-import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
 import {DataTypes} from "@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol";
@@ -14,7 +14,7 @@ import {IShare} from "../interfaces/IShare.sol";
 import {IYieldPeer} from "../interfaces/IYieldPeer.sol";
 import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
 
-abstract contract YieldPeer is CCIPReceiver, Ownable, IERC677Receiver, IYieldPeer {
+abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYieldPeer {
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/

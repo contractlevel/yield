@@ -41,12 +41,5 @@ interface IYieldPeer {
         uint64 chainSelector; // chain selector of the chain the withdrawal originated from
     }
 
-    // @review can delete this, we're using the Strategy struct instead
-    // struct RebalanceData {
-    //     uint256 amount; // amount of funds to reallocate // @review do we need this if we have tokenAmounts?
-    //     uint64 newStrategyChainSelector; // chain selector to reallocate funds to
-    //     Protocol protocol; // protocol to reallocate funds to
-    // }
-
     function deposit(uint256 amountToDeposit) external;
 }

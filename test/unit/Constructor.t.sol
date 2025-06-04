@@ -6,32 +6,36 @@ import {IYieldPeer} from "../../src/interfaces/IYieldPeer.sol";
 
 contract ConstructorTest is BaseTest {
     function test_yield_parent_constructor() public view {
-        assertEq(arbParentPeer.getLink(), arbNetworkConfig.link);
-        assertEq(arbParentPeer.getThisChainSelector(), arbNetworkConfig.thisChainSelector);
-        assertEq(arbParentPeer.getUsdc(), arbNetworkConfig.usdc);
-        assertEq(arbParentPeer.getAavePoolAddressesProvider(), arbNetworkConfig.aavePoolAddressesProvider);
-        assertEq(arbParentPeer.getComet(), arbNetworkConfig.comet);
-        assertEq(arbParentPeer.getShare(), address(arbShare));
+        assertEq(baseParentPeer.getLink(), baseNetworkConfig.tokens.link);
+        assertEq(baseParentPeer.getThisChainSelector(), baseNetworkConfig.ccip.thisChainSelector);
+        assertEq(baseParentPeer.getUsdc(), baseNetworkConfig.tokens.usdc);
+        assertEq(baseParentPeer.getAavePoolAddressesProvider(), baseNetworkConfig.protocols.aavePoolAddressesProvider);
+        assertEq(baseParentPeer.getComet(), baseNetworkConfig.protocols.comet);
+        assertEq(baseParentPeer.getShare(), address(baseShare));
 
-        assertEq(uint8(arbParentPeer.getStrategy().protocol), uint8(IYieldPeer.Protocol.Aave));
-        assertEq(arbParentPeer.getStrategy().chainSelector, arbNetworkConfig.thisChainSelector);
+        assertEq(uint8(baseParentPeer.getStrategy().protocol), uint8(IYieldPeer.Protocol.Aave));
+        assertEq(baseParentPeer.getStrategy().chainSelector, baseNetworkConfig.ccip.thisChainSelector);
+
+        assertEq(baseParentPeer.getFunctionsRouter(), baseNetworkConfig.clf.functionsRouter);
+        assertEq(baseParentPeer.getDonId(), baseNetworkConfig.clf.donId);
+        assertEq(baseParentPeer.getClfSubId(), clfSubId);
     }
 
     function test_yield_child_constructor() public view {
-        assertEq(optChildPeer.getLink(), optNetworkConfig.link);
-        assertEq(optChildPeer.getThisChainSelector(), optNetworkConfig.thisChainSelector);
-        assertEq(optChildPeer.getUsdc(), optNetworkConfig.usdc);
-        assertEq(optChildPeer.getAavePoolAddressesProvider(), optNetworkConfig.aavePoolAddressesProvider);
-        assertEq(optChildPeer.getComet(), optNetworkConfig.comet);
+        assertEq(optChildPeer.getLink(), optNetworkConfig.tokens.link);
+        assertEq(optChildPeer.getThisChainSelector(), optNetworkConfig.ccip.thisChainSelector);
+        assertEq(optChildPeer.getUsdc(), optNetworkConfig.tokens.usdc);
+        assertEq(optChildPeer.getAavePoolAddressesProvider(), optNetworkConfig.protocols.aavePoolAddressesProvider);
+        assertEq(optChildPeer.getComet(), optNetworkConfig.protocols.comet);
         assertEq(optChildPeer.getShare(), address(optShare));
-        assertEq(optChildPeer.getParentChainSelector(), arbNetworkConfig.thisChainSelector);
+        assertEq(optChildPeer.getParentChainSelector(), baseNetworkConfig.ccip.thisChainSelector);
 
-        assertEq(ethChildPeer.getLink(), ethNetworkConfig.link);
-        assertEq(ethChildPeer.getThisChainSelector(), ethNetworkConfig.thisChainSelector);
-        assertEq(ethChildPeer.getUsdc(), ethNetworkConfig.usdc);
-        assertEq(ethChildPeer.getAavePoolAddressesProvider(), ethNetworkConfig.aavePoolAddressesProvider);
-        assertEq(ethChildPeer.getComet(), ethNetworkConfig.comet);
+        assertEq(ethChildPeer.getLink(), ethNetworkConfig.tokens.link);
+        assertEq(ethChildPeer.getThisChainSelector(), ethNetworkConfig.ccip.thisChainSelector);
+        assertEq(ethChildPeer.getUsdc(), ethNetworkConfig.tokens.usdc);
+        assertEq(ethChildPeer.getAavePoolAddressesProvider(), ethNetworkConfig.protocols.aavePoolAddressesProvider);
+        assertEq(ethChildPeer.getComet(), ethNetworkConfig.protocols.comet);
         assertEq(ethChildPeer.getShare(), address(ethShare));
-        assertEq(ethChildPeer.getParentChainSelector(), arbNetworkConfig.thisChainSelector);
+        assertEq(ethChildPeer.getParentChainSelector(), baseNetworkConfig.ccip.thisChainSelector);
     }
 }

@@ -165,13 +165,13 @@ contract ParentPeer is YieldPeer {
             bytes32 ccipMessageId = _ccipSend(
                 depositData.chainSelector, CcipTxType.DepositCallbackChild, abi.encode(depositData), ZERO_BRIDGE_AMOUNT
             );
-            // do something with ccipMessageId?
+            // @review do something with ccipMessageId?
         }
         /// @dev If Strategy is on third chain, forward deposit to strategy
         if (strategy.chainSelector != i_thisChainSelector && strategy.chainSelector != depositData.chainSelector) {
             bytes32 ccipMessageId =
                 _ccipSend(strategy.chainSelector, CcipTxType.DepositToStrategy, encodedDepositData, depositData.amount);
-            // do something with ccipMessageId?
+            // @review do something with ccipMessageId?
         }
     }
 

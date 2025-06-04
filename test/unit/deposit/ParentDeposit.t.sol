@@ -14,41 +14,41 @@ import {CCTPMessageTransmitterProxy} from
 contract ParentDepositTest is BaseTest {
     function setUp() public override {
         super.setUp();
-        /// @dev arbFork is the parent chain
-        _selectFork(arbFork);
-        deal(address(arbUsdc), depositor, DEPOSIT_AMOUNT);
+        /// @dev baseFork is the parent chain
+        _selectFork(baseFork);
+        deal(address(baseUsdc), depositor, DEPOSIT_AMOUNT);
         _changePrank(depositor);
-        arbUsdc.approve(address(arbParentPeer), DEPOSIT_AMOUNT);
+        baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
     }
 
     function test_yield_parent_deposit_revertsWhen_zeroAmount() public {
         vm.expectRevert(abi.encodeWithSignature("YieldPeer__NoZeroAmount()"));
-        arbParentPeer.deposit(0);
+        baseParentPeer.deposit(0);
     }
 
     /// @notice Scenario: Deposit made on Parent chain, where the Strategy is, and the Strategy Protocol is Aave
     function test_yield_parent_deposit_strategyIsParent_aave() public {
-        assertEq(arbShare.totalSupply(), 0);
+        assertEq(baseShare.totalSupply(), 0);
 
-        uint256 usdcBalanceBefore = arbUsdc.balanceOf(depositor);
+        uint256 usdcBalanceBefore = baseUsdc.balanceOf(depositor);
 
         /// @dev act
-        arbParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(DEPOSIT_AMOUNT);
 
         /// @dev assert depositor's USDC balance reduced by the deposit amount
-        uint256 usdcBalanceAfter = arbUsdc.balanceOf(depositor);
+        uint256 usdcBalanceAfter = baseUsdc.balanceOf(depositor);
         assertEq(usdcBalanceAfter, usdcBalanceBefore - DEPOSIT_AMOUNT);
 
         /// @dev assert correct amount of shares minted
         uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
-        assertEq(arbShare.totalSupply(), expectedShareMintAmount);
-        assertEq(arbShare.balanceOf(depositor), expectedShareMintAmount);
-        assertEq(arbParentPeer.getTotalShares(), expectedShareMintAmount);
+        assertEq(baseShare.totalSupply(), expectedShareMintAmount);
+        assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount);
+        assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
 
         /// @dev assert USDC was deposited to Aave
-        address aUsdc = _getATokenAddress(arbNetworkConfig.aavePoolAddressesProvider, address(arbUsdc));
+        address aUsdc = _getATokenAddress(baseNetworkConfig.protocols.aavePoolAddressesProvider, address(baseUsdc));
         assertApproxEqAbs(
-            IERC20(aUsdc).balanceOf(address(arbParentPeer)),
+            IERC20(aUsdc).balanceOf(address(baseParentPeer)),
             DEPOSIT_AMOUNT,
             BALANCE_TOLERANCE,
             "Aave balance should be approximately equal to deposit amount"
@@ -58,25 +58,25 @@ contract ParentDepositTest is BaseTest {
     /// @notice Scenario: Deposit made on Parent chain, where the Strategy is, and the Strategy Protocol is Compound
     function test_yield_parent_deposit_strategyIsParent_compound() public {
         // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
-        arbParentPeer.setStrategy(arbChainSelector, IYieldPeer.Protocol.Compound);
+        baseParentPeer.setStrategy(baseChainSelector, IYieldPeer.Protocol.Compound);
 
-        uint256 usdcBalanceBefore = arbUsdc.balanceOf(depositor);
+        uint256 usdcBalanceBefore = baseUsdc.balanceOf(depositor);
 
         /// @dev act
-        arbParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(DEPOSIT_AMOUNT);
 
         /// @dev assert depositor's USDC balance reduced by the deposit amount
-        uint256 usdcBalanceAfter = arbUsdc.balanceOf(depositor);
+        uint256 usdcBalanceAfter = baseUsdc.balanceOf(depositor);
         assertEq(usdcBalanceAfter, usdcBalanceBefore - DEPOSIT_AMOUNT);
 
         /// @dev assert correct amount of shares minted
         uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
-        assertEq(arbShare.totalSupply(), expectedShareMintAmount);
-        assertEq(arbShare.balanceOf(depositor), expectedShareMintAmount);
-        assertEq(arbParentPeer.getTotalShares(), expectedShareMintAmount);
+        assertEq(baseShare.totalSupply(), expectedShareMintAmount);
+        assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount);
+        assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
 
         /// @dev assert USDC was deposited to Compound
-        uint256 compoundBalance = IComet(arbNetworkConfig.comet).balanceOf(address(arbParentPeer));
+        uint256 compoundBalance = IComet(baseNetworkConfig.protocols.comet).balanceOf(address(baseParentPeer));
         assertApproxEqAbs(
             compoundBalance,
             DEPOSIT_AMOUNT,
@@ -87,7 +87,7 @@ contract ParentDepositTest is BaseTest {
         // @review this is not a strictly necessary test, it could be used as a sanity check elsewhere later
         /// @dev assert balance increases with time
         vm.warp(block.timestamp + 10 days);
-        assertGt(IComet(arbNetworkConfig.comet).balanceOf(address(arbParentPeer)), DEPOSIT_AMOUNT);
+        assertGt(IComet(baseNetworkConfig.protocols.comet).balanceOf(address(baseParentPeer)), DEPOSIT_AMOUNT);
     }
 
     /// @notice Scenario: Deposit made on Parent chain, where the Strategy is not, and the Strategy Protocol is Aave
@@ -95,23 +95,23 @@ contract ParentDepositTest is BaseTest {
         // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
         _selectFork(optFork);
         optChildPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
-        _selectFork(arbFork);
-        arbParentPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
+        _selectFork(baseFork);
+        baseParentPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
 
-        uint256 usdcBalanceBefore = arbUsdc.balanceOf(depositor);
+        uint256 usdcBalanceBefore = baseUsdc.balanceOf(depositor);
 
         /// @dev act
-        arbParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(DEPOSIT_AMOUNT);
 
         /// @dev assert depositor's USDC balance reduced by the deposit amount on parent chain
-        uint256 usdcBalanceAfter = arbUsdc.balanceOf(depositor);
+        uint256 usdcBalanceAfter = baseUsdc.balanceOf(depositor);
         assertEq(usdcBalanceAfter, usdcBalanceBefore - DEPOSIT_AMOUNT);
 
         /// @dev switch to child chain and route ccip message with USDC to deposit to strategy
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
 
         /// @dev assert USDC was deposited to Aave on child chain
-        address aUsdc = _getATokenAddress(optNetworkConfig.aavePoolAddressesProvider, address(optUsdc));
+        address aUsdc = _getATokenAddress(optNetworkConfig.protocols.aavePoolAddressesProvider, address(optUsdc));
         assertApproxEqAbs(
             IERC20(aUsdc).balanceOf(address(optChildPeer)),
             DEPOSIT_AMOUNT,
@@ -120,13 +120,13 @@ contract ParentDepositTest is BaseTest {
         );
 
         /// @dev switch back to parent chain and route ccip message with totalValue to calculate shareMintAmount
-        ccipLocalSimulatorFork.switchChainAndRouteMessage(arbFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
 
         /// @dev assert correct amount of shares minted
         uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
-        assertEq(arbShare.totalSupply(), expectedShareMintAmount);
-        assertEq(arbShare.balanceOf(depositor), expectedShareMintAmount);
-        assertEq(arbParentPeer.getTotalShares(), expectedShareMintAmount);
+        assertEq(baseShare.totalSupply(), expectedShareMintAmount);
+        assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount);
+        assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
     }
 
     /// @notice Scenario: Deposit made on Parent chain, where the Strategy is not, and the Strategy Protocol is Compound
@@ -134,23 +134,23 @@ contract ParentDepositTest is BaseTest {
         // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
         _selectFork(optFork);
         optChildPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Compound);
-        _selectFork(arbFork);
-        arbParentPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Compound);
+        _selectFork(baseFork);
+        baseParentPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Compound);
 
-        uint256 usdcBalanceBefore = arbUsdc.balanceOf(depositor);
+        uint256 usdcBalanceBefore = baseUsdc.balanceOf(depositor);
 
         /// @dev act
-        arbParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(DEPOSIT_AMOUNT);
 
         /// @dev assert depositor's USDC balance reduced by the deposit amount on parent chain
-        uint256 usdcBalanceAfter = arbUsdc.balanceOf(depositor);
+        uint256 usdcBalanceAfter = baseUsdc.balanceOf(depositor);
         assertEq(usdcBalanceAfter, usdcBalanceBefore - DEPOSIT_AMOUNT);
 
         /// @dev switch to child chain and route ccip message with USDC to deposit to strategy
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
 
         /// @dev assert USDC was deposited to Compound on child chain
-        uint256 compoundBalance = IComet(optNetworkConfig.comet).balanceOf(address(optChildPeer));
+        uint256 compoundBalance = IComet(optNetworkConfig.protocols.comet).balanceOf(address(optChildPeer));
         assertApproxEqAbs(
             compoundBalance,
             DEPOSIT_AMOUNT,
@@ -159,12 +159,12 @@ contract ParentDepositTest is BaseTest {
         );
 
         /// @dev switch back to parent chain and route ccip message with totalValue to calculate shareMintAmount
-        ccipLocalSimulatorFork.switchChainAndRouteMessage(arbFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
 
         /// @dev assert correct amount of shares minted
         uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
-        assertEq(arbShare.totalSupply(), expectedShareMintAmount);
-        assertEq(arbShare.balanceOf(depositor), expectedShareMintAmount);
-        assertEq(arbParentPeer.getTotalShares(), expectedShareMintAmount);
+        assertEq(baseShare.totalSupply(), expectedShareMintAmount);
+        assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount);
+        assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
     }
 }

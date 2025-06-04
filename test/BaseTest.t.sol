@@ -6,10 +6,11 @@ import {Test, console2, Vm} from "forge-std/Test.sol";
 import {ERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {CCIPLocalSimulatorFork, Register} from "@chainlink-local/src/ccip/CCIPLocalSimulatorFork.sol";
 
-import {DeployParent, HelperConfig, ParentPeer} from "../script/deploy/DeployParent.s.sol";
+import {DeployParent, HelperConfig, ParentCLF} from "../script/deploy/DeployParent.s.sol";
 import {DeployChild, ChildPeer} from "../script/deploy/DeployChild.s.sol";
 import {Share} from "../src/token/Share.sol";
 import {SharePool} from "../src/token/SharePool.sol";
@@ -19,6 +20,11 @@ import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAd
 import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
 import {DataTypes} from "@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol";
 import {USDCTokenPool} from "@chainlink/contracts/src/v0.8/ccip/pools/USDC/USDCTokenPool.sol";
+import {IFunctionsSubscriptions} from
+    "@chainlink/contracts/src/v0.8/functions/v1_0_0/interfaces/IFunctionsSubscriptions.sol";
+import {IFunctionsRouter} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/interfaces/IFunctionsRouter.sol";
+import {FunctionsClient} from "@chainlink/contracts/src/v0.8/functions/v1_3_0/FunctionsClient.sol";
+import {LinkTokenInterface} from "@chainlink/contracts/src/v0.8/shared/interfaces/LinkTokenInterface.sol";
 import {IMessageTransmitter} from "../src/interfaces/IMessageTransmitter.sol";
 import {IYieldPeer} from "../src/interfaces/IYieldPeer.sol";
 import {IComet} from "../src/interfaces/IComet.sol";
@@ -35,9 +41,9 @@ contract BaseTest is Test {
     uint256 internal constant LINK_AMOUNT = 1_000 * 1e18; // 1000 LINK
     uint256 internal constant INITIAL_CCIP_GAS_LIMIT = 500_000;
 
-    string internal constant ARBITRUM_MAINNET_RPC_URL = "https://arb1.arbitrum.io/rpc";
-    uint256 internal constant ARBITRUM_MAINNET_CHAIN_ID = 42161;
-    uint256 internal arbFork;
+    string internal constant BASE_MAINNET_RPC_URL = "https://mainnet.base.org";
+    uint256 internal constant BASE_MAINNET_CHAIN_ID = 8453;
+    uint256 internal baseFork;
 
     string internal constant OPTIMISM_MAINNET_RPC_URL = "https://mainnet.optimism.io";
     uint256 internal constant OPTIMISM_MAINNET_CHAIN_ID = 10;
@@ -46,15 +52,17 @@ contract BaseTest is Test {
     uint256 internal constant ETHEREUM_MAINNET_CHAIN_ID = 1;
     uint256 internal ethFork;
 
-    Share internal arbShare;
-    SharePool internal arbSharePool;
-    ParentPeer internal arbParentPeer;
-    HelperConfig internal arbConfig;
-    HelperConfig.NetworkConfig internal arbNetworkConfig;
-    uint64 internal arbChainSelector;
-    ERC20 internal arbUsdc;
-    USDCTokenPool internal arbUsdcTokenPool;
-    IMessageTransmitter internal arbCCTPMessageTransmitter;
+    uint64 internal clfSubId;
+
+    Share internal baseShare;
+    SharePool internal baseSharePool;
+    ParentCLF internal baseParentPeer;
+    HelperConfig internal baseConfig;
+    HelperConfig.NetworkConfig internal baseNetworkConfig;
+    uint64 internal baseChainSelector;
+    ERC20 internal baseUsdc;
+    USDCTokenPool internal baseUsdcTokenPool;
+    IMessageTransmitter internal baseCCTPMessageTransmitter;
 
     Share internal optShare;
     SharePool internal optSharePool;
@@ -79,6 +87,7 @@ contract BaseTest is Test {
     address internal owner = makeAddr("owner");
     address internal depositor = makeAddr("depositor");
     address internal withdrawer = makeAddr("withdrawer");
+    address internal upkeepAddress = makeAddr("upkeepAddress");
     address[] internal attesters = new address[](4);
     address internal cctpAttester1;
     address internal cctpAttester2;
@@ -99,31 +108,43 @@ contract BaseTest is Test {
         _setCrossChainPeers();
         _dealLinkToPeers();
 
-        for (uint256 i = 0; i < attesters.length; i++) {
-            (attesters[i], attesterPks[i]) = makeAddrAndKey(string.concat("attester", vm.toString(i)));
-        }
         _setCCTPAttesters();
         _setDomains();
 
+        _setUpAutomationAndFunctions();
+
+        /// @dev sanity check that we're ending BaseTest.setUp() on the Parent chain
+        assertEq(block.chainid, BASE_MAINNET_CHAIN_ID);
+        _stopPrank();
+    }
+
+    /// @notice Chainlink Functions requires signing Terms of Service - we can bypass this in our fork tests by pranking the FunctionsRouter contract owner and setting the allowListId for the TermsOfServiceAllowList contract to map to address(0)
+    function _bypassClfTermsOfService() internal {
+        HelperConfig config = new HelperConfig();
+        address functionsRouter = config.getActiveNetworkConfig().clf.functionsRouter;
+        _changePrank(Ownable(functionsRouter).owner());
+        IFunctionsRouter(functionsRouter).setAllowListId("");
         _stopPrank();
     }
 
     function _deployInfra() internal {
-        // Deploy on Arbitrum
-        arbFork = vm.createSelectFork(ARBITRUM_MAINNET_RPC_URL);
-        assertEq(block.chainid, ARBITRUM_MAINNET_CHAIN_ID);
+        // Deploy on Base
+        baseFork = vm.createSelectFork(BASE_MAINNET_RPC_URL);
+        assertEq(block.chainid, BASE_MAINNET_CHAIN_ID);
 
-        DeployParent arbDeployParent = new DeployParent();
-        (arbShare, arbSharePool, arbParentPeer, arbConfig) = arbDeployParent.run();
-        vm.makePersistent(address(arbShare));
-        vm.makePersistent(address(arbSharePool));
-        vm.makePersistent(address(arbParentPeer));
+        _bypassClfTermsOfService();
 
-        arbNetworkConfig = arbConfig.getActiveNetworkConfig();
-        arbChainSelector = arbNetworkConfig.thisChainSelector;
-        arbUsdc = ERC20(arbNetworkConfig.usdc);
-        arbUsdcTokenPool = USDCTokenPool(arbNetworkConfig.usdcTokenPool);
-        arbCCTPMessageTransmitter = IMessageTransmitter(arbNetworkConfig.cctpMessageTransmitter);
+        DeployParent baseDeployParent = new DeployParent();
+        (baseShare, baseSharePool, baseParentPeer, baseConfig, clfSubId) = baseDeployParent.run();
+        vm.makePersistent(address(baseShare));
+        vm.makePersistent(address(baseSharePool));
+        vm.makePersistent(address(baseParentPeer));
+
+        baseNetworkConfig = baseConfig.getActiveNetworkConfig();
+        baseChainSelector = baseNetworkConfig.ccip.thisChainSelector;
+        baseUsdc = ERC20(baseNetworkConfig.tokens.usdc);
+        baseUsdcTokenPool = USDCTokenPool(baseNetworkConfig.ccip.usdcTokenPool);
+        baseCCTPMessageTransmitter = IMessageTransmitter(baseNetworkConfig.ccip.cctpMessageTransmitter);
 
         // Deploy on Optimism
         optFork = vm.createSelectFork(OPTIMISM_MAINNET_RPC_URL);
@@ -136,10 +157,10 @@ contract BaseTest is Test {
         vm.makePersistent(address(optChildPeer));
 
         optNetworkConfig = optConfig.getActiveNetworkConfig();
-        optChainSelector = optNetworkConfig.thisChainSelector;
-        optUsdc = ERC20(optNetworkConfig.usdc);
-        optUsdcTokenPool = USDCTokenPool(optNetworkConfig.usdcTokenPool);
-        optCCTPMessageTransmitter = IMessageTransmitter(optNetworkConfig.cctpMessageTransmitter);
+        optChainSelector = optNetworkConfig.ccip.thisChainSelector;
+        optUsdc = ERC20(optNetworkConfig.tokens.usdc);
+        optUsdcTokenPool = USDCTokenPool(optNetworkConfig.ccip.usdcTokenPool);
+        optCCTPMessageTransmitter = IMessageTransmitter(optNetworkConfig.ccip.cctpMessageTransmitter);
 
         // Deploy on Ethereum
         ethFork = vm.createSelectFork(vm.envString("ETH_MAINNET_RPC_URL"));
@@ -152,10 +173,10 @@ contract BaseTest is Test {
         vm.makePersistent(address(ethChildPeer));
 
         ethNetworkConfig = ethConfig.getActiveNetworkConfig();
-        ethChainSelector = ethNetworkConfig.thisChainSelector;
-        ethUsdc = ERC20(ethNetworkConfig.usdc);
-        ethUsdcTokenPool = USDCTokenPool(ethNetworkConfig.usdcTokenPool);
-        ethCCTPMessageTransmitter = IMessageTransmitter(ethNetworkConfig.cctpMessageTransmitter);
+        ethChainSelector = ethNetworkConfig.ccip.thisChainSelector;
+        ethUsdc = ERC20(ethNetworkConfig.tokens.usdc);
+        ethUsdcTokenPool = USDCTokenPool(ethNetworkConfig.ccip.usdcTokenPool);
+        ethCCTPMessageTransmitter = IMessageTransmitter(ethNetworkConfig.ccip.cctpMessageTransmitter);
 
         ccipLocalSimulatorFork = new CCIPLocalSimulatorFork();
         vm.makePersistent(address(ccipLocalSimulatorFork));
@@ -167,84 +188,84 @@ contract BaseTest is Test {
         address[] memory remotePools = new address[](2);
         address[] memory remoteTokens = new address[](2);
 
-        // Set up Arbitrum's pool to know about Optimism and Ethereum
-        _selectFork(arbFork);
+        // Set up Base's pool to know about Optimism and Ethereum
+        _selectFork(baseFork);
         remoteChains[0] = optChainSelector;
         remoteChains[1] = ethChainSelector;
         remotePools[0] = address(optChildPeer);
         remotePools[1] = address(ethChildPeer);
         remoteTokens[0] = address(optShare);
         remoteTokens[1] = address(ethShare);
-        _applyChainUpdates(arbSharePool, remoteChains, remotePools, remoteTokens);
-        _assertArraysEqual(arbSharePool.getSupportedChains(), remoteChains);
-        assertEq(arbSharePool.isRemotePool(optChainSelector, abi.encode(address(optChildPeer))), true);
-        assertEq(arbSharePool.isRemotePool(ethChainSelector, abi.encode(address(ethChildPeer))), true);
-        assertEq(arbSharePool.getRemoteToken(optChainSelector), abi.encode(address(optShare)));
-        assertEq(arbSharePool.getRemoteToken(ethChainSelector), abi.encode(address(ethShare)));
+        _applyChainUpdates(baseSharePool, remoteChains, remotePools, remoteTokens);
+        _assertArraysEqual(baseSharePool.getSupportedChains(), remoteChains);
+        assertEq(baseSharePool.isRemotePool(optChainSelector, abi.encode(address(optChildPeer))), true);
+        assertEq(baseSharePool.isRemotePool(ethChainSelector, abi.encode(address(ethChildPeer))), true);
+        assertEq(baseSharePool.getRemoteToken(optChainSelector), abi.encode(address(optShare)));
+        assertEq(baseSharePool.getRemoteToken(ethChainSelector), abi.encode(address(ethShare)));
 
-        // Set up Optimism's pool to know about Arbitrum and Ethereum
+        // Set up Optimism's pool to know about Base and Ethereum
         _selectFork(optFork);
-        remoteChains[0] = arbChainSelector;
+        remoteChains[0] = baseChainSelector;
         remoteChains[1] = ethChainSelector;
-        remotePools[0] = address(arbParentPeer);
+        remotePools[0] = address(baseParentPeer);
         remotePools[1] = address(ethChildPeer);
-        remoteTokens[0] = address(arbShare);
+        remoteTokens[0] = address(baseShare);
         remoteTokens[1] = address(ethShare);
         _applyChainUpdates(optSharePool, remoteChains, remotePools, remoteTokens);
         _assertArraysEqual(optSharePool.getSupportedChains(), remoteChains);
-        assertEq(optSharePool.isRemotePool(arbChainSelector, abi.encode(address(arbParentPeer))), true);
+        assertEq(optSharePool.isRemotePool(baseChainSelector, abi.encode(address(baseParentPeer))), true);
         assertEq(optSharePool.isRemotePool(ethChainSelector, abi.encode(address(ethChildPeer))), true);
-        assertEq(optSharePool.getRemoteToken(arbChainSelector), abi.encode(address(arbShare)));
+        assertEq(optSharePool.getRemoteToken(baseChainSelector), abi.encode(address(baseShare)));
         assertEq(optSharePool.getRemoteToken(ethChainSelector), abi.encode(address(ethShare)));
 
-        // Set up Ethereum's pool to know about Arbitrum and Optimism
+        // Set up Ethereum's pool to know about Base and Optimism
         _selectFork(ethFork);
-        remoteChains[0] = arbChainSelector;
+        remoteChains[0] = baseChainSelector;
         remoteChains[1] = optChainSelector;
-        remotePools[0] = address(arbParentPeer);
+        remotePools[0] = address(baseParentPeer);
         remotePools[1] = address(optChildPeer);
-        remoteTokens[0] = address(arbShare);
+        remoteTokens[0] = address(baseShare);
         remoteTokens[1] = address(optShare);
         _applyChainUpdates(ethSharePool, remoteChains, remotePools, remoteTokens);
         _assertArraysEqual(ethSharePool.getSupportedChains(), remoteChains);
-        assertEq(ethSharePool.isRemotePool(arbChainSelector, abi.encode(address(arbParentPeer))), true);
+        assertEq(ethSharePool.isRemotePool(baseChainSelector, abi.encode(address(baseParentPeer))), true);
         assertEq(ethSharePool.isRemotePool(optChainSelector, abi.encode(address(optChildPeer))), true);
-        assertEq(ethSharePool.getRemoteToken(arbChainSelector), abi.encode(address(arbShare)));
+        assertEq(ethSharePool.getRemoteToken(baseChainSelector), abi.encode(address(baseShare)));
         assertEq(ethSharePool.getRemoteToken(optChainSelector), abi.encode(address(optShare)));
     }
 
     function _setCrossChainPeers() internal {
-        _selectFork(arbFork);
-        arbParentPeer.setCCIPGasLimit(INITIAL_CCIP_GAS_LIMIT);
-        arbParentPeer.setAllowedChain(optChainSelector, true);
-        arbParentPeer.setAllowedChain(ethChainSelector, true);
-        arbParentPeer.setAllowedPeer(optChainSelector, address(optChildPeer));
-        arbParentPeer.setAllowedPeer(ethChainSelector, address(ethChildPeer));
-        assertEq(arbParentPeer.getAllowedChain(optChainSelector), true);
-        assertEq(arbParentPeer.getAllowedChain(ethChainSelector), true);
-        assertEq(arbParentPeer.getAllowedPeer(optChainSelector), address(optChildPeer));
-        assertEq(arbParentPeer.getAllowedPeer(ethChainSelector), address(ethChildPeer));
+        _selectFork(baseFork);
+        baseParentPeer.setCCIPGasLimit(INITIAL_CCIP_GAS_LIMIT);
+        baseParentPeer.setAllowedChain(optChainSelector, true);
+        baseParentPeer.setAllowedChain(ethChainSelector, true);
+        baseParentPeer.setAllowedPeer(optChainSelector, address(optChildPeer));
+        baseParentPeer.setAllowedPeer(ethChainSelector, address(ethChildPeer));
+        assertEq(baseParentPeer.getAllowedChain(optChainSelector), true);
+        assertEq(baseParentPeer.getAllowedChain(ethChainSelector), true);
+        assertEq(baseParentPeer.getAllowedPeer(optChainSelector), address(optChildPeer));
+        assertEq(baseParentPeer.getAllowedPeer(ethChainSelector), address(ethChildPeer));
 
         _selectFork(optFork);
         optChildPeer.setCCIPGasLimit(INITIAL_CCIP_GAS_LIMIT);
-        optChildPeer.setAllowedChain(arbChainSelector, true);
+        optChildPeer.setAllowedChain(baseChainSelector, true);
         optChildPeer.setAllowedChain(ethChainSelector, true);
-        optChildPeer.setAllowedPeer(arbChainSelector, address(arbParentPeer));
+        optChildPeer.setAllowedPeer(baseChainSelector, address(baseParentPeer));
         optChildPeer.setAllowedPeer(ethChainSelector, address(ethChildPeer));
-        assertEq(optChildPeer.getAllowedChain(arbChainSelector), true);
+        assertEq(optChildPeer.getAllowedChain(baseChainSelector), true);
         assertEq(optChildPeer.getAllowedChain(ethChainSelector), true);
-        assertEq(optChildPeer.getAllowedPeer(arbChainSelector), address(arbParentPeer));
+        assertEq(optChildPeer.getAllowedPeer(baseChainSelector), address(baseParentPeer));
         assertEq(optChildPeer.getAllowedPeer(ethChainSelector), address(ethChildPeer));
 
         _selectFork(ethFork);
         ethChildPeer.setCCIPGasLimit(INITIAL_CCIP_GAS_LIMIT);
-        ethChildPeer.setAllowedChain(arbChainSelector, true);
+        ethChildPeer.setAllowedChain(baseChainSelector, true);
         ethChildPeer.setAllowedChain(optChainSelector, true);
-        ethChildPeer.setAllowedPeer(arbChainSelector, address(arbParentPeer));
+        ethChildPeer.setAllowedPeer(baseChainSelector, address(baseParentPeer));
         ethChildPeer.setAllowedPeer(optChainSelector, address(optChildPeer));
-        assertEq(ethChildPeer.getAllowedChain(arbChainSelector), true);
+        assertEq(ethChildPeer.getAllowedChain(baseChainSelector), true);
         assertEq(ethChildPeer.getAllowedChain(optChainSelector), true);
-        assertEq(ethChildPeer.getAllowedPeer(arbChainSelector), address(arbParentPeer));
+        assertEq(ethChildPeer.getAllowedPeer(baseChainSelector), address(baseParentPeer));
         assertEq(ethChildPeer.getAllowedPeer(optChainSelector), address(optChildPeer));
     }
 
@@ -277,8 +298,8 @@ contract BaseTest is Test {
     }
 
     function _dealLinkToPeers() internal {
-        _selectFork(arbFork);
-        deal(arbParentPeer.getLink(), address(arbParentPeer), LINK_AMOUNT);
+        _selectFork(baseFork);
+        deal(baseParentPeer.getLink(), address(baseParentPeer), LINK_AMOUNT);
 
         _selectFork(optFork);
         deal(optChildPeer.getLink(), address(optChildPeer), LINK_AMOUNT);
@@ -290,47 +311,47 @@ contract BaseTest is Test {
     function _registerChains() internal {
         // Set up Optimism network details using values from HelperConfig
         Register.NetworkDetails memory optimismDetails = Register.NetworkDetails({
-            chainSelector: optChainSelector, // From HelperConfig
-            routerAddress: optNetworkConfig.ccipRouter, // From HelperConfig
-            linkAddress: optNetworkConfig.link, // From HelperConfig
-            wrappedNativeAddress: address(0), // Not needed for testing
-            ccipBnMAddress: address(0), // Not needed for testing
-            ccipLnMAddress: address(0), // Not needed for testing
-            rmnProxyAddress: address(0), // Not needed for testing
-            registryModuleOwnerCustomAddress: address(0), // Not needed for testing
-            tokenAdminRegistryAddress: address(0) // Not needed for testing
+            chainSelector: optChainSelector,
+            routerAddress: optNetworkConfig.ccip.ccipRouter,
+            linkAddress: optNetworkConfig.tokens.link,
+            wrappedNativeAddress: address(0),
+            ccipBnMAddress: address(0),
+            ccipLnMAddress: address(0),
+            rmnProxyAddress: address(0),
+            registryModuleOwnerCustomAddress: address(0),
+            tokenAdminRegistryAddress: address(0)
         });
 
         // Set the network details for Optimism
         ccipLocalSimulatorFork.setNetworkDetails(OPTIMISM_MAINNET_CHAIN_ID, optimismDetails);
 
-        // Set up Arbitrum network details using values from HelperConfig
-        Register.NetworkDetails memory arbitrumDetails = Register.NetworkDetails({
-            chainSelector: arbChainSelector, // From HelperConfig
-            routerAddress: arbNetworkConfig.ccipRouter, // From HelperConfig
-            linkAddress: arbNetworkConfig.link, // From HelperConfig
-            wrappedNativeAddress: address(0), // Not needed for testing
-            ccipBnMAddress: address(0), // Not needed for testing
-            ccipLnMAddress: address(0), // Not needed for testing
-            rmnProxyAddress: address(0), // Not needed for testing
-            registryModuleOwnerCustomAddress: address(0), // Not needed for testing
-            tokenAdminRegistryAddress: address(0) // Not needed for testing
+        // Set up Base network details using values from HelperConfig
+        Register.NetworkDetails memory baseDetails = Register.NetworkDetails({
+            chainSelector: baseChainSelector,
+            routerAddress: baseNetworkConfig.ccip.ccipRouter,
+            linkAddress: baseNetworkConfig.tokens.link,
+            wrappedNativeAddress: address(0),
+            ccipBnMAddress: address(0),
+            ccipLnMAddress: address(0),
+            rmnProxyAddress: address(0),
+            registryModuleOwnerCustomAddress: address(0),
+            tokenAdminRegistryAddress: address(0)
         });
 
-        // Set the network details for Arbitrum
-        ccipLocalSimulatorFork.setNetworkDetails(ARBITRUM_MAINNET_CHAIN_ID, arbitrumDetails);
+        // Set the network details for Base
+        ccipLocalSimulatorFork.setNetworkDetails(BASE_MAINNET_CHAIN_ID, baseDetails);
 
         // Set up Ethereum network details using values from HelperConfig
         Register.NetworkDetails memory ethereumDetails = Register.NetworkDetails({
-            chainSelector: ethChainSelector, // From HelperConfig
-            routerAddress: ethNetworkConfig.ccipRouter, // From HelperConfig
-            linkAddress: ethNetworkConfig.link, // From HelperConfig
-            wrappedNativeAddress: address(0), // Not needed for testing
-            ccipBnMAddress: address(0), // Not needed for testing
-            ccipLnMAddress: address(0), // Not needed for testing
-            rmnProxyAddress: address(0), // Not needed for testing
-            registryModuleOwnerCustomAddress: address(0), // Not needed for testing
-            tokenAdminRegistryAddress: address(0) // Not needed for testing
+            chainSelector: ethChainSelector,
+            routerAddress: ethNetworkConfig.ccip.ccipRouter,
+            linkAddress: ethNetworkConfig.tokens.link,
+            wrappedNativeAddress: address(0),
+            ccipBnMAddress: address(0),
+            ccipLnMAddress: address(0),
+            rmnProxyAddress: address(0),
+            registryModuleOwnerCustomAddress: address(0),
+            tokenAdminRegistryAddress: address(0)
         });
 
         // Set the network details for Ethereum
@@ -338,14 +359,18 @@ contract BaseTest is Test {
     }
 
     function _setCCTPAttesters() internal {
-        _selectFork(arbFork);
-        _changePrank(arbCCTPMessageTransmitter.owner());
-        arbCCTPMessageTransmitter.updateAttesterManager(attesters[0]);
+        for (uint256 i = 0; i < attesters.length; i++) {
+            (attesters[i], attesterPks[i]) = makeAddrAndKey(string.concat("attester", vm.toString(i)));
+        }
+
+        _selectFork(baseFork);
+        _changePrank(baseCCTPMessageTransmitter.owner());
+        baseCCTPMessageTransmitter.updateAttesterManager(attesters[0]);
         _changePrank(attesters[0]);
         for (uint256 i = 0; i < attesters.length; i++) {
-            arbCCTPMessageTransmitter.enableAttester(attesters[i]);
+            baseCCTPMessageTransmitter.enableAttester(attesters[i]);
         }
-        arbCCTPMessageTransmitter.setSignatureThreshold(attesters.length);
+        baseCCTPMessageTransmitter.setSignatureThreshold(attesters.length);
 
         _selectFork(optFork);
         _changePrank(optCCTPMessageTransmitter.owner());
@@ -384,14 +409,15 @@ contract BaseTest is Test {
             enabled: true
         });
         domains[2] = USDCTokenPool.DomainUpdate({
-            allowedCaller: bytes32(uint256(uint160(address(arbUsdcTokenPool)))),
-            domainIdentifier: 3,
-            destChainSelector: arbChainSelector,
+            allowedCaller: bytes32(uint256(uint160(address(baseUsdcTokenPool)))),
+            domainIdentifier: 6,
+            destChainSelector: baseChainSelector,
             enabled: true
         });
-        _selectFork(arbFork);
-        _changePrank(arbUsdcTokenPool.owner());
-        arbUsdcTokenPool.setDomains(domains);
+
+        _selectFork(baseFork);
+        _changePrank(baseUsdcTokenPool.owner());
+        baseUsdcTokenPool.setDomains(domains);
         _selectFork(optFork);
         _changePrank(optUsdcTokenPool.owner());
         optUsdcTokenPool.setDomains(domains);
@@ -401,38 +427,23 @@ contract BaseTest is Test {
         _stopPrank();
     }
 
-    // function _configureCCTPAllowedCallers() internal {
-    //     // Configure Arbitrum's CCTP Message Transmitter Proxy
-    //     _selectFork(arbFork);
-    //     _changePrank(arbCCTPMessageTransmitterProxy.owner());
-    //     CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[] memory allowedCallerParams =
-    //         new CCTPMessageTransmitterProxy.AllowedCallerConfigArgs[](1);
-    //     allowedCallerParams[0] =
-    //         CCTPMessageTransmitterProxy.AllowedCallerConfigArgs({caller: address(arbUsdcTokenPool), allowed: true});
-    //     CCTPMessageTransmitterProxy(address(arbCCTPMessageTransmitterProxy)).configureAllowedCallers(
-    //         allowedCallerParams
-    //     );
+    function _setUpAutomationAndFunctions() internal {
+        _selectFork(baseFork);
 
-    //     // Configure Optimism's CCTP Message Transmitter Proxy
-    //     _selectFork(optFork);
-    //     _changePrank(optCCTPMessageTransmitterProxy.owner());
-    //     allowedCallerParams[0] =
-    //         CCTPMessageTransmitterProxy.AllowedCallerConfigArgs({caller: address(optUsdcTokenPool), allowed: true});
-    //     CCTPMessageTransmitterProxy(address(optCCTPMessageTransmitterProxy)).configureAllowedCallers(
-    //         allowedCallerParams
-    //     );
+        /// @dev set upkeepAddress
+        address parentPeerOwner = baseParentPeer.owner();
+        _changePrank(parentPeerOwner);
+        baseParentPeer.setUpkeepAddress(upkeepAddress);
+        baseParentPeer.setNumberOfProtocols(1); // 0 is Aave, 1 is Compound
 
-    //     // Configure Ethereum's CCTP Message Transmitter Proxy
-    //     _selectFork(ethFork);
-    //     _changePrank(ethCCTPMessageTransmitterProxy.owner());
-    //     allowedCallerParams[0] =
-    //         CCTPMessageTransmitterProxy.AllowedCallerConfigArgs({caller: address(ethUsdcTokenPool), allowed: true});
-    //     CCTPMessageTransmitterProxy(address(ethCCTPMessageTransmitterProxy)).configureAllowedCallers(
-    //         allowedCallerParams
-    //     );
+        /// @dev add ParentPeer as consumer to Chainlink Functions subscription
+        address functionsRouter = baseNetworkConfig.clf.functionsRouter;
+        IFunctionsSubscriptions(functionsRouter).addConsumer(clfSubId, address(baseParentPeer));
 
-    //     _stopPrank();
-    // }
+        /// @dev fund Chainlink Functions subscription
+        deal(baseParentPeer.getLink(), parentPeerOwner, LINK_AMOUNT);
+        LinkTokenInterface(baseParentPeer.getLink()).transferAndCall(functionsRouter, LINK_AMOUNT, abi.encode(clfSubId));
+    }
 
     function test_baseTest() public {}
 
@@ -467,5 +478,15 @@ contract BaseTest is Test {
         address aavePool = IPoolAddressesProvider(poolAddressesProvider).getPool();
         DataTypes.ReserveData memory reserveData = IPool(aavePool).getReserveData(underlyingToken);
         return reserveData.aTokenAddress;
+    }
+
+    /// @notice Helper function to fulfill a Chainlink Functions request
+    /// @param requestId The ID of the request to fulfill
+    /// @param response The response to the request
+    /// @param err The error message to return if the request fails
+    function _fulfillRequest(bytes32 requestId, bytes memory response, bytes memory err) internal {
+        _changePrank(baseNetworkConfig.clf.functionsRouter);
+        FunctionsClient(address(baseParentPeer)).handleOracleFulfillment(requestId, response, err);
+        _stopPrank();
     }
 }

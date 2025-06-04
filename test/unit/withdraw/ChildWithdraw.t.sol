@@ -18,7 +18,7 @@ contract ChildWithdrawTest is BaseTest {
     function test_yield_child_onTokenTransfer_revertsWhen_notShare() public {
         /// @dev arrange
         optChildPeer.deposit(DEPOSIT_AMOUNT);
-        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(arbFork, attesters, attesterPks);
+        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
         /// @dev act and assert
@@ -29,21 +29,21 @@ contract ChildWithdrawTest is BaseTest {
     // Scenario: Strategy is on the same chain as the child the withdrawal was initiated. Strategy is Aave.
     function test_yield_child_withdraw_strategyIsChild_aave() public {
         // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
-        _selectFork(arbFork);
-        arbParentPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
+        _selectFork(baseFork);
+        baseParentPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
         _selectFork(optFork);
         optChildPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
 
         /// @dev arrange
         optChildPeer.deposit(DEPOSIT_AMOUNT);
-        ccipLocalSimulatorFork.switchChainAndRouteMessage(arbFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
         uint256 expectedShareBalance = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
 
         /// @dev act
         optShare.transferAndCall(address(optChildPeer), expectedShareBalance, "");
-        ccipLocalSimulatorFork.switchChainAndRouteMessage(arbFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
         /// @dev assert
@@ -60,21 +60,21 @@ contract ChildWithdrawTest is BaseTest {
     // Scenario: Strategy is on the same chain as the child the withdrawal was initiated. Strategy is Compound.
     function test_yield_child_withdraw_strategyIsChild_compound() public {
         // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
-        _selectFork(arbFork);
-        arbParentPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Compound);
+        _selectFork(baseFork);
+        baseParentPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Compound);
         _selectFork(optFork);
         optChildPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Compound);
 
         /// @dev arrange
         optChildPeer.deposit(DEPOSIT_AMOUNT);
-        ccipLocalSimulatorFork.switchChainAndRouteMessage(arbFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
         uint256 expectedShareBalance = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
 
         /// @dev act
         optShare.transferAndCall(address(optChildPeer), expectedShareBalance, "");
-        ccipLocalSimulatorFork.switchChainAndRouteMessage(arbFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
         /// @dev assert
@@ -91,18 +91,18 @@ contract ChildWithdrawTest is BaseTest {
     /// @notice Scenario: Withdrawal is initiated from a child chain, Strategy chain is Parent chain, Strategy Protocol is Aave.
     function test_yield_child_withdraw_strategyIsParent_aave() public {
         // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
-        optChildPeer.setStrategy(arbChainSelector, IYieldPeer.Protocol.Aave);
+        optChildPeer.setStrategy(baseChainSelector, IYieldPeer.Protocol.Aave);
 
         /// @dev arrange
         optChildPeer.deposit(DEPOSIT_AMOUNT);
-        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(arbFork, attesters, attesterPks);
+        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
         uint256 expectedShareBalance = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
 
         /// @dev act
         optShare.transferAndCall(address(optChildPeer), expectedShareBalance, "");
-        ccipLocalSimulatorFork.switchChainAndRouteMessage(arbFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
 
         /// @dev assert
@@ -119,21 +119,21 @@ contract ChildWithdrawTest is BaseTest {
     /// @notice Scenario: Withdrawal is initiated from a child chain, Strategy chain is Parent chain, Strategy Protocol is Compound.
     function test_yield_child_withdraw_strategyIsParent_compound() public {
         // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
-        _selectFork(arbFork);
-        arbParentPeer.setStrategy(arbChainSelector, IYieldPeer.Protocol.Compound);
+        _selectFork(baseFork);
+        baseParentPeer.setStrategy(baseChainSelector, IYieldPeer.Protocol.Compound);
         _selectFork(optFork);
-        optChildPeer.setStrategy(arbChainSelector, IYieldPeer.Protocol.Compound);
+        optChildPeer.setStrategy(baseChainSelector, IYieldPeer.Protocol.Compound);
 
         /// @dev arrange
         optChildPeer.deposit(DEPOSIT_AMOUNT);
-        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(arbFork, attesters, attesterPks);
+        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
         uint256 expectedShareBalance = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
 
         /// @dev act
         optShare.transferAndCall(address(optChildPeer), expectedShareBalance, "");
-        ccipLocalSimulatorFork.switchChainAndRouteMessage(arbFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
 
         /// @dev assert
@@ -152,23 +152,23 @@ contract ChildWithdrawTest is BaseTest {
         // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
         _selectFork(ethFork);
         ethChildPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Aave);
-        _selectFork(arbFork);
-        arbParentPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Aave);
+        _selectFork(baseFork);
+        baseParentPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Aave);
         _selectFork(optFork);
         optChildPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Aave);
 
         /// @dev arrange
         optChildPeer.deposit(DEPOSIT_AMOUNT);
-        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(arbFork, attesters, attesterPks);
+        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(ethFork, attesters, attesterPks);
-        ccipLocalSimulatorFork.switchChainAndRouteMessage(arbFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
         uint256 expectedShareBalance = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
 
         /// @dev act
         optShare.transferAndCall(address(optChildPeer), expectedShareBalance, "");
-        ccipLocalSimulatorFork.switchChainAndRouteMessage(arbFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(ethFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
 
@@ -188,23 +188,23 @@ contract ChildWithdrawTest is BaseTest {
         // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
         _selectFork(ethFork);
         ethChildPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Compound);
-        _selectFork(arbFork);
-        arbParentPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Compound);
+        _selectFork(baseFork);
+        baseParentPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Compound);
         _selectFork(optFork);
         optChildPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Compound);
 
         /// @dev arrange
         optChildPeer.deposit(DEPOSIT_AMOUNT);
-        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(arbFork, attesters, attesterPks);
+        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(ethFork, attesters, attesterPks);
-        ccipLocalSimulatorFork.switchChainAndRouteMessage(arbFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
         uint256 expectedShareBalance = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
 
         /// @dev act
         optShare.transferAndCall(address(optChildPeer), expectedShareBalance, "");
-        ccipLocalSimulatorFork.switchChainAndRouteMessage(arbFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(ethFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
 
