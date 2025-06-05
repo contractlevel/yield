@@ -31,6 +31,7 @@ contract HelperConfig is Script {
         address functionsRouter;
         bytes32 donId;
         uint64 clfSubId;
+        bytes encryptedSecret;
     }
 
     struct NetworkConfig {
@@ -90,7 +91,8 @@ contract HelperConfig is Script {
             clf: CLFConfig({
                 functionsRouter: 0x65Dcc24F8ff9e51F10DCc7Ed1e4e2A61e6E14bd6,
                 donId: 0x66756e2d657468657265756d2d6d61696e6e65742d3100000000000000000000,
-                clfSubId: 0 // @review dummy value
+                clfSubId: 0, // @review dummy value
+                encryptedSecret: ""
             })
         });
     }
@@ -117,7 +119,8 @@ contract HelperConfig is Script {
             clf: CLFConfig({
                 functionsRouter: 0xaA8AaA682C9eF150C0C8E96a8D60945BCB21faad,
                 donId: 0x66756e2d6f7074696d69736d2d6d61696e6e65742d310a000000000000000000,
-                clfSubId: 0 // @review dummy value
+                clfSubId: 0, // @review dummy value
+                encryptedSecret: ""
             })
         });
     }
@@ -144,7 +147,8 @@ contract HelperConfig is Script {
             clf: CLFConfig({
                 functionsRouter: 0x97083E831F8F0638855e2A515c90EdCF158DF238,
                 donId: 0x66756e2d617262697472756d2d6d61696e6e65742d3100000000000000000000,
-                clfSubId: 0 // @review dummy value
+                clfSubId: 0, // @review dummy value
+                encryptedSecret: ""
             })
         });
     }
@@ -171,7 +175,8 @@ contract HelperConfig is Script {
             clf: CLFConfig({
                 functionsRouter: 0xf9B8fc078197181C841c296C876945aaa425B278,
                 donId: 0x66756e2d626173652d6d61696e6e65742d310000000000000000000000000000,
-                clfSubId: 0 // @review dummy value
+                clfSubId: 0, // @review dummy value
+                encryptedSecret: ""
             })
         });
     }
@@ -201,7 +206,36 @@ contract HelperConfig is Script {
             clf: CLFConfig({
                 functionsRouter: 0xb83E47C2bC239B3bf370bc41e1459A34b41238D0,
                 donId: 0x66756e2d657468657265756d2d7365706f6c69612d3100000000000000000000,
-                clfSubId: 0 // @review dummy value
+                clfSubId: 0, // @review dummy value
+                encryptedSecret: ""
+            })
+        });
+    }
+
+    function getBaseSepoliaConfig() public pure returns (NetworkConfig memory) {
+        return NetworkConfig({
+            ccip: CCIPConfig({
+                ccipRouter: 0xD3b06cEbF099CE7DA4AcCf578aaebFDBd6e88a93,
+                thisChainSelector: 10344971235874465080,
+                parentChainSelector: 10344971235874465080,
+                rmnProxy: 0x99360767a4705f68CcCb9533195B761648d6d807,
+                usdcTokenPool: 0x5931822f394baBC2AACF4588E98FC77a9f5aa8C9,
+                cctpMessageTransmitter: 0x7865fAfC2db2093669d92c0F33AeEF291086BEFD
+            }),
+            tokens: TokensConfig({
+                link: 0xE4aB69C077896252FAFBD49EFD26B5D171A32410,
+                usdc: 0x036CbD53842c5426634e7929541eC2318f3dCF7e,
+                share: address(0) // needs to be deployed
+            }),
+            protocols: ProtocolsConfig({
+                aavePoolAddressesProvider: address(0),
+                comet: 0x571621Ce60Cebb0c1D442B5afb38B1663C6Bf017
+            }),
+            clf: CLFConfig({
+                functionsRouter: 0xf9B8fc078197181C841c296C876945aaa425B278,
+                donId: 0x66756e2d626173652d7365706f6c69612d310000000000000000000000000000,
+                clfSubId: 333,
+                encryptedSecret: "0xed68cd6fa80efc88a377b9a7c00a11fd0305cba98d104f23153e6a829637653f123555bbf3f9e4654f87f2d74f95163ffb153a856288472008ae2d37c8f5f878f31dc3dae151646a79e5c7a7cbec82900231eb08906849fd81deef3300259edddb62817452e51f650152c27a648669c8414eb714b6c39cdb1c118e776bac29c6e0ca4ac90884c0119a43cbda28e024b15f2a1835ae59ea003ed3426d403a5dfa4b16707d3846a2e6085e03161a4d07640ae17f9485f8c72a8b8170169b2d14bba5f9cf0705986023811f7e6ee9f7025f8668b91f64829b5e587c681a252ae0ae8f"
             })
         });
     }
@@ -231,7 +265,8 @@ contract HelperConfig is Script {
             clf: CLFConfig({
                 functionsRouter: address(0),
                 donId: "",
-                clfSubId: 0 // @review dummy value
+                clfSubId: 0, // @review dummy value
+                encryptedSecret: ""
             })
         });
     }

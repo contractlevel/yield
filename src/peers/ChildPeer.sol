@@ -1,24 +1,30 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {YieldPeer, Client, IRouterClient} from "./YieldPeer.sol";
+import {YieldPeer, Client, IRouterClient, CCIPOperations} from "./YieldPeer.sol";
 
+/// @title CLY ChildPeer
+/// @author @contractlevel
+/// @notice This contract is a ChildPeer of the Contract Level Yield system
+/// @notice This contract is deployed on every chain in the system except for the one the ParentPeer is deployed on
+/// @notice Users can deposit and withdraw USDC to/from the system via this contract
 contract ChildPeer is YieldPeer {
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
+    /// @dev The CCIP selector of the parent chain
     uint64 internal immutable i_parentChainSelector;
-
-    /*//////////////////////////////////////////////////////////////
-                               EVENTS
-    //////////////////////////////////////////////////////////////*/
-    event StrategyDepositCompleted(
-        bytes32 indexed ccipMessageId, address indexed strategyPool, DepositData indexed depositData
-    );
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
+    /// @param ccipRouter The address of the CCIP router
+    /// @param link The address of the LINK token
+    /// @param thisChainSelector The CCIP selector of the chain this peer is deployed on
+    /// @param usdc The address of the USDC token
+    /// @param aavePoolAddressesProvider The address of the Aave pool addresses provider
+    /// @param comet The address of the Compound v3 cUSDCv3 contract
+    /// @param share The address of the Share token, native to this system that is minted in return for deposits
     constructor(
         address ccipRouter,
         address link,
@@ -42,103 +48,87 @@ contract ChildPeer is YieldPeer {
     /// @param amountToDeposit The amount of USDC to deposit into the system
     /// @dev Revert if amountToDeposit is 0
     function deposit(uint256 amountToDeposit) external override {
-        _revertIfZeroAmount(amountToDeposit);
-        _transferUsdcFrom(msg.sender, address(this), amountToDeposit);
+        _initiateDeposit(amountToDeposit);
 
         address strategyPool = _getStrategyPool();
         DepositData memory depositData = _buildDepositData(amountToDeposit);
 
-        emit DepositInitiated(msg.sender, amountToDeposit, i_thisChainSelector);
-
         // 1. This Child is the Strategy
         if (strategyPool != address(0)) {
-            // @review we could modularize these two lines into a function
             /// @dev deposit USDC in strategy pool
             _depositToStrategy(strategyPool, amountToDeposit);
             /// @dev get totalValue from strategyPool and update depositData
             depositData.totalValue = _getTotalValueFromStrategy(strategyPool);
 
             /// @dev send a message to parent contract to request shareMintAmount
-            bytes32 ccipMessageId = _ccipSend(
+            _ccipSend(
                 i_parentChainSelector, CcipTxType.DepositCallbackParent, abi.encode(depositData), ZERO_BRIDGE_AMOUNT
             );
         }
         // 2. This Child is not the Strategy
         else {
             /// @dev send a message to parent contract to deposit to strategy and request shareMintAmount
-            bytes32 ccipMessageId =
-                _ccipSend(i_parentChainSelector, CcipTxType.DepositToParent, abi.encode(depositData), amountToDeposit);
+            _ccipSend(i_parentChainSelector, CcipTxType.DepositToParent, abi.encode(depositData), amountToDeposit);
         }
     }
 
-    // function withdraw(uint256 shareBurnAmount) external override {}
-
-    function onTokenTransfer(address withdrawer, uint256 shareBurnAmount, bytes calldata data) external override {
+    /// @notice This function is to facilitate USDC withdrawals from the system
+    /// @notice This function is called when a SHARE holder transferAndCall()s to this contract
+    /// @param withdrawer The address of the SHARE holder to send withdrawn USDC to
+    /// @param shareBurnAmount The amount of SHARE to burn
+    /// @dev Revert if msg.sender is not the SHARE token
+    /// @dev Revert if shareBurnAmount is 0
+    /// @dev Burn the SHARE tokens and send a message to the parent chain to withdraw USDC from the strategy
+    function onTokenTransfer(address withdrawer, uint256 shareBurnAmount, bytes calldata /* data */ )
+        external
+        override
+    {
         _revertIfMsgSenderIsNotShare();
         _revertIfZeroAmount(shareBurnAmount);
-        _burnShares(shareBurnAmount);
+        _burnShares(withdrawer, shareBurnAmount);
         WithdrawData memory withdrawData = _buildWithdrawData(withdrawer, shareBurnAmount);
         _ccipSend(i_parentChainSelector, CcipTxType.WithdrawToParent, abi.encode(withdrawData), ZERO_BRIDGE_AMOUNT);
+        emit WithdrawInitiated(withdrawer, shareBurnAmount, i_thisChainSelector);
     }
 
     /*//////////////////////////////////////////////////////////////
                                 INTERNAL
     //////////////////////////////////////////////////////////////*/
     /// @notice Receives a CCIP message from a peer
-    /// @param message The CCIP message received
+    ///  The CCIP message received
     /// - CcipTxType DepositToStrategy: A tx from parent to this-child-strategy to deposit USDC in strategy and get totalValue
     /// - CcipTxType DepositCallbackChild: A tx from parent to this-child to mint shares to the depositor
     /// - CcipTxType WithdrawToStrategy: A tx from parent to this-child-strategy to withdraw USDC from strategy and get usdcWithdrawAmount
-    function _ccipReceive(Client.Any2EVMMessage memory message)
+    function _handleCCIPMessage(CcipTxType txType, Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data)
         internal
         override
-        onlyAllowed(message.sourceChainSelector, abi.decode(message.sender, (address)))
     {
-        (CcipTxType txType, bytes memory data) = abi.decode(message.data, (CcipTxType, bytes));
-
-        emit CCIPMessageReceived(message.messageId, txType, message.sourceChainSelector);
-
-        if (txType == CcipTxType.DepositToStrategy) {
-            DepositData memory depositData = abi.decode(data, (DepositData));
-            _validateTokenAmounts(message.destTokenAmounts, depositData.amount);
-            _handleCCIPDepositToStrategy(depositData);
-        }
-        if (txType == CcipTxType.DepositCallbackChild) {
-            DepositData memory depositData = abi.decode(data, (DepositData));
-            _handleCCIPDepositCallbackChild(depositData);
-        }
-        if (txType == CcipTxType.WithdrawToStrategy) {
-            WithdrawData memory withdrawData = abi.decode(data, (WithdrawData));
-            _handleCCIPWithdrawToStrategy(withdrawData);
-        }
-        if (txType == CcipTxType.WithdrawCallback) {
-            _handleCCIPWithdrawCallback(message.destTokenAmounts, data);
-        }
-        if (txType == CcipTxType.RebalanceOldStrategy) {
-            _handleCCIPRebalanceOldStrategy(data);
-        }
-        if (txType == CcipTxType.RebalanceNewStrategy) {
-            _handleCCIPRebalanceNewStrategy(data);
-        }
-        // add withdraw and rebalance tx type handling
+        if (txType == CcipTxType.DepositToStrategy) _handleCCIPDepositToStrategy(tokenAmounts, data);
+        if (txType == CcipTxType.DepositCallbackChild) _handleCCIPDepositCallbackChild(data);
+        if (txType == CcipTxType.WithdrawToStrategy) _handleCCIPWithdrawToStrategy(data);
+        if (txType == CcipTxType.WithdrawCallback) _handleCCIPWithdrawCallback(tokenAmounts, data);
+        if (txType == CcipTxType.RebalanceOldStrategy) _handleCCIPRebalanceOldStrategy(data);
+        if (txType == CcipTxType.RebalanceNewStrategy) _handleCCIPRebalanceNewStrategy(data);
     }
 
     /// @notice This function handles a deposit sent from Parent to this Strategy-Child
     /// @notice The purpose of this tx is to deposit USDC in the strategy and return the totalValue so that the parent can calculate the shareMintAmount.
     /// deposit -> parent -> strategy (HERE) -> callback to parent -> possible callback to child
-    function _handleCCIPDepositToStrategy(DepositData memory depositData) internal {
+    function _handleCCIPDepositToStrategy(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data) internal {
+        DepositData memory depositData = _decodeDepositData(data);
+        CCIPOperations._validateTokenAmounts(tokenAmounts, address(i_usdc), depositData.amount);
+
         depositData.totalValue = _depositToStrategyAndGetTotalValue(depositData.amount);
 
         /// @dev send a message to parent with totalValue to calculate shareMintAmount
-        bytes32 ccipMessageId = _ccipSend(
-            i_parentChainSelector, CcipTxType.DepositCallbackParent, abi.encode(depositData), ZERO_BRIDGE_AMOUNT
-        );
+        _ccipSend(i_parentChainSelector, CcipTxType.DepositCallbackParent, abi.encode(depositData), ZERO_BRIDGE_AMOUNT);
     }
 
     /// @notice This function handles a deposit callback from the parent chain
     /// @notice The purpose of this callback is to mint shares to the depositor on this chain
     /// deposit on this chain -> parent -> strategy -> callback to parent -> callback to child (HERE)
-    function _handleCCIPDepositCallbackChild(DepositData memory depositData) internal {
+    function _handleCCIPDepositCallbackChild(bytes memory data) internal {
+        DepositData memory depositData = _decodeDepositData(data);
         _mintShares(depositData.depositor, depositData.shareMintAmount);
     }
 
@@ -146,13 +136,15 @@ contract ChildPeer is YieldPeer {
     /// @notice The purpose of this tx is to withdraw USDC from the strategy and then send it back to the withdraw chain
     /// withdraw -> parent -> strategy (HERE) -> callback to withdraw chain
     /// @notice If this strategy chain is the same as the withdraw chain, we transfer the USDC to the withdrawer, concluding the withdrawal process.
-    function _handleCCIPWithdrawToStrategy(WithdrawData memory withdrawData) internal {
+    function _handleCCIPWithdrawToStrategy(bytes memory data) internal {
+        WithdrawData memory withdrawData = _decodeWithdrawData(data);
         withdrawData.usdcWithdrawAmount = _withdrawFromStrategyAndGetUsdcWithdrawAmount(withdrawData);
 
         if (i_thisChainSelector == withdrawData.chainSelector) {
             _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
+            emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
         } else {
-            bytes32 ccipMessageId = _ccipSend(
+            _ccipSend(
                 withdrawData.chainSelector,
                 CcipTxType.WithdrawCallback,
                 abi.encode(withdrawData),
@@ -166,10 +158,5 @@ contract ChildPeer is YieldPeer {
     //////////////////////////////////////////////////////////////*/
     function getParentChainSelector() external view returns (uint64) {
         return i_parentChainSelector;
-    }
-
-    // @review REMOVE THIS OR REPLACE IT WITH A WRAPPER
-    function setStrategy(uint64 chainSelector, Protocol protocol) external {
-        _updateStrategyPool(chainSelector, protocol);
     }
 }

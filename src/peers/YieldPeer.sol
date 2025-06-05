@@ -13,6 +13,9 @@ import {IComet} from "../interfaces/IComet.sol";
 import {IShare} from "../interfaces/IShare.sol";
 import {IYieldPeer} from "../interfaces/IYieldPeer.sol";
 import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
+import {ProtocolOperations} from "../libraries/ProtocolOperations.sol";
+import {DataStructures} from "../libraries/DataStructures.sol";
+import {CCIPOperations} from "../libraries/CCIPOperations.sol";
 
 abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYieldPeer {
     /*//////////////////////////////////////////////////////////////
@@ -23,16 +26,21 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     error YieldPeer__ChainNotAllowed(uint64 chainSelector);
     error YieldPeer__PeerNotAllowed(address peer);
     error YieldPeer__NoZeroAmount();
-    error YieldPeer__NotEnoughLink(uint256 linkBalance, uint256 fees);
+    // error YieldPeer__NotEnoughLink(uint256 linkBalance, uint256 fees);
     error YieldPeer__InvalidToken(address invalidToken);
-    error YieldPeer__InvalidTokenAmount(uint256 invalidAmount);
+    // error YieldPeer__InvalidTokenAmount(uint256 invalidAmount);
+    error YieldPeer__InvalidStrategyChain(uint64 invalidChainSelector);
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
+    /// @dev Constant for the zero bridge amount - some CCIP messages don't need to send any USDC
     uint256 internal constant ZERO_BRIDGE_AMOUNT = 0;
+    /// @dev Constant for the USDC decimals
     uint256 internal constant USDC_DECIMALS = 1e6;
+    /// @dev Constant for the Share decimals
     uint256 internal constant SHARE_DECIMALS = 1e18;
+    /// @dev Constant for the initial share precision
     uint256 internal constant INITIAL_SHARE_PRECISION = SHARE_DECIMALS / USDC_DECIMALS;
 
     /// @dev Chainlink token
@@ -51,6 +59,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @dev Gas limit for CCIP
     uint256 internal s_ccipGasLimit;
     /// @dev Mapping of allowed chains
+    /// @dev This must include the Parent Chain on the ParentPeer!
     mapping(uint64 chainSelector => bool isAllowed) internal s_allowedChains;
     /// @dev Mapping of peers (ie other Yield contracts)
     mapping(uint64 chainSelector => address peer) internal s_peers;
@@ -65,29 +74,34 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     event AllowedChainSet(uint64 indexed chainSelector, bool indexed isAllowed);
     event AllowedPeerSet(uint64 indexed chainSelector, address indexed peer);
     event CCIPGasLimitSet(uint256 indexed gasLimit);
-    event StrategyPoolSet(address indexed strategyPool);
+    event StrategyPoolUpdated(address indexed strategyPool);
     event DepositToStrategy(address indexed strategyPool, uint256 indexed amount);
     event WithdrawFromStrategy(address indexed strategyPool, uint256 indexed amount);
 
     /// @notice Emitted when a user deposits USDC into the system
     event DepositInitiated(address indexed depositor, uint256 indexed amount, uint64 indexed thisChainSelector);
+    /// @notice Emitted when a deposit to the strategy is completed
+    event DepositCompleted(address indexed strategyPool, uint256 indexed amount, uint256 indexed totalValue);
+    /// @notice Emitted when a user initiates a withdrawal of USDC from the system
+    event WithdrawInitiated(address indexed withdrawer, uint256 indexed amount, uint64 indexed thisChainSelector);
+    /// @notice Emitted when a withdrawal is completed and the USDC is sent to the user
+    event WithdrawCompleted(address indexed withdrawer, uint256 indexed amount);
+
     /// @notice Emitted when a CCIP message is sent to the parent chain
     event CCIPMessageSent(bytes32 indexed messageId, CcipTxType indexed txType, uint256 indexed amount);
     /// @notice Emitted when a CCIP message is received from the parent chain
     event CCIPMessageReceived(bytes32 indexed messageId, CcipTxType indexed txType, uint64 indexed sourceChainSelector);
-
+    /// @notice Emitted when shares are minted
     event SharesMinted(address indexed to, uint256 indexed amount);
-
-    // @review this
-    event DepositToStrategyCompleted(address indexed strategyPool, uint256 indexed amount, uint256 indexed totalValue);
-
-    // @review - debug events, remove later
-    event DebugWithdrawCalculation(uint256 totalValue, uint256 totalShares, uint256 shareBurnAmount);
-    event DebugWithdrawAmount(uint256 usdcWithdrawAmount);
+    /// @notice Emitted when shares are burned
+    event SharesBurned(address indexed from, uint256 indexed amount);
 
     /*//////////////////////////////////////////////////////////////
                                MODIFIERS
     //////////////////////////////////////////////////////////////*/
+    /// @notice Modifier to check if the chain selector and peer are allowed to send CCIP messages
+    /// @param chainSelector The chain selector to check
+    /// @param peer The peer to check
     modifier onlyAllowed(uint64 chainSelector, address peer) {
         // @review is the chainSelector check needed?
         if (!s_allowedChains[chainSelector]) revert YieldPeer__ChainNotAllowed(chainSelector);
@@ -98,6 +112,13 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
+    /// @param ccipRouter The address of the CCIP router
+    /// @param link The address of the Chainlink token
+    /// @param thisChainSelector The chain selector for this chain
+    /// @param usdc The address of the USDC token
+    /// @param aavePoolAddressesProvider The address of the Aave v3 pool addresses provider
+    /// @param comet The address of the Compound v3 cUSDCv3 contract
+    /// @param share The address of the Share token, native to this system that is minted in return for deposits
     constructor(
         address ccipRouter,
         address link,
@@ -124,171 +145,70 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
 
     /// @notice ERC677Receiver interface implementation
     /// @dev This function is called when the Share token is transferAndCall'd to this contract
-    /// @dev Redeems/withdraws USDC and sends to sender
-    /// @param sender The address that sent the Share token
-    /// @param amount The amount of Share token sent
-    /// @param data Additional data (not used)
-    function onTokenTransfer(address sender, uint256 amount, bytes calldata data) external virtual {
-        if (msg.sender != address(i_share)) revert YieldPeer__OnlyShare();
-
-        // redeem `amount` for USDC and send to sender
-
-        // burn `amount` of Share token
-        i_share.burn(sender, amount);
-
-        // uint256 usdcWithdrawAmount = _calculateUsdcWithdrawAmount(amount);
-
-        // redeem `amount` for USDC and send to sender
-        // i_usdc.transfer(sender, usdcWithdrawAmount);
-    }
+    /// @dev Redeems/withdraws USDC and sends to withdrawer
+    /// @param withdrawer The address that sent the SHARE token to withdraw USDC
+    /// @param shareBurnAmount The amount of SHARE token sent
+    /// @notice This function is overridden and implemented in the ChildPeer and ParentPeer contracts
+    function onTokenTransfer(address withdrawer, uint256 shareBurnAmount, bytes calldata /* data */ )
+        external
+        virtual;
 
     /*//////////////////////////////////////////////////////////////
                                 INTERNAL
     //////////////////////////////////////////////////////////////*/
+    /// @notice Receives a CCIP message from a peer
+    /// @dev Revert if message came from a chain that is not allowed
+    /// @dev Revert if message came from a contract that is not allowed
+    /// @dev _handleCCIPMessage is overridden and implemented in the ChildPeer and ParentPeer contracts
+    function _ccipReceive(Client.Any2EVMMessage memory message)
+        internal
+        override
+        onlyAllowed(message.sourceChainSelector, abi.decode(message.sender, (address)))
+    {
+        (CcipTxType txType, bytes memory data) = abi.decode(message.data, (CcipTxType, bytes));
+        emit CCIPMessageReceived(message.messageId, txType, message.sourceChainSelector);
+
+        _handleCCIPMessage(txType, message.destTokenAmounts, data);
+    }
+
+    /// @notice Handles CCIP messages based on transaction type
+    /// @param txType The type of transaction
+    /// @param tokenAmounts The token amounts in the message
+    /// @param data The message data - decodes to DepositData, WithdrawData, or Strategy
+    /// @notice This function is overridden and implemented in the ChildPeer and ParentPeer contracts
+    function _handleCCIPMessage(CcipTxType txType, Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data)
+        internal
+        virtual;
+
     /// @notice Send a CCIP message to a peer
     /// @param destChainSelector The chain selector of the peer
     /// @param txType The type of transaction - see ./interfaces/IYieldPeer.sol
     /// @param data The data to send
     /// @param bridgeAmount The amount of USDC to send
-    function _ccipSend(uint64 destChainSelector, CcipTxType txType, bytes memory data, uint256 bridgeAmount)
-        internal
-        returns (bytes32 ccipMessageId)
-    {
-        Client.EVMTokenAmount[] memory tokenAmounts;
-        if (bridgeAmount > 0) {
-            tokenAmounts = new Client.EVMTokenAmount[](1);
-            tokenAmounts[0] = Client.EVMTokenAmount({token: address(i_usdc), amount: bridgeAmount});
-            i_usdc.approve(i_ccipRouter, bridgeAmount);
-        } else {
-            tokenAmounts = new Client.EVMTokenAmount[](0);
-        }
+    function _ccipSend(uint64 destChainSelector, CcipTxType txType, bytes memory data, uint256 bridgeAmount) internal {
+        Client.EVMTokenAmount[] memory tokenAmounts =
+            CCIPOperations._prepareTokenAmounts(i_usdc, bridgeAmount, i_ccipRouter);
 
-        Client.EVM2AnyMessage memory evm2AnyMessage =
-            _buildCCIPMessage(s_peers[destChainSelector], txType, data, tokenAmounts);
+        Client.EVM2AnyMessage memory evm2AnyMessage = CCIPOperations._buildCCIPMessage(
+            s_peers[destChainSelector], txType, data, tokenAmounts, s_ccipGasLimit, address(i_link)
+        );
 
-        /// @dev handle LINK fees
-        _handleCCIPFees(destChainSelector, evm2AnyMessage);
+        CCIPOperations._handleCCIPFees(i_ccipRouter, address(i_link), destChainSelector, evm2AnyMessage);
 
-        ccipMessageId = IRouterClient(i_ccipRouter).ccipSend(destChainSelector, evm2AnyMessage);
+        bytes32 ccipMessageId = IRouterClient(i_ccipRouter).ccipSend(destChainSelector, evm2AnyMessage);
 
         emit CCIPMessageSent(ccipMessageId, txType, bridgeAmount);
     }
 
-    function _transferUsdcTo(address to, uint256 amount) internal {
-        if (!i_usdc.transfer(to, amount)) revert YieldPeer__USDCTransferFailed();
-    }
-
-    function _transferUsdcFrom(address from, address to, uint256 amount) internal {
-        if (!i_usdc.transferFrom(from, to, amount)) revert YieldPeer__USDCTransferFailed();
-    }
-
-    function _handleCCIPFees(uint64 dstChainSelector, Client.EVM2AnyMessage memory evm2AnyMessage) internal {
-        uint256 fees = IRouterClient(i_ccipRouter).getFee(dstChainSelector, evm2AnyMessage);
-        uint256 linkBalance = i_link.balanceOf(address(this));
-        if (fees > linkBalance) revert YieldPeer__NotEnoughLink(linkBalance, fees);
-        i_link.approve(i_ccipRouter, fees);
-    }
-
-    function _buildCCIPMessage(
-        address receiver,
-        CcipTxType txType,
-        bytes memory data,
-        Client.EVMTokenAmount[] memory tokenAmounts
-    ) internal view returns (Client.EVM2AnyMessage memory evm2AnyMessage) {
-        evm2AnyMessage = Client.EVM2AnyMessage({
-            receiver: abi.encode(receiver),
-            data: abi.encode(txType, data),
-            tokenAmounts: tokenAmounts,
-            extraArgs: Client._argsToBytes(
-                Client.GenericExtraArgsV2({gasLimit: s_ccipGasLimit, allowOutOfOrderExecution: true})
-            ),
-            feeToken: address(i_link)
-        });
-    }
-
-    function _buildDepositData(uint256 amount) internal view returns (DepositData memory depositData) {
-        depositData.depositor = msg.sender;
-        depositData.amount = amount;
-        depositData.chainSelector = i_thisChainSelector;
-    }
-
-    function _buildWithdrawData(address withdrawer, uint256 shareBurnAmount)
-        internal
-        view
-        returns (WithdrawData memory withdrawData)
-    {
-        withdrawData.withdrawer = withdrawer;
-        withdrawData.shareBurnAmount = shareBurnAmount;
-        withdrawData.chainSelector = i_thisChainSelector;
-    }
-
-    function _depositToStrategy(address strategyPool, uint256 amount) internal {
-        address aavePool = i_aavePoolAddressesProvider.getPool();
-        if (strategyPool == address(i_aavePoolAddressesProvider)) _depositToAave(aavePool, amount);
-        else if (strategyPool == address(i_comet)) _depositToCompound(amount);
-        emit DepositToStrategy(strategyPool, amount);
-    }
-
-    function _depositToAave(address aavePool, uint256 amount) internal {
-        i_usdc.approve(aavePool, amount);
-        IPool(aavePool).supply(address(i_usdc), amount, address(this), 0);
-    }
-
-    function _depositToCompound(uint256 amount) internal {
-        i_usdc.approve(address(i_comet), amount);
-        i_comet.supply(address(i_usdc), amount);
-    }
-
-    function _withdrawFromStrategy(address strategyPool, uint256 amount) internal {
-        if (strategyPool == address(i_aavePoolAddressesProvider)) _withdrawFromAave(amount);
-        else if (strategyPool == address(i_comet)) _withdrawFromCompound(amount);
-        emit WithdrawFromStrategy(strategyPool, amount);
-    }
-
-    function _withdrawFromAave(uint256 amount) internal {
-        address aavePool = i_aavePoolAddressesProvider.getPool();
-        IPool(aavePool).withdraw(address(i_usdc), amount, address(this));
-    }
-
-    function _withdrawFromCompound(uint256 amount) internal {
-        i_comet.withdraw(address(i_usdc), amount);
-    }
-
-    /// @notice Deposits USDC to the strategy and returns the total value of the system
-    /// @param amount The amount of USDC to deposit
-    /// @return totalValue The total value of the system
-    function _depositToStrategyAndGetTotalValue(uint256 amount) internal returns (uint256 totalValue) {
-        address strategyPool = _getStrategyPool();
-        _depositToStrategy(strategyPool, amount);
-        totalValue = _getTotalValueFromStrategy(strategyPool);
-
-        emit DepositToStrategyCompleted(strategyPool, amount, totalValue);
-    }
-
-    function _withdrawFromStrategyAndGetUsdcWithdrawAmount(WithdrawData memory withdrawData)
-        internal
-        returns (uint256 usdcWithdrawAmount)
-    {
-        address strategyPool = _getStrategyPool();
-        uint256 totalValue = _getTotalValueFromStrategy(strategyPool);
-        usdcWithdrawAmount =
-            _calculateWithdrawAmount(totalValue, withdrawData.totalShares, withdrawData.shareBurnAmount);
-        _withdrawFromStrategy(strategyPool, usdcWithdrawAmount);
-    }
-
-    function _mintShares(address to, uint256 amount) internal {
-        i_share.mint(to, amount);
-        emit SharesMinted(to, amount);
-    }
-
-    function _burnShares(uint256 amount) internal {
-        i_share.burn(amount);
-    }
-
+    /// @notice Handles the CCIP message for a withdraw callback
+    /// @notice This function is called as the last step in the withdraw flow and sends USDC to the withdrawer
+    /// @param tokenAmounts The token amounts in the message
+    /// @param data The message data - decodes to WithdrawData
     function _handleCCIPWithdrawCallback(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data) internal {
-        WithdrawData memory withdrawData = abi.decode(data, (WithdrawData));
-        _validateTokenAmounts(tokenAmounts, withdrawData.usdcWithdrawAmount);
+        WithdrawData memory withdrawData = _decodeWithdrawData(data);
+        CCIPOperations._validateTokenAmounts(tokenAmounts, address(i_usdc), withdrawData.usdcWithdrawAmount);
         _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
+        emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
     }
 
     function _handleCCIPRebalanceOldStrategy(bytes memory data) internal {
@@ -307,47 +227,141 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         }
         // if the new strategy is a different chain, then we need to send the usdc we just withdrew to the new strategy
         else {
-            _sendRebalanceMessage(
-                newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, data, i_usdc.balanceOf(address(this))
-            );
+            _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, data, i_usdc.balanceOf(address(this)));
         }
     }
 
     function _handleCCIPRebalanceNewStrategy(bytes memory data) internal {
-        /// @dev update strategy pool to either protocol on this chain or address(0) if on a different chain
+        /// @dev update strategy pool to protocol on this chain
         Strategy memory newStrategy = abi.decode(data, (Strategy));
+        if (newStrategy.chainSelector != i_thisChainSelector) {
+            revert YieldPeer__InvalidStrategyChain(newStrategy.chainSelector);
+        }
         address newStrategyPool = _updateStrategyPool(newStrategy.chainSelector, newStrategy.protocol);
+
         /// @dev deposit to the new strategy
-        _depositToStrategy(newStrategyPool, i_usdc.balanceOf(address(this)));
+        uint256 usdcBalance = i_usdc.balanceOf(address(this));
+        if (usdcBalance != 0) _depositToStrategy(newStrategyPool, usdcBalance);
+    }
+
+    /// @notice Internal helper to handle strategy pool updates
+    /// @param chainSelector The chain selector for the strategy
+    /// @param protocol The protocol for the strategy
+    /// @return strategyPool The new strategy pool address
+    function _updateStrategyPool(uint64 chainSelector, Protocol protocol) internal returns (address strategyPool) {
+        if (chainSelector == i_thisChainSelector) {
+            strategyPool = _getStrategyPoolFromProtocol(protocol);
+            s_strategyPool = strategyPool;
+        } else {
+            s_strategyPool = address(0);
+        }
+        emit StrategyPoolUpdated(strategyPool);
+    }
+
+    function _depositToStrategy(address strategyPool, uint256 amount) internal {
+        ProtocolOperations.depositToStrategy(strategyPool, _getProtocolConfig(), amount);
+        emit DepositToStrategy(strategyPool, amount);
+    }
+
+    function _withdrawFromStrategy(address strategyPool, uint256 amount) internal {
+        ProtocolOperations.withdrawFromStrategy(strategyPool, _getProtocolConfig(), amount);
+        emit WithdrawFromStrategy(strategyPool, amount);
+    }
+
+    /// @notice Deposits USDC to the strategy and returns the total value of the system
+    /// @param amount The amount of USDC to deposit
+    /// @return totalValue The total value of the system
+    function _depositToStrategyAndGetTotalValue(uint256 amount) internal returns (uint256 totalValue) {
+        address strategyPool = _getStrategyPool();
+        _depositToStrategy(strategyPool, amount);
+        totalValue = _getTotalValueFromStrategy(strategyPool);
+
+        emit DepositCompleted(strategyPool, amount, totalValue);
+    }
+
+    function _withdrawFromStrategyAndGetUsdcWithdrawAmount(WithdrawData memory withdrawData)
+        internal
+        returns (uint256 usdcWithdrawAmount)
+    {
+        address strategyPool = _getStrategyPool();
+        uint256 totalValue = _getTotalValueFromStrategy(strategyPool);
+        usdcWithdrawAmount =
+            _calculateWithdrawAmount(totalValue, withdrawData.totalShares, withdrawData.shareBurnAmount);
+        _withdrawFromStrategy(strategyPool, usdcWithdrawAmount);
+    }
+
+    /// @notice Initiates a deposit
+    /// @param amountToDeposit The amount of USDC to deposit
+    /// @dev Revert if amountToDeposit is 0
+    /// @dev Transfer USDC from msg.sender to this contract
+    /// @dev Emit DepositInitiated event
+    function _initiateDeposit(uint256 amountToDeposit) internal {
+        _revertIfZeroAmount(amountToDeposit);
+        _transferUsdcFrom(msg.sender, address(this), amountToDeposit);
+        emit DepositInitiated(msg.sender, amountToDeposit, i_thisChainSelector);
+    }
+
+    /// @notice Transfer USDC to an address
+    /// @param to The address to transfer USDC to
+    /// @param amount The amount of USDC to transfer
+    function _transferUsdcTo(address to, uint256 amount) internal {
+        if (!i_usdc.transfer(to, amount)) revert YieldPeer__USDCTransferFailed();
+    }
+
+    /// @notice Transfer USDC from an address
+    /// @param from The address to transfer USDC from
+    /// @param to The address to transfer USDC to
+    /// @param amount The amount of USDC to transfer
+    function _transferUsdcFrom(address from, address to, uint256 amount) internal {
+        if (!i_usdc.transferFrom(from, to, amount)) revert YieldPeer__USDCTransferFailed();
+    }
+
+    /// @notice Mints shares
+    /// @param to The address to mint shares to
+    /// @param amount The amount of shares to mint
+    function _mintShares(address to, uint256 amount) internal {
+        i_share.mint(to, amount);
+        emit SharesMinted(to, amount);
+    }
+
+    /// @notice Burns shares
+    /// @param from The address who transferAndCall'd the SHAREs to this contract
+    /// @param amount The amount of shares to burn
+    function _burnShares(address from, uint256 amount) internal {
+        i_share.burn(amount);
+        emit SharesBurned(from, amount);
     }
 
     /*//////////////////////////////////////////////////////////////
                              INTERNAL VIEW
     //////////////////////////////////////////////////////////////*/
-    /// @return totalValue The total value of the system to 6 decimals
-    function _getTotalValueFromStrategy(address strategyPool) internal view returns (uint256) {
-        address aavePool = i_aavePoolAddressesProvider.getPool();
-        if (strategyPool == address(i_aavePoolAddressesProvider)) return _getTotalValueFromAave(aavePool);
-        else if (strategyPool == address(i_comet)) return _getTotalValueFromCompound();
+    function _getProtocolConfig() internal view returns (ProtocolOperations.ProtocolConfig memory protocolConfig) {
+        protocolConfig =
+            ProtocolOperations.createConfig(address(i_usdc), address(i_aavePoolAddressesProvider), address(i_comet));
     }
 
-    function _getTotalValueFromAave(address aavePool) internal view returns (uint256) {
-        DataTypes.ReserveData memory reserveData = IPool(aavePool).getReserveData(address(i_usdc));
-        address aTokenAddress = reserveData.aTokenAddress;
-        return IERC20(aTokenAddress).balanceOf(address(this));
+    function _buildDepositData(uint256 amount) internal view returns (IYieldPeer.DepositData memory depositData) {
+        depositData = DataStructures.buildDepositData(msg.sender, amount, i_thisChainSelector);
     }
 
-    function _getTotalValueFromCompound() internal view returns (uint256) {
-        return i_comet.balanceOf(address(this));
+    function _buildWithdrawData(address withdrawer, uint256 shareBurnAmount)
+        internal
+        view
+        returns (WithdrawData memory withdrawData)
+    {
+        withdrawData = DataStructures.buildWithdrawData(withdrawer, shareBurnAmount, i_thisChainSelector);
+    }
+
+    function _getTotalValueFromStrategy(address strategyPool) internal view returns (uint256 totalValue) {
+        totalValue = ProtocolOperations.getTotalValueFromStrategy(strategyPool, _getProtocolConfig());
+    }
+
+    function _getStrategyPoolFromProtocol(IYieldPeer.Protocol protocol) internal view returns (address strategyPool) {
+        strategyPool = ProtocolOperations.getStrategyPoolFromProtocol(protocol, _getProtocolConfig());
     }
 
     function _getStrategyPool() internal view returns (address) {
         return s_strategyPool;
-    }
-
-    function _validateTokenAmounts(Client.EVMTokenAmount[] memory tokenAmounts, uint256 amount) internal view {
-        if (tokenAmounts[0].token != address(i_usdc)) revert YieldPeer__InvalidToken(tokenAmounts[0].token);
-        if (tokenAmounts[0].amount != amount) revert YieldPeer__InvalidTokenAmount(tokenAmounts[0].amount);
     }
 
     function _calculateWithdrawAmount(uint256 totalValue, uint256 totalShares, uint256 shareBurnAmount)
@@ -366,10 +380,12 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         if (msg.sender != address(i_share)) revert YieldPeer__OnlyShare();
     }
 
-    function _getStrategyPoolFromProtocol(IYieldPeer.Protocol protocol) internal view returns (address) {
-        if (protocol == IYieldPeer.Protocol.Aave) return address(i_aavePoolAddressesProvider);
-        else if (protocol == IYieldPeer.Protocol.Compound) return address(i_comet);
-        // else revert YieldPeer__InvalidProtocol(protocol);
+    function _decodeDepositData(bytes memory data) internal pure returns (DepositData memory depositData) {
+        depositData = abi.decode(data, (DepositData));
+    }
+
+    function _decodeWithdrawData(bytes memory data) internal pure returns (WithdrawData memory withdrawData) {
+        withdrawData = abi.decode(data, (WithdrawData));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -433,33 +449,5 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     // @review double check this later
     function getIsStrategyChain() external view returns (bool) {
         return s_strategyPool != address(0);
-    }
-
-    /// @notice Internal helper to handle strategy pool updates
-    /// @param chainSelector The chain selector for the strategy
-    /// @param protocol The protocol for the strategy
-    /// @return strategyPool The new strategy pool address
-    function _updateStrategyPool(uint64 chainSelector, Protocol protocol) internal returns (address) {
-        address strategyPool;
-        if (chainSelector == i_thisChainSelector) {
-            strategyPool = _getStrategyPoolFromProtocol(protocol);
-            s_strategyPool = strategyPool;
-        } else {
-            s_strategyPool = address(0);
-        }
-        return strategyPool;
-    }
-
-    /// @notice Internal helper to handle CCIP message sending for rebalancing
-    /// @param targetChainSelector The target chain selector
-    /// @param txType The type of CCIP transaction
-    /// @param data The data to send
-    /// @param amount The amount to send (if any)
-    /// @return messageId The CCIP message ID
-    function _sendRebalanceMessage(uint64 targetChainSelector, CcipTxType txType, bytes memory data, uint256 amount)
-        internal
-        returns (bytes32)
-    {
-        return _ccipSend(targetChainSelector, txType, data, amount);
     }
 }

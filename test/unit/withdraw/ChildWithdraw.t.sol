@@ -28,11 +28,9 @@ contract ChildWithdrawTest is BaseTest {
 
     // Scenario: Strategy is on the same chain as the child the withdrawal was initiated. Strategy is Aave.
     function test_yield_child_withdraw_strategyIsChild_aave() public {
-        // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
-        _selectFork(baseFork);
-        baseParentPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
+        _setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
         _selectFork(optFork);
-        optChildPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
+        _changePrank(withdrawer);
 
         /// @dev arrange
         optChildPeer.deposit(DEPOSIT_AMOUNT);
@@ -59,11 +57,9 @@ contract ChildWithdrawTest is BaseTest {
 
     // Scenario: Strategy is on the same chain as the child the withdrawal was initiated. Strategy is Compound.
     function test_yield_child_withdraw_strategyIsChild_compound() public {
-        // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
-        _selectFork(baseFork);
-        baseParentPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Compound);
+        _setStrategy(optChainSelector, IYieldPeer.Protocol.Compound);
         _selectFork(optFork);
-        optChildPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Compound);
+        _changePrank(withdrawer);
 
         /// @dev arrange
         optChildPeer.deposit(DEPOSIT_AMOUNT);
@@ -90,8 +86,9 @@ contract ChildWithdrawTest is BaseTest {
 
     /// @notice Scenario: Withdrawal is initiated from a child chain, Strategy chain is Parent chain, Strategy Protocol is Aave.
     function test_yield_child_withdraw_strategyIsParent_aave() public {
-        // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
-        optChildPeer.setStrategy(baseChainSelector, IYieldPeer.Protocol.Aave);
+        _setStrategy(baseChainSelector, IYieldPeer.Protocol.Aave);
+        _selectFork(optFork);
+        _changePrank(withdrawer);
 
         /// @dev arrange
         optChildPeer.deposit(DEPOSIT_AMOUNT);
@@ -118,11 +115,9 @@ contract ChildWithdrawTest is BaseTest {
 
     /// @notice Scenario: Withdrawal is initiated from a child chain, Strategy chain is Parent chain, Strategy Protocol is Compound.
     function test_yield_child_withdraw_strategyIsParent_compound() public {
-        // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
-        _selectFork(baseFork);
-        baseParentPeer.setStrategy(baseChainSelector, IYieldPeer.Protocol.Compound);
+        _setStrategy(baseChainSelector, IYieldPeer.Protocol.Compound);
         _selectFork(optFork);
-        optChildPeer.setStrategy(baseChainSelector, IYieldPeer.Protocol.Compound);
+        _changePrank(withdrawer);
 
         /// @dev arrange
         optChildPeer.deposit(DEPOSIT_AMOUNT);
@@ -149,13 +144,9 @@ contract ChildWithdrawTest is BaseTest {
 
     /// @notice Scenario: Withdrawal is initiated from a child chain, Strategy chain is another child chain, Strategy Protocol is Aave.
     function test_yield_child_withdraw_strategyIsChainC_aave() public {
-        // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
-        _selectFork(ethFork);
-        ethChildPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Aave);
-        _selectFork(baseFork);
-        baseParentPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Aave);
+        _setStrategy(ethChainSelector, IYieldPeer.Protocol.Aave);
         _selectFork(optFork);
-        optChildPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Aave);
+        _changePrank(withdrawer);
 
         /// @dev arrange
         optChildPeer.deposit(DEPOSIT_AMOUNT);
@@ -185,13 +176,9 @@ contract ChildWithdrawTest is BaseTest {
 
     /// @notice Scenario: Withdrawal is initiated from a child chain, Strategy chain is another child chain, Strategy Protocol is Compound.
     function test_yield_child_withdraw_strategyIsChainC_compound() public {
-        // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
-        _selectFork(ethFork);
-        ethChildPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Compound);
-        _selectFork(baseFork);
-        baseParentPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Compound);
+        _setStrategy(ethChainSelector, IYieldPeer.Protocol.Compound);
         _selectFork(optFork);
-        optChildPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Compound);
+        _changePrank(withdrawer);
 
         /// @dev arrange
         optChildPeer.deposit(DEPOSIT_AMOUNT);

@@ -55,8 +55,8 @@ contract ParentWithdrawTest is BaseTest {
 
     /// @notice Scenario: Withdraw made on Parent chain, where the Strategy is, and the Strategy Protocol is Compound
     function test_yield_parent_withdraw_strategyIsParent_compound() public {
-        // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
-        baseParentPeer.setStrategy(baseChainSelector, IYieldPeer.Protocol.Compound);
+        _setStrategy(baseChainSelector, IYieldPeer.Protocol.Compound);
+        _changePrank(withdrawer);
 
         /// @dev arrange
         baseParentPeer.deposit(DEPOSIT_AMOUNT);
@@ -86,11 +86,9 @@ contract ParentWithdrawTest is BaseTest {
 
     /// @notice Scenario: Withdraw made on Parent chain, where the Strategy is not, and the Strategy Protocol is Aave
     function test_yield_parent_withdraw_strategyIsNotParent_aave() public {
-        // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
-        _selectFork(optFork);
-        optChildPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
+        _setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
         _selectFork(baseFork);
-        baseParentPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
+        _changePrank(withdrawer);
 
         /// @dev arrange
         baseParentPeer.deposit(DEPOSIT_AMOUNT);
@@ -123,11 +121,9 @@ contract ParentWithdrawTest is BaseTest {
 
     /// @notice Scenario: Withdraw made on Parent chain, where the Strategy is not, and the Strategy Protocol is Compound
     function test_yield_parent_withdraw_strategyIsNotParent_compound() public {
-        // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
-        _selectFork(optFork);
-        optChildPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Compound);
+        _setStrategy(optChainSelector, IYieldPeer.Protocol.Compound);
         _selectFork(baseFork);
-        baseParentPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Compound);
+        _changePrank(withdrawer);
 
         /// @dev arrange
         baseParentPeer.deposit(DEPOSIT_AMOUNT);

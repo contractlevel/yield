@@ -239,6 +239,7 @@ contract BaseTest is Test {
         baseParentPeer.setCCIPGasLimit(INITIAL_CCIP_GAS_LIMIT);
         baseParentPeer.setAllowedChain(optChainSelector, true);
         baseParentPeer.setAllowedChain(ethChainSelector, true);
+        baseParentPeer.setAllowedChain(baseChainSelector, true);
         baseParentPeer.setAllowedPeer(optChainSelector, address(optChildPeer));
         baseParentPeer.setAllowedPeer(ethChainSelector, address(ethChildPeer));
         assertEq(baseParentPeer.getAllowedChain(optChainSelector), true);
@@ -488,5 +489,23 @@ contract BaseTest is Test {
         _changePrank(baseNetworkConfig.clf.functionsRouter);
         FunctionsClient(address(baseParentPeer)).handleOracleFulfillment(requestId, response, err);
         _stopPrank();
+    }
+
+    /// @notice Helper function to set the strategy across chains
+    /// @param chainSelector The chain selector of the strategy
+    /// @param protocol The protocol of the strategy
+    function _setStrategy(uint64 chainSelector, IYieldPeer.Protocol protocol) internal {
+        _selectFork(baseFork);
+
+        /// @dev set the strategy on the parent chain by pranking Chainlink Functions fulfillRequest
+        bytes32 requestId = bytes32("requestId");
+        bytes memory response = abi.encode(uint256(chainSelector), uint256(uint8(protocol)));
+        _fulfillRequest(requestId, response, "");
+
+        if (chainSelector == optChainSelector) {
+            ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
+        } else if (chainSelector == ethChainSelector) {
+            ccipLocalSimulatorFork.switchChainAndRouteMessage(ethFork);
+        }
     }
 }

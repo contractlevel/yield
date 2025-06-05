@@ -4,6 +4,7 @@ pragma solidity 0.8.26;
 import {BaseTest, IERC20} from "../../BaseTest.t.sol";
 import {IYieldPeer} from "../../../src/interfaces/IYieldPeer.sol";
 import {IComet} from "../../../src/interfaces/IComet.sol";
+import {console2} from "forge-std/console2.sol";
 
 contract ChildDepositTest is BaseTest {
     function setUp() public override {
@@ -25,8 +26,10 @@ contract ChildDepositTest is BaseTest {
     //     - ccipMessage to parent, passing amount deposited and `totalValue`
     //     - ccipReceive from parent, getting shareMintAmount
     function test_yield_child_deposit_strategyIsChild_aave() public {
-        // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
-        optChildPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
+        /// @dev arrange
+        _setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
+        _selectFork(optFork);
+        _changePrank(depositor);
 
         uint256 usdcBalanceBefore = optUsdc.balanceOf(depositor);
 
@@ -60,8 +63,10 @@ contract ChildDepositTest is BaseTest {
     }
 
     function test_yield_child_deposit_strategyIsChild_compound() public {
-        // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
-        optChildPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Compound);
+        /// @dev arrange
+        _setStrategy(optChainSelector, IYieldPeer.Protocol.Compound);
+        _selectFork(optFork);
+        _changePrank(depositor);
 
         uint256 usdcBalanceBefore = optUsdc.balanceOf(depositor);
 
@@ -99,10 +104,6 @@ contract ChildDepositTest is BaseTest {
     //     - deposit usdc directly into parent strategy
     //     - calculate and send `shareMintAmount` from parent-strategy to child
     function test_yield_child_deposit_strategyIsParent_aave() public {
-        // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
-        _selectFork(optFork);
-        optChildPeer.setStrategy(baseChainSelector, IYieldPeer.Protocol.Aave);
-
         uint256 usdcBalanceBefore = optUsdc.balanceOf(depositor);
 
         /// @dev act
@@ -137,11 +138,10 @@ contract ChildDepositTest is BaseTest {
     }
 
     function test_yield_child_deposit_strategyIsParent_compound() public {
-        // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
-        _selectFork(baseFork);
-        baseParentPeer.setStrategy(baseChainSelector, IYieldPeer.Protocol.Compound);
+        /// @dev arrange
+        _setStrategy(baseChainSelector, IYieldPeer.Protocol.Compound);
         _selectFork(optFork);
-        optChildPeer.setStrategy(baseChainSelector, IYieldPeer.Protocol.Compound);
+        _changePrank(depositor);
 
         uint256 usdcBalanceBefore = optUsdc.balanceOf(depositor);
 
@@ -182,13 +182,10 @@ contract ChildDepositTest is BaseTest {
     //     - send `totalValue` and depositData from strategy to parent
     //     - send `shareMintAmount` from parent to child
     function test_yield_child_deposit_strategyIsChainC_aave() public {
-        // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
-        _selectFork(ethFork);
-        ethChildPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Aave);
-        _selectFork(baseFork);
-        baseParentPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Aave);
+        /// @dev arrange
+        _setStrategy(ethChainSelector, IYieldPeer.Protocol.Aave);
         _selectFork(optFork);
-        optChildPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Aave);
+        _changePrank(depositor);
 
         uint256 usdcBalanceBefore = optUsdc.balanceOf(depositor);
 
@@ -227,13 +224,10 @@ contract ChildDepositTest is BaseTest {
     }
 
     function test_yield_child_deposit_strategyIsChainC_compound() public {
-        // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
-        _selectFork(ethFork);
-        ethChildPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Compound);
-        _selectFork(baseFork);
-        baseParentPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Compound);
+        /// @dev arrange
+        _setStrategy(ethChainSelector, IYieldPeer.Protocol.Compound);
         _selectFork(optFork);
-        optChildPeer.setStrategy(ethChainSelector, IYieldPeer.Protocol.Compound);
+        _changePrank(depositor);
 
         uint256 usdcBalanceBefore = optUsdc.balanceOf(depositor);
 

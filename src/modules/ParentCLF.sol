@@ -22,12 +22,16 @@ contract ParentCLF is ParentPeer, FunctionsClient {
     /// @dev Chainlink Functions gas limit
     uint32 internal constant CLF_GAS_LIMIT = 300_000;
     /// @dev Source code for the Chainlink Functions request
-    string internal constant SOURCE = "123";
+    string internal constant SOURCE = "https://raw.githubusercontent.com/contractlevel/yield/main/functions/src.js";
+    bytes internal constant ENCRYPTED_SECRET =
+        "0x4153bb6d413085aeb1a60f3574ceddfe021b4e5915e1a8dc02518668af9b738ab992e595217e19465ca9691e3bc0adb7915b94d3e8c1551456a251abd8fdf2c3c88d3ecf2cece543fd2b8fd8431bc547c5835de69ab6a29e49e0543bdb99c3c775be7aaec40a2576802233ef9ea841829b779e766a656fcbfd434a63ca79cf7fe328af03cc9e5f2280659014c9db075196e167c754bea74fdc0a085a879b58ac742eb6beb455e67211340639783f6d0baa190a288dd57949c7e058f6d09ab5ecdd7ea7af855bc6808004444b10e2c131590735a1fb2d957cfae404a62fd05f3b44";
 
     /// @dev Chainlink Functions DON ID
     bytes32 internal immutable i_donId;
     /// @dev Chainlink Functions subscription ID
     uint64 internal immutable i_clfSubId;
+    /// @dev Chainlink Functions encrypted secret
+    bytes internal s_encryptedSecret;
 
     /// @dev Chainlink Automation upkeep address
     /// @notice This is not "forwarder" because we are using time-based Automation
@@ -39,10 +43,15 @@ contract ParentCLF is ParentPeer, FunctionsClient {
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
+    /// @notice Emitted when a Chainlink Functions request is sent
     event CLFRequestSent(bytes32 indexed requestId);
+    /// @notice Emitted when a Chainlink Functions request returns an error
     event CLFRequestError(bytes32 indexed requestId, bytes err);
+    /// @notice Emitted when a Chainlink Functions request is fulfilled
     event CLFRequestFulfilled(bytes32 indexed requestId, uint64 indexed chainSelector, uint8 indexed protocolEnum);
+    /// @notice Emitted when a Chainlink Functions request returns an invalid chain selector
     event InvalidChainSelector(bytes32 indexed requestId, uint64 indexed chainSelector);
+    /// @notice Emitted when a Chainlink Functions request returns an invalid protocol enum
     event InvalidProtocolEnum(bytes32 indexed requestId, uint8 indexed protocolEnum);
 
     /*//////////////////////////////////////////////////////////////
@@ -90,7 +99,8 @@ contract ParentCLF is ParentPeer, FunctionsClient {
 
         /// @dev Send CLF request
         FunctionsRequest.Request memory req;
-        req._initializeRequestForInlineJavaScript(SOURCE);
+        req._initializeRequest(FunctionsRequest.Location.Remote, FunctionsRequest.CodeLanguage.JavaScript, SOURCE);
+        req._addSecretsReference(ENCRYPTED_SECRET);
 
         bytes32 requestId = _sendRequest(req._encodeCBOR(), i_clfSubId, CLF_GAS_LIMIT, i_donId);
 
@@ -100,6 +110,15 @@ contract ParentCLF is ParentPeer, FunctionsClient {
     /*//////////////////////////////////////////////////////////////
                                 INTERNAL
     //////////////////////////////////////////////////////////////*/
+    /// @notice Chainlink Functions request callback
+    /// @notice The CLF infrastructure calls this to return the chain selector and protocol enum for the strategy with the highest yield
+    /// @param requestId The ID of the request
+    /// @param response The response from the Chainlink Functions request
+    /// @param err The error from the Chainlink Functions request
+    /// @dev Return if the response is an error
+    /// @dev Return if the chain selector is not allowed
+    /// @dev Return if the protocol enum is not valid
+    /// @dev If there are no shares, there is no value in the system. Therefore there is nothing to rebalance.
     function _fulfillRequest(bytes32 requestId, bytes memory response, bytes memory err) internal override {
         if (err.length > 0) {
             emit CLFRequestError(requestId, err);
@@ -121,8 +140,9 @@ contract ParentCLF is ParentPeer, FunctionsClient {
         emit CLFRequestFulfilled(requestId, chainSelector, protocolEnum);
 
         /// @dev If there are no shares, there is no value in the system. Therefore there is nothing to rebalance.
-        // @review double check this invariant
-        if (s_totalShares == 0) return;
+        // @review double check this
+        // @review including this is a bug because then we cant rebalance regardless.
+        // if (s_totalShares == 0) return;
 
         _setStrategy(chainSelector, Protocol(protocolEnum));
     }
@@ -130,10 +150,16 @@ contract ParentCLF is ParentPeer, FunctionsClient {
     /*//////////////////////////////////////////////////////////////
                                  SETTER
     //////////////////////////////////////////////////////////////*/
+    /// @notice Set the Chainlink Automation upkeep address
+    /// @param upkeepAddress The address of the Chainlink Automation upkeep
+    /// @dev Revert if the caller is not the owner
     function setUpkeepAddress(address upkeepAddress) external onlyOwner {
         s_upkeepAddress = upkeepAddress;
     }
 
+    /// @notice Set the number of protocols
+    /// @param numberOfProtocols The number of protocols
+    /// @dev Revert if the caller is not the owner
     function setNumberOfProtocols(uint8 numberOfProtocols) external onlyOwner {
         s_numberOfProtocols = numberOfProtocols;
     }
@@ -141,14 +167,17 @@ contract ParentCLF is ParentPeer, FunctionsClient {
     /*//////////////////////////////////////////////////////////////
                                  GETTER
     //////////////////////////////////////////////////////////////*/
+    /// @return The address of the Chainlink Functions router
     function getFunctionsRouter() external view returns (address) {
         return address(i_functionsRouter);
     }
 
+    /// @return The Chainlink Functions DON ID
     function getDonId() external view returns (bytes32) {
         return i_donId;
     }
 
+    /// @return The Chainlink Functions subscription ID
     function getClfSubId() external view returns (uint64) {
         return i_clfSubId;
     }

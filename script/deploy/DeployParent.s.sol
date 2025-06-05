@@ -17,16 +17,14 @@ contract DeployParent is Script {
     function run() public returns (Share, SharePool, ParentCLF, HelperConfig, uint64) {
         HelperConfig config = new HelperConfig();
         HelperConfig.NetworkConfig memory networkConfig = config.getActiveNetworkConfig();
-        address functionsRouter = networkConfig.clf.functionsRouter;
 
         vm.startBroadcast();
-        // bytes32 allowListId = IFunctionsRouter(functionsRouter).getAllowListId();
-        // address termsOfServiceAllowList = IFunctionsRouter(functionsRouter).getContractById(allowListId);
-        uint64 clfSubId = IFunctionsSubscriptions(functionsRouter).createSubscription();
+        uint64 clfSubId = IFunctionsSubscriptions(networkConfig.clf.functionsRouter).createSubscription();
 
         Share share = new Share();
         SharePool sharePool =
             new SharePool(share, new address[](0), networkConfig.ccip.rmnProxy, networkConfig.ccip.ccipRouter);
+
         ParentCLF parentPeer = new ParentCLF(
             networkConfig.ccip.ccipRouter,
             networkConfig.tokens.link,
@@ -35,10 +33,12 @@ contract DeployParent is Script {
             networkConfig.protocols.aavePoolAddressesProvider,
             networkConfig.protocols.comet,
             address(share),
-            functionsRouter,
+            networkConfig.clf.functionsRouter,
             networkConfig.clf.donId,
             clfSubId
         );
+        // networkConfig.clf.encryptedSecret
+
         share.grantMintAndBurnRoles(address(sharePool));
         share.grantMintAndBurnRoles(address(parentPeer));
 

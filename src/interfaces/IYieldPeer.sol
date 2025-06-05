@@ -36,7 +36,7 @@ interface IYieldPeer {
     struct WithdrawData {
         address withdrawer; // user who is withdrawing USDC
         uint256 shareBurnAmount; // amount of shares burned
-        uint256 totalShares; // total shares in the system
+        uint256 totalShares; // total shares in the system (updated on the parent chain)
         uint256 usdcWithdrawAmount; // amount of USDC to withdraw // @review do we need this if we have tokenAmounts?
         uint64 chainSelector; // chain selector of the chain the withdrawal originated from
     }

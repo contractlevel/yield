@@ -57,8 +57,9 @@ contract ParentDepositTest is BaseTest {
 
     /// @notice Scenario: Deposit made on Parent chain, where the Strategy is, and the Strategy Protocol is Compound
     function test_yield_parent_deposit_strategyIsParent_compound() public {
-        // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
-        baseParentPeer.setStrategy(baseChainSelector, IYieldPeer.Protocol.Compound);
+        _setStrategy(baseChainSelector, IYieldPeer.Protocol.Compound);
+        _selectFork(baseFork);
+        _changePrank(depositor);
 
         uint256 usdcBalanceBefore = baseUsdc.balanceOf(depositor);
 
@@ -92,11 +93,9 @@ contract ParentDepositTest is BaseTest {
 
     /// @notice Scenario: Deposit made on Parent chain, where the Strategy is not, and the Strategy Protocol is Aave
     function test_yield_parent_deposit_strategyIsChild_aave() public {
-        // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
-        _selectFork(optFork);
-        optChildPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
+        _setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
         _selectFork(baseFork);
-        baseParentPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
+        _changePrank(depositor);
 
         uint256 usdcBalanceBefore = baseUsdc.balanceOf(depositor);
 
@@ -131,11 +130,9 @@ contract ParentDepositTest is BaseTest {
 
     /// @notice Scenario: Deposit made on Parent chain, where the Strategy is not, and the Strategy Protocol is Compound
     function test_yield_parent_deposit_strategyIsChild_compound() public {
-        // @review REPLACE THIS WITH A WRAPPER OR ACTUAL CLF CALLTRACE
-        _selectFork(optFork);
-        optChildPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Compound);
+        _setStrategy(optChainSelector, IYieldPeer.Protocol.Compound);
         _selectFork(baseFork);
-        baseParentPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Compound);
+        _changePrank(depositor);
 
         uint256 usdcBalanceBefore = baseUsdc.balanceOf(depositor);
 

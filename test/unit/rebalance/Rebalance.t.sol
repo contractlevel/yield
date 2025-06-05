@@ -88,11 +88,9 @@ contract RebalanceTest is BaseTest {
 
     /// @notice Scenario: Old Strategy is on child chain, New Strategy is on same child chain, but different protocol
     function test_yield_rebalance_oldChild_newChild() public {
-        // @review REMOVE THIS AND REPLACE WITH CLF CALL
-        _selectFork(optFork);
-        optChildPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
+        _setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
         _selectFork(baseFork);
-        baseParentPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
+        _changePrank(depositor);
 
         /// @dev arrange
         /// @notice the current/old strategy chain is the child (opt) and the protocol is Aave
@@ -128,10 +126,9 @@ contract RebalanceTest is BaseTest {
 
     /// @notice Scenario: Old Strategy is on Parent, New Strategy is on child chain
     function test_yield_rebalance_oldParent_newChild() public {
-        // @review REMOVE THIS AND REPLACE WITH CLF CALL
-        _selectFork(optFork);
-        optChildPeer.setStrategy(baseChainSelector, IYieldPeer.Protocol.Aave);
+        _setStrategy(baseChainSelector, IYieldPeer.Protocol.Aave);
         _selectFork(baseFork);
+        _changePrank(depositor);
 
         /// @dev arrange
         /// @notice strategy chain selector here is the parent (base)
@@ -164,11 +161,9 @@ contract RebalanceTest is BaseTest {
 
     /// @notice Scenario: Old Strategy is on child chain, New Strategy is on Parent
     function test_yield_rebalance_oldChild_newParent() public {
-        // @review REMOVE THIS AND REPLACE WITH CLF CALL
-        _selectFork(optFork);
-        optChildPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
+        _setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
         _selectFork(baseFork);
-        baseParentPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
+        _changePrank(depositor);
 
         /// @dev arrange
         /// @notice the current/old strategy chain is the child (opt) and the protocol is Aave
@@ -205,13 +200,9 @@ contract RebalanceTest is BaseTest {
 
     /// @notice Scenario: Old Strategy is on a Child chain, New Strategy is on a different Child chain ("Chain C")
     function test_yield_rebalance_oldChild_newChainC() public {
-        // @review REMOVE THIS AND REPLACE WITH CLF CALL
-        _selectFork(ethFork);
-        ethChildPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
-        _selectFork(optFork);
-        optChildPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
+        _setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
         _selectFork(baseFork);
-        baseParentPeer.setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
+        _changePrank(depositor);
 
         /// @dev arrange
         /// @notice the current/old strategy chain is the child (opt) and the protocol is Aave
@@ -229,9 +220,12 @@ contract RebalanceTest is BaseTest {
 
         /// @dev act
         /// @notice here we are setting the strategy chain selector to a different child (eth)
-        baseParentPeer.rebalance(
-            IYieldPeer.Strategy({chainSelector: ethChainSelector, protocol: IYieldPeer.Protocol.Aave})
-        );
+        // baseParentPeer.rebalance(
+        //     IYieldPeer.Strategy({chainSelector: ethChainSelector, protocol: IYieldPeer.Protocol.Aave})
+        // );
+        bytes32 requestId = keccak256("requestId");
+        bytes memory response = abi.encode(uint256(ethChainSelector), uint256(0));
+        _fulfillRequest(requestId, response, "");
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(ethFork, attesters, attesterPks);
 
