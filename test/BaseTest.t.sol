@@ -41,11 +41,9 @@ contract BaseTest is Test {
     uint256 internal constant LINK_AMOUNT = 1_000 * 1e18; // 1000 LINK
     uint256 internal constant INITIAL_CCIP_GAS_LIMIT = 500_000;
 
-    string internal constant BASE_MAINNET_RPC_URL = "https://mainnet.base.org";
     uint256 internal constant BASE_MAINNET_CHAIN_ID = 8453;
     uint256 internal baseFork;
 
-    string internal constant OPTIMISM_MAINNET_RPC_URL = "https://mainnet.optimism.io";
     uint256 internal constant OPTIMISM_MAINNET_CHAIN_ID = 10;
     uint256 internal optFork;
 
@@ -130,7 +128,7 @@ contract BaseTest is Test {
 
     function _deployInfra() internal {
         // Deploy on Base
-        baseFork = vm.createSelectFork(BASE_MAINNET_RPC_URL);
+        baseFork = vm.createSelectFork(vm.envString("BASE_MAINNET_RPC_URL"));
         assertEq(block.chainid, BASE_MAINNET_CHAIN_ID);
 
         _bypassClfTermsOfService();
@@ -148,7 +146,7 @@ contract BaseTest is Test {
         baseCCTPMessageTransmitter = IMessageTransmitter(baseNetworkConfig.ccip.cctpMessageTransmitter);
 
         // Deploy on Optimism
-        optFork = vm.createSelectFork(OPTIMISM_MAINNET_RPC_URL);
+        optFork = vm.createSelectFork(vm.envString("OPTIMISM_MAINNET_RPC_URL"));
         assertEq(block.chainid, OPTIMISM_MAINNET_CHAIN_ID);
 
         DeployChild optDeployChild = new DeployChild();
@@ -524,5 +522,12 @@ contract BaseTest is Test {
         } else if (chainSelector == ethChainSelector) {
             ccipLocalSimulatorFork.switchChainAndRouteMessage(ethFork);
         }
+    }
+
+    function _dealAndApproveUsdc(uint256 forkId, address approver, address approvee, uint256 amount) internal {
+        _selectFork(forkId);
+        deal(address(baseUsdc), approver, amount);
+        _changePrank(approver);
+        baseUsdc.approve(approvee, amount);
     }
 }

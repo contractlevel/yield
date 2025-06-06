@@ -473,4 +473,8 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     function getIsStrategyChain() external view returns (bool) {
         return s_strategyPool != address(0);
     }
+
+    function getCCIPGasLimit() external view returns (uint256) {
+        return s_ccipGasLimit;
+    }
 }
