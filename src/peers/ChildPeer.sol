@@ -76,17 +76,20 @@ contract ChildPeer is YieldPeer {
     /// @notice This function is called when a SHARE holder transferAndCall()s to this contract
     /// @param withdrawer The address of the SHARE holder to send withdrawn USDC to
     /// @param shareBurnAmount The amount of SHARE to burn
+    /// @param encodedWithdrawChainSelector The encoded chain selector to withdraw USDC to. If this is empty, the withdrawn USDC will be sent back to this chain
+    /// @dev Revert if encodedWithdrawChainSelector doesn't decode to an allowed chain selector
     /// @dev Revert if msg.sender is not the SHARE token
     /// @dev Revert if shareBurnAmount is 0
     /// @dev Burn the SHARE tokens and send a message to the parent chain to withdraw USDC from the strategy
-    function onTokenTransfer(address withdrawer, uint256 shareBurnAmount, bytes calldata /* data */ )
+    function onTokenTransfer(address withdrawer, uint256 shareBurnAmount, bytes calldata encodedWithdrawChainSelector)
         external
         override
     {
         _revertIfMsgSenderIsNotShare();
         _revertIfZeroAmount(shareBurnAmount);
         _burnShares(withdrawer, shareBurnAmount);
-        WithdrawData memory withdrawData = _buildWithdrawData(withdrawer, shareBurnAmount);
+        WithdrawData memory withdrawData =
+            _buildWithdrawData(withdrawer, shareBurnAmount, _decodeWithdrawChainSelector(encodedWithdrawChainSelector));
         _ccipSend(i_parentChainSelector, CcipTxType.WithdrawToParent, abi.encode(withdrawData), ZERO_BRIDGE_AMOUNT);
         emit WithdrawInitiated(withdrawer, shareBurnAmount, i_thisChainSelector);
     }

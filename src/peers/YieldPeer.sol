@@ -332,6 +332,20 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         emit SharesBurned(from, amount);
     }
 
+    /// @notice Decodes the chain selector to withdraw USDC to from the data
+    /// @param data The data to decode
+    /// @return withdrawChainSelector The chain selector to withdraw USDC to
+    /// @dev Revert if the chain selector is not allowed
+    /// @dev If the data is empty, the withdrawn USDC will be sent back to the chain the withdrawal was initiated on
+    function _decodeWithdrawChainSelector(bytes calldata data) internal view returns (uint64 withdrawChainSelector) {
+        if (data.length > 0) {
+            withdrawChainSelector = abi.decode(data, (uint64));
+            if (!s_allowedChains[withdrawChainSelector]) revert YieldPeer__ChainNotAllowed(withdrawChainSelector);
+        } else {
+            withdrawChainSelector = i_thisChainSelector;
+        }
+    }
+
     /*//////////////////////////////////////////////////////////////
                              INTERNAL VIEW
     //////////////////////////////////////////////////////////////*/
@@ -344,12 +358,12 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         depositData = DataStructures.buildDepositData(msg.sender, amount, i_thisChainSelector);
     }
 
-    function _buildWithdrawData(address withdrawer, uint256 shareBurnAmount)
+    function _buildWithdrawData(address withdrawer, uint256 shareBurnAmount, uint64 withdrawChainSelector)
         internal
-        view
+        pure
         returns (WithdrawData memory withdrawData)
     {
-        withdrawData = DataStructures.buildWithdrawData(withdrawer, shareBurnAmount, i_thisChainSelector);
+        withdrawData = DataStructures.buildWithdrawData(withdrawer, shareBurnAmount, withdrawChainSelector);
     }
 
     function _getTotalValueFromStrategy(address strategyPool) internal view returns (uint256 totalValue) {

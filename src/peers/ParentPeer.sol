@@ -93,18 +93,22 @@ contract ParentPeer is YieldPeer {
     /// @notice This function is used to withdraw USDC from the system
     /// @param withdrawer The address that transferred the SHAREs to withdraw their USDC from the system
     /// @param shareBurnAmount The amount of SHAREs transferred to be burned
+    /// @param encodedWithdrawChainSelector The encoded chain selector to withdraw USDC to. If this is empty, the withdrawn USDC will be sent back to this chain
+    /// @dev Revert if encodedWithdrawChainSelector doesn't decode to an allowed chain selector
     /// @dev Revert if msg.sender is not the SHARE token
     /// @dev Revert if shareBurnAmount is 0
     /// @dev Update s_totalShares and burn shares from msg.sender
     /// @dev Handle the case where the parent is the strategy
     /// @dev Handle the case where the parent is not the strategy
-    function onTokenTransfer(address withdrawer, uint256 shareBurnAmount, bytes calldata /* data */ )
+    function onTokenTransfer(address withdrawer, uint256 shareBurnAmount, bytes calldata encodedWithdrawChainSelector)
         external
         override
     {
         _revertIfMsgSenderIsNotShare();
 
         _revertIfZeroAmount(shareBurnAmount);
+
+        uint64 withdrawChainSelector = _decodeWithdrawChainSelector(encodedWithdrawChainSelector);
 
         /// @dev cache totalShares before updating
         uint256 totalShares = s_totalShares;
@@ -113,6 +117,7 @@ contract ParentPeer is YieldPeer {
         s_totalShares -= shareBurnAmount;
         _burnShares(withdrawer, shareBurnAmount);
         emit ShareBurned(shareBurnAmount, i_thisChainSelector, totalShares - shareBurnAmount);
+        emit WithdrawInitiated(withdrawer, shareBurnAmount, i_thisChainSelector);
 
         Strategy memory strategy = s_strategy;
 
@@ -124,11 +129,22 @@ contract ParentPeer is YieldPeer {
             uint256 usdcWithdrawAmount = _calculateWithdrawAmount(totalValue, totalShares, shareBurnAmount);
 
             _withdrawFromStrategy(strategyPool, usdcWithdrawAmount);
-            _transferUsdcTo(withdrawer, usdcWithdrawAmount);
+
+            if (withdrawChainSelector == i_thisChainSelector) {
+                _transferUsdcTo(withdrawer, usdcWithdrawAmount);
+                emit WithdrawCompleted(withdrawer, usdcWithdrawAmount);
+            } else {
+                WithdrawData memory withdrawData =
+                    _buildWithdrawData(withdrawer, shareBurnAmount, withdrawChainSelector);
+                withdrawData.usdcWithdrawAmount = usdcWithdrawAmount;
+                _ccipSend(
+                    withdrawChainSelector, CcipTxType.WithdrawCallback, abi.encode(withdrawData), usdcWithdrawAmount
+                );
+            }
         }
         // 2. This Parent is not the Strategy. Therefore the shareBurnAmount is sent to the strategy and the USDC tokens usdcWithdrawAmount is sent back.
         else {
-            WithdrawData memory withdrawData = _buildWithdrawData(withdrawer, shareBurnAmount);
+            WithdrawData memory withdrawData = _buildWithdrawData(withdrawer, shareBurnAmount, withdrawChainSelector);
             withdrawData.totalShares = totalShares;
             _ccipSend(
                 strategy.chainSelector, CcipTxType.WithdrawToStrategy, abi.encode(withdrawData), ZERO_BRIDGE_AMOUNT
@@ -241,12 +257,17 @@ contract ParentPeer is YieldPeer {
         if (strategy.chainSelector == i_thisChainSelector) {
             withdrawData.usdcWithdrawAmount = _withdrawFromStrategyAndGetUsdcWithdrawAmount(withdrawData);
 
-            _ccipSend(
-                withdrawData.chainSelector,
-                CcipTxType.WithdrawCallback,
-                abi.encode(withdrawData),
-                withdrawData.usdcWithdrawAmount
-            );
+            if (withdrawData.chainSelector == i_thisChainSelector) {
+                _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
+                emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
+            } else {
+                _ccipSend(
+                    withdrawData.chainSelector,
+                    CcipTxType.WithdrawCallback,
+                    abi.encode(withdrawData),
+                    withdrawData.usdcWithdrawAmount
+                );
+            }
         }
         // 2. If the parent is not the strategy, we want to forward the withdrawData to the strategy
         else {
