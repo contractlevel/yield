@@ -446,6 +446,7 @@ contract BaseTest is Test {
         LinkTokenInterface(baseParentPeer.getLink()).transferAndCall(functionsRouter, LINK_AMOUNT, abi.encode(clfSubId));
     }
 
+    /// @notice empty test to skip file in coverage
     function test_baseTest() public {}
 
     /*//////////////////////////////////////////////////////////////

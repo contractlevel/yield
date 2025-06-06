@@ -37,7 +37,6 @@ contract DeployParent is Script {
             networkConfig.clf.donId,
             clfSubId
         );
-        // networkConfig.clf.encryptedSecret
 
         share.grantMintAndBurnRoles(address(sharePool));
         share.grantMintAndBurnRoles(address(parentPeer));

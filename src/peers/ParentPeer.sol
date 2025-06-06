@@ -9,6 +9,7 @@ import {YieldPeer, Client, IRouterClient, CCIPOperations} from "./YieldPeer.sol"
 /// @notice This contract is deployed on only one chain
 /// @notice Users can deposit and withdraw USDC to/from the system via this contract
 /// @notice This contract tracks system wide state and acts as a system wide hub for forwarding CCIP messages to the Strategy
+/// @notice This version of ParentPeer is incomplete - ParentCLF must be used as it inherits this and implements Automation and Functions
 contract ParentPeer is YieldPeer {
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
@@ -51,6 +52,7 @@ contract ParentPeer is YieldPeer {
         address share
     ) YieldPeer(ccipRouter, link, thisChainSelector, usdc, aavePoolAddressesProvider, comet, share) {
         // @review modularize this
+        // @review CHANGE THIS TO COMPOUND IF PARENT IS BASE SEPOLIA - AAVE V3 IS NOT ON BASE SEPOLIA
         s_strategy = Strategy({chainSelector: thisChainSelector, protocol: Protocol.Aave});
         _updateStrategyPool(thisChainSelector, Protocol.Aave);
     }

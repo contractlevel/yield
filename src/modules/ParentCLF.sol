@@ -5,6 +5,11 @@ import {ParentPeer} from "../peers/ParentPeer.sol";
 import {FunctionsClient} from "@chainlink/contracts/src/v0.8/functions/v1_3_0/FunctionsClient.sol";
 import {FunctionsRequest} from "@chainlink/contracts/src/v0.8/functions/dev/v1_X/libraries/FunctionsRequest.sol";
 
+/// @title CLY Parent Peer with Chainlink Functions
+/// @author @contractlevel
+/// @notice This is the contract that must be used as the ParentPeer for the CLY system as it includes essential functionality
+/// @notice This contract handles the Automation of the CLY system by using Chainlink Functions to fetch the strategy with the highest yield
+/// @notice This contract must inherit ParentPeer
 contract ParentCLF is ParentPeer, FunctionsClient {
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS
@@ -22,16 +27,17 @@ contract ParentCLF is ParentPeer, FunctionsClient {
     /// @dev Chainlink Functions gas limit
     uint32 internal constant CLF_GAS_LIMIT = 300_000;
     /// @dev Source code for the Chainlink Functions request
-    string internal constant SOURCE = "https://raw.githubusercontent.com/contractlevel/yield/main/functions/src.js";
+    /// @notice This includes a remote script that is fetched from the contract level repo, enabling us to add more protocols and chains without redeploying this contract
+    string internal constant SOURCE =
+        "try { const r = await fetch('https://raw.githubusercontent.com/contractlevel/yield/main/functions/src.min.js'); if (!r.ok) throw Error('F:' + r.status); return eval(await r.text()); } catch (e) { return Functions.encodeString(e.message.slice(0,99)); }";
+    /// @dev Encrypted secret for the Chainlink Functions request
     bytes internal constant ENCRYPTED_SECRET =
-        "0x4153bb6d413085aeb1a60f3574ceddfe021b4e5915e1a8dc02518668af9b738ab992e595217e19465ca9691e3bc0adb7915b94d3e8c1551456a251abd8fdf2c3c88d3ecf2cece543fd2b8fd8431bc547c5835de69ab6a29e49e0543bdb99c3c775be7aaec40a2576802233ef9ea841829b779e766a656fcbfd434a63ca79cf7fe328af03cc9e5f2280659014c9db075196e167c754bea74fdc0a085a879b58ac742eb6beb455e67211340639783f6d0baa190a288dd57949c7e058f6d09ab5ecdd7ea7af855bc6808004444b10e2c131590735a1fb2d957cfae404a62fd05f3b44";
+        hex"1b4e2d1a565a496c987dc6d8303c52370378b6dcecfd8c1a11b7141822be2b3cb96daba5632633858fe0f07fd5ac85b5293101588003a9f260b0c3d1134765de7b9b16bc1d9087affbf117c4b40a259bc618892ade4707190950fd320e239e36e1f16d577e8c9ed52bad67544530dbca3d846dc4b1f3f8eb6c7a6346172762f449be0d5bcfac35dde9a342db2e009d19c87facf05164b6a3ea257c5a687190b38ec8fd117bfc6a27d7da08abb980afb3aca40b71adbf1cf823b6a3b7bda583e3dc76f1e828bb991398c0b0ee96a2b6c5414c86f62e317286480850e80e8d6ab32718640ef44135f7a875b29e757566a823";
 
     /// @dev Chainlink Functions DON ID
     bytes32 internal immutable i_donId;
     /// @dev Chainlink Functions subscription ID
     uint64 internal immutable i_clfSubId;
-    /// @dev Chainlink Functions encrypted secret
-    bytes internal s_encryptedSecret;
 
     /// @dev Chainlink Automation upkeep address
     /// @notice This is not "forwarder" because we are using time-based Automation
@@ -99,11 +105,12 @@ contract ParentCLF is ParentPeer, FunctionsClient {
 
         /// @dev Send CLF request
         FunctionsRequest.Request memory req;
-        req._initializeRequest(FunctionsRequest.Location.Remote, FunctionsRequest.CodeLanguage.JavaScript, SOURCE);
+        req._initializeRequest(FunctionsRequest.Location.Inline, FunctionsRequest.CodeLanguage.JavaScript, SOURCE);
         req._addSecretsReference(ENCRYPTED_SECRET);
 
         bytes32 requestId = _sendRequest(req._encodeCBOR(), i_clfSubId, CLF_GAS_LIMIT, i_donId);
 
+        // @review I dont think we need this because _sendRequest emits an essentially identical event
         emit CLFRequestSent(requestId);
     }
 
@@ -118,7 +125,6 @@ contract ParentCLF is ParentPeer, FunctionsClient {
     /// @dev Return if the response is an error
     /// @dev Return if the chain selector is not allowed
     /// @dev Return if the protocol enum is not valid
-    /// @dev If there are no shares, there is no value in the system. Therefore there is nothing to rebalance.
     function _fulfillRequest(bytes32 requestId, bytes memory response, bytes memory err) internal override {
         if (err.length > 0) {
             emit CLFRequestError(requestId, err);
