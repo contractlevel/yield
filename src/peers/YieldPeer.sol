@@ -40,7 +40,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     uint256 internal constant USDC_DECIMALS = 1e6;
     /// @dev Constant for the Share decimals
     uint256 internal constant SHARE_DECIMALS = 1e18;
-    /// @dev Constant for the initial share precision
+    /// @dev Constant for the initial share precision used to calculate the mint amount for first deposit
     uint256 internal constant INITIAL_SHARE_PRECISION = SHARE_DECIMALS / USDC_DECIMALS;
 
     /// @dev Chainlink token
@@ -71,11 +71,19 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
+    /// @notice Emitted when a chain is set as allowed
     event AllowedChainSet(uint64 indexed chainSelector, bool indexed isAllowed);
+    /// @notice Emitted when a peer is set as allowed for an allowed chain
     event AllowedPeerSet(uint64 indexed chainSelector, address indexed peer);
+    /// @notice Emitted when the CCIP gas limit is set
     event CCIPGasLimitSet(uint256 indexed gasLimit);
+
+    /// @notice Emitted when the strategy pool is updated
     event StrategyPoolUpdated(address indexed strategyPool);
+
+    /// @notice Emitted when USDC is deposited to the strategy
     event DepositToStrategy(address indexed strategyPool, uint256 indexed amount);
+    /// @notice Emitted when USDC is withdrawn from the strategy
     event WithdrawFromStrategy(address indexed strategyPool, uint256 indexed amount);
 
     /// @notice Emitted when a user deposits USDC into the system
@@ -91,6 +99,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     event CCIPMessageSent(bytes32 indexed messageId, CcipTxType indexed txType, uint256 indexed amount);
     /// @notice Emitted when a CCIP message is received from the parent chain
     event CCIPMessageReceived(bytes32 indexed messageId, CcipTxType indexed txType, uint64 indexed sourceChainSelector);
+
     /// @notice Emitted when shares are minted
     event SharesMinted(address indexed to, uint256 indexed amount);
     /// @notice Emitted when shares are burned

@@ -20,22 +20,21 @@ contract SharePool is BurnMintTokenPool {
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
     /// @param shareToken The SHARE token contract for this chain
-    /// @param officialShareTokens Array of addresses of official SHARE token deployments on other chains
     /// @param rmnProxy The Risk Management Network proxy address
     /// @param ccipRouter The CCIP router address
-    constructor(IBurnMintERC20 shareToken, address[] memory officialShareTokens, address rmnProxy, address ccipRouter)
-        BurnMintTokenPool(shareToken, 18, officialShareTokens, rmnProxy, ccipRouter)
+    constructor(IBurnMintERC20 shareToken, address rmnProxy, address ccipRouter)
+        BurnMintTokenPool(shareToken, 18, new address[](0), rmnProxy, ccipRouter)
     {}
 
-    /*//////////////////////////////////////////////////////////////
-                                EXTERNAL
-    //////////////////////////////////////////////////////////////*/
-    /// @notice transferAndCall SHAREs to this contract to move them across chains
-    /// @param sender The address that transferred the SHAREs
-    /// @param amount The amount of SHAREs transferred
-    /// @param data This should decode to the destination chain selector
-    /// @dev Revert if the msg.sender is not the SHARE token
-    /// @dev Revert if the destination chain selector is not allowed
+    // /*//////////////////////////////////////////////////////////////
+    //                             EXTERNAL
+    // //////////////////////////////////////////////////////////////*/
+    // /// @notice transferAndCall SHAREs to this contract to move them across chains
+    // /// @param sender The address that transferred the SHAREs
+    // /// @param amount The amount of SHAREs transferred
+    // /// @param data This should decode to the destination chain selector
+    // /// @dev Revert if the msg.sender is not the SHARE token
+    // /// @dev Revert if the destination chain selector is not allowed
     // function onTokenTransfer(address sender, uint256 amount, bytes calldata data) external {
     //     if (msg.sender != address(i_token)) revert SharePool__OnlyShare();
 

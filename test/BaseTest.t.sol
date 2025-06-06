@@ -87,6 +87,7 @@ contract BaseTest is Test {
     address internal owner = makeAddr("owner");
     address internal depositor = makeAddr("depositor");
     address internal withdrawer = makeAddr("withdrawer");
+    address internal holder = makeAddr("holder");
     address internal upkeepAddress = makeAddr("upkeepAddress");
     address[] internal attesters = new address[](4);
     address internal cctpAttester1;
@@ -184,54 +185,69 @@ contract BaseTest is Test {
     }
 
     function _setPools() internal {
-        uint64[] memory remoteChains = new uint64[](2);
-        address[] memory remotePools = new address[](2);
-        address[] memory remoteTokens = new address[](2);
+        uint64[] memory remoteChains = new uint64[](3);
+        address[] memory remotePools = new address[](3);
+        address[] memory remoteTokens = new address[](3);
 
         // Set up Base's pool to know about Optimism and Ethereum
         _selectFork(baseFork);
         remoteChains[0] = optChainSelector;
         remoteChains[1] = ethChainSelector;
-        remotePools[0] = address(optChildPeer);
-        remotePools[1] = address(ethChildPeer);
+        remoteChains[2] = baseChainSelector;
+        remotePools[0] = address(optSharePool);
+        remotePools[1] = address(ethSharePool);
+        remotePools[2] = address(baseSharePool);
         remoteTokens[0] = address(optShare);
         remoteTokens[1] = address(ethShare);
+        remoteTokens[2] = address(baseShare);
         _applyChainUpdates(baseSharePool, remoteChains, remotePools, remoteTokens);
         _assertArraysEqual(baseSharePool.getSupportedChains(), remoteChains);
-        assertEq(baseSharePool.isRemotePool(optChainSelector, abi.encode(address(optChildPeer))), true);
-        assertEq(baseSharePool.isRemotePool(ethChainSelector, abi.encode(address(ethChildPeer))), true);
+        assertEq(baseSharePool.isRemotePool(optChainSelector, abi.encode(address(optSharePool))), true);
+        assertEq(baseSharePool.isRemotePool(ethChainSelector, abi.encode(address(ethSharePool))), true);
+        assertEq(baseSharePool.isRemotePool(baseChainSelector, abi.encode(address(baseSharePool))), true);
         assertEq(baseSharePool.getRemoteToken(optChainSelector), abi.encode(address(optShare)));
         assertEq(baseSharePool.getRemoteToken(ethChainSelector), abi.encode(address(ethShare)));
+        assertEq(baseSharePool.getRemoteToken(baseChainSelector), abi.encode(address(baseShare)));
 
         // Set up Optimism's pool to know about Base and Ethereum
         _selectFork(optFork);
         remoteChains[0] = baseChainSelector;
         remoteChains[1] = ethChainSelector;
-        remotePools[0] = address(baseParentPeer);
-        remotePools[1] = address(ethChildPeer);
+        remoteChains[2] = optChainSelector;
+        remotePools[0] = address(baseSharePool);
+        remotePools[1] = address(ethSharePool);
+        remotePools[2] = address(optSharePool);
         remoteTokens[0] = address(baseShare);
         remoteTokens[1] = address(ethShare);
+        remoteTokens[2] = address(optShare);
         _applyChainUpdates(optSharePool, remoteChains, remotePools, remoteTokens);
         _assertArraysEqual(optSharePool.getSupportedChains(), remoteChains);
-        assertEq(optSharePool.isRemotePool(baseChainSelector, abi.encode(address(baseParentPeer))), true);
-        assertEq(optSharePool.isRemotePool(ethChainSelector, abi.encode(address(ethChildPeer))), true);
+        assertEq(optSharePool.isRemotePool(baseChainSelector, abi.encode(address(baseSharePool))), true);
+        assertEq(optSharePool.isRemotePool(ethChainSelector, abi.encode(address(ethSharePool))), true);
+        assertEq(optSharePool.isRemotePool(optChainSelector, abi.encode(address(optSharePool))), true);
         assertEq(optSharePool.getRemoteToken(baseChainSelector), abi.encode(address(baseShare)));
         assertEq(optSharePool.getRemoteToken(ethChainSelector), abi.encode(address(ethShare)));
+        assertEq(optSharePool.getRemoteToken(optChainSelector), abi.encode(address(optShare)));
 
         // Set up Ethereum's pool to know about Base and Optimism
         _selectFork(ethFork);
         remoteChains[0] = baseChainSelector;
         remoteChains[1] = optChainSelector;
-        remotePools[0] = address(baseParentPeer);
-        remotePools[1] = address(optChildPeer);
+        remoteChains[2] = ethChainSelector;
+        remotePools[0] = address(baseSharePool);
+        remotePools[1] = address(optSharePool);
+        remotePools[2] = address(ethSharePool);
         remoteTokens[0] = address(baseShare);
         remoteTokens[1] = address(optShare);
+        remoteTokens[2] = address(ethShare);
         _applyChainUpdates(ethSharePool, remoteChains, remotePools, remoteTokens);
         _assertArraysEqual(ethSharePool.getSupportedChains(), remoteChains);
-        assertEq(ethSharePool.isRemotePool(baseChainSelector, abi.encode(address(baseParentPeer))), true);
-        assertEq(ethSharePool.isRemotePool(optChainSelector, abi.encode(address(optChildPeer))), true);
+        assertEq(ethSharePool.isRemotePool(baseChainSelector, abi.encode(address(baseSharePool))), true);
+        assertEq(ethSharePool.isRemotePool(optChainSelector, abi.encode(address(optSharePool))), true);
+        assertEq(ethSharePool.isRemotePool(ethChainSelector, abi.encode(address(ethSharePool))), true);
         assertEq(ethSharePool.getRemoteToken(baseChainSelector), abi.encode(address(baseShare)));
         assertEq(ethSharePool.getRemoteToken(optChainSelector), abi.encode(address(optShare)));
+        assertEq(ethSharePool.getRemoteToken(ethChainSelector), abi.encode(address(ethShare)));
     }
 
     function _setCrossChainPeers() internal {

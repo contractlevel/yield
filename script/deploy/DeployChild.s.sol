@@ -6,6 +6,9 @@ import {HelperConfig} from "../HelperConfig.s.sol";
 import {ChildPeer} from "../../src/peers/ChildPeer.sol";
 import {Share} from "../../src/token/Share.sol";
 import {SharePool} from "../../src/token/SharePool.sol";
+import {ITokenAdminRegistry} from "@chainlink/contracts/src/v0.8/ccip/interfaces/ITokenAdminRegistry.sol";
+import {RegistryModuleOwnerCustom} from
+    "@chainlink/contracts/src/v0.8/ccip/tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
 
 contract DeployChild is Script {
     /*//////////////////////////////////////////////////////////////
@@ -17,8 +20,11 @@ contract DeployChild is Script {
 
         vm.startBroadcast();
         Share share = new Share();
-        SharePool sharePool =
-            new SharePool(share, new address[](0), networkConfig.ccip.rmnProxy, networkConfig.ccip.ccipRouter);
+        SharePool sharePool = new SharePool(share, networkConfig.ccip.rmnProxy, networkConfig.ccip.ccipRouter);
+        RegistryModuleOwnerCustom(networkConfig.ccip.registryModuleOwnerCustom).registerAdminViaOwner(address(share));
+        ITokenAdminRegistry(networkConfig.ccip.tokenAdminRegistry).acceptAdminRole(address(share));
+        ITokenAdminRegistry(networkConfig.ccip.tokenAdminRegistry).setPool(address(share), address(sharePool));
+
         ChildPeer childPeer = new ChildPeer(
             networkConfig.ccip.ccipRouter,
             networkConfig.tokens.link,

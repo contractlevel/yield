@@ -9,6 +9,9 @@ import {SharePool} from "../../src/token/SharePool.sol";
 import {IFunctionsSubscriptions} from
     "@chainlink/contracts/src/v0.8/functions/v1_0_0/interfaces/IFunctionsSubscriptions.sol";
 import {IFunctionsRouter} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/interfaces/IFunctionsRouter.sol";
+import {ITokenAdminRegistry} from "@chainlink/contracts/src/v0.8/ccip/interfaces/ITokenAdminRegistry.sol";
+import {RegistryModuleOwnerCustom} from
+    "@chainlink/contracts/src/v0.8/ccip/tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
 
 contract DeployParent is Script {
     /*//////////////////////////////////////////////////////////////
@@ -22,8 +25,10 @@ contract DeployParent is Script {
         uint64 clfSubId = IFunctionsSubscriptions(networkConfig.clf.functionsRouter).createSubscription();
 
         Share share = new Share();
-        SharePool sharePool =
-            new SharePool(share, new address[](0), networkConfig.ccip.rmnProxy, networkConfig.ccip.ccipRouter);
+        SharePool sharePool = new SharePool(share, networkConfig.ccip.rmnProxy, networkConfig.ccip.ccipRouter);
+        RegistryModuleOwnerCustom(networkConfig.ccip.registryModuleOwnerCustom).registerAdminViaOwner(address(share));
+        ITokenAdminRegistry(networkConfig.ccip.tokenAdminRegistry).acceptAdminRole(address(share));
+        ITokenAdminRegistry(networkConfig.ccip.tokenAdminRegistry).setPool(address(share), address(sharePool));
 
         ParentCLF parentPeer = new ParentCLF(
             networkConfig.ccip.ccipRouter,

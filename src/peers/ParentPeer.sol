@@ -27,9 +27,9 @@ contract ParentPeer is YieldPeer {
     /// @notice Emitted when the current strategy is optimal
     event CurrentStrategyOptimal(uint64 indexed chainSelector, Protocol indexed protocol);
     /// @notice Emitted when the amount of shares minted is updated
-    event ShareMinted(uint256 indexed shareMintAmount, uint64 indexed chainSelector, uint256 indexed totalShares);
+    event ShareMintUpdate(uint256 indexed shareMintAmount, uint64 indexed chainSelector, uint256 indexed totalShares);
     /// @notice Emitted when the amount of shares burned is updated
-    event ShareBurned(uint256 indexed shareBurnAmount, uint64 indexed chainSelector, uint256 indexed totalShares);
+    event ShareBurnUpdate(uint256 indexed shareBurnAmount, uint64 indexed chainSelector, uint256 indexed totalShares);
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -80,7 +80,7 @@ contract ParentPeer is YieldPeer {
 
             /// @dev mint SHAREs to msg.sender based on amount deposited and total value of the system
             _mintShares(msg.sender, shareMintAmount);
-            emit ShareMinted(shareMintAmount, i_thisChainSelector, s_totalShares);
+            emit ShareMintUpdate(shareMintAmount, i_thisChainSelector, s_totalShares);
         }
         // 2. This Parent is not the Strategy. Therefore the deposit must be sent to the strategy and get totalValue.
         else {
@@ -116,7 +116,7 @@ contract ParentPeer is YieldPeer {
         /// @dev update s_totalShares and burn shares from msg.sender
         s_totalShares -= shareBurnAmount;
         _burnShares(withdrawer, shareBurnAmount);
-        emit ShareBurned(shareBurnAmount, i_thisChainSelector, totalShares - shareBurnAmount);
+        emit ShareBurnUpdate(shareBurnAmount, i_thisChainSelector, totalShares - shareBurnAmount);
         emit WithdrawInitiated(withdrawer, shareBurnAmount, i_thisChainSelector);
 
         Strategy memory strategy = s_strategy;
@@ -199,7 +199,7 @@ contract ParentPeer is YieldPeer {
         if (strategy.chainSelector == i_thisChainSelector || strategy.chainSelector == depositData.chainSelector) {
             depositData.shareMintAmount = _calculateMintAmount(depositData.totalValue, depositData.amount);
             s_totalShares += depositData.shareMintAmount;
-            emit ShareMinted(depositData.shareMintAmount, i_thisChainSelector, s_totalShares);
+            emit ShareMintUpdate(depositData.shareMintAmount, i_thisChainSelector, s_totalShares);
 
             _ccipSend(
                 depositData.chainSelector, CcipTxType.DepositCallbackChild, abi.encode(depositData), ZERO_BRIDGE_AMOUNT
@@ -240,14 +240,14 @@ contract ParentPeer is YieldPeer {
             );
         }
 
-        emit ShareMinted(depositData.shareMintAmount, i_thisChainSelector, s_totalShares);
+        emit ShareMintUpdate(depositData.shareMintAmount, i_thisChainSelector, s_totalShares);
     }
 
     function _handleCCIPWithdrawToParent(bytes memory data) internal {
         WithdrawData memory withdrawData = _decodeWithdrawData(data);
         withdrawData.totalShares = s_totalShares;
         s_totalShares -= withdrawData.shareBurnAmount;
-        emit ShareBurned(
+        emit ShareBurnUpdate(
             withdrawData.shareBurnAmount, i_thisChainSelector, withdrawData.totalShares - withdrawData.shareBurnAmount
         );
 

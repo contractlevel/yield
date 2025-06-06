@@ -14,6 +14,8 @@ contract HelperConfig is Script {
         address rmnProxy;
         address usdcTokenPool;
         address cctpMessageTransmitter;
+        address tokenAdminRegistry;
+        address registryModuleOwnerCustom;
     }
 
     struct TokensConfig {
@@ -77,7 +79,9 @@ contract HelperConfig is Script {
                 parentChainSelector: MAINNET_PARENT_CHAIN_SELECTOR,
                 rmnProxy: 0x411dE17f12D1A34ecC7F45f49844626267c75e81,
                 usdcTokenPool: 0xc2e3A3C18ccb634622B57fF119a1C8C7f12e8C0c,
-                cctpMessageTransmitter: 0x0a992d191DEeC32aFe36203Ad87D7d289a738F81
+                cctpMessageTransmitter: 0x0a992d191DEeC32aFe36203Ad87D7d289a738F81,
+                tokenAdminRegistry: 0xb22764f98dD05c789929716D677382Df22C05Cb6,
+                registryModuleOwnerCustom: 0x4855174E9479E211337832E109E7721d43A4CA64
             }),
             tokens: TokensConfig({
                 link: 0x514910771AF9Ca656af840dff83E8264EcF986CA,
@@ -104,7 +108,9 @@ contract HelperConfig is Script {
                 parentChainSelector: MAINNET_PARENT_CHAIN_SELECTOR,
                 rmnProxy: 0x55b3FCa23EdDd28b1f5B4a3C7975f63EFd2d06CE,
                 usdcTokenPool: 0x5931822f394baBC2AACF4588E98FC77a9f5aa8C9,
-                cctpMessageTransmitter: 0x4D41f22c5a0e5c74090899E5a8Fb597a8842b3e8
+                cctpMessageTransmitter: 0x4D41f22c5a0e5c74090899E5a8Fb597a8842b3e8,
+                tokenAdminRegistry: 0x657c42abE4CD8aa731Aec322f871B5b90cf6274F,
+                registryModuleOwnerCustom: 0xAFEd606Bd2CAb6983fC6F10167c98aaC2173D77f
             }),
             tokens: TokensConfig({
                 link: 0x350a791Bfc2C21F9Ed5d10980Dad2e2638ffa7f6,
@@ -131,7 +137,9 @@ contract HelperConfig is Script {
                 parentChainSelector: MAINNET_PARENT_CHAIN_SELECTOR,
                 rmnProxy: 0xC311a21e6fEf769344EB1515588B9d535662a145,
                 usdcTokenPool: 0x9fCd83bC7F67ADa1fB51a4caBEa333c72B641bd1,
-                cctpMessageTransmitter: 0xC30362313FBBA5cf9163F0bb16a0e01f01A896ca
+                cctpMessageTransmitter: 0xC30362313FBBA5cf9163F0bb16a0e01f01A896ca,
+                tokenAdminRegistry: 0x39AE1032cF4B334a1Ed41cdD0833bdD7c7E7751E,
+                registryModuleOwnerCustom: 0x1f1df9f7fc939E71819F766978d8F900B816761b
             }),
             tokens: TokensConfig({
                 link: 0xf97f4df75117a78c1A5a0DBb814Af92458539FB4,
@@ -158,7 +166,9 @@ contract HelperConfig is Script {
                 parentChainSelector: MAINNET_PARENT_CHAIN_SELECTOR,
                 rmnProxy: 0xC842c69d54F83170C42C4d556B4F6B2ca53Dd3E8,
                 usdcTokenPool: 0x5931822f394baBC2AACF4588E98FC77a9f5aa8C9,
-                cctpMessageTransmitter: 0xAD09780d193884d503182aD4588450C416D6F9D4
+                cctpMessageTransmitter: 0xAD09780d193884d503182aD4588450C416D6F9D4,
+                tokenAdminRegistry: 0x6f6C373d09C07425BaAE72317863d7F6bb731e37,
+                registryModuleOwnerCustom: 0xAFEd606Bd2CAb6983fC6F10167c98aaC2173D77f
             }),
             tokens: TokensConfig({
                 link: 0x88Fb150BDc53A65fe94Dea0c9BA0a6dAf8C6e196,
@@ -188,7 +198,9 @@ contract HelperConfig is Script {
                 parentChainSelector: TESTNET_PARENT_CHAIN_SELECTOR,
                 rmnProxy: 0x411dE17f12D1A34ecC7F45f49844626267c75e81,
                 usdcTokenPool: address(0), // @review
-                cctpMessageTransmitter: address(0) // @review
+                cctpMessageTransmitter: address(0), // @review
+                tokenAdminRegistry: 0x95F29FEE11c5C55d26cCcf1DB6772DE953B37B82,
+                registryModuleOwnerCustom: 0x62e731218d0D47305aba2BE3751E7EE9E5520790
             }),
             tokens: TokensConfig({
                 link: 0x404460C6A5EdE2D891e8297795264fDe62ADBB75,
@@ -215,7 +227,9 @@ contract HelperConfig is Script {
                 parentChainSelector: 10344971235874465080,
                 rmnProxy: 0x99360767a4705f68CcCb9533195B761648d6d807,
                 usdcTokenPool: 0x5931822f394baBC2AACF4588E98FC77a9f5aa8C9,
-                cctpMessageTransmitter: 0x7865fAfC2db2093669d92c0F33AeEF291086BEFD
+                cctpMessageTransmitter: 0x7865fAfC2db2093669d92c0F33AeEF291086BEFD,
+                tokenAdminRegistry: 0x736D0bBb318c1B27Ff686cd19804094E66250e17,
+                registryModuleOwnerCustom: 0x8A55C61227f26a3e2f217842eCF20b52007bAaBe
             }),
             tokens: TokensConfig({
                 link: 0xE4aB69C077896252FAFBD49EFD26B5D171A32410,
@@ -245,7 +259,9 @@ contract HelperConfig is Script {
                 parentChainSelector: MAINNET_PARENT_CHAIN_SELECTOR,
                 rmnProxy: 0x411dE17f12D1A34ecC7F45f49844626267c75e81,
                 usdcTokenPool: address(0), // @review
-                cctpMessageTransmitter: address(0) // @review
+                cctpMessageTransmitter: address(0), // @review
+                tokenAdminRegistry: address(0), // @review
+                registryModuleOwnerCustom: address(0) // @review
             }),
             tokens: TokensConfig({
                 link: 0x404460C6A5EdE2D891e8297795264fDe62ADBB75,
