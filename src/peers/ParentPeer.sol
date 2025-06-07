@@ -241,6 +241,11 @@ contract ParentPeer is YieldPeer {
         emit ShareMintUpdate(depositData.shareMintAmount, i_thisChainSelector, s_totalShares);
     }
 
+    /// @notice This function handles a withdraw tx that initiated on another chain.
+    /// If this Parent is the strategy, we withdraw and send the USDC back to the withdrawer
+    /// If this Parent is the strategy AND the withdrawer wants the USDC on this chain, we transfer it directly
+    /// If this Parent is not the strategy, we forward the withdrawData to the strategy
+    /// @dev Updates s_totalShares and emits ShareBurnUpdate
     function _handleCCIPWithdrawToParent(bytes memory data) internal {
         WithdrawData memory withdrawData = _decodeWithdrawData(data);
         withdrawData.totalShares = s_totalShares;
@@ -273,10 +278,6 @@ contract ParentPeer is YieldPeer {
                 strategy.chainSelector, CcipTxType.WithdrawToStrategy, abi.encode(withdrawData), ZERO_BRIDGE_AMOUNT
             );
         }
-    }
-
-    function _rebalance(Strategy memory newStrategy) internal {
-        _setStrategy(newStrategy.chainSelector, newStrategy.protocol);
     }
 
     /// @notice This function sets the strategy on the parent
@@ -381,10 +382,5 @@ contract ParentPeer is YieldPeer {
 
     function getTotalShares() external view returns (uint256) {
         return s_totalShares;
-    }
-
-    // @review REMOVE THIS AND REPLACE WITH CLF CALL
-    function rebalance(Strategy memory newStrategy) external {
-        _rebalance(newStrategy);
     }
 }

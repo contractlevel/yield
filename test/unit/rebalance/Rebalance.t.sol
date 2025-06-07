@@ -30,9 +30,9 @@ contract RebalanceTest is BaseTest {
 
         /// @dev act
         /// @notice the strategy chain and protocol are the same as the old strategy
-        baseParentPeer.rebalance(
-            IYieldPeer.Strategy({chainSelector: baseChainSelector, protocol: IYieldPeer.Protocol.Aave})
-        );
+        bytes32 requestId = keccak256("requestId");
+        bytes memory response = abi.encode(uint256(baseChainSelector), uint256(0)); // 0 is Aave
+        _fulfillRequest(requestId, response, "");
 
         /// @dev assert
         Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -71,9 +71,9 @@ contract RebalanceTest is BaseTest {
 
         /// @dev act
         /// @notice here we are setting the new strategy chain to the same parent (base) whereas the protocol is Compound
-        baseParentPeer.rebalance(
-            IYieldPeer.Strategy({chainSelector: baseChainSelector, protocol: IYieldPeer.Protocol.Compound})
-        );
+        bytes32 requestId = keccak256("requestId");
+        bytes memory response = abi.encode(uint256(baseChainSelector), uint256(1)); // 1 is Compound
+        _fulfillRequest(requestId, response, "");
 
         /// @dev assert
         assertEq(IERC20(aUsdc).balanceOf(address(baseParentPeer)), 0);
@@ -108,9 +108,9 @@ contract RebalanceTest is BaseTest {
 
         /// @dev act
         /// @notice here we are setting the new strategy chain to the same child (opt) whereas the protocol is Compound
-        baseParentPeer.rebalance(
-            IYieldPeer.Strategy({chainSelector: optChainSelector, protocol: IYieldPeer.Protocol.Compound})
-        );
+        bytes32 requestId = keccak256("requestId");
+        bytes memory response = abi.encode(uint256(optChainSelector), uint256(1)); // 1 is Compound
+        _fulfillRequest(requestId, response, "");
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
         /// @dev assert
@@ -144,9 +144,9 @@ contract RebalanceTest is BaseTest {
 
         /// @dev act
         /// @notice here we are setting the strategy chain selector to a child (opt)
-        baseParentPeer.rebalance(
-            IYieldPeer.Strategy({chainSelector: optChainSelector, protocol: IYieldPeer.Protocol.Aave})
-        );
+        bytes32 requestId = keccak256("requestId");
+        bytes memory response = abi.encode(uint256(optChainSelector), uint256(0)); // 0 is Aave
+        _fulfillRequest(requestId, response, "");
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
 
         /// @dev assert
@@ -181,9 +181,9 @@ contract RebalanceTest is BaseTest {
 
         /// @dev act
         /// @notice here we are setting the strategy chain selector to the parent (base)
-        baseParentPeer.rebalance(
-            IYieldPeer.Strategy({chainSelector: baseChainSelector, protocol: IYieldPeer.Protocol.Aave})
-        );
+        bytes32 requestId = keccak256("requestId");
+        bytes memory response = abi.encode(uint256(baseChainSelector), uint256(0)); // 0 is Aave
+        _fulfillRequest(requestId, response, "");
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
 

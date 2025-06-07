@@ -3,7 +3,7 @@ pragma solidity 0.8.26;
 
 import {ParentPeer} from "../ParentPeer.sol";
 import {FunctionsClient} from "@chainlink/contracts/src/v0.8/functions/v1_3_0/FunctionsClient.sol";
-import {FunctionsRequest} from "@chainlink/contracts/src/v0.8/functions/dev/v1_X/libraries/FunctionsRequest.sol";
+import {FunctionsRequest} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/libraries/FunctionsRequest.sol";
 
 /// @title CLY Parent Peer with Chainlink Functions
 /// @author @contractlevel
@@ -105,10 +105,10 @@ contract ParentCLF is ParentPeer, FunctionsClient {
 
         /// @dev Send CLF request
         FunctionsRequest.Request memory req;
-        req._initializeRequest(FunctionsRequest.Location.Inline, FunctionsRequest.CodeLanguage.JavaScript, SOURCE);
-        req._addSecretsReference(ENCRYPTED_SECRET);
+        req.initializeRequest(FunctionsRequest.Location.Inline, FunctionsRequest.CodeLanguage.JavaScript, SOURCE);
+        req.addSecretsReference(ENCRYPTED_SECRET);
 
-        bytes32 requestId = _sendRequest(req._encodeCBOR(), i_clfSubId, CLF_GAS_LIMIT, i_donId);
+        bytes32 requestId = _sendRequest(req.encodeCBOR(), i_clfSubId, CLF_GAS_LIMIT, i_donId);
 
         // @review I dont think we need this because _sendRequest emits an essentially identical event
         emit CLFRequestSent(requestId);
@@ -144,11 +144,6 @@ contract ParentCLF is ParentPeer, FunctionsClient {
         }
 
         emit CLFRequestFulfilled(requestId, chainSelector, protocolEnum);
-
-        /// @dev If there are no shares, there is no value in the system. Therefore there is nothing to rebalance.
-        // @review double check this
-        // @review including this is a bug because then we cant rebalance regardless.
-        // if (s_totalShares == 0) return;
 
         _setStrategy(chainSelector, Protocol(protocolEnum));
     }
