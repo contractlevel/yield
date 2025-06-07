@@ -13,7 +13,6 @@ library ProtocolOperations {
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
-    error ProtocolOperations__InvalidProtocol(IYieldPeer.Protocol protocol);
     error ProtocolOperations__InvalidStrategyPool(address strategyPool);
 
     /*//////////////////////////////////////////////////////////////
@@ -83,11 +82,10 @@ library ProtocolOperations {
     function getStrategyPoolFromProtocol(IYieldPeer.Protocol protocol, ProtocolConfig memory config)
         external
         pure
-        returns (address)
+        returns (address strategyPool)
     {
-        if (protocol == IYieldPeer.Protocol.Aave) return config.aavePoolAddressesProvider;
-        else if (protocol == IYieldPeer.Protocol.Compound) return config.comet;
-        else revert ProtocolOperations__InvalidProtocol(protocol);
+        if (protocol == IYieldPeer.Protocol.Aave) strategyPool = config.aavePoolAddressesProvider;
+        else if (protocol == IYieldPeer.Protocol.Compound) strategyPool = config.comet;
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -164,4 +164,29 @@ contract ParentDepositTest is BaseTest {
         assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount);
         assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
     }
+
+    function test_yield_parent_deposit_multipleDeposits() public {
+        /// @dev arrange
+        address depositor2 = makeAddr("depositor2");
+        deal(address(baseUsdc), depositor2, DEPOSIT_AMOUNT);
+        _changePrank(depositor2);
+        baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
+
+        _changePrank(depositor);
+        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        /// @dev assert correct amount of shares minted
+        uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
+        assertEq(baseShare.totalSupply(), expectedShareMintAmount);
+        assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount);
+
+        /// @dev act
+        _changePrank(depositor2);
+        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+
+        /// @dev assert correct amount of shares minted for second deposit
+        uint256 totalValue = baseParentPeer.getTotalValue();
+        uint256 expectedSecondShareMintAmount = (DEPOSIT_AMOUNT * expectedShareMintAmount) / totalValue;
+        assertEq(baseShare.totalSupply(), expectedShareMintAmount + expectedSecondShareMintAmount);
+        assertEq(baseShare.balanceOf(depositor2), expectedSecondShareMintAmount);
+    }
 }

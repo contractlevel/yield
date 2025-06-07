@@ -142,6 +142,69 @@ contract ChildWithdrawTest is BaseTest {
         );
     }
 
+    /// @notice Scenario: Withdrawal is initiated from a child chain, Strategy chain is Parent chain, Strategy Protocol is Compound.
+    /// But the withdraw chain is a different chain
+    function test_yield_child_withdraw_strategyIsParent_compound_withdrawToDifferentChain() public {
+        _setStrategy(baseChainSelector, IYieldPeer.Protocol.Compound);
+        _selectFork(optFork);
+        _changePrank(withdrawer);
+
+        /// @dev arrange
+        optChildPeer.deposit(DEPOSIT_AMOUNT);
+        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
+
+        uint256 expectedShareBalance = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
+
+        bytes memory encodedWithdrawChainSelector = abi.encode(ethChainSelector);
+
+        /// @dev act
+        optShare.transferAndCall(address(optChildPeer), expectedShareBalance, encodedWithdrawChainSelector);
+        assertEq(optShare.balanceOf(withdrawer), 0);
+        assertEq(optShare.totalSupply(), 0);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(ethFork, attesters, attesterPks);
+
+        /// @dev assert
+        assertApproxEqAbs(
+            ethUsdc.balanceOf(withdrawer),
+            DEPOSIT_AMOUNT,
+            BALANCE_TOLERANCE,
+            "USDC balance should be approximately equal to deposit amount"
+        );
+    }
+
+    /// @notice Scenario: Withdrawal is initiated from a child chain, Strategy chain is Parent chain, Strategy Protocol is Compound.
+    /// But the withdraw chain is the Parent
+    function test_yield_child_withdraw_strategyIsParent_compound_withdrawToParentChain() public {
+        _setStrategy(baseChainSelector, IYieldPeer.Protocol.Compound);
+        _selectFork(optFork);
+        _changePrank(withdrawer);
+
+        /// @dev arrange
+        optChildPeer.deposit(DEPOSIT_AMOUNT);
+        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
+
+        uint256 expectedShareBalance = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
+
+        bytes memory encodedWithdrawChainSelector = abi.encode(baseChainSelector);
+
+        /// @dev act
+        optShare.transferAndCall(address(optChildPeer), expectedShareBalance, encodedWithdrawChainSelector);
+        assertEq(optShare.balanceOf(withdrawer), 0);
+        assertEq(optShare.totalSupply(), 0);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
+
+        /// @dev assert
+        assertApproxEqAbs(
+            baseUsdc.balanceOf(withdrawer),
+            DEPOSIT_AMOUNT,
+            BALANCE_TOLERANCE,
+            "USDC balance should be approximately equal to deposit amount"
+        );
+    }
+
     /// @notice Scenario: Withdrawal is initiated from a child chain, Strategy chain is another child chain, Strategy Protocol is Aave.
     function test_yield_child_withdraw_strategyIsChainC_aave() public {
         _setStrategy(ethChainSelector, IYieldPeer.Protocol.Aave);

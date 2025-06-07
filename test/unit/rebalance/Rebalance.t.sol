@@ -220,9 +220,6 @@ contract RebalanceTest is BaseTest {
 
         /// @dev act
         /// @notice here we are setting the strategy chain selector to a different child (eth)
-        // baseParentPeer.rebalance(
-        //     IYieldPeer.Strategy({chainSelector: ethChainSelector, protocol: IYieldPeer.Protocol.Aave})
-        // );
         bytes32 requestId = keccak256("requestId");
         bytes memory response = abi.encode(uint256(ethChainSelector), uint256(0));
         _fulfillRequest(requestId, response, "");

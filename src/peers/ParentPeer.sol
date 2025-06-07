@@ -161,7 +161,6 @@ contract ParentPeer is YieldPeer {
     /// - CcipTxType DepositCallbackParent: A tx from the strategy to parent to calculate shareMintAmount and mint shares to the depositor on this chain or another child chain
     /// - CcipTxType WithdrawCallback: A tx from the strategy chain to send USDC to the withdrawer
     /// - CcipTxType WithdrawToParent: A tx from the withdraw chain to forward to the strategy chain
-    /// - CcipTxType RebalanceOldStrategy: A tx from the parent to the old strategy chain to rebalance funds from the old strategy to the new strategy
     /// - CcipTxType RebalanceNewStrategy: A tx from the old strategy, sending rebalanced funds to the new strategy
     function _handleCCIPMessage(CcipTxType txType, Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data)
         internal
@@ -171,7 +170,6 @@ contract ParentPeer is YieldPeer {
         if (txType == CcipTxType.DepositCallbackParent) _handleCCIPDepositCallbackParent(data);
         if (txType == CcipTxType.WithdrawToParent) _handleCCIPWithdrawToParent(data);
         if (txType == CcipTxType.WithdrawCallback) _handleCCIPWithdrawCallback(tokenAmounts, data);
-        if (txType == CcipTxType.RebalanceOldStrategy) _handleCCIPRebalanceOldStrategy(data);
         if (txType == CcipTxType.RebalanceNewStrategy) _handleCCIPRebalanceNewStrategy(data);
     }
 
@@ -296,18 +294,18 @@ contract ParentPeer is YieldPeer {
         if (!_updateStrategy(newStrategy, oldStrategy)) {
             return;
         }
-        // Handle strategy changes on the same chain
+        // Handle strategy changes on the this parent chain
         if (
             chainSelector == i_thisChainSelector && oldStrategy.chainSelector == i_thisChainSelector
                 && protocol != oldStrategy.protocol
         ) {
             _handleLocalStrategyChange(newStrategy);
         }
-        // Handle moving strategy to a different chain
+        // Handle moving strategy from this parent chain to a different chain
         else if (oldStrategy.chainSelector == i_thisChainSelector && chainSelector != i_thisChainSelector) {
             _handleStrategyMoveToNewChain(newStrategy);
         }
-        // Handle rebalancing from a different chain
+        // Handle rebalancing from a different chain (a child)
         else {
             _handleRebalanceFromDifferentChain(oldStrategy, newStrategy);
         }
@@ -368,14 +366,10 @@ contract ParentPeer is YieldPeer {
     /// @return shareMintAmount The amount of SHAREs to mint
     /// @notice Returns amount * (SHARE_DECIMALS / USDC_DECIMALS) if there are no shares minted yet
     /// @dev Revert if totalValue is 0 (should never happen, but just in case)
-    function _calculateMintAmount(uint256 totalValue, uint256 amount) internal view returns (uint256) {
+    function _calculateMintAmount(uint256 totalValue, uint256 amount) internal view returns (uint256 shareMintAmount) {
         uint256 totalShares = s_totalShares;
-        if (totalShares == 0) return amount * INITIAL_SHARE_PRECISION;
-
-        _revertIfZeroAmount(totalValue); // @review - is this superfluous?
-
-        uint256 shareMintAmount = (amount * totalShares) / totalValue;
-        return shareMintAmount;
+        if (totalShares == 0 || totalValue == 0) shareMintAmount = amount * INITIAL_SHARE_PRECISION;
+        else shareMintAmount = (amount * totalShares) / totalValue;
     }
 
     /*//////////////////////////////////////////////////////////////
