@@ -26,10 +26,6 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     error YieldPeer__ChainNotAllowed(uint64 chainSelector);
     error YieldPeer__PeerNotAllowed(address peer);
     error YieldPeer__NoZeroAmount();
-    // error YieldPeer__NotEnoughLink(uint256 linkBalance, uint256 fees);
-    error YieldPeer__InvalidToken(address invalidToken);
-    // error YieldPeer__InvalidTokenAmount(uint256 invalidAmount);
-    error YieldPeer__InvalidStrategyChain(uint64 invalidChainSelector);
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
@@ -112,7 +108,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @param chainSelector The chain selector to check
     /// @param peer The peer to check
     modifier onlyAllowed(uint64 chainSelector, address peer) {
-        // @review is the chainSelector check needed?
+        // @review is the chainSelector check needed if we are checking the peer for the chainSelector too?
         if (!s_allowedChains[chainSelector]) revert YieldPeer__ChainNotAllowed(chainSelector);
         if (peer != s_peers[chainSelector]) revert YieldPeer__PeerNotAllowed(peer);
         _;
@@ -243,9 +239,6 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     function _handleCCIPRebalanceNewStrategy(bytes memory data) internal {
         /// @dev update strategy pool to protocol on this chain
         Strategy memory newStrategy = abi.decode(data, (Strategy));
-        if (newStrategy.chainSelector != i_thisChainSelector) {
-            revert YieldPeer__InvalidStrategyChain(newStrategy.chainSelector);
-        }
         address newStrategyPool = _updateStrategyPool(newStrategy.chainSelector, newStrategy.protocol);
 
         /// @dev deposit to the new strategy
@@ -465,11 +458,6 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         return address(i_share);
     }
 
-    function getStrategyPool() external view returns (address) {
-        return s_strategyPool;
-    }
-
-    // @review double check this later
     function getIsStrategyChain() external view returns (bool) {
         return s_strategyPool != address(0);
     }

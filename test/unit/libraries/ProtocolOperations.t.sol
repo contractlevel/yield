@@ -123,4 +123,7 @@ contract ProtocolOperationsClient {
     {
         return ProtocolOperations.getStrategyPoolFromProtocol(protocol, config);
     }
+
+    /// @notice empty test to skip file in coverage
+    function test_emptyTest() public {}
 }

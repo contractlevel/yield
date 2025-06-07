@@ -114,4 +114,7 @@ contract CCIPOperationsClient {
     {
         return CCIPOperations._prepareTokenAmounts(IERC20(usdc), bridgeAmount, ccipRouter);
     }
+
+    /// @notice empty test to skip file in coverage
+    function test_emptyTest() public {}
 }

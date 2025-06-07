@@ -38,4 +38,10 @@ contract ConstructorTest is BaseTest {
         assertEq(ethChildPeer.getShare(), address(ethShare));
         assertEq(ethChildPeer.getParentChainSelector(), baseNetworkConfig.ccip.thisChainSelector);
     }
+
+    function test_yield_getIsStrategyChain() public view {
+        assertEq(baseParentPeer.getIsStrategyChain(), true);
+        assertEq(optChildPeer.getIsStrategyChain(), false);
+        assertEq(ethChildPeer.getIsStrategyChain(), false);
+    }
 }
