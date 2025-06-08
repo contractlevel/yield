@@ -30,6 +30,10 @@ contract ParentPeer is YieldPeer {
     event ShareMintUpdate(uint256 indexed shareMintAmount, uint64 indexed chainSelector, uint256 indexed totalShares);
     /// @notice Emitted when the amount of shares burned is updated
     event ShareBurnUpdate(uint256 indexed shareBurnAmount, uint64 indexed chainSelector, uint256 indexed totalShares);
+    /// @notice Emitted when a deposit is forwarded to the strategy
+    event DepositForwardedToStrategy(uint256 indexed depositAmount, uint64 indexed chainSelector);
+    /// @notice Emitted when a withdraw is forwarded to the strategy
+    event WithdrawForwardedToStrategy(uint256 indexed withdrawAmount, uint64 indexed chainSelector);
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -86,6 +90,7 @@ contract ParentPeer is YieldPeer {
         else {
             DepositData memory depositData = _buildDepositData(amountToDeposit);
             _ccipSend(strategy.chainSelector, CcipTxType.DepositToStrategy, abi.encode(depositData), amountToDeposit);
+            emit DepositForwardedToStrategy(amountToDeposit, strategy.chainSelector);
         }
     }
 
@@ -202,12 +207,11 @@ contract ParentPeer is YieldPeer {
             _ccipSend(
                 depositData.chainSelector, CcipTxType.DepositCallbackChild, abi.encode(depositData), ZERO_BRIDGE_AMOUNT
             );
-            // @review do something with ccipMessageId?
         }
         /// @dev If Strategy is on third chain, forward deposit to strategy
         if (strategy.chainSelector != i_thisChainSelector && strategy.chainSelector != depositData.chainSelector) {
             _ccipSend(strategy.chainSelector, CcipTxType.DepositToStrategy, encodedDepositData, depositData.amount);
-            // @review do something with ccipMessageId?
+            emit DepositForwardedToStrategy(depositData.amount, strategy.chainSelector);
         }
     }
 
@@ -277,6 +281,7 @@ contract ParentPeer is YieldPeer {
             _ccipSend(
                 strategy.chainSelector, CcipTxType.WithdrawToStrategy, abi.encode(withdrawData), ZERO_BRIDGE_AMOUNT
             );
+            emit WithdrawForwardedToStrategy(withdrawData.usdcWithdrawAmount, strategy.chainSelector);
         }
     }
 
@@ -369,6 +374,7 @@ contract ParentPeer is YieldPeer {
     /// @dev Revert if totalValue is 0 (should never happen, but just in case)
     function _calculateMintAmount(uint256 totalValue, uint256 amount) internal view returns (uint256 shareMintAmount) {
         uint256 totalShares = s_totalShares;
+        // @review if totalShares isn't 0, then totalValue shouldn't be either.
         if (totalShares == 0 || totalValue == 0) shareMintAmount = amount * INITIAL_SHARE_PRECISION;
         else shareMintAmount = (amount * totalShares) / totalValue;
     }

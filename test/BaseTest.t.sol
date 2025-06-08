@@ -105,7 +105,7 @@ contract BaseTest is Test {
         _deployInfra();
         _setPools();
         _setCrossChainPeers();
-        _dealLinkToPeers();
+        _dealLinkToPeers(false, address(0), address(0), address(0), address(0));
 
         _setCCTPAttesters();
         _setDomains();
@@ -126,7 +126,7 @@ contract BaseTest is Test {
         _stopPrank();
     }
 
-    function _deployInfra() internal {
+    function _deployInfra() internal virtual {
         // Deploy on Base
         baseFork = vm.createSelectFork(vm.envString("BASE_MAINNET_RPC_URL"));
         assertEq(block.chainid, BASE_MAINNET_CHAIN_ID);
@@ -248,7 +248,7 @@ contract BaseTest is Test {
         assertEq(ethSharePool.getRemoteToken(ethChainSelector), abi.encode(address(ethShare)));
     }
 
-    function _setCrossChainPeers() internal {
+    function _setCrossChainPeers() internal virtual {
         _selectFork(baseFork);
         baseParentPeer.setCCIPGasLimit(INITIAL_CCIP_GAS_LIMIT);
         baseParentPeer.setAllowedChain(optChainSelector, true);
@@ -312,15 +312,21 @@ contract BaseTest is Test {
         sharePool.applyChainUpdates(new uint64[](0), chainUpdates);
     }
 
-    function _dealLinkToPeers() internal {
-        _selectFork(baseFork);
-        deal(baseParentPeer.getLink(), address(baseParentPeer), LINK_AMOUNT);
+    function _dealLinkToPeers(bool isLocal, address parent, address child1, address child2, address link) internal {
+        if (isLocal) {
+            deal(link, parent, LINK_AMOUNT);
+            deal(link, child1, LINK_AMOUNT);
+            deal(link, child2, LINK_AMOUNT);
+        } else {
+            _selectFork(baseFork);
+            deal(baseParentPeer.getLink(), address(baseParentPeer), LINK_AMOUNT);
 
-        _selectFork(optFork);
-        deal(optChildPeer.getLink(), address(optChildPeer), LINK_AMOUNT);
+            _selectFork(optFork);
+            deal(optChildPeer.getLink(), address(optChildPeer), LINK_AMOUNT);
 
-        _selectFork(ethFork);
-        deal(ethChildPeer.getLink(), address(ethChildPeer), LINK_AMOUNT);
+            _selectFork(ethFork);
+            deal(ethChildPeer.getLink(), address(ethChildPeer), LINK_AMOUNT);
+        }
     }
 
     function _registerChains() internal {

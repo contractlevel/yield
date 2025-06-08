@@ -2,6 +2,15 @@
 pragma solidity 0.8.26;
 
 import {Script} from "forge-std/Script.sol";
+import {MockAavePool} from "../test/mocks/MockAavePool.sol";
+import {MockComet} from "../test/mocks/MockComet.sol";
+import {MockAToken} from "../test/mocks/MockAToken.sol";
+import {MockPoolAddressesProvider} from "../test/mocks/MockPoolAddressesProvider.sol";
+import {MockAToken} from "../test/mocks/MockAToken.sol";
+import {MockUsdc} from "../test/mocks/MockUsdc.sol";
+import {MockFunctionsRouter} from "../test/mocks/MockFunctionsRouter.sol";
+import {CCIPLocalSimulator, LinkToken, IRouterClient} from "@chainlink-local/src/ccip/CCIPLocalSimulator.sol";
+import {Share} from "../src/token/Share.sol";
 
 contract HelperConfig is Script {
     /*//////////////////////////////////////////////////////////////
@@ -44,7 +53,6 @@ contract HelperConfig is Script {
 
     NetworkConfig public activeNetworkConfig;
 
-    // uint64 public constant MAINNET_PARENT_CHAIN_SELECTOR = 4949039107694359620; // arbitrum
     uint64 public constant MAINNET_PARENT_CHAIN_SELECTOR = 15971525489660198786; // base
     uint64 public constant TESTNET_PARENT_CHAIN_SELECTOR = 20; // update this
 
@@ -251,29 +259,37 @@ contract HelperConfig is Script {
     /*//////////////////////////////////////////////////////////////
                                  LOCAL
     //////////////////////////////////////////////////////////////*/
-    function getOrCreateAnvilEthConfig() public pure returns (NetworkConfig memory) {
+    function getOrCreateAnvilEthConfig() public returns (NetworkConfig memory) {
+        MockUsdc usdc = new MockUsdc();
+        MockAavePool aavePool = new MockAavePool(address(usdc)); // need to set aToken address later
+        MockAToken aToken = new MockAToken(address(aavePool));
+        MockPoolAddressesProvider poolAddressesProvider = new MockPoolAddressesProvider(address(aavePool));
+        aavePool.setATokenAddress(address(usdc), address(aToken));
+        MockComet comet = new MockComet();
+        MockFunctionsRouter functionsRouter = new MockFunctionsRouter();
+
+        CCIPLocalSimulator ccipLocalSimulator = new CCIPLocalSimulator();
+        (, IRouterClient ccipRouter,,, LinkToken link,,) = ccipLocalSimulator.configuration();
+
+        Share share = new Share();
+        ccipLocalSimulator.supportNewTokenViaOwner(address(usdc));
+        ccipLocalSimulator.supportNewTokenViaGetCCIPAdmin(address(share));
+
         return NetworkConfig({
             ccip: CCIPConfig({
-                ccipRouter: 0x794a61358D6845594F94dc1DB02A252b5b4814aD,
-                thisChainSelector: 10, // @review dummy value
-                parentChainSelector: MAINNET_PARENT_CHAIN_SELECTOR,
+                ccipRouter: address(ccipRouter),
+                thisChainSelector: 0, // @review dummy value
+                parentChainSelector: 0, // set these with separate values
                 rmnProxy: 0x411dE17f12D1A34ecC7F45f49844626267c75e81,
                 usdcTokenPool: address(0), // @review
                 cctpMessageTransmitter: address(0), // @review
                 tokenAdminRegistry: address(0), // @review
                 registryModuleOwnerCustom: address(0) // @review
             }),
-            tokens: TokensConfig({
-                link: 0x404460C6A5EdE2D891e8297795264fDe62ADBB75,
-                usdc: 0x7F5c764cBc14f9669B88837ca1490cCa17c31607,
-                share: 0x794a61358D6845594F94dc1DB02A252b5b4814aD
-            }),
-            protocols: ProtocolsConfig({
-                aavePoolAddressesProvider: 0x794a61358D6845594F94dc1DB02A252b5b4814aD,
-                comet: 0x794a61358D6845594F94dc1DB02A252b5b4814aD
-            }),
+            tokens: TokensConfig({link: address(link), usdc: address(usdc), share: address(share)}),
+            protocols: ProtocolsConfig({aavePoolAddressesProvider: address(poolAddressesProvider), comet: address(comet)}),
             clf: CLFConfig({
-                functionsRouter: address(0),
+                functionsRouter: address(functionsRouter),
                 donId: "",
                 clfSubId: 0 // @review dummy value
             })
