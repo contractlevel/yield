@@ -16,6 +16,7 @@ contract Handler is Test {
     //////////////////////////////////////////////////////////////*/
     uint256 internal constant MAX_DEPOSIT_AMOUNT = 1_000_000_000_000;
     uint256 internal constant MIN_DEPOSIT_AMOUNT = 1_000_000;
+    uint256 internal constant INITIAL_DEPOSIT_AMOUNT = 100_000_000;
 
     ParentCLF internal parent;
     ChildPeer internal child1;
@@ -25,6 +26,7 @@ contract Handler is Test {
     IERC20 internal usdc;
     address internal upkeep;
     address internal functionsRouter;
+    address internal admin = makeAddr("admin");
 
     uint64 internal parentChainSelector;
     uint64 internal child1ChainSelector;
@@ -115,6 +117,8 @@ contract Handler is Test {
         /// @notice this is set in parent constructor
         ghost_state_currentStrategyChainSelector = parentChainSelector;
         ghost_state_currentStrategyProtocolEnum = 0;
+
+        _adminDeposit();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -283,9 +287,11 @@ contract Handler is Test {
                                 UTILITY
     //////////////////////////////////////////////////////////////*/
     /// @dev convert a seed to an address
-    function _seedToAddress(uint256 addressSeed) internal pure returns (address seedAddress) {
+    function _seedToAddress(uint256 addressSeed) internal view returns (address seedAddress) {
         uint160 boundInt = uint160(bound(addressSeed, 1, type(uint160).max));
         seedAddress = address(boundInt);
+        if (seedAddress == admin) seedAddress = _seedToAddress(addressSeed + 1);
+        if (seedAddress == address(share)) seedAddress = _seedToAddress(addressSeed + 2);
     }
 
     /// @dev create a user address for calling and passing to requestKycStatus or onTokenTransfer
@@ -308,6 +314,17 @@ contract Handler is Test {
         for (uint256 i; i < chainSelectors.length(); ++i) {
             func(uint64(chainSelectors.at(i)));
         }
+    }
+
+    /// @notice this is needed to mitigate share inflation attacks
+    function _adminDeposit() internal {
+        vm.recordLogs();
+        _changePrank(admin);
+        deal(address(usdc), admin, INITIAL_DEPOSIT_AMOUNT);
+        usdc.approve(address(parent), INITIAL_DEPOSIT_AMOUNT);
+        parent.deposit(INITIAL_DEPOSIT_AMOUNT);
+        _updateDepositGhosts(admin, INITIAL_DEPOSIT_AMOUNT, parentChainSelector);
+        _handleDepositLogs();
     }
 
     function _changePrank(address newPrank) internal {

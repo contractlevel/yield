@@ -370,7 +370,6 @@ contract ParentPeer is YieldPeer {
     /// @param amount The amount of USDC deposited
     /// @return shareMintAmount The amount of SHAREs to mint
     /// @notice Returns amount * (SHARE_DECIMALS / USDC_DECIMALS) if there are no shares minted yet
-    /// @dev Revert if totalValue is 0 (should never happen, but just in case)
     function _calculateMintAmount(uint256 totalValue, uint256 amount) internal view returns (uint256 shareMintAmount) {
         uint256 totalShares = s_totalShares;
         // @review if totalShares isn't 0, then totalValue shouldn't be either.
