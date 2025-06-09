@@ -211,11 +211,14 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @param data The message data - decodes to WithdrawData
     function _handleCCIPWithdrawCallback(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data) internal {
         WithdrawData memory withdrawData = _decodeWithdrawData(data);
-        CCIPOperations._validateTokenAmounts(tokenAmounts, address(i_usdc), withdrawData.usdcWithdrawAmount);
-        _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
+        if (withdrawData.usdcWithdrawAmount != 0) {
+            CCIPOperations._validateTokenAmounts(tokenAmounts, address(i_usdc), withdrawData.usdcWithdrawAmount);
+            _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
+        }
         emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
     }
 
+    // @review natspec
     function _handleCCIPRebalanceOldStrategy(bytes memory data) internal {
         /// @dev withdraw from the old strategy
         address oldStrategyPool = _getStrategyPool();
@@ -236,6 +239,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         }
     }
 
+    // @review natspec
     function _handleCCIPRebalanceNewStrategy(bytes memory data) internal {
         /// @dev update strategy pool to protocol on this chain
         Strategy memory newStrategy = abi.decode(data, (Strategy));
@@ -260,11 +264,13 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         emit StrategyPoolUpdated(strategyPool);
     }
 
+    // @review natspec
     function _depositToStrategy(address strategyPool, uint256 amount) internal {
         ProtocolOperations.depositToStrategy(strategyPool, _getProtocolConfig(), amount);
         emit DepositToStrategy(strategyPool, amount);
     }
 
+    // @review natspec
     function _withdrawFromStrategy(address strategyPool, uint256 amount) internal {
         ProtocolOperations.withdrawFromStrategy(strategyPool, _getProtocolConfig(), amount);
         emit WithdrawFromStrategy(strategyPool, amount);
@@ -289,7 +295,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         uint256 totalValue = _getTotalValueFromStrategy(strategyPool);
         usdcWithdrawAmount =
             _calculateWithdrawAmount(totalValue, withdrawData.totalShares, withdrawData.shareBurnAmount);
-        _withdrawFromStrategy(strategyPool, usdcWithdrawAmount);
+        if (usdcWithdrawAmount != 0) _withdrawFromStrategy(strategyPool, usdcWithdrawAmount);
     }
 
     /// @notice Initiates a deposit
@@ -298,6 +304,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @dev Transfer USDC from msg.sender to this contract
     /// @dev Emit DepositInitiated event
     function _initiateDeposit(uint256 amountToDeposit) internal {
+        // @review should we add a minimum deposit amount check? ie if (amountToDeposit < 1e6) revert;
         _revertIfZeroAmount(amountToDeposit);
         _transferUsdcFrom(msg.sender, address(this), amountToDeposit);
         emit DepositInitiated(msg.sender, amountToDeposit, i_thisChainSelector);
@@ -383,9 +390,9 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     function _calculateWithdrawAmount(uint256 totalValue, uint256 totalShares, uint256 shareBurnAmount)
         internal
         pure
-        returns (uint256)
+        returns (uint256 usdcWithdrawAmount)
     {
-        return (shareBurnAmount * totalValue) / totalShares;
+        usdcWithdrawAmount = (shareBurnAmount * totalValue) / totalShares;
     }
 
     function _revertIfZeroAmount(uint256 amount) internal pure {
@@ -468,5 +475,9 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
 
     function getTotalValue() external view returns (uint256) {
         return _getTotalValueFromStrategy(s_strategyPool);
+    }
+
+    function getStrategyPool() external view returns (address) {
+        return s_strategyPool;
     }
 }

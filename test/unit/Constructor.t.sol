@@ -44,4 +44,10 @@ contract ConstructorTest is BaseTest {
         assertEq(optChildPeer.getIsStrategyChain(), false);
         assertEq(ethChildPeer.getIsStrategyChain(), false);
     }
+
+    function test_yield_getStrategyPool() public view {
+        assertEq(baseParentPeer.getStrategyPool(), baseNetworkConfig.protocols.aavePoolAddressesProvider);
+        assertEq(optChildPeer.getStrategyPool(), address(0));
+        assertEq(ethChildPeer.getStrategyPool(), address(0));
+    }
 }

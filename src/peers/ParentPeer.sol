@@ -18,7 +18,6 @@ contract ParentPeer is YieldPeer {
     // @invariant s_totalShares == ghost_totalSharesMinted - ghost_totalSharesBurned
     uint256 internal s_totalShares;
     /// @dev The current strategy - chainSelector and protocol
-    // @review could this be just a s_strategyChainSelector?
     Strategy internal s_strategy;
 
     /*//////////////////////////////////////////////////////////////
@@ -133,10 +132,10 @@ contract ParentPeer is YieldPeer {
 
             uint256 usdcWithdrawAmount = _calculateWithdrawAmount(totalValue, totalShares, shareBurnAmount);
 
-            _withdrawFromStrategy(strategyPool, usdcWithdrawAmount);
+            if (usdcWithdrawAmount != 0) _withdrawFromStrategy(strategyPool, usdcWithdrawAmount);
 
             if (withdrawChainSelector == i_thisChainSelector) {
-                _transferUsdcTo(withdrawer, usdcWithdrawAmount);
+                if (usdcWithdrawAmount != 0) _transferUsdcTo(withdrawer, usdcWithdrawAmount);
                 emit WithdrawCompleted(withdrawer, usdcWithdrawAmount);
             } else {
                 WithdrawData memory withdrawData =

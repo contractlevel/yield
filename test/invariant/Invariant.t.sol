@@ -2,7 +2,7 @@
 pragma solidity 0.8.26;
 
 import {StdInvariant} from "forge-std/StdInvariant.sol";
-import {BaseTest, Vm, console2, ParentCLF, ChildPeer, Share} from "../BaseTest.t.sol";
+import {BaseTest, Vm, console2, ParentCLF, ChildPeer, Share, IYieldPeer} from "../BaseTest.t.sol";
 import {Handler} from "./Handler.t.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
 // import {CCIPLocalSimulator} from "@chainlink-local/src/ccip/CCIPLocalSimulator.sol";
@@ -19,7 +19,8 @@ contract Invariant is StdInvariant, BaseTest {
     uint64 internal constant CHILD1_SELECTOR = 2;
     uint64 internal constant CHILD2_SELECTOR = 3;
     uint256 internal constant STRATEGY_POOL_USDC_STARTING_BALANCE = 1_000_000_000_000; // 1M USDC
-    uint256 internal constant CCIP_GAS_LIMIT = 5_000_000;
+    // uint256 internal constant CCIP_GAS_LIMIT = 169_500;
+    uint256 internal constant CCIP_GAS_LIMIT = 1_000_000;
 
     /// @dev Handler contract we are running calls to the SBT through
     Handler internal handler;
@@ -164,13 +165,37 @@ contract Invariant is StdInvariant, BaseTest {
     /*//////////////////////////////////////////////////////////////
                                INVARIANTS
     //////////////////////////////////////////////////////////////*/
-    /// @notice Withdraw Solvency: Total USDC withdrawn should be greater than or equal to the total USDC deposited
-    // function invariant_withdraw_solvency() public view {
-    //     assertTrue(
-    //         handler.ghost_state_totalUsdcWithdrawn() >= handler.ghost_state_totalUsdcDeposited(),
-    //         "Invariant violated: Total USDC withdrawn should be greater than or equal to the total USDC deposited."
-    //     );
-    // }
+    /// @notice Strategy Consistency: Strategy Pool should only be set on the strategy chain
+    function invariant_strategy_consistency() public {
+        handler.forEachChainSelector(this.checkStrategyPoolPerChainSelector);
+    }
+
+    function checkStrategyPoolPerChainSelector(uint64 chainSelector) external view {
+        if (chainSelector == handler.ghost_state_currentStrategyChainSelector()) {
+            assertTrue(
+                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getStrategyPool() != address(0),
+                "Invariant violated: Strategy pool should be set on the strategy chain"
+            );
+        } else {
+            assertTrue(
+                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getStrategyPool() == address(0),
+                "Invariant violated: Strategy pool should not be set on non-strategy chains"
+            );
+        }
+    }
+
+    /// @notice Total Shares Accountancy: The total shares tracked by ParentPeer should be equal to total minted minus total burned system wide.
+    function invariant_totalShares_integrity() public view {
+        assertEq(
+            parent.getTotalShares(),
+            handler.ghost_event_totalSharesMinted() - handler.ghost_state_totalSharesBurned(),
+            "Invariant violated: Total shares tracked by ParentPeer should be equal to total minted minus total burned system wide."
+        );
+    }
 }
 
 // If someone deposits and then withdraws the full amount, they should have withdrawnUsdc >= depositedUsdc
+
+// depositing usdc should mint shares
+
+// withdrawing usdc should burn shares

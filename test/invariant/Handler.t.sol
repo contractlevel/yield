@@ -9,11 +9,13 @@ contract Handler is Test {
                            TYPE DECLARATIONS
     //////////////////////////////////////////////////////////////*/
     using EnumerableSet for EnumerableSet.AddressSet;
+    using EnumerableSet for EnumerableSet.UintSet;
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
     uint256 internal constant MAX_DEPOSIT_AMOUNT = 1_000_000_000_000;
+    uint256 internal constant MIN_DEPOSIT_AMOUNT = 1_000_000;
 
     ParentCLF internal parent;
     ChildPeer internal child1;
@@ -27,21 +29,25 @@ contract Handler is Test {
     uint64 internal parentChainSelector;
     uint64 internal child1ChainSelector;
     uint64 internal child2ChainSelector;
-    mapping(uint64 => address) internal chainSelectorsToPeers;
-    mapping(address => uint64) internal peersToChainSelectors;
+    mapping(uint64 => address) public chainSelectorsToPeers;
+    mapping(address => uint64) public peersToChainSelectors;
 
     /*//////////////////////////////////////////////////////////////
-                                 ACTORS
+                            ENUMERABLE SETS
     //////////////////////////////////////////////////////////////*/
     /// @dev track the users in the system
     EnumerableSet.AddressSet internal users;
+    /// @dev track the chain selectors in the system
+    EnumerableSet.UintSet internal chainSelectors;
 
     /*//////////////////////////////////////////////////////////////
                                  GHOSTS
     //////////////////////////////////////////////////////////////*/
     uint256 public ghost_state_totalSharesMinted;
+    /// @dev track the total shares burned by incrementing by shareBurnAmount everytime share.transferAndCall is used to withdraw USDC
     uint256 public ghost_state_totalSharesBurned;
 
+    /// @dev track the total shares minted amount according to ShareMintUpdate events emitted by ParentPeet
     uint256 public ghost_event_totalSharesMinted;
     uint256 public ghost_event_totalSharesBurned;
 
@@ -50,9 +56,12 @@ contract Handler is Test {
     uint256 public ghost_state_totalUsdcWithdrawn;
 
     /// @dev track total USDC deposited per user
-    mapping(address user => uint256 amount) public ghost_state_totalUsdcDepositedPerUser;
+    mapping(address user => uint256 usdcDepositAmount) public ghost_state_totalUsdcDepositedPerUser;
     /// @dev track total USDC withdrawn per user
-    mapping(address user => uint256 amount) public ghost_state_totalUsdcWithdrawnPerUser;
+    mapping(address user => uint256 usdcWithdrawAmount) public ghost_state_totalUsdcWithdrawnPerUser;
+
+    /// @dev track total shares burnt per user
+    mapping(address user => uint256 shareBurnAmount) public ghost_state_totalSharesBurnedPerUser;
 
     /// @dev track total USDC deposited per chain
     // @review not sure we'll need these
@@ -97,11 +106,25 @@ contract Handler is Test {
         peersToChainSelectors[address(parent)] = parentChainSelector;
         peersToChainSelectors[address(child1)] = child1ChainSelector;
         peersToChainSelectors[address(child2)] = child2ChainSelector;
+
+        chainSelectors.add(parentChainSelector);
+        chainSelectors.add(child1ChainSelector);
+        chainSelectors.add(child2ChainSelector);
+
+        /// @dev set the initial strategy to the parent chain
+        /// @notice this is set in parent constructor
+        ghost_state_currentStrategyChainSelector = parentChainSelector;
+        ghost_state_currentStrategyProtocolEnum = 0;
     }
 
     /*//////////////////////////////////////////////////////////////
                                 EXTERNAL
     //////////////////////////////////////////////////////////////*/
+    /// @notice This function handles deposits to the system
+    /// @param isNewDepositor whether the depositor is a new user or an existing user
+    /// @param addressSeed the seed used to create or get the depositor
+    /// @param depositAmount the amount of USDC to deposit
+    /// @param chainSelectorSeed the seed used to get the deposit chain selector
     function deposit(bool isNewDepositor, uint256 addressSeed, uint256 depositAmount, uint256 chainSelectorSeed)
         public
         returns (address depositor)
@@ -111,11 +134,13 @@ contract Handler is Test {
         else depositor = _createOrGetUser(addressSeed);
 
         /// @dev bind the fuzzed deposit amount and deal the USDC to the depositor
-        depositAmount = bound(depositAmount, 1, MAX_DEPOSIT_AMOUNT);
+        depositAmount = bound(depositAmount, MIN_DEPOSIT_AMOUNT, MAX_DEPOSIT_AMOUNT);
         deal(address(usdc), depositor, depositAmount);
 
         /// @dev bind the fuzzed chain selector to the range of valid values
         uint64 chainSelector = uint64(bound(chainSelectorSeed, 1, 3));
+
+        vm.recordLogs();
 
         /// @dev deposit the USDC to the peer
         address peer = chainSelectorsToPeers[chainSelector];
@@ -123,15 +148,22 @@ contract Handler is Test {
 
         /// @dev update the ghost state
         _updateDepositGhosts(depositor, depositAmount, chainSelector);
+        _handleDepositLogs();
     }
 
+    /// @notice This function handles withdraws from the system
+    /// @param addressSeed the seed used to create or get the withdrawer
+    /// @notice If the withdrawer has no shares, the function will deposit some USDC to get shares
+    /// @param shareBurnAmount the amount of shares to burn
     /// @param initiateChainSelectorSeed the chain selector of the chain the withdrawal is initiated on
     /// @param withdrawChainSelectorSeed the chain selector of the chain the withdrawal is received on
+    /// @param usdcDepositAmount the amount of USDC to deposit if the withdrawer has no shares
     function withdraw(
         uint256 addressSeed,
-        uint256 withdrawAmount,
+        uint256 shareBurnAmount,
         uint256 initiateChainSelectorSeed,
-        uint256 withdrawChainSelectorSeed
+        uint256 withdrawChainSelectorSeed,
+        uint256 usdcDepositAmount
     ) public {
         /// @dev create or get the withdrawer
         address withdrawer = _createOrGetUser(addressSeed);
@@ -139,12 +171,12 @@ contract Handler is Test {
 
         /// @dev if the withdrawer has no shares, deposit some USDC to get shares
         if (withdrawerShareBalance == 0) {
-            withdrawer = deposit(true, addressSeed, withdrawAmount, initiateChainSelectorSeed);
+            withdrawer = deposit(true, addressSeed, usdcDepositAmount, initiateChainSelectorSeed);
             withdrawerShareBalance = share.balanceOf(withdrawer);
         }
 
         /// @dev bind the fuzzed withdraw amount to the range of valid values
-        withdrawAmount = bound(withdrawAmount, 1, withdrawerShareBalance);
+        shareBurnAmount = bound(shareBurnAmount, 1, withdrawerShareBalance);
         /// @dev bind the fuzzed chain selectors to the range of valid values
         uint64 initiateChainSelector = uint64(bound(initiateChainSelectorSeed, 1, 3));
         uint64 withdrawChainSelector = uint64(bound(withdrawChainSelectorSeed, 1, 3));
@@ -153,12 +185,13 @@ contract Handler is Test {
         address peer = chainSelectorsToPeers[initiateChainSelector];
         bytes memory encodedWithdrawChainSelector = abi.encode(withdrawChainSelector);
         _changePrank(withdrawer);
-        share.transferAndCall(peer, withdrawAmount, encodedWithdrawChainSelector);
+        share.transferAndCall(peer, shareBurnAmount, encodedWithdrawChainSelector);
 
         /// @dev update the ghost state
-        _updateWithdrawGhosts(withdrawer, withdrawAmount, withdrawChainSelector);
+        _updateWithdrawGhosts(withdrawer, shareBurnAmount, withdrawChainSelector);
     }
 
+    /// @notice This function handles the fulfillment of requests to the CLF don - the purpose of which is to update the strategy
     function fulfillRequest(uint256 chainSelectorSeed, uint256 protocolEnumSeed) public {
         /// @dev bind the chain selector and protocol enum to the range of valid values
         uint64 chainSelector = uint64(bound(chainSelectorSeed, 1, 3));
@@ -210,9 +243,11 @@ contract Handler is Test {
         // ghost_state_totalUsdcDepositedPerChain[chainSelector] += depositAmount;
     }
 
-    function _updateWithdrawGhosts(address withdrawer, uint256 withdrawAmount, uint64 chainSelector) internal {
-        ghost_state_totalUsdcWithdrawn += withdrawAmount;
-        ghost_state_totalUsdcWithdrawnPerUser[withdrawer] += withdrawAmount;
+    function _updateWithdrawGhosts(address withdrawer, uint256 shareBurnAmount, uint64 chainSelector) internal {
+        ghost_state_totalSharesBurned += shareBurnAmount;
+        ghost_state_totalSharesBurnedPerUser[withdrawer] += shareBurnAmount;
+        // ghost_state_totalUsdcWithdrawn += withdrawAmount;
+        // ghost_state_totalUsdcWithdrawnPerUser[withdrawer] += withdrawAmount;
         // ghost_state_totalUsdcWithdrawnPerChain[chainSelector] += withdrawAmount;
     }
 
@@ -220,6 +255,28 @@ contract Handler is Test {
     function _updateStrategyGhosts(uint64 chainSelector, uint8 protocolEnum) internal {
         ghost_state_currentStrategyChainSelector = chainSelector;
         ghost_state_currentStrategyProtocolEnum = protocolEnum;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                              HANDLE LOGS
+    //////////////////////////////////////////////////////////////*/
+    function _handleDepositLogs() internal {
+        bytes32 depositInitiatedEvent = keccak256("DepositInitiated(address,uint256,uint64)");
+        bytes32 shareMintUpdateEvent = keccak256("ShareMintUpdate(uint256,uint64,uint256)");
+        bool depositInitiatedEventFound = false;
+        bool shareMintUpdateEventFound = false;
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == depositInitiatedEvent) depositInitiatedEventFound = true;
+            if (logs[i].topics[0] == shareMintUpdateEvent) {
+                shareMintUpdateEventFound = true;
+                uint256 shareMintAmount = uint256(logs[i].topics[1]);
+                ghost_event_totalSharesMinted += shareMintAmount;
+            }
+        }
+        assertTrue(depositInitiatedEventFound, "DepositInitiated log not found");
+        assertTrue(shareMintUpdateEventFound, "ShareMintUpdate log not found");
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -244,6 +301,13 @@ contract Handler is Test {
     /// @dev convert an index to an existing user
     function _indexToUser(uint256 addressIndex) internal view returns (address) {
         return users.at(bound(addressIndex, 0, users.length() - 1));
+    }
+
+    /// @dev helper function for looping through chainSelectors in the system
+    function forEachChainSelector(function(uint64) external func) external {
+        for (uint256 i; i < chainSelectors.length(); ++i) {
+            func(uint64(chainSelectors.at(i)));
+        }
     }
 
     function _changePrank(address newPrank) internal {
