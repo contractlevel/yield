@@ -220,8 +220,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         /// @dev withdraw from the old strategy
         address oldStrategyPool = _getStrategyPool();
         uint256 totalValue = _getTotalValueFromStrategy(oldStrategyPool);
-        // @review if (totalValue != 0) then withdraw
-        _withdrawFromStrategy(oldStrategyPool, totalValue);
+        if (totalValue != 0) _withdrawFromStrategy(oldStrategyPool, totalValue);
 
         /// @dev update strategy pool to either protocol on this chain or address(0) if on a different chain
         Strategy memory newStrategy = abi.decode(data, (Strategy));

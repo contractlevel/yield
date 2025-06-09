@@ -7,7 +7,9 @@ import {MockAavePool} from "./MockAavePool.sol";
 contract MockAToken is ERC20 {
     address internal immutable i_aavePool;
 
-    constructor(address aavePool) ERC20("MockAToken", "aMOCK") {}
+    constructor(address aavePool) ERC20("MockAToken", "aMOCK") {
+        i_aavePool = aavePool;
+    }
 
     function balanceOf(address account) public view override returns (uint256) {
         return MockAavePool(i_aavePool).balanceOf(account);

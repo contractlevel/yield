@@ -5,10 +5,11 @@ import {StdInvariant} from "forge-std/StdInvariant.sol";
 import {BaseTest, Vm, console2, ParentCLF, ChildPeer, Share} from "../BaseTest.t.sol";
 import {Handler} from "./Handler.t.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
-import {CCIPLocalSimulator} from "@chainlink-local/src/ccip/CCIPLocalSimulator.sol";
+// import {CCIPLocalSimulator} from "@chainlink-local/src/ccip/CCIPLocalSimulator.sol";
 import {IRouterClient} from "@chainlink/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
 import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
 import {IComet} from "../../src/interfaces/IComet.sol";
+import {MockCCIPRouter} from "@chainlink-local/test/mocks/MockRouter.sol";
 
 contract Invariant is StdInvariant, BaseTest {
     /*//////////////////////////////////////////////////////////////
@@ -17,32 +18,52 @@ contract Invariant is StdInvariant, BaseTest {
     uint64 internal constant PARENT_SELECTOR = 1;
     uint64 internal constant CHILD1_SELECTOR = 2;
     uint64 internal constant CHILD2_SELECTOR = 3;
-    uint256 internal constant USDC_AMOUNT = 1_000_000_000_000; // 1M USDC
+    uint256 internal constant STRATEGY_POOL_USDC_STARTING_BALANCE = 1_000_000_000_000; // 1M USDC
+    uint256 internal constant CCIP_GAS_LIMIT = 5_000_000;
 
     /// @dev Handler contract we are running calls to the SBT through
     Handler internal handler;
-    /// @dev provides addresses passed to the contracts
+    /// @dev provides addresses passed to the contracts based on where we are deploying (locally in this case)
     HelperConfig internal helperConfig;
+    /// @dev provides address passed to contracts
     HelperConfig.NetworkConfig internal networkConfig;
-    CCIPLocalSimulator internal ccipLocalSimulator;
+    /// @dev Parent Peer contract
     ParentCLF internal parent;
+    /// @dev Child Peer contract
     ChildPeer internal child1;
+    /// @dev Child Peer contract
     ChildPeer internal child2;
+    /// @dev Share contract
     Share internal share;
+    /// @dev Chainlink Automation Time-based Upkeep Address
+    address internal upkeep = makeAddr("upkeep");
 
     /*//////////////////////////////////////////////////////////////
                                  SETUP
     //////////////////////////////////////////////////////////////*/
     function setUp() public override {
+        /// @dev deploy infrastructure
         _deployInfra();
         _dealLinkToPeers(true, address(parent), address(child1), address(child2), networkConfig.tokens.link);
         _setCrossChainPeers();
 
-        handler = new Handler(parent, child1, child2, share, networkConfig.ccip.ccipRouter, networkConfig.tokens.usdc);
+        /// @dev deploy handler
+        handler = new Handler(
+            parent,
+            child1,
+            child2,
+            share,
+            networkConfig.ccip.ccipRouter,
+            networkConfig.tokens.usdc,
+            upkeep,
+            networkConfig.clf.functionsRouter
+        );
 
         /// @dev define appropriate function selectors
-        bytes4[] memory selectors = new bytes4[](1);
+        bytes4[] memory selectors = new bytes4[](3);
         selectors[0] = Handler.deposit.selector;
+        selectors[1] = Handler.withdraw.selector;
+        selectors[2] = Handler.fulfillRequest.selector;
 
         /// @dev target handler and appropriate function selectors
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
@@ -71,6 +92,7 @@ contract Invariant is StdInvariant, BaseTest {
             networkConfig.clf.donId, // 0x0
             networkConfig.clf.clfSubId // 0
         );
+        parent.setUpkeepAddress(upkeep);
         /// @dev deploy at least 2 child peers to cover all CCIP tx types
         child1 = new ChildPeer(
             networkConfig.ccip.ccipRouter,
@@ -102,14 +124,14 @@ contract Invariant is StdInvariant, BaseTest {
 
         /// @dev our mocks of aave and compound will need to be dealt usdc
         address aavePool = IPoolAddressesProvider(networkConfig.protocols.aavePoolAddressesProvider).getPool();
-        deal(networkConfig.tokens.usdc, aavePool, USDC_AMOUNT);
-        deal(networkConfig.tokens.usdc, networkConfig.protocols.comet, USDC_AMOUNT);
+        deal(networkConfig.tokens.usdc, aavePool, STRATEGY_POOL_USDC_STARTING_BALANCE);
+        deal(networkConfig.tokens.usdc, networkConfig.protocols.comet, STRATEGY_POOL_USDC_STARTING_BALANCE);
     }
 
     function _setCrossChainPeers() internal override {
-        parent.setCCIPGasLimit(INITIAL_CCIP_GAS_LIMIT);
-        child1.setCCIPGasLimit(INITIAL_CCIP_GAS_LIMIT);
-        child2.setCCIPGasLimit(INITIAL_CCIP_GAS_LIMIT);
+        parent.setCCIPGasLimit(CCIP_GAS_LIMIT);
+        child1.setCCIPGasLimit(CCIP_GAS_LIMIT);
+        child2.setCCIPGasLimit(CCIP_GAS_LIMIT);
 
         parent.setAllowedChain(PARENT_SELECTOR, true);
         parent.setAllowedChain(CHILD1_SELECTOR, true);
@@ -131,7 +153,24 @@ contract Invariant is StdInvariant, BaseTest {
         child2.setAllowedPeer(PARENT_SELECTOR, address(parent));
         child2.setAllowedPeer(CHILD1_SELECTOR, address(child1));
         child2.setAllowedPeer(CHILD2_SELECTOR, address(child2));
+
+        MockCCIPRouter(networkConfig.ccip.ccipRouter).setPeerToChainSelector(address(parent), PARENT_SELECTOR);
+        MockCCIPRouter(networkConfig.ccip.ccipRouter).setPeerToChainSelector(address(child1), CHILD1_SELECTOR);
+        MockCCIPRouter(networkConfig.ccip.ccipRouter).setPeerToChainSelector(address(child2), CHILD2_SELECTOR);
     }
 
     function test_invariant_setUp() public {}
+
+    /*//////////////////////////////////////////////////////////////
+                               INVARIANTS
+    //////////////////////////////////////////////////////////////*/
+    /// @notice Withdraw Solvency: Total USDC withdrawn should be greater than or equal to the total USDC deposited
+    // function invariant_withdraw_solvency() public view {
+    //     assertTrue(
+    //         handler.ghost_state_totalUsdcWithdrawn() >= handler.ghost_state_totalUsdcDeposited(),
+    //         "Invariant violated: Total USDC withdrawn should be greater than or equal to the total USDC deposited."
+    //     );
+    // }
 }
+
+// If someone deposits and then withdraws the full amount, they should have withdrawnUsdc >= depositedUsdc
