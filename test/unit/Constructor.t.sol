@@ -50,4 +50,12 @@ contract ConstructorTest is BaseTest {
         assertEq(optChildPeer.getStrategyPool(), address(0));
         assertEq(ethChildPeer.getStrategyPool(), address(0));
     }
+
+    function test_yield_getTotalValue() public {
+        assertEq(baseParentPeer.getTotalValue(), 0);
+        vm.expectRevert(abi.encodeWithSignature("YieldPeer__NotStrategyChain()"));
+        optChildPeer.getTotalValue();
+        vm.expectRevert(abi.encodeWithSignature("YieldPeer__NotStrategyChain()"));
+        ethChildPeer.getTotalValue();
+    }
 }

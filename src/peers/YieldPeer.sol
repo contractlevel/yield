@@ -26,6 +26,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     error YieldPeer__ChainNotAllowed(uint64 chainSelector);
     error YieldPeer__PeerNotAllowed(address peer);
     error YieldPeer__NoZeroAmount();
+    error YieldPeer__NotStrategyChain();
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
@@ -473,11 +474,15 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         return s_ccipGasLimit;
     }
 
-    function getTotalValue() external view returns (uint256) {
-        return _getTotalValueFromStrategy(s_strategyPool);
-    }
-
     function getStrategyPool() external view returns (address) {
         return s_strategyPool;
+    }
+
+    /// @dev Reverts if this chain is not the strategy chain
+    function getTotalValue() external view returns (uint256 totalValue) {
+        address strategyPool = _getStrategyPool();
+        // @review add unit test for this
+        if (strategyPool != address(0)) totalValue = _getTotalValueFromStrategy(strategyPool);
+        else revert YieldPeer__NotStrategyChain();
     }
 }

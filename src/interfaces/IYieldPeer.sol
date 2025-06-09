@@ -43,4 +43,5 @@ interface IYieldPeer {
 
     function deposit(uint256 amountToDeposit) external;
     function getStrategyPool() external view returns (address);
+    function getTotalValue() external view returns (uint256);
 }

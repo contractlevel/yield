@@ -11,6 +11,7 @@ import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAd
 import {IComet} from "../../src/interfaces/IComet.sol";
 import {MockCCIPRouter} from "@chainlink-local/test/mocks/MockRouter.sol";
 
+/// @notice We are making the assumption that the gasLimit set for CCIP works correctly
 contract Invariant is StdInvariant, BaseTest {
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
@@ -160,8 +161,6 @@ contract Invariant is StdInvariant, BaseTest {
         MockCCIPRouter(networkConfig.ccip.ccipRouter).setPeerToChainSelector(address(child2), CHILD2_SELECTOR);
     }
 
-    function test_invariant_setUp() public {}
-
     /*//////////////////////////////////////////////////////////////
                                INVARIANTS
     //////////////////////////////////////////////////////////////*/
@@ -171,7 +170,7 @@ contract Invariant is StdInvariant, BaseTest {
     }
 
     function checkStrategyPoolPerChainSelector(uint64 chainSelector) external view {
-        if (chainSelector == handler.ghost_state_currentStrategyChainSelector()) {
+        if (chainSelector == parent.getStrategy().chainSelector) {
             assertTrue(
                 IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getStrategyPool() != address(0),
                 "Invariant violated: Strategy pool should be set on the strategy chain"
@@ -192,10 +191,54 @@ contract Invariant is StdInvariant, BaseTest {
             "Invariant violated: Total shares tracked by ParentPeer should be equal to total minted minus total burned system wide."
         );
     }
+
+    /// @notice Total Value Accountancy: The total value in the system should be more than or equal to total USDC deposited minus total USDC withdrawn
+    function invariant_totalValue_integrity() public {
+        handler.forEachChainSelector(this.checkTotalValuePerChainSelector);
+    }
+
+    function checkTotalValuePerChainSelector(uint64 chainSelector) external view {
+        if (chainSelector == handler.ghost_state_currentStrategyChainSelector()) {
+            assertTrue(
+                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getTotalValue()
+                    >= handler.ghost_state_totalUsdcDeposited() - handler.ghost_event_totalUsdcWithdrawn(),
+                "Invariant violated: Total value in the system should be more than or equal to total USDC deposited minus total USDC withdrawn"
+            );
+        }
+    }
+
+    /// @notice Total Share Balances: The total shares tracked by ParentPeer should be equal to the sum of all holder balances
+    function invariant_totalShareBalances_integrity() public view {
+        /// @dev we mint an initial amount of shares to the admin to mitigate share inflation attacks
+        uint256 sumOfBalances = handler.getAdminShareBalance();
+        /// @dev loop through all users in the system and add their share balances to the sum
+        for (uint256 i = 0; i < handler.getUsersLength(); i++) {
+            address user = handler.getUserAt(i);
+            sumOfBalances += share.balanceOf(user);
+        }
+
+        assertEq(
+            parent.getTotalShares(),
+            sumOfBalances,
+            "Invariant violated: Total shares tracked by ParentPeer should be equal to the sum of all holder balances"
+        );
+    }
+
+    /// @notice Event Consistency: The number of WithdrawCompleted events should be equal to the number of ShareBurnUpdate events
+    function invariant_withdrawCompleted_shareBurnUpdate_consistency() public view {
+        assertEq(
+            handler.ghost_event_withdrawCompleted_emissions(),
+            handler.ghost_event_shareBurnUpdate_emissions(),
+            "Invariant violated: The number of WithdrawCompleted events should be equal to the number of ShareBurnUpdate events"
+        );
+    }
+
+    /// @notice Event Consistency: The number of DepositInitiated events should be equal to the number of ShareMintUpdate events
+    function invariant_depositInitiated_shareMintUpdate_consistency() public view {
+        assertEq(
+            handler.ghost_event_depositInitiated_emissions(),
+            handler.ghost_event_shareMintUpdate_emissions(),
+            "Invariant violated: The number of DepositInitiated events should be equal to the number of ShareMintUpdate events"
+        );
+    }
 }
-
-// If someone deposits and then withdraws the full amount, they should have withdrawnUsdc >= depositedUsdc
-
-// depositing usdc should mint shares
-
-// withdrawing usdc should burn shares

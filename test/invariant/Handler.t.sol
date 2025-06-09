@@ -4,6 +4,7 @@ pragma solidity 0.8.26;
 import {Test, Vm, console2, ParentCLF, ChildPeer, IERC20, Share, IYieldPeer} from "../BaseTest.t.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
+/// @notice This contract is used to handle fuzzed interactions with the external functions of the system to test invariants.
 contract Handler is Test {
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS
@@ -37,7 +38,7 @@ contract Handler is Test {
     /*//////////////////////////////////////////////////////////////
                             ENUMERABLE SETS
     //////////////////////////////////////////////////////////////*/
-    /// @dev track the users in the system
+    /// @dev track the users in the system (the only role for a user is to deposit and withdraw USDC)
     EnumerableSet.AddressSet internal users;
     /// @dev track the chain selectors in the system
     EnumerableSet.UintSet internal chainSelectors;
@@ -51,11 +52,16 @@ contract Handler is Test {
 
     /// @dev track the total shares minted amount according to ShareMintUpdate events emitted by ParentPeet
     uint256 public ghost_event_totalSharesMinted;
+    /// @dev track the total shares burned amount according to ShareBurnUpdate events emitted by ParentPeer
     uint256 public ghost_event_totalSharesBurned;
 
     /// @dev track total USDC deposited across the system
     uint256 public ghost_state_totalUsdcDeposited;
     uint256 public ghost_state_totalUsdcWithdrawn;
+
+    uint256 public ghost_event_totalUsdcDeposited;
+    /// @dev track the total USDC withdrawn amount according to WithdrawCompleted events emitted by Peers
+    uint256 public ghost_event_totalUsdcWithdrawn;
 
     /// @dev track total USDC deposited per user
     mapping(address user => uint256 usdcDepositAmount) public ghost_state_totalUsdcDepositedPerUser;
@@ -72,6 +78,16 @@ contract Handler is Test {
 
     uint64 public ghost_state_currentStrategyChainSelector;
     uint8 public ghost_state_currentStrategyProtocolEnum;
+
+    /// @dev incremented by 1 everytime a DepositInitiated event is emitted
+    uint256 public ghost_event_depositInitiated_emissions;
+    /// @dev incremented by 1 everytime a ShareMintUpdate event is emitted
+    uint256 public ghost_event_shareMintUpdate_emissions;
+
+    /// @dev incremented by 1 everytime a WithdrawCompleted event is emitted
+    uint256 public ghost_event_withdrawCompleted_emissions;
+    /// @dev incremented by 1 everytime a ShareBurnUpdate event is emitted
+    uint256 public ghost_event_shareBurnUpdate_emissions;
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -95,7 +111,6 @@ contract Handler is Test {
         upkeep = _upkeep;
         functionsRouter = _functionsRouter;
 
-        // @review could delete this
         parentChainSelector = parent.getThisChainSelector();
         child1ChainSelector = child1.getThisChainSelector();
         child2ChainSelector = child2.getThisChainSelector();
@@ -103,11 +118,6 @@ contract Handler is Test {
         chainSelectorsToPeers[parentChainSelector] = address(parent);
         chainSelectorsToPeers[child1ChainSelector] = address(child1);
         chainSelectorsToPeers[child2ChainSelector] = address(child2);
-
-        // @review could delete this
-        peersToChainSelectors[address(parent)] = parentChainSelector;
-        peersToChainSelectors[address(child1)] = child1ChainSelector;
-        peersToChainSelectors[address(child2)] = child2ChainSelector;
 
         chainSelectors.add(parentChainSelector);
         chainSelectors.add(child1ChainSelector);
@@ -118,6 +128,7 @@ contract Handler is Test {
         ghost_state_currentStrategyChainSelector = parentChainSelector;
         ghost_state_currentStrategyProtocolEnum = 0;
 
+        /// @dev admin deposits USDC to the system to mitigate share inflation attacks
         _adminDeposit();
     }
 
@@ -151,7 +162,7 @@ contract Handler is Test {
         _deposit(depositor, depositAmount, peer);
 
         /// @dev update the ghost state
-        _updateDepositGhosts(depositor, depositAmount, chainSelector);
+        _updateDepositGhosts(depositor, depositAmount);
         _handleDepositLogs();
     }
 
@@ -185,6 +196,8 @@ contract Handler is Test {
         uint64 initiateChainSelector = uint64(bound(initiateChainSelectorSeed, 1, 3));
         uint64 withdrawChainSelector = uint64(bound(withdrawChainSelectorSeed, 1, 3));
 
+        vm.recordLogs();
+
         /// @dev withdraw the shares from the peer
         address peer = chainSelectorsToPeers[initiateChainSelector];
         bytes memory encodedWithdrawChainSelector = abi.encode(withdrawChainSelector);
@@ -192,7 +205,8 @@ contract Handler is Test {
         share.transferAndCall(peer, shareBurnAmount, encodedWithdrawChainSelector);
 
         /// @dev update the ghost state
-        _updateWithdrawGhosts(withdrawer, shareBurnAmount, withdrawChainSelector);
+        _updateWithdrawGhosts(withdrawer, shareBurnAmount);
+        _handleWithdrawLogs();
     }
 
     /// @notice This function handles the fulfillment of requests to the CLF don - the purpose of which is to update the strategy
@@ -240,19 +254,14 @@ contract Handler is Test {
     /*//////////////////////////////////////////////////////////////
                              UPDATE GHOSTS
     //////////////////////////////////////////////////////////////*/
-    function _updateDepositGhosts(address depositor, uint256 depositAmount, uint64 chainSelector) internal {
-        // uint256 userShareBalance = share.balanceOf(depositor);
+    function _updateDepositGhosts(address depositor, uint256 depositAmount) internal {
         ghost_state_totalUsdcDeposited += depositAmount;
         ghost_state_totalUsdcDepositedPerUser[depositor] += depositAmount;
-        // ghost_state_totalUsdcDepositedPerChain[chainSelector] += depositAmount;
     }
 
-    function _updateWithdrawGhosts(address withdrawer, uint256 shareBurnAmount, uint64 chainSelector) internal {
+    function _updateWithdrawGhosts(address withdrawer, uint256 shareBurnAmount) internal {
         ghost_state_totalSharesBurned += shareBurnAmount;
         ghost_state_totalSharesBurnedPerUser[withdrawer] += shareBurnAmount;
-        // ghost_state_totalUsdcWithdrawn += withdrawAmount;
-        // ghost_state_totalUsdcWithdrawnPerUser[withdrawer] += withdrawAmount;
-        // ghost_state_totalUsdcWithdrawnPerChain[chainSelector] += withdrawAmount;
     }
 
     /// @notice we track the current strategy chain selector and protocol enum with ghosts
@@ -272,9 +281,13 @@ contract Handler is Test {
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i = 0; i < logs.length; i++) {
-            if (logs[i].topics[0] == depositInitiatedEvent) depositInitiatedEventFound = true;
+            if (logs[i].topics[0] == depositInitiatedEvent) {
+                depositInitiatedEventFound = true;
+                ghost_event_depositInitiated_emissions++;
+            }
             if (logs[i].topics[0] == shareMintUpdateEvent) {
                 shareMintUpdateEventFound = true;
+                ghost_event_shareMintUpdate_emissions++;
                 uint256 shareMintAmount = uint256(logs[i].topics[1]);
                 ghost_event_totalSharesMinted += shareMintAmount;
             }
@@ -283,15 +296,39 @@ contract Handler is Test {
         assertTrue(shareMintUpdateEventFound, "ShareMintUpdate log not found");
     }
 
+    function _handleWithdrawLogs() internal {
+        bytes32 withdrawCompletedEvent = keccak256("WithdrawCompleted(address,uint256)");
+        bytes32 shareBurnUpdateEvent = keccak256("ShareBurnUpdate(uint256,uint64,uint256)");
+        bool withdrawCompletedEventFound = false;
+        bool shareBurnUpdateEventFound = false;
+
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == withdrawCompletedEvent) {
+                withdrawCompletedEventFound = true;
+                ghost_event_withdrawCompleted_emissions++;
+                ghost_event_totalUsdcWithdrawn += uint256(logs[i].topics[2]);
+            }
+            if (logs[i].topics[0] == shareBurnUpdateEvent) {
+                shareBurnUpdateEventFound = true;
+                uint256 shareBurnAmount = uint256(logs[i].topics[1]);
+                ghost_event_shareBurnUpdate_emissions++;
+                ghost_event_totalSharesBurned += shareBurnAmount;
+            }
+        }
+        assertTrue(withdrawCompletedEventFound, "WithdrawCompleted log not found");
+    }
+
     /*//////////////////////////////////////////////////////////////
                                 UTILITY
     //////////////////////////////////////////////////////////////*/
     /// @dev convert a seed to an address
-    function _seedToAddress(uint256 addressSeed) internal view returns (address seedAddress) {
+    function _seedToAddress(uint256 addressSeed) internal returns (address seedAddress) {
         uint160 boundInt = uint160(bound(addressSeed, 1, type(uint160).max));
         seedAddress = address(boundInt);
         if (seedAddress == admin) seedAddress = _seedToAddress(addressSeed + 1);
         if (seedAddress == address(share)) seedAddress = _seedToAddress(addressSeed + 2);
+        users.add(seedAddress);
     }
 
     /// @dev create a user address for calling and passing to requestKycStatus or onTokenTransfer
@@ -323,7 +360,7 @@ contract Handler is Test {
         deal(address(usdc), admin, INITIAL_DEPOSIT_AMOUNT);
         usdc.approve(address(parent), INITIAL_DEPOSIT_AMOUNT);
         parent.deposit(INITIAL_DEPOSIT_AMOUNT);
-        _updateDepositGhosts(admin, INITIAL_DEPOSIT_AMOUNT, parentChainSelector);
+        _updateDepositGhosts(admin, INITIAL_DEPOSIT_AMOUNT);
         _handleDepositLogs();
     }
 
@@ -334,5 +371,20 @@ contract Handler is Test {
 
     function _stopPrank() internal {
         vm.stopPrank();
+    }
+
+    /// @dev getter for the number of users
+    function getUsersLength() external view returns (uint256) {
+        return EnumerableSet.length(users);
+    }
+
+    /// @dev getter for a user at a specific index
+    function getUserAt(uint256 index) external view returns (address) {
+        return EnumerableSet.at(users, index);
+    }
+
+    /// @dev getter for the admin's share balance
+    function getAdminShareBalance() external view returns (uint256) {
+        return share.balanceOf(admin);
     }
 }
