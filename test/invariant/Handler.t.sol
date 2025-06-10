@@ -46,6 +46,7 @@ contract Handler is Test {
     /*//////////////////////////////////////////////////////////////
                                  GHOSTS
     //////////////////////////////////////////////////////////////*/
+    // 1
     uint256 public ghost_state_totalSharesMinted;
     /// @dev track the total shares burned by incrementing by shareBurnAmount everytime share.transferAndCall is used to withdraw USDC
     uint256 public ghost_state_totalSharesBurned;
@@ -57,8 +58,10 @@ contract Handler is Test {
 
     /// @dev track total USDC deposited across the system
     uint256 public ghost_state_totalUsdcDeposited;
+    // 1
     uint256 public ghost_state_totalUsdcWithdrawn;
 
+    // 1
     uint256 public ghost_event_totalUsdcDeposited;
     /// @dev track the total USDC withdrawn amount according to WithdrawCompleted events emitted by Peers
     uint256 public ghost_event_totalUsdcWithdrawn;
@@ -66,18 +69,11 @@ contract Handler is Test {
     /// @dev track total USDC deposited per user
     mapping(address user => uint256 usdcDepositAmount) public ghost_state_totalUsdcDepositedPerUser;
     /// @dev track total USDC withdrawn per user
+    // 1
     mapping(address user => uint256 usdcWithdrawAmount) public ghost_state_totalUsdcWithdrawnPerUser;
 
     /// @dev track total shares burnt per user
     mapping(address user => uint256 shareBurnAmount) public ghost_state_totalSharesBurnedPerUser;
-
-    /// @dev track total USDC deposited per chain
-    // @review not sure we'll need these
-    mapping(uint64 chainSelector => uint256 amount) public ghost_state_totalUsdcDepositedPerChain;
-    mapping(uint64 chainSelector => uint256 amount) public ghost_state_totalUsdcWithdrawnPerChain;
-
-    uint64 public ghost_state_currentStrategyChainSelector;
-    uint8 public ghost_state_currentStrategyProtocolEnum;
 
     /// @dev incremented by 1 everytime a DepositInitiated event is emitted
     uint256 public ghost_event_depositInitiated_emissions;
@@ -122,11 +118,6 @@ contract Handler is Test {
         chainSelectors.add(parentChainSelector);
         chainSelectors.add(child1ChainSelector);
         chainSelectors.add(child2ChainSelector);
-
-        /// @dev set the initial strategy to the parent chain
-        /// @notice this is set in parent constructor
-        ghost_state_currentStrategyChainSelector = parentChainSelector;
-        ghost_state_currentStrategyProtocolEnum = 0;
 
         /// @dev admin deposits USDC to the system to mitigate share inflation attacks
         _adminDeposit();
@@ -235,10 +226,6 @@ contract Handler is Test {
         /// @dev simulate fulfilling request from CLF don to update the strategy
         _changePrank(functionsRouter);
         parent.handleOracleFulfillment(requestId, response, "");
-        _stopPrank();
-
-        /// @dev update the ghost state
-        _updateStrategyGhosts(chainSelector, protocolEnum);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -262,12 +249,6 @@ contract Handler is Test {
     function _updateWithdrawGhosts(address withdrawer, uint256 shareBurnAmount) internal {
         ghost_state_totalSharesBurned += shareBurnAmount;
         ghost_state_totalSharesBurnedPerUser[withdrawer] += shareBurnAmount;
-    }
-
-    /// @notice we track the current strategy chain selector and protocol enum with ghosts
-    function _updateStrategyGhosts(uint64 chainSelector, uint8 protocolEnum) internal {
-        ghost_state_currentStrategyChainSelector = chainSelector;
-        ghost_state_currentStrategyProtocolEnum = protocolEnum;
     }
 
     /*//////////////////////////////////////////////////////////////

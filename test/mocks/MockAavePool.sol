@@ -76,4 +76,8 @@ contract MockAavePool {
     function setATokenAddress(address asset, address aTokenAddress) external {
         s_aTokenAddresses[asset] = aTokenAddress;
     }
+
+    function getInterestRate() external view returns (uint256) {
+        return s_interestRate;
+    }
 }

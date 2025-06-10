@@ -5,7 +5,6 @@ import {StdInvariant} from "forge-std/StdInvariant.sol";
 import {BaseTest, Vm, console2, ParentCLF, ChildPeer, Share, IYieldPeer} from "../BaseTest.t.sol";
 import {Handler} from "./Handler.t.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
-// import {CCIPLocalSimulator} from "@chainlink-local/src/ccip/CCIPLocalSimulator.sol";
 import {IRouterClient} from "@chainlink/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
 import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
 import {IComet} from "../../src/interfaces/IComet.sol";
@@ -20,7 +19,6 @@ contract Invariant is StdInvariant, BaseTest {
     uint64 internal constant CHILD1_SELECTOR = 2;
     uint64 internal constant CHILD2_SELECTOR = 3;
     uint256 internal constant STRATEGY_POOL_USDC_STARTING_BALANCE = 1_000_000_000_000; // 1M USDC
-    // uint256 internal constant CCIP_GAS_LIMIT = 169_500;
     uint256 internal constant CCIP_GAS_LIMIT = 1_000_000;
 
     /// @dev Handler contract we are running calls to the SBT through
@@ -221,7 +219,7 @@ contract Invariant is StdInvariant, BaseTest {
     }
 
     function checkTotalValuePerChainSelector(uint64 chainSelector) external view {
-        if (chainSelector == handler.ghost_state_currentStrategyChainSelector()) {
+        if (chainSelector == parent.getStrategy().chainSelector) {
             assertTrue(
                 IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getTotalValue()
                     >= handler.ghost_state_totalUsdcDeposited() - handler.ghost_event_totalUsdcWithdrawn(),
