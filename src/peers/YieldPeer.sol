@@ -485,4 +485,14 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         if (strategyPool != address(0)) totalValue = _getTotalValueFromStrategy(strategyPool);
         else revert YieldPeer__NotStrategyChain();
     }
+
+    /// @return compound cUSDCv3 address
+    function getCompound() external view returns (address compound) {
+        compound = address(i_comet);
+    }
+
+    /// @return aave Aave Pool Addresses Provider address
+    function getAave() external view returns (address aave) {
+        aave = address(i_aavePoolAddressesProvider);
+    }
 }

@@ -183,6 +183,29 @@ contract Invariant is StdInvariant, BaseTest {
         }
     }
 
+    /// @notice Strategy Protocol Consistency: Strategy Protocol pool on active strategy chain should match the protocol stored in ParentPeer
+    function invariant_strategyProtocol_consistency() public {
+        handler.forEachChainSelector(this.checkStrategyProtocolPerChainSelector);
+    }
+
+    function checkStrategyProtocolPerChainSelector(uint64 chainSelector) external view {
+        if (chainSelector == parent.getStrategy().chainSelector) {
+            if (parent.getStrategy().protocol == IYieldPeer.Protocol.Aave) {
+                assertEq(
+                    IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getAave(),
+                    IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getStrategyPool(),
+                    "Invariant violated: Strategy protocol on active strategy chain should match the protocol stored in ParentPeer"
+                );
+            } else if (parent.getStrategy().protocol == IYieldPeer.Protocol.Compound) {
+                assertEq(
+                    IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getCompound(),
+                    IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getStrategyPool(),
+                    "Invariant violated: Strategy protocol on active strategy chain should match the protocol stored in ParentPeer"
+                );
+            }
+        }
+    }
+
     /// @notice Total Shares Accountancy: The total shares tracked by ParentPeer should be equal to total minted minus total burned system wide.
     function invariant_totalShares_integrity() public view {
         assertEq(
