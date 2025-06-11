@@ -264,7 +264,7 @@ contract HelperConfig is Script {
         MockAavePool aavePool = new MockAavePool(address(usdc)); // need to set aToken address later
         MockAToken aToken = new MockAToken(address(aavePool));
         MockPoolAddressesProvider poolAddressesProvider = new MockPoolAddressesProvider(address(aavePool));
-        aavePool.setATokenAddress(address(usdc), address(aToken));
+        aavePool.setATokenAddress(address(aToken));
         MockComet comet = new MockComet();
         MockFunctionsRouter functionsRouter = new MockFunctionsRouter();
 

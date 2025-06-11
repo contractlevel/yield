@@ -16,9 +16,15 @@ contract MockAavePool {
     // Track aToken addresses for each asset
     mapping(address => address) private s_aTokenAddresses;
 
+    address internal s_aToken;
+
     error InvalidInterestRate();
 
-    constructor(address usdc) {}
+    address internal immutable i_usdc;
+
+    constructor(address usdc) {
+        i_usdc = usdc;
+    }
 
     function supply(address asset, uint256 amount, address onBehalfOf, uint16) external {
         // Transfer asset from user
@@ -47,9 +53,9 @@ contract MockAavePool {
         return amount;
     }
 
-    function getReserveData(address asset) external view returns (DataTypes.ReserveData memory) {
+    function getReserveData(address) external view returns (DataTypes.ReserveData memory) {
         DataTypes.ReserveData memory reserveData;
-        reserveData.aTokenAddress = s_aTokenAddresses[asset];
+        reserveData.aTokenAddress = s_aToken;
         return reserveData;
     }
 
@@ -73,8 +79,8 @@ contract MockAavePool {
         s_interestRate = interestRate;
     }
 
-    function setATokenAddress(address asset, address aTokenAddress) external {
-        s_aTokenAddresses[asset] = aTokenAddress;
+    function setATokenAddress(address aTokenAddress) external {
+        s_aToken = aTokenAddress;
     }
 
     function getInterestRate() external view returns (uint256) {

@@ -102,6 +102,9 @@ contract ChildPeer is YieldPeer {
     /// - CcipTxType DepositToStrategy: A tx from parent to this-child-strategy to deposit USDC in strategy and get totalValue
     /// - CcipTxType DepositCallbackChild: A tx from parent to this-child to mint shares to the depositor
     /// - CcipTxType WithdrawToStrategy: A tx from parent to this-child-strategy to withdraw USDC from strategy and get usdcWithdrawAmount
+    /// - CcipTxType WithdrawCallback: A tx from strategy to this-child to transfer USDC to withdrawer
+    /// - CcipTxType RebalanceOldStrategy: A tx from parent to this-old-strategy to rebalance funds to the new strategy
+    /// - CcipTxType RebalanceNewStrategy: A tx from the old strategy, sending rebalanced funds to this new strategy
     function _handleCCIPMessage(CcipTxType txType, Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data)
         internal
         override
@@ -153,6 +156,31 @@ contract ChildPeer is YieldPeer {
                 abi.encode(withdrawData),
                 withdrawData.usdcWithdrawAmount
             );
+        }
+    }
+
+    /// @notice Handles the CCIP message for a rebalance old strategy
+    /// @notice The message this function handles is sent by the Parent when the Strategy is updated
+    /// @notice This function should only be executed when this chain is the (old) strategy
+    /// @dev Rebalances funds from the old strategy to the new strategy
+    /// @param data The data to decode - decodes to Strategy (chainSelector, protocol)
+    function _handleCCIPRebalanceOldStrategy(bytes memory data) internal {
+        /// @dev withdraw from the old strategy
+        address oldStrategyPool = _getStrategyPool();
+        uint256 totalValue = _getTotalValueFromStrategy(oldStrategyPool);
+        if (totalValue != 0) _withdrawFromStrategy(oldStrategyPool, totalValue);
+
+        /// @dev update strategy pool to either protocol on this chain or address(0) if on a different chain
+        Strategy memory newStrategy = abi.decode(data, (Strategy));
+        address newStrategyPool = _updateStrategyPool(newStrategy.chainSelector, newStrategy.protocol);
+
+        // if the new strategy is this chain, but different protocol, then we need to deposit to the new strategy
+        if (newStrategy.chainSelector == i_thisChainSelector) {
+            _depositToStrategy(newStrategyPool, i_usdc.balanceOf(address(this)));
+        }
+        // if the new strategy is a different chain, then we need to send the usdc we just withdrew to the new strategy
+        else {
+            _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, data, i_usdc.balanceOf(address(this)));
         }
     }
 

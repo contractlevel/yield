@@ -18,7 +18,7 @@ contract Invariant is StdInvariant, BaseTest {
     uint64 internal constant PARENT_SELECTOR = 1;
     uint64 internal constant CHILD1_SELECTOR = 2;
     uint64 internal constant CHILD2_SELECTOR = 3;
-    uint256 internal constant STRATEGY_POOL_USDC_STARTING_BALANCE = 1_000_000_000_000; // 1M USDC
+    uint256 internal constant STRATEGY_POOL_USDC_STARTING_BALANCE = 1_000_000_000_000_000_000; // 1T USDC
     uint256 internal constant CCIP_GAS_LIMIT = 1_000_000;
 
     /// @dev Handler contract we are running calls to the SBT through
@@ -37,6 +37,8 @@ contract Invariant is StdInvariant, BaseTest {
     Share internal share;
     /// @dev Chainlink Automation Time-based Upkeep Address
     address internal upkeep = makeAddr("upkeep");
+    /// @dev Aave Pool Address
+    address internal aavePool;
 
     /*//////////////////////////////////////////////////////////////
                                  SETUP
@@ -56,7 +58,9 @@ contract Invariant is StdInvariant, BaseTest {
             networkConfig.ccip.ccipRouter,
             networkConfig.tokens.usdc,
             upkeep,
-            networkConfig.clf.functionsRouter
+            networkConfig.clf.functionsRouter,
+            aavePool,
+            networkConfig.protocols.comet
         );
 
         /// @dev define appropriate function selectors
@@ -75,6 +79,7 @@ contract Invariant is StdInvariant, BaseTest {
         helperConfig = new HelperConfig();
         networkConfig = helperConfig.getOrCreateAnvilEthConfig();
         share = Share(networkConfig.tokens.share);
+        aavePool = IPoolAddressesProvider(networkConfig.protocols.aavePoolAddressesProvider).getPool();
 
         /// @dev since we are not forking mainnets, we will deploy contracts locally
         /// the deployed peers will interact via the ccip local simulator as if they were crosschain
@@ -123,7 +128,6 @@ contract Invariant is StdInvariant, BaseTest {
         _stopPrank();
 
         /// @dev our mocks of aave and compound will need to be dealt usdc
-        address aavePool = IPoolAddressesProvider(networkConfig.protocols.aavePoolAddressesProvider).getPool();
         deal(networkConfig.tokens.usdc, aavePool, STRATEGY_POOL_USDC_STARTING_BALANCE);
         deal(networkConfig.tokens.usdc, networkConfig.protocols.comet, STRATEGY_POOL_USDC_STARTING_BALANCE);
     }

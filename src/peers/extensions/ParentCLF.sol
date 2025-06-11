@@ -59,6 +59,10 @@ contract ParentCLF is ParentPeer, FunctionsClient {
     event InvalidChainSelector(bytes32 indexed requestId, uint64 indexed chainSelector);
     /// @notice Emitted when a Chainlink Functions request returns an invalid protocol enum
     event InvalidProtocolEnum(bytes32 indexed requestId, uint8 indexed protocolEnum);
+    /// @notice Emitted when the Chainlink Automation upkeep address is set
+    event UpkeepAddressSet(address indexed upkeepAddress);
+    /// @notice Emitted when the number of protocols is set
+    event NumberOfProtocolsSet(uint8 indexed numberOfProtocols);
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -104,6 +108,7 @@ contract ParentCLF is ParentPeer, FunctionsClient {
         if (msg.sender != s_upkeepAddress) revert ParentCLF__OnlyUpkeep();
 
         /// @dev Send CLF request
+        //slither-disable-next-line uninitialized-local
         FunctionsRequest.Request memory req;
         req.initializeRequest(FunctionsRequest.Location.Inline, FunctionsRequest.CodeLanguage.JavaScript, SOURCE);
         req.addSecretsReference(ENCRYPTED_SECRET);
@@ -154,8 +159,10 @@ contract ParentCLF is ParentPeer, FunctionsClient {
     /// @notice Set the Chainlink Automation upkeep address
     /// @param upkeepAddress The address of the Chainlink Automation upkeep
     /// @dev Revert if the caller is not the owner
+    //slither-disable-next-line missing-zero-check
     function setUpkeepAddress(address upkeepAddress) external onlyOwner {
         s_upkeepAddress = upkeepAddress;
+        emit UpkeepAddressSet(upkeepAddress);
     }
 
     /// @notice Set the number of protocols
@@ -163,6 +170,7 @@ contract ParentCLF is ParentPeer, FunctionsClient {
     /// @dev Revert if the caller is not the owner
     function setNumberOfProtocols(uint8 numberOfProtocols) external onlyOwner {
         s_numberOfProtocols = numberOfProtocols;
+        emit NumberOfProtocolsSet(numberOfProtocols);
     }
 
     /*//////////////////////////////////////////////////////////////

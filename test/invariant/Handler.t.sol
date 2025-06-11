@@ -18,6 +18,7 @@ contract Handler is Test {
     uint256 internal constant MAX_DEPOSIT_AMOUNT = 1_000_000_000_000;
     uint256 internal constant MIN_DEPOSIT_AMOUNT = 1_000_000;
     uint256 internal constant INITIAL_DEPOSIT_AMOUNT = 100_000_000;
+    uint256 internal constant POOL_DEAL_AMOUNT = 1_000_000_000_000_000_000; // 1T USDC
 
     ParentCLF internal parent;
     ChildPeer internal child1;
@@ -28,6 +29,8 @@ contract Handler is Test {
     address internal upkeep;
     address internal functionsRouter;
     address internal admin = makeAddr("admin");
+    address internal aavePool;
+    address internal compoundPool;
 
     uint64 internal parentChainSelector;
     uint64 internal child1ChainSelector;
@@ -96,7 +99,9 @@ contract Handler is Test {
         address _ccipRouter,
         address _usdc,
         address _upkeep,
-        address _functionsRouter
+        address _functionsRouter,
+        address _aavePool,
+        address _compoundPool
     ) {
         parent = _parent;
         child1 = _child1;
@@ -106,6 +111,8 @@ contract Handler is Test {
         usdc = IERC20(_usdc);
         upkeep = _upkeep;
         functionsRouter = _functionsRouter;
+        aavePool = _aavePool;
+        compoundPool = _compoundPool;
 
         parentChainSelector = parent.getThisChainSelector();
         child1ChainSelector = child1.getThisChainSelector();
@@ -202,6 +209,10 @@ contract Handler is Test {
 
     /// @notice This function handles the fulfillment of requests to the CLF don - the purpose of which is to update the strategy
     function fulfillRequest(uint256 chainSelectorSeed, uint256 protocolEnumSeed) public {
+        /// @dev ensure the pools have enough liquidity
+        // uint256 totalValue =
+        _dealPoolsUsdc();
+
         /// @dev bind the chain selector and protocol enum to the range of valid values
         uint64 chainSelector = uint64(bound(chainSelectorSeed, 1, 3));
         uint8 protocolEnum = uint8(bound(protocolEnumSeed, 0, 1));
@@ -343,6 +354,12 @@ contract Handler is Test {
         parent.deposit(INITIAL_DEPOSIT_AMOUNT);
         _updateDepositGhosts(admin, INITIAL_DEPOSIT_AMOUNT);
         _handleDepositLogs();
+    }
+
+    /// @notice deal USDC to the pools to ensure they have enough liquidity and we dont get insufficient balance errors
+    function _dealPoolsUsdc() internal {
+        deal(address(usdc), aavePool, POOL_DEAL_AMOUNT);
+        deal(address(usdc), compoundPool, POOL_DEAL_AMOUNT);
     }
 
     function _changePrank(address newPrank) internal {

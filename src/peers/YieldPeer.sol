@@ -33,12 +33,6 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     //////////////////////////////////////////////////////////////*/
     /// @dev Constant for the zero bridge amount - some CCIP messages don't need to send any USDC
     uint256 internal constant ZERO_BRIDGE_AMOUNT = 0;
-    /// @dev Constant for the USDC decimals
-    uint256 internal constant USDC_DECIMALS = 1e6;
-    /// @dev Constant for the Share decimals
-    uint256 internal constant SHARE_DECIMALS = 1e18;
-    /// @dev Constant for the initial share precision used to calculate the mint amount for first deposit
-    uint256 internal constant INITIAL_SHARE_PRECISION = SHARE_DECIMALS / USDC_DECIMALS;
 
     /// @dev Chainlink token
     LinkTokenInterface internal immutable i_link;
@@ -219,28 +213,11 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
     }
 
-    // @review natspec
-    function _handleCCIPRebalanceOldStrategy(bytes memory data) internal {
-        /// @dev withdraw from the old strategy
-        address oldStrategyPool = _getStrategyPool();
-        uint256 totalValue = _getTotalValueFromStrategy(oldStrategyPool);
-        if (totalValue != 0) _withdrawFromStrategy(oldStrategyPool, totalValue);
-
-        /// @dev update strategy pool to either protocol on this chain or address(0) if on a different chain
-        Strategy memory newStrategy = abi.decode(data, (Strategy));
-        address newStrategyPool = _updateStrategyPool(newStrategy.chainSelector, newStrategy.protocol);
-
-        // if the new strategy is this chain, but different protocol, then we need to withdraw from the old strategy and deposit to the new strategy
-        if (newStrategy.chainSelector == i_thisChainSelector) {
-            _depositToStrategy(newStrategyPool, i_usdc.balanceOf(address(this)));
-        }
-        // if the new strategy is a different chain, then we need to send the usdc we just withdrew to the new strategy
-        else {
-            _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, data, i_usdc.balanceOf(address(this)));
-        }
-    }
-
-    // @review natspec
+    /// @notice Handles the CCIP message for a rebalance new strategy
+    /// @notice The message this function handles is sent by the old strategy when the strategy is updated
+    /// @dev Updates the strategy pool to the new strategy
+    /// @dev Deposits USDC totalValue of the system into the new strategy
+    /// @param data The data to decode - decodes to Strategy (chainSelector, protocol)
     function _handleCCIPRebalanceNewStrategy(bytes memory data) internal {
         /// @dev update strategy pool to protocol on this chain
         Strategy memory newStrategy = abi.decode(data, (Strategy));
@@ -265,13 +242,19 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         emit StrategyPoolUpdated(strategyPool);
     }
 
-    // @review natspec
+    /// @notice Internal helper to deposit to the strategy
+    /// @param strategyPool The strategy pool to deposit to
+    /// @param amount The amount of USDC to deposit
+    /// @dev Emit DepositToStrategy event
     function _depositToStrategy(address strategyPool, uint256 amount) internal {
         ProtocolOperations.depositToStrategy(strategyPool, _getProtocolConfig(), amount);
         emit DepositToStrategy(strategyPool, amount);
     }
 
-    // @review natspec
+    /// @notice Internal helper to withdraw from the strategy
+    /// @param strategyPool The strategy pool to withdraw from
+    /// @param amount The amount of USDC to withdraw
+    /// @dev Emit WithdrawFromStrategy event
     function _withdrawFromStrategy(address strategyPool, uint256 amount) internal {
         ProtocolOperations.withdrawFromStrategy(strategyPool, _getProtocolConfig(), amount);
         emit WithdrawFromStrategy(strategyPool, amount);
@@ -284,10 +267,15 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         address strategyPool = _getStrategyPool();
         _depositToStrategy(strategyPool, amount);
         totalValue = _getTotalValueFromStrategy(strategyPool);
-
+        // @review this event
+        // is this event only emitted when a user deposits, and not a rebalance?
+        // we should have some rebalance events
         emit DepositCompleted(strategyPool, amount, totalValue);
     }
 
+    /// @notice Withdraws from the strategy and returns the USDC withdraw amount
+    /// @param withdrawData The withdraw data
+    /// @return usdcWithdrawAmount The USDC withdraw amount
     function _withdrawFromStrategyAndGetUsdcWithdrawAmount(WithdrawData memory withdrawData)
         internal
         returns (uint256 usdcWithdrawAmount)
@@ -330,16 +318,16 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @param to The address to mint shares to
     /// @param amount The amount of shares to mint
     function _mintShares(address to, uint256 amount) internal {
-        i_share.mint(to, amount);
         emit SharesMinted(to, amount);
+        i_share.mint(to, amount);
     }
 
     /// @notice Burns shares
     /// @param from The address who transferAndCall'd the SHAREs to this contract
     /// @param amount The amount of shares to burn
     function _burnShares(address from, uint256 amount) internal {
-        i_share.burn(amount);
         emit SharesBurned(from, amount);
+        i_share.burn(amount);
     }
 
     /// @notice Decodes the chain selector to withdraw USDC to from the data

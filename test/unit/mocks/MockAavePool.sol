@@ -15,7 +15,7 @@ contract MockAavePoolTest is Test {
         mockUsdc = new MockUsdc();
         mockAavePool = new MockAavePool(address(mockUsdc));
         mockAToken = new MockAToken(address(mockAavePool));
-        mockAavePool.setATokenAddress(address(mockUsdc), address(mockAToken));
+        mockAavePool.setATokenAddress(address(mockAToken));
     }
 
     function test_mockAavePool_setInterestRate_revertsWhen_interestRateTooHigh() public {

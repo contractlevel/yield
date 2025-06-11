@@ -19,3 +19,4 @@ script/deploy/DeploySimple.s.sol
 report.md
 src/modules/ThrowCLF.sol
 .notes.md
+.certora_internal/

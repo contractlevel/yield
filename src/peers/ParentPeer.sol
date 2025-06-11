@@ -14,6 +14,13 @@ contract ParentPeer is YieldPeer {
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
+    /// @dev Constant for the USDC decimals
+    uint256 internal constant USDC_DECIMALS = 1e6;
+    /// @dev Constant for the Share decimals
+    uint256 internal constant SHARE_DECIMALS = 1e18;
+    /// @dev Constant for the initial share precision used to calculate the mint amount for first deposit
+    uint256 internal constant INITIAL_SHARE_PRECISION = SHARE_DECIMALS / USDC_DECIMALS;
+
     /// @dev total SHAREs minted across all chains
     // @invariant s_totalShares == ghost_totalSharesMinted - ghost_totalSharesBurned
     uint256 internal s_totalShares;
@@ -25,6 +32,8 @@ contract ParentPeer is YieldPeer {
     //////////////////////////////////////////////////////////////*/
     /// @notice Emitted when the current strategy is optimal
     event CurrentStrategyOptimal(uint64 indexed chainSelector, Protocol indexed protocol);
+    /// @notice Emitted when the strategy is updated
+    event StrategyUpdated(uint64 indexed chainSelector, Protocol indexed protocol);
     /// @notice Emitted when the amount of shares minted is updated
     event ShareMintUpdate(uint256 indexed shareMintAmount, uint64 indexed chainSelector, uint256 indexed totalShares);
     /// @notice Emitted when the amount of shares burned is updated
@@ -300,6 +309,7 @@ contract ParentPeer is YieldPeer {
             return;
         }
         // Handle strategy changes on the this parent chain
+        // @review we probably dont need this bit `&& protocol != oldStrategy.protocol` because the last check would've handled it
         if (
             chainSelector == i_thisChainSelector && oldStrategy.chainSelector == i_thisChainSelector
                 && protocol != oldStrategy.protocol
@@ -326,6 +336,7 @@ contract ParentPeer is YieldPeer {
             return false;
         }
         s_strategy = newStrategy;
+        emit StrategyUpdated(newStrategy.chainSelector, newStrategy.protocol);
         return true;
     }
 
