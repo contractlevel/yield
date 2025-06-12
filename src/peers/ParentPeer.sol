@@ -389,8 +389,6 @@ contract ParentPeer is YieldPeer {
         // @review if totalShares isn't 0, then totalValue shouldn't be either.
         if (totalShares == 0 || totalValue == 0) shareMintAmount = amount * INITIAL_SHARE_PRECISION;
         else shareMintAmount = (amount * totalShares) / totalValue;
-        // @review if this reverts for a crosschain callback, that is very bad
-        // else shareMintAmount = FixedPointMathLib.fullMulDivUp(amount, totalShares, totalValue);
     }
 
     /*//////////////////////////////////////////////////////////////

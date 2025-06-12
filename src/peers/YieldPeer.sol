@@ -17,6 +17,9 @@ import {ProtocolOperations} from "../libraries/ProtocolOperations.sol";
 import {DataStructures} from "../libraries/DataStructures.sol";
 import {CCIPOperations} from "../libraries/CCIPOperations.sol";
 
+/// @title YieldPeer
+/// @author @contractlevel
+/// @notice YieldPeer is the base contract for the Parent and Child Peers in the Contract Level Yield system
 abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYieldPeer {
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -56,7 +59,6 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     mapping(uint64 chainSelector => address peer) internal s_peers;
     /// @notice We use this as a flag to know if this chain is the strategy
     /// @dev This is either i_aavePool, i_comet, or address(0)
-    // @invariant s_strategyPool must be address(0) if this chain is not the strategy
     address internal s_strategyPool;
 
     /*//////////////////////////////////////////////////////////////
@@ -247,7 +249,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @param amount The amount of USDC to deposit
     /// @dev Emit DepositToStrategy event
     function _depositToStrategy(address strategyPool, uint256 amount) internal {
-        ProtocolOperations.depositToStrategy(strategyPool, _getProtocolConfig(), amount);
+        ProtocolOperations._depositToStrategy(strategyPool, _getProtocolConfig(), amount);
         emit DepositToStrategy(strategyPool, amount);
     }
 
@@ -256,7 +258,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @param amount The amount of USDC to withdraw
     /// @dev Emit WithdrawFromStrategy event
     function _withdrawFromStrategy(address strategyPool, uint256 amount) internal {
-        ProtocolOperations.withdrawFromStrategy(strategyPool, _getProtocolConfig(), amount);
+        ProtocolOperations._withdrawFromStrategy(strategyPool, _getProtocolConfig(), amount);
         emit WithdrawFromStrategy(strategyPool, amount);
     }
 
@@ -349,15 +351,25 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /*//////////////////////////////////////////////////////////////
                              INTERNAL VIEW
     //////////////////////////////////////////////////////////////*/
+    /// @notice Helper function to make ProtocolOperations easier
+    /// @return protocolConfig Struct containing USDC and strategy addresses
     function _getProtocolConfig() internal view returns (ProtocolOperations.ProtocolConfig memory protocolConfig) {
         protocolConfig =
-            ProtocolOperations.createConfig(address(i_usdc), address(i_aavePoolAddressesProvider), address(i_comet));
+            ProtocolOperations._createConfig(address(i_usdc), address(i_aavePoolAddressesProvider), address(i_comet));
     }
 
+    /// @notice Builds DepositData struct, which gets used in CCIP deposit messages
+    /// @param amount The amount of USDC to deposit
+    /// @return depositData Struct containing depositor, amount, and chain selector
     function _buildDepositData(uint256 amount) internal view returns (IYieldPeer.DepositData memory depositData) {
         depositData = DataStructures.buildDepositData(msg.sender, amount, i_thisChainSelector);
     }
 
+    /// @notice Builds WithdrawData struct, which gets used in CCIP withdraw messages
+    /// @param withdrawer The address that initiated the withdrawal
+    /// @param shareBurnAmount The amount of shares the withdrawer burned
+    /// @param withdrawChainSelector The chain selector to withdraw USDC to
+    /// @return withdrawData Struct containing withdrawer, share burn amount, and chain selector
     function _buildWithdrawData(address withdrawer, uint256 shareBurnAmount, uint64 withdrawChainSelector)
         internal
         pure
@@ -366,18 +378,32 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         withdrawData = DataStructures.buildWithdrawData(withdrawer, shareBurnAmount, withdrawChainSelector);
     }
 
+    /// @notice Helper function to get the total value from the strategy
+    /// @param strategyPool The strategy pool to get the total value from
+    /// @return totalValue The total value in the Contract Level Yield system
     function _getTotalValueFromStrategy(address strategyPool) internal view returns (uint256 totalValue) {
-        totalValue = ProtocolOperations.getTotalValueFromStrategy(strategyPool, _getProtocolConfig());
+        totalValue = ProtocolOperations._getTotalValueFromStrategy(strategyPool, _getProtocolConfig());
     }
 
+    /// @notice Helper function to get the strategy pool from the protocol
+    /// @param protocol The protocol to get the strategy pool from
+    /// @return strategyPool The strategy pool address
     function _getStrategyPoolFromProtocol(IYieldPeer.Protocol protocol) internal view returns (address strategyPool) {
-        strategyPool = ProtocolOperations.getStrategyPoolFromProtocol(protocol, _getProtocolConfig());
+        strategyPool = ProtocolOperations._getStrategyPoolFromProtocol(protocol, _getProtocolConfig());
     }
 
+    /// @notice Helper function to get the strategy pool
+    /// @return strategyPool The strategy pool address
+    /// @notice This will return address(0) if this chain is not the strategy chain
     function _getStrategyPool() internal view returns (address) {
         return s_strategyPool;
     }
 
+    /// @notice Helper function to calculate the USDC withdraw amount
+    /// @param totalValue The total value in the Contract Level Yield system
+    /// @param totalShares The total shares in the Contract Level Yield system
+    /// @param shareBurnAmount The amount of shares the withdrawer burned
+    /// @return usdcWithdrawAmount The USDC withdraw amount
     function _calculateWithdrawAmount(uint256 totalValue, uint256 totalShares, uint256 shareBurnAmount)
         internal
         pure
@@ -386,22 +412,35 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         usdcWithdrawAmount = (shareBurnAmount * totalValue) / totalShares;
     }
 
+    /// @dev Revert if the amount is 0
+    /// @param amount The amount to check
     function _revertIfZeroAmount(uint256 amount) internal pure {
         if (amount == 0) revert YieldPeer__NoZeroAmount();
     }
 
+    /// @dev Revert if the msg.sender is not the Share token
+    /// @notice This is used to protect ERC677Receiver.onTokenTransfer
     function _revertIfMsgSenderIsNotShare() internal view {
         if (msg.sender != address(i_share)) revert YieldPeer__OnlyShare();
     }
 
+    /// @notice Decodes the DepositData struct from the data
+    /// @param data The data to decode
+    /// @return depositData Struct containing depositor, amount, totalValue, shareMintAmount, and chainSelector
     function _decodeDepositData(bytes memory data) internal pure returns (DepositData memory depositData) {
         depositData = abi.decode(data, (DepositData));
     }
 
+    /// @notice Decodes the WithdrawData struct from the data
+    /// @param data The data to decode
+    /// @return withdrawData Struct containing withdrawer, share burn amount, usdc withdraw amount, total shares, and chain selector
     function _decodeWithdrawData(bytes memory data) internal pure returns (WithdrawData memory withdrawData) {
         withdrawData = abi.decode(data, (WithdrawData));
     }
 
+    /// @notice Get the total value of the Contract Level Yield system
+    /// @return totalValue The total value in the Contract Level Yield system
+    /// @dev Revert if this chain is not the strategy chain because the totalValue will be on another chain
     function _getTotalValue() internal view returns (uint256 totalValue) {
         address strategyPool = _getStrategyPool();
         // @review add unit test for this
@@ -412,17 +451,28 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /*//////////////////////////////////////////////////////////////
                                  SETTER
     //////////////////////////////////////////////////////////////*/
+    /// @notice Set chains that are allowed to send CCIP messages to this peer
+    /// @param chainSelector The chain selector to set
+    /// @param isAllowed Whether the chain is allowed to send CCIP messages to this peer
+    /// @dev Access control: onlyOwner
     function setAllowedChain(uint64 chainSelector, bool isAllowed) external onlyOwner {
         s_allowedChains[chainSelector] = isAllowed;
         emit AllowedChainSet(chainSelector, isAllowed);
     }
 
+    /// @notice Set the peer contract for an allowed chain selector
+    /// @param chainSelector The chain selector to set
+    /// @param peer The peer to set
+    /// @dev Access control: onlyOwner
     function setAllowedPeer(uint64 chainSelector, address peer) external onlyOwner {
         if (!s_allowedChains[chainSelector]) revert YieldPeer__ChainNotAllowed(chainSelector);
         s_peers[chainSelector] = peer;
         emit AllowedPeerSet(chainSelector, peer);
     }
 
+    /// @notice Set the CCIP gas limit
+    /// @param gasLimit The gas limit to set
+    /// @dev Access control: onlyOwner
     function setCCIPGasLimit(uint256 gasLimit) external onlyOwner {
         s_ccipGasLimit = gasLimit;
         emit CCIPGasLimitSet(gasLimit);
@@ -431,60 +481,77 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /*//////////////////////////////////////////////////////////////
                                  GETTER
     //////////////////////////////////////////////////////////////*/
+    /// @notice Get the chain selector for this chain
+    /// @return thisChainSelector The chain selector for this chain
     function getThisChainSelector() external view returns (uint64) {
         return i_thisChainSelector;
     }
 
+    /// @notice Get whether a chain is allowed to send CCIP messages to this peer
+    /// @param chainSelector The chain selector to check
+    /// @return isAllowed Whether the chain is allowed to send CCIP messages to this peer
     function getAllowedChain(uint64 chainSelector) external view returns (bool) {
         return s_allowedChains[chainSelector];
     }
 
+    /// @notice Get the peer contract for an allowed chain selector
+    /// @param chainSelector The chain selector to check
+    /// @return peer The peer contract for the chain selector
     function getAllowedPeer(uint64 chainSelector) external view returns (address) {
         return s_peers[chainSelector];
     }
 
+    /// @notice Get the Chainlink token address
+    /// @return link The Chainlink token address
     function getLink() external view returns (address) {
         return address(i_link);
     }
 
+    /// @notice Get the USDC token address
+    /// @return usdc The USDC token address
     function getUsdc() external view returns (address) {
         return address(i_usdc);
     }
 
-    function getAavePoolAddressesProvider() external view returns (address) {
-        return address(i_aavePoolAddressesProvider);
-    }
-
-    function getComet() external view returns (address) {
-        return address(i_comet);
-    }
-
+    /// @notice Get the Share token address native to this system
+    /// @return share The Share token address
     function getShare() external view returns (address) {
         return address(i_share);
     }
 
+    /// @notice Get whether this chain is the strategy chain
+    /// @return isStrategyChain Whether this chain is the strategy chain
+    // @review this
     function getIsStrategyChain() external view returns (bool) {
         return s_strategyPool != address(0);
     }
 
+    /// @notice Get the CCIP gas limit
+    /// @return ccipGasLimit The CCIP gas limit
     function getCCIPGasLimit() external view returns (uint256) {
         return s_ccipGasLimit;
     }
 
+    /// @notice Get the strategy pool address
+    /// @return strategyPool The strategy pool address
+    /// @notice This will return address(0) if this chain is not the strategy chain
     function getStrategyPool() external view returns (address) {
         return s_strategyPool;
     }
 
     /// @dev Reverts if this chain is not the strategy chain
+    /// @return totalValue The total value in the Contract Level Yield system
     function getTotalValue() external view returns (uint256 totalValue) {
         totalValue = _getTotalValue();
     }
 
-    /// @return compound cUSDCv3 address
+    /// @notice Get the Compound cUSDCv3 address
+    /// @return compound The Compound cUSDCv3 address
     function getCompound() external view returns (address compound) {
         compound = address(i_comet);
     }
 
+    /// @notice Get the Aave Pool Addresses Provider address
     /// @return aave Aave Pool Addresses Provider address
     function getAave() external view returns (address aave) {
         aave = address(i_aavePoolAddressesProvider);

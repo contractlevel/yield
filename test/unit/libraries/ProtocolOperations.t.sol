@@ -93,19 +93,19 @@ contract ProtocolOperationsClient {
         pure
         returns (ProtocolOperations.ProtocolConfig memory)
     {
-        return ProtocolOperations.createConfig(usdc, aavePoolAddressesProvider, comet);
+        return ProtocolOperations._createConfig(usdc, aavePoolAddressesProvider, comet);
     }
 
     function depositToStrategy(address strategyPool, ProtocolOperations.ProtocolConfig memory config, uint256 amount)
         external
     {
-        ProtocolOperations.depositToStrategy(strategyPool, config, amount);
+        ProtocolOperations._depositToStrategy(strategyPool, config, amount);
     }
 
     function withdrawFromStrategy(address strategyPool, ProtocolOperations.ProtocolConfig memory config, uint256 amount)
         external
     {
-        ProtocolOperations.withdrawFromStrategy(strategyPool, config, amount);
+        ProtocolOperations._withdrawFromStrategy(strategyPool, config, amount);
     }
 
     function getTotalValueFromStrategy(address strategyPool, ProtocolOperations.ProtocolConfig memory config)
@@ -113,7 +113,7 @@ contract ProtocolOperationsClient {
         view
         returns (uint256)
     {
-        return ProtocolOperations.getTotalValueFromStrategy(strategyPool, config);
+        return ProtocolOperations._getTotalValueFromStrategy(strategyPool, config);
     }
 
     function getStrategyPoolFromProtocol(IYieldPeer.Protocol protocol, ProtocolOperations.ProtocolConfig memory config)
@@ -121,7 +121,7 @@ contract ProtocolOperationsClient {
         pure
         returns (address)
     {
-        return ProtocolOperations.getStrategyPoolFromProtocol(protocol, config);
+        return ProtocolOperations._getStrategyPoolFromProtocol(protocol, config);
     }
 
     /// @notice empty test to skip file in coverage

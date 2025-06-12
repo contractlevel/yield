@@ -54,7 +54,7 @@ contract HelperConfig is Script {
     NetworkConfig public activeNetworkConfig;
 
     uint64 public constant MAINNET_PARENT_CHAIN_SELECTOR = 15971525489660198786; // base
-    uint64 public constant TESTNET_PARENT_CHAIN_SELECTOR = 20; // update this
+    uint64 public constant TESTNET_PARENT_CHAIN_SELECTOR = 10344971235874465080; // base sepolia
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -201,28 +201,28 @@ contract HelperConfig is Script {
     function getEthSepoliaConfig() public pure returns (NetworkConfig memory) {
         return NetworkConfig({
             ccip: CCIPConfig({
-                ccipRouter: 0x794a61358D6845594F94dc1DB02A252b5b4814aD,
-                thisChainSelector: 10,
+                ccipRouter: 0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59,
+                thisChainSelector: 16015286601757825753,
                 parentChainSelector: TESTNET_PARENT_CHAIN_SELECTOR,
-                rmnProxy: 0x411dE17f12D1A34ecC7F45f49844626267c75e81,
-                usdcTokenPool: address(0), // @review
-                cctpMessageTransmitter: address(0), // @review
+                rmnProxy: 0xba3f6251de62dED61Ff98590cB2fDf6871FbB991,
+                usdcTokenPool: 0xAff3fE524ea94118EF09DaDBE3c77ba6AA0005EC,
+                cctpMessageTransmitter: 0x7865fAfC2db2093669d92c0F33AeEF291086BEFD,
                 tokenAdminRegistry: 0x95F29FEE11c5C55d26cCcf1DB6772DE953B37B82,
                 registryModuleOwnerCustom: 0x62e731218d0D47305aba2BE3751E7EE9E5520790
             }),
             tokens: TokensConfig({
-                link: 0x404460C6A5EdE2D891e8297795264fDe62ADBB75,
-                usdc: 0x7F5c764cBc14f9669B88837ca1490cCa17c31607,
-                share: 0x794a61358D6845594F94dc1DB02A252b5b4814aD
+                link: 0x779877A7B0D9E8603169DdbD7836e478b4624789,
+                usdc: 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238,
+                share: address(0) // needs to be deployed
             }),
             protocols: ProtocolsConfig({
-                aavePoolAddressesProvider: 0x794a61358D6845594F94dc1DB02A252b5b4814aD,
-                comet: 0x794a61358D6845594F94dc1DB02A252b5b4814aD
+                aavePoolAddressesProvider: 0x012bAC54348C0E635dCAc9D5FB99f06F24136C9A,
+                comet: 0xAec1F48e02Cfb822Be958B68C7957156EB3F0b6e
             }),
             clf: CLFConfig({
                 functionsRouter: 0xb83E47C2bC239B3bf370bc41e1459A34b41238D0,
                 donId: 0x66756e2d657468657265756d2d7365706f6c69612d3100000000000000000000,
-                clfSubId: 0 // @review dummy value
+                clfSubId: 0 // dummy value
             })
         });
     }
@@ -232,7 +232,7 @@ contract HelperConfig is Script {
             ccip: CCIPConfig({
                 ccipRouter: 0xD3b06cEbF099CE7DA4AcCf578aaebFDBd6e88a93,
                 thisChainSelector: 10344971235874465080,
-                parentChainSelector: 10344971235874465080,
+                parentChainSelector: TESTNET_PARENT_CHAIN_SELECTOR,
                 rmnProxy: 0x99360767a4705f68CcCb9533195B761648d6d807,
                 usdcTokenPool: 0x5931822f394baBC2AACF4588E98FC77a9f5aa8C9,
                 cctpMessageTransmitter: 0x7865fAfC2db2093669d92c0F33AeEF291086BEFD,
@@ -252,6 +252,35 @@ contract HelperConfig is Script {
                 functionsRouter: 0xf9B8fc078197181C841c296C876945aaa425B278,
                 donId: 0x66756e2d626173652d7365706f6c69612d310000000000000000000000000000,
                 clfSubId: 333
+            })
+        });
+    }
+
+    function getArbitrumSepoliaConfig() public pure returns (NetworkConfig memory) {
+        return NetworkConfig({
+            ccip: CCIPConfig({
+                ccipRouter: 0x2a9C5afB0d0e4BAb2BCdaE109EC4b0c4Be15a165,
+                thisChainSelector: 3478487238524512106,
+                parentChainSelector: MAINNET_PARENT_CHAIN_SELECTOR,
+                rmnProxy: 0x9527E2d01A3064ef6b50c1Da1C0cC523803BCFF2,
+                usdcTokenPool: 0xbfd2b0b21bd22fD9aB482BAAbc815ef4974F769f,
+                cctpMessageTransmitter: 0xaCF1ceeF35caAc005e15888dDb8A3515C41B4872,
+                tokenAdminRegistry: 0x8126bE56454B628a88C17849B9ED99dd5a11Bd2f,
+                registryModuleOwnerCustom: 0xE625f0b8b0Ac86946035a7729Aba124c8A64cf69
+            }),
+            tokens: TokensConfig({
+                link: 0xb1D4538B4571d411F07960EF2838Ce337FE1E80E,
+                usdc: 0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d,
+                share: address(0) // needs to be deployed
+            }),
+            protocols: ProtocolsConfig({
+                aavePoolAddressesProvider: 0x5931822f394baBC2AACF4588E98FC77a9f5aa8C9,
+                comet: 0x5931822f394baBC2AACF4588E98FC77a9f5aa8C9
+            }),
+            clf: CLFConfig({
+                functionsRouter: 0xf9B8fc078197181C841c296C876945aaa425B278,
+                donId: 0x66756e2d617262697472756d2d7365706f6c69612d3100000000000000000000,
+                clfSubId: 0 // @review dummy value
             })
         });
     }

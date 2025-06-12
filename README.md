@@ -26,7 +26,14 @@ certoraRun ./certora/conf/child/BaseChild.conf
 certoraRun ./certora/conf/parent/BaseParent.conf
 ```
 
-The `Yield` spec verifies internal properties of the abstract `YieldPeer` contract.
+The `Parent` and `Child` specs verify behaviors particular to their respective peers.
+
+```
+certoraRun ./certora/conf/parent/Parent.conf
+certoraRun ./certora/conf/child/Child.conf
+```
+
+The `Yield` spec verifies internal properties of the abstract `YieldPeer` contract such as depositing to and withdrawing from strategies, as well as CCIP tx handling.
 
 ```
 certoraRun ./certora/conf/Yield.conf

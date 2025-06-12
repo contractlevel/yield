@@ -85,7 +85,6 @@ contract ParentDepositTest is BaseTest {
             "Compound balance should be approximately equal to deposit amount"
         );
 
-        // @review this is not a strictly necessary test, it could be used as a sanity check elsewhere later
         /// @dev assert balance increases with time
         vm.warp(block.timestamp + 10 days);
         assertGt(IComet(baseNetworkConfig.protocols.comet).balanceOf(address(baseParentPeer)), DEPOSIT_AMOUNT);

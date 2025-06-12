@@ -25,16 +25,15 @@ library ProtocolOperations {
         address comet;
     }
 
-    // @review - these can probably be changed to internal
     /*//////////////////////////////////////////////////////////////
-                                EXTERNAL
+                                INTERNAL
     //////////////////////////////////////////////////////////////*/
     /// @notice Creates a ProtocolConfig struct
     /// @param usdc The address of the USDC token
     /// @param aavePoolAddressesProvider The address of the Aave v3 pool addresses provider
     /// @param comet The address of the Compound v3 pool
     /// @return config The ProtocolConfig struct
-    function createConfig(address usdc, address aavePoolAddressesProvider, address comet)
+    function _createConfig(address usdc, address aavePoolAddressesProvider, address comet)
         internal
         pure
         returns (ProtocolConfig memory)
@@ -42,7 +41,7 @@ library ProtocolOperations {
         return ProtocolConfig({usdc: usdc, aavePoolAddressesProvider: aavePoolAddressesProvider, comet: comet});
     }
 
-    function depositToStrategy(address strategyPool, ProtocolConfig memory config, uint256 amount) external {
+    function _depositToStrategy(address strategyPool, ProtocolConfig memory config, uint256 amount) internal {
         if (strategyPool == address(config.aavePoolAddressesProvider)) {
             _depositToAave(config.usdc, config.aavePoolAddressesProvider, amount);
         } else if (strategyPool == address(config.comet)) {
@@ -52,7 +51,7 @@ library ProtocolOperations {
         }
     }
 
-    function withdrawFromStrategy(address strategyPool, ProtocolConfig memory config, uint256 amount) external {
+    function _withdrawFromStrategy(address strategyPool, ProtocolConfig memory config, uint256 amount) internal {
         if (strategyPool == address(config.aavePoolAddressesProvider)) {
             _withdrawFromAave(config.usdc, config.aavePoolAddressesProvider, amount);
         } else if (strategyPool == address(config.comet)) {
@@ -65,8 +64,8 @@ library ProtocolOperations {
     /*//////////////////////////////////////////////////////////////
                                  GETTER
     //////////////////////////////////////////////////////////////*/
-    function getTotalValueFromStrategy(address strategyPool, ProtocolConfig memory config)
-        external
+    function _getTotalValueFromStrategy(address strategyPool, ProtocolConfig memory config)
+        internal
         view
         returns (uint256)
     {
@@ -79,8 +78,8 @@ library ProtocolOperations {
         }
     }
 
-    function getStrategyPoolFromProtocol(IYieldPeer.Protocol protocol, ProtocolConfig memory config)
-        external
+    function _getStrategyPoolFromProtocol(IYieldPeer.Protocol protocol, ProtocolConfig memory config)
+        internal
         pure
         returns (address strategyPool)
     {

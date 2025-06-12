@@ -336,4 +336,3 @@ rule decodeWithdrawChainSelector_returns_allowedChainSelector() {
     calldataarg args;
     assert getAllowedChain(decodeWithdrawChainSelector(e, args)) || decodeWithdrawChainSelector(e, args) == getThisChainSelector();
 }
-
