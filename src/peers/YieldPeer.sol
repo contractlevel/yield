@@ -294,7 +294,9 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @dev Emit DepositInitiated event
     function _initiateDeposit(uint256 amountToDeposit) internal {
         // @review should we add a minimum deposit amount check? ie if (amountToDeposit < 1e6) revert;
-        _revertIfZeroAmount(amountToDeposit);
+        // _revertIfZeroAmount(amountToDeposit);
+        // @review rename this error (if keeping it) and refactor relevant tests
+        if (amountToDeposit < 1e6) revert YieldPeer__NoZeroAmount();
         _transferUsdcFrom(msg.sender, address(this), amountToDeposit);
         emit DepositInitiated(msg.sender, amountToDeposit, i_thisChainSelector);
     }
@@ -400,6 +402,13 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         withdrawData = abi.decode(data, (WithdrawData));
     }
 
+    function _getTotalValue() internal view returns (uint256 totalValue) {
+        address strategyPool = _getStrategyPool();
+        // @review add unit test for this
+        if (strategyPool != address(0)) totalValue = _getTotalValueFromStrategy(strategyPool);
+        else revert YieldPeer__NotStrategyChain();
+    }
+
     /*//////////////////////////////////////////////////////////////
                                  SETTER
     //////////////////////////////////////////////////////////////*/
@@ -468,10 +477,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
 
     /// @dev Reverts if this chain is not the strategy chain
     function getTotalValue() external view returns (uint256 totalValue) {
-        address strategyPool = _getStrategyPool();
-        // @review add unit test for this
-        if (strategyPool != address(0)) totalValue = _getTotalValueFromStrategy(strategyPool);
-        else revert YieldPeer__NotStrategyChain();
+        totalValue = _getTotalValue();
     }
 
     /// @return compound cUSDCv3 address

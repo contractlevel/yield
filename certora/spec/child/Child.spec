@@ -10,6 +10,7 @@ using MockPoolAddressesProvider as addressesProvider;
                             METHODS
 //////////////////////////////////////////////////////////////*/
 methods {
+    // Peer methods
     function getAllowedChain(uint64) external returns (bool) envfree;
     function getAllowedPeer(uint64) external returns (address) envfree;
     function getStrategyPool() external returns (address) envfree;
@@ -125,112 +126,14 @@ hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
 /*//////////////////////////////////////////////////////////////
                            INVARIANTS
 //////////////////////////////////////////////////////////////*/
+// if the child.getStrategyPool != 0 && getTotalValue != 0 => aUsdc/cUSDCv3.balanceOf(child) > 0
 
 
 /*//////////////////////////////////////////////////////////////
                              RULES
 //////////////////////////////////////////////////////////////*/
-// NOTE: THESE ARE UNIVERSAL RULES FOR CHILD AND PARENT SO FAR
-
-
-// --- deposit --- //
-/// deposit should increase share.totalSupply
-rule deposit_revertsWhen_zeroAmount() {
-    env e;
-    uint256 amountToDeposit = 0;
-    deposit@withrevert(e, amountToDeposit);
-    assert lastReverted;
-}
-
-rule deposit_transfersUsdcFromMsgSender() {
-    env e;
-    uint256 amountToDeposit;
-    uint256 balanceBefore = usdc.balanceOf(e.msg.sender);
-
-    require balanceBefore - amountToDeposit >= 0, "should not cause underflow";
-    require e.msg.sender != getCompound() && e.msg.sender != addressesProvider.getPool(),
-        "msg.sender should not be the compound or aave pool";
-    require e.msg.sender != currentContract, "msg.sender should not be the current contract";
-
-    deposit(e, amountToDeposit);
-    assert usdc.balanceOf(e.msg.sender) == balanceBefore - amountToDeposit;
-}
-
-rule deposit_emits_DepositInitiated() {
-    env e;
-    calldataarg args;
-    require ghost_depositInitiated_eventCount == 0;
-    deposit(e, args);
-    assert ghost_depositInitiated_eventCount == 1;
-}
-
-/// onTokenTransfer should decrease share.totalSupply
-// --- onTokenTransfer --- //
-rule onTokenTransfer_revertsWhen_msgSenderIsNotShare() {
-    env e;
-    calldataarg args;
-    require e.msg.sender != currentContract.i_share, "msg.sender must be the share token";
-    onTokenTransfer@withrevert(e, args);
-    assert lastReverted;
-}
-
-rule onTokenTransfer_revertsWhen_zeroAmount() {
-    env e;
-    address withdrawer;
-    uint256 shareBurnAmount;
-    uint64 chainSelector;
-    require e.msg.sender == currentContract.i_share,
-        "msg.sender must be the share token";
-    require getAllowedChain(chainSelector) || chainSelector == getThisChainSelector(), 
-        "withdraw chain selector must be allowed";
-    bytes encodedWithdrawChainSelector = encodeUint64(chainSelector);
-
-    require shareBurnAmount == 0, "onTokenTransfer should revert when share burn amount is 0";
-    onTokenTransfer@withrevert(e, withdrawer, shareBurnAmount, encodedWithdrawChainSelector); 
-    assert lastReverted;
-}
-
-rule onTokenTransfer_revertsWhen_chainNotAllowed() {
-    env e;
-    address withdrawer;
-    uint256 shareBurnAmount;
-    uint64 chainSelector;
-    require e.msg.sender == currentContract.i_share,
-        "msg.sender must be the share token";
-    require shareBurnAmount > 0, "shareBurnAmount must be greater than 0";
-    require !getAllowedChain(chainSelector) && chainSelector != getThisChainSelector(), 
-        "onTokenTransfer should revert when chain selector is not allowed";
-    bytes encodedWithdrawChainSelector = encodeUint64(chainSelector);
-    onTokenTransfer@withrevert(e, withdrawer, shareBurnAmount, encodedWithdrawChainSelector); 
-    assert lastReverted;
-}
-
-rule onTokenTransfer_emits_WithdrawInitiated_and_SharesBurned() {
-    env e;
-    calldataarg args;
-    require ghost_withdrawInitiated_eventCount == 0;
-    require ghost_sharesBurned_eventCount == 0;
-    onTokenTransfer(e, args);
-    assert ghost_withdrawInitiated_eventCount == 1;
-    assert ghost_sharesBurned_eventCount == 1;
-}
-
-rule onTokenTransfer_decreases_share_totalSupply() {
-    env e;
-    address withdrawer;
-    uint256 shareBurnAmount;
-    bytes encodedWithdrawChainSelector;
-
-    uint256 shareTotalSupplyBefore = share.totalSupply();
-
-    require shareTotalSupplyBefore - shareBurnAmount >= 0, "should not cause underflow";
-
-    onTokenTransfer(e, withdrawer, shareBurnAmount, encodedWithdrawChainSelector);
-
-    assert share.totalSupply() == shareTotalSupplyBefore - shareBurnAmount;
-}
-
-rule onTokenTransfer_emits_CCIPMessageSent() {
+/// @notice this rule is specific to the ChildPeer, not the ParentPeer
+rule child_onTokenTransfer_emits_CCIPMessageSent() {
     env e;
     calldataarg args;
     require ghost_ccipMessageSent_eventCount == 0;
@@ -256,7 +159,6 @@ rule child_deposit_emits_CCIPMessageSent() {
         ghost_ccipMessageSent_bridgeAmount_emitted == amountToDeposit;
 }
 
-/// @notice NOTE: these rules are specific to the ChildPeer, not the ParentPeer
 // --- handleCCIPDepositToStrategy --- //
 rule handleCCIPDepositToStrategy_emits_CCIPMessageSent() {
     env e;
