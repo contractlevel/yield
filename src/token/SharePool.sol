@@ -2,7 +2,6 @@
 pragma solidity 0.8.26;
 
 import {BurnMintTokenPool, IBurnMintERC20} from "@chainlink/contracts/src/v0.8/ccip/pools/BurnMintTokenPool.sol";
-import {Pool} from "@chainlink/contracts/src/v0.8/ccip/libraries/Pool.sol";
 
 contract SharePool is BurnMintTokenPool {
     /*//////////////////////////////////////////////////////////////

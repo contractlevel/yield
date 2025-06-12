@@ -394,10 +394,14 @@ contract ParentPeer is YieldPeer {
     /*//////////////////////////////////////////////////////////////
                                  GETTER
     //////////////////////////////////////////////////////////////*/
+    /// @notice Get the current strategy
+    /// @return strategy The current strategy - chainSelector and protocol
     function getStrategy() external view returns (Strategy memory) {
         return s_strategy;
     }
 
+    /// @notice Get the total shares minted across all chains
+    /// @return totalShares The total shares minted across all chains
     function getTotalShares() external view returns (uint256) {
         return s_totalShares;
     }
