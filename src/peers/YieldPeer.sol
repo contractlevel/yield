@@ -441,7 +441,6 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @dev Revert if this chain is not the strategy chain because the totalValue will be on another chain
     function _getTotalValue() internal view returns (uint256 totalValue) {
         address strategyPool = _getStrategyPool();
-        // @review add unit test for this
         if (strategyPool != address(0)) totalValue = _getTotalValueFromStrategy(strategyPool);
         else revert YieldPeer__NotStrategyChain();
     }
@@ -519,7 +518,6 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
 
     /// @notice Get whether this chain is the strategy chain
     /// @return isStrategyChain Whether this chain is the strategy chain
-    // @review this
     function getIsStrategyChain() external view returns (bool) {
         return s_strategyPool != address(0);
     }

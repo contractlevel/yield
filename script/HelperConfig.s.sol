@@ -256,35 +256,6 @@ contract HelperConfig is Script {
         });
     }
 
-    function getArbitrumSepoliaConfig() public pure returns (NetworkConfig memory) {
-        return NetworkConfig({
-            ccip: CCIPConfig({
-                ccipRouter: 0x2a9C5afB0d0e4BAb2BCdaE109EC4b0c4Be15a165,
-                thisChainSelector: 3478487238524512106,
-                parentChainSelector: MAINNET_PARENT_CHAIN_SELECTOR,
-                rmnProxy: 0x9527E2d01A3064ef6b50c1Da1C0cC523803BCFF2,
-                usdcTokenPool: 0xbfd2b0b21bd22fD9aB482BAAbc815ef4974F769f,
-                cctpMessageTransmitter: 0xaCF1ceeF35caAc005e15888dDb8A3515C41B4872,
-                tokenAdminRegistry: 0x8126bE56454B628a88C17849B9ED99dd5a11Bd2f,
-                registryModuleOwnerCustom: 0xE625f0b8b0Ac86946035a7729Aba124c8A64cf69
-            }),
-            tokens: TokensConfig({
-                link: 0xb1D4538B4571d411F07960EF2838Ce337FE1E80E,
-                usdc: 0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d,
-                share: address(0) // needs to be deployed
-            }),
-            protocols: ProtocolsConfig({
-                aavePoolAddressesProvider: 0x5931822f394baBC2AACF4588E98FC77a9f5aa8C9,
-                comet: 0x5931822f394baBC2AACF4588E98FC77a9f5aa8C9
-            }),
-            clf: CLFConfig({
-                functionsRouter: 0xf9B8fc078197181C841c296C876945aaa425B278,
-                donId: 0x66756e2d617262697472756d2d7365706f6c69612d3100000000000000000000,
-                clfSubId: 0 // @review dummy value
-            })
-        });
-    }
-
     /*//////////////////////////////////////////////////////////////
                                  LOCAL
     //////////////////////////////////////////////////////////////*/
