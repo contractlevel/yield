@@ -54,7 +54,8 @@ contract HelperConfig is Script {
     NetworkConfig public activeNetworkConfig;
 
     uint64 public constant MAINNET_PARENT_CHAIN_SELECTOR = 15971525489660198786; // base
-    uint64 public constant TESTNET_PARENT_CHAIN_SELECTOR = 10344971235874465080; // base sepolia
+    // uint64 public constant TESTNET_PARENT_CHAIN_SELECTOR = 10344971235874465080; // base sepolia
+    uint64 public constant TESTNET_PARENT_CHAIN_SELECTOR = 14767482510784806043; // avalanche fuji
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -213,7 +214,7 @@ contract HelperConfig is Script {
             tokens: TokensConfig({
                 link: 0x779877A7B0D9E8603169DdbD7836e478b4624789,
                 usdc: 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238,
-                share: address(0) // needs to be deployed
+                share: 0xdaB4AA006F411C5BCA2bF3D7561f3f00C1EB2717
             }),
             protocols: ProtocolsConfig({
                 aavePoolAddressesProvider: 0x012bAC54348C0E635dCAc9D5FB99f06F24136C9A,
@@ -242,16 +243,45 @@ contract HelperConfig is Script {
             tokens: TokensConfig({
                 link: 0xE4aB69C077896252FAFBD49EFD26B5D171A32410,
                 usdc: 0x036CbD53842c5426634e7929541eC2318f3dCF7e,
-                share: address(0) // needs to be deployed
+                share: 0xAb96743Df71874074628870C0951Bb54C300522c
             }),
             protocols: ProtocolsConfig({
-                aavePoolAddressesProvider: address(0),
+                aavePoolAddressesProvider: 0xC88543241BE4A46Ca5AFC2d44100A0cc767D6B78,
                 comet: 0x571621Ce60Cebb0c1D442B5afb38B1663C6Bf017
             }),
             clf: CLFConfig({
                 functionsRouter: 0xf9B8fc078197181C841c296C876945aaa425B278,
                 donId: 0x66756e2d626173652d7365706f6c69612d310000000000000000000000000000,
                 clfSubId: 333
+            })
+        });
+    }
+
+    function getAvalancheFujiConfig() public pure returns (NetworkConfig memory) {
+        return NetworkConfig({
+            ccip: CCIPConfig({
+                ccipRouter: 0xF694E193200268f9a4868e4Aa017A0118C9a8177,
+                thisChainSelector: 14767482510784806043,
+                parentChainSelector: TESTNET_PARENT_CHAIN_SELECTOR,
+                rmnProxy: 0xAc8CFc3762a979628334a0E4C1026244498E821b,
+                usdcTokenPool: 0x5931822f394baBC2AACF4588E98FC77a9f5aa8C9,
+                cctpMessageTransmitter: 0xa9fB1b3009DCb79E2fe346c16a604B8Fa8aE0a79,
+                tokenAdminRegistry: 0xA92053a4a3922084d992fD2835bdBa4caC6877e6,
+                registryModuleOwnerCustom: 0x97300785aF1edE1343DB6d90706A35CF14aA3d81
+            }),
+            tokens: TokensConfig({
+                link: 0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846,
+                usdc: 0x5425890298aed601595a70AB815c96711a31Bc65,
+                share: address(0) // needs to be deployed
+            }),
+            protocols: ProtocolsConfig({
+                aavePoolAddressesProvider: 0xEA8176c28417A6FD2F2e40F871EA04dfFE1CAcd8,
+                comet: 0x43a5Ddb9561762D835B6c0f15Cb8a7ed02F6D958
+            }),
+            clf: CLFConfig({
+                functionsRouter: 0xA9d587a00A31A52Ed70D6026794a8FC5E2F5dCb0,
+                donId: 0x66756e2d6176616c616e6368652d66756a692d31000000000000000000000000,
+                clfSubId: 15593
             })
         });
     }

@@ -412,6 +412,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
 
     /// @dev Revert if the amount is 0
     /// @param amount The amount to check
+    // @review currently not in coverage report
     function _revertIfZeroAmount(uint256 amount) internal pure {
         if (amount == 0) revert YieldPeer__NoZeroAmount();
     }

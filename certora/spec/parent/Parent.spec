@@ -242,7 +242,7 @@ rule deposit_mintsShares_when_parent_is_strategy() {
     uint256 totalSharesBefore = getTotalShares();
 
     /// @notice simulating initial admin deposit to mitigate inflation attack
-    require getTotalValue(e) > 1000000 && totalSharesBefore > 1000000000000; // 1 usdc
+    require getTotalValue(e) >= 1000000 && totalSharesBefore >= 1000000000000; // 1 usdc
 
     deposit(e, args);
 

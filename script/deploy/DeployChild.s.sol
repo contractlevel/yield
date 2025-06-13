@@ -20,7 +20,7 @@ contract DeployChild is Script {
 
         vm.startBroadcast();
         Share share = new Share();
-        SharePool sharePool = new SharePool(share, networkConfig.ccip.rmnProxy, networkConfig.ccip.ccipRouter);
+        SharePool sharePool = new SharePool(address(share), networkConfig.ccip.rmnProxy, networkConfig.ccip.ccipRouter);
         RegistryModuleOwnerCustom(networkConfig.ccip.registryModuleOwnerCustom).registerAdminViaOwner(address(share));
         ITokenAdminRegistry(networkConfig.ccip.tokenAdminRegistry).acceptAdminRole(address(share));
         ITokenAdminRegistry(networkConfig.ccip.tokenAdminRegistry).setPool(address(share), address(sharePool));

@@ -20,3 +20,4 @@ report.md
 src/modules/ThrowCLF.sol
 .notes.md
 .certora_internal/
+flattened/

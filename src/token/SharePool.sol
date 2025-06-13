@@ -10,7 +10,7 @@ contract SharePool is BurnMintTokenPool {
     /// @param shareToken The SHARE token contract for this chain
     /// @param rmnProxy The Risk Management Network proxy address
     /// @param ccipRouter The CCIP router address
-    constructor(IBurnMintERC20 shareToken, address rmnProxy, address ccipRouter)
-        BurnMintTokenPool(shareToken, 18, new address[](0), rmnProxy, ccipRouter)
+    constructor(address shareToken, address rmnProxy, address ccipRouter)
+        BurnMintTokenPool(IBurnMintERC20(shareToken), 18, new address[](0), rmnProxy, ccipRouter)
     {}
 }
