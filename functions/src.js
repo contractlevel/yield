@@ -2,11 +2,16 @@ if (!secrets.api) {
   throw Error('Proxy API URL not provided');
 }
 
+// const chainSelectorMap = {
+//   Arbitrum: '4949039107694359620',
+//   Ethereum: '16015286601757825753', // 5009297550715157269
+//   Base: '10344971235874465080', // 15971525489660198786
+//   Optimism: '3734403246176062136',
+// };
 const chainSelectorMap = {
-  Arbitrum: '4949039107694359620',
-  Ethereum: '5009297550715157269',
-  Base: '15971525489660198786',
-  Optimism: '3734403246176062136',
+  Avalanche: '14767482510784806043', // Fuji
+  Ethereum: '16015286601757825753', // Sepolia
+  Base: '10344971235874465080', // Sepolia
 };
 const allowedChains = Object.keys(chainSelectorMap);
 

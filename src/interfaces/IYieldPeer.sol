@@ -46,4 +46,9 @@ interface IYieldPeer {
     function getTotalValue() external view returns (uint256);
     function getCompound() external view returns (address);
     function getAave() external view returns (address);
+    function setCCIPGasLimit(uint256 gasLimit) external;
+    function setAllowedChain(uint64 chainSelector, bool allowed) external;
+    function setAllowedPeer(uint64 chainSelector, address peer) external;
+    function getAllowedChain(uint64 chainSelector) external view returns (bool);
+    function getAllowedPeer(uint64 chainSelector) external view returns (address);
 }

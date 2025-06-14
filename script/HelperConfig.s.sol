@@ -49,13 +49,51 @@ contract HelperConfig is Script {
         TokensConfig tokens;
         ProtocolsConfig protocols;
         CLFConfig clf;
+        PeersConfig peers;
+    }
+
+    struct PeersConfig {
+        address localPeer;
+        uint64 localChainSelector;
+        address[] remotePeers;
+        uint64[] remoteChainSelectors;
+        address localSharePool;
+        address[] remoteSharePools;
+        address localShare;
+        address[] remoteShares;
     }
 
     NetworkConfig public activeNetworkConfig;
 
+    /*//////////////////////////////////////////////////////////////
+                               CONSTANTS
+    //////////////////////////////////////////////////////////////*/
     uint64 public constant MAINNET_PARENT_CHAIN_SELECTOR = 15971525489660198786; // base
-    // uint64 public constant TESTNET_PARENT_CHAIN_SELECTOR = 10344971235874465080; // base sepolia
     uint64 public constant TESTNET_PARENT_CHAIN_SELECTOR = 14767482510784806043; // avalanche fuji
+
+    uint64 public constant AVALANCHE_FUJI_CHAIN_SELECTOR = 14767482510784806043;
+    uint64 public constant BASE_SEPOLIA_CHAIN_SELECTOR = 10344971235874465080;
+    uint64 public constant ETH_SEPOLIA_CHAIN_SELECTOR = 16015286601757825753;
+
+    address public constant AVALANCHE_FUJI_PARENT_PEER = 0x7406dBE173967a005585129Df7728caB243BF235;
+    address public constant AVALANCHE_FUJI_SHARE_TOKEN = 0xc84fAcbCEaaB9dbc27C14fB553b2c25C1b794497;
+    address public constant AVALANCHE_FUJI_SHARE_POOL = 0xAFbfb8e05c865213FdF795eA520C6D2241537Cb1;
+
+    address public constant ETH_SEPOLIA_CHILD_PEER = 0xF07A080C018AC30a274CD5c9aDc1433078F9541B;
+    address public constant ETH_SEPOLIA_SHARE_TOKEN = 0xdaB4AA006F411C5BCA2bF3D7561f3f00C1EB2717;
+    address public constant ETH_SEPOLIA_SHARE_POOL = 0x97cD63e0b8645A9a40B4a86327b9ed9e8EBFF8A0;
+
+    address public constant BASE_SEPOLIA_CHILD_PEER = 0x9eBa292a8933EA353364C7e5b16498941ac76319;
+    address public constant BASE_SEPOLIA_SHARE_TOKEN = 0x41a80C30B1DdC0752871393e68D4773E16Ae2fD2;
+    address public constant BASE_SEPOLIA_SHARE_POOL = 0xAF1B97Bb3f6809813a50cB99c892872b3F0B6EFb;
+
+    /*//////////////////////////////////////////////////////////////
+                                 ARRAYS
+    //////////////////////////////////////////////////////////////*/
+    address[] public remotePeers = new address[](2);
+    uint64[] public remoteChainSelectors = new uint64[](2);
+    address[] public remoteSharePools = new address[](2);
+    address[] public remoteShares = new address[](2);
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -67,6 +105,7 @@ contract HelperConfig is Script {
         else if (block.chainid == 8453) activeNetworkConfig = getBaseConfig();
         else if (block.chainid == 11155111) activeNetworkConfig = getEthSepoliaConfig();
         else if (block.chainid == 84532) activeNetworkConfig = getBaseSepoliaConfig();
+        else if (block.chainid == 43113) activeNetworkConfig = getAvalancheFujiConfig();
         else activeNetworkConfig = getOrCreateAnvilEthConfig();
     }
 
@@ -104,7 +143,17 @@ contract HelperConfig is Script {
             clf: CLFConfig({
                 functionsRouter: 0x65Dcc24F8ff9e51F10DCc7Ed1e4e2A61e6E14bd6,
                 donId: 0x66756e2d657468657265756d2d6d61696e6e65742d3100000000000000000000,
-                clfSubId: 0 // @review dummy value
+                clfSubId: 0 // dummy value
+            }),
+            peers: PeersConfig({
+                localPeer: 0x0000000000000000000000000000000000000000,
+                localChainSelector: 0,
+                remotePeers: new address[](0),
+                remoteChainSelectors: new uint64[](0),
+                localSharePool: 0x0000000000000000000000000000000000000000,
+                remoteSharePools: new address[](0),
+                localShare: 0x0000000000000000000000000000000000000000,
+                remoteShares: new address[](0)
             })
         });
     }
@@ -133,7 +182,17 @@ contract HelperConfig is Script {
             clf: CLFConfig({
                 functionsRouter: 0xaA8AaA682C9eF150C0C8E96a8D60945BCB21faad,
                 donId: 0x66756e2d6f7074696d69736d2d6d61696e6e65742d310a000000000000000000,
-                clfSubId: 0 // @review dummy value
+                clfSubId: 0 // dummy value
+            }),
+            peers: PeersConfig({
+                localPeer: 0x0000000000000000000000000000000000000000,
+                localChainSelector: 0,
+                remotePeers: new address[](0),
+                remoteChainSelectors: new uint64[](0),
+                localSharePool: 0x0000000000000000000000000000000000000000,
+                remoteSharePools: new address[](0),
+                localShare: 0x0000000000000000000000000000000000000000,
+                remoteShares: new address[](0)
             })
         });
     }
@@ -163,6 +222,16 @@ contract HelperConfig is Script {
                 functionsRouter: 0x97083E831F8F0638855e2A515c90EdCF158DF238,
                 donId: 0x66756e2d617262697472756d2d6d61696e6e65742d3100000000000000000000,
                 clfSubId: 0 // @review dummy value
+            }),
+            peers: PeersConfig({
+                localPeer: 0x0000000000000000000000000000000000000000,
+                localChainSelector: 0,
+                remotePeers: new address[](0),
+                remoteChainSelectors: new uint64[](0),
+                localSharePool: 0x0000000000000000000000000000000000000000,
+                remoteSharePools: new address[](0),
+                localShare: 0x0000000000000000000000000000000000000000,
+                remoteShares: new address[](0)
             })
         });
     }
@@ -192,6 +261,16 @@ contract HelperConfig is Script {
                 functionsRouter: 0xf9B8fc078197181C841c296C876945aaa425B278,
                 donId: 0x66756e2d626173652d6d61696e6e65742d310000000000000000000000000000,
                 clfSubId: 0 // @review dummy value
+            }),
+            peers: PeersConfig({
+                localPeer: 0x0000000000000000000000000000000000000000,
+                localChainSelector: 0,
+                remotePeers: new address[](0),
+                remoteChainSelectors: new uint64[](0),
+                localSharePool: 0x0000000000000000000000000000000000000000,
+                remoteSharePools: new address[](0),
+                localShare: 0x0000000000000000000000000000000000000000,
+                remoteShares: new address[](0)
             })
         });
     }
@@ -199,7 +278,19 @@ contract HelperConfig is Script {
     /*//////////////////////////////////////////////////////////////
                                 TESTNETS
     //////////////////////////////////////////////////////////////*/
-    function getEthSepoliaConfig() public pure returns (NetworkConfig memory) {
+    function getEthSepoliaConfig() public returns (NetworkConfig memory) {
+        remotePeers[0] = BASE_SEPOLIA_CHILD_PEER;
+        remotePeers[1] = AVALANCHE_FUJI_PARENT_PEER;
+
+        remoteChainSelectors[0] = BASE_SEPOLIA_CHAIN_SELECTOR;
+        remoteChainSelectors[1] = AVALANCHE_FUJI_CHAIN_SELECTOR;
+
+        remoteSharePools[0] = BASE_SEPOLIA_SHARE_POOL;
+        remoteSharePools[1] = AVALANCHE_FUJI_SHARE_POOL;
+
+        remoteShares[0] = BASE_SEPOLIA_SHARE_TOKEN;
+        remoteShares[1] = AVALANCHE_FUJI_SHARE_TOKEN;
+
         return NetworkConfig({
             ccip: CCIPConfig({
                 ccipRouter: 0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59,
@@ -224,11 +315,33 @@ contract HelperConfig is Script {
                 functionsRouter: 0xb83E47C2bC239B3bf370bc41e1459A34b41238D0,
                 donId: 0x66756e2d657468657265756d2d7365706f6c69612d3100000000000000000000,
                 clfSubId: 0 // dummy value
+            }),
+            peers: PeersConfig({
+                localPeer: ETH_SEPOLIA_CHILD_PEER,
+                localChainSelector: ETH_SEPOLIA_CHAIN_SELECTOR,
+                remotePeers: remotePeers,
+                remoteChainSelectors: remoteChainSelectors,
+                localSharePool: ETH_SEPOLIA_SHARE_POOL,
+                remoteSharePools: remoteSharePools,
+                localShare: ETH_SEPOLIA_SHARE_TOKEN,
+                remoteShares: remoteShares
             })
         });
     }
 
-    function getBaseSepoliaConfig() public pure returns (NetworkConfig memory) {
+    function getBaseSepoliaConfig() public returns (NetworkConfig memory) {
+        remotePeers[0] = ETH_SEPOLIA_CHILD_PEER;
+        remotePeers[1] = AVALANCHE_FUJI_PARENT_PEER;
+
+        remoteChainSelectors[0] = ETH_SEPOLIA_CHAIN_SELECTOR;
+        remoteChainSelectors[1] = AVALANCHE_FUJI_CHAIN_SELECTOR;
+
+        remoteSharePools[0] = ETH_SEPOLIA_SHARE_POOL;
+        remoteSharePools[1] = AVALANCHE_FUJI_SHARE_POOL;
+
+        remoteShares[0] = ETH_SEPOLIA_SHARE_TOKEN;
+        remoteShares[1] = AVALANCHE_FUJI_SHARE_TOKEN;
+
         return NetworkConfig({
             ccip: CCIPConfig({
                 ccipRouter: 0xD3b06cEbF099CE7DA4AcCf578aaebFDBd6e88a93,
@@ -243,21 +356,43 @@ contract HelperConfig is Script {
             tokens: TokensConfig({
                 link: 0xE4aB69C077896252FAFBD49EFD26B5D171A32410,
                 usdc: 0x036CbD53842c5426634e7929541eC2318f3dCF7e,
-                share: 0xAb96743Df71874074628870C0951Bb54C300522c
+                share: BASE_SEPOLIA_SHARE_TOKEN
             }),
             protocols: ProtocolsConfig({
-                aavePoolAddressesProvider: 0xC88543241BE4A46Ca5AFC2d44100A0cc767D6B78,
+                aavePoolAddressesProvider: 0x9bf12E915461A48bc61ddca5f295A0E20BBBa5D7,
                 comet: 0x571621Ce60Cebb0c1D442B5afb38B1663C6Bf017
             }),
             clf: CLFConfig({
                 functionsRouter: 0xf9B8fc078197181C841c296C876945aaa425B278,
                 donId: 0x66756e2d626173652d7365706f6c69612d310000000000000000000000000000,
                 clfSubId: 333
+            }),
+            peers: PeersConfig({
+                localPeer: BASE_SEPOLIA_CHILD_PEER,
+                localChainSelector: BASE_SEPOLIA_CHAIN_SELECTOR,
+                remotePeers: remotePeers,
+                remoteChainSelectors: remoteChainSelectors,
+                localSharePool: BASE_SEPOLIA_SHARE_POOL,
+                remoteSharePools: remoteSharePools,
+                localShare: BASE_SEPOLIA_SHARE_TOKEN,
+                remoteShares: remoteShares
             })
         });
     }
 
-    function getAvalancheFujiConfig() public pure returns (NetworkConfig memory) {
+    function getAvalancheFujiConfig() public returns (NetworkConfig memory) {
+        remotePeers[0] = ETH_SEPOLIA_CHILD_PEER;
+        remotePeers[1] = BASE_SEPOLIA_CHILD_PEER;
+
+        remoteChainSelectors[0] = ETH_SEPOLIA_CHAIN_SELECTOR;
+        remoteChainSelectors[1] = BASE_SEPOLIA_CHAIN_SELECTOR;
+
+        remoteSharePools[0] = ETH_SEPOLIA_SHARE_POOL;
+        remoteSharePools[1] = BASE_SEPOLIA_SHARE_POOL;
+
+        remoteShares[0] = ETH_SEPOLIA_SHARE_TOKEN;
+        remoteShares[1] = BASE_SEPOLIA_SHARE_TOKEN;
+
         return NetworkConfig({
             ccip: CCIPConfig({
                 ccipRouter: 0xF694E193200268f9a4868e4Aa017A0118C9a8177,
@@ -272,16 +407,26 @@ contract HelperConfig is Script {
             tokens: TokensConfig({
                 link: 0x0b9d5D9136855f6FEc3c0993feE6E9CE8a297846,
                 usdc: 0x5425890298aed601595a70AB815c96711a31Bc65,
-                share: address(0) // needs to be deployed
+                share: AVALANCHE_FUJI_SHARE_TOKEN
             }),
             protocols: ProtocolsConfig({
-                aavePoolAddressesProvider: 0xEA8176c28417A6FD2F2e40F871EA04dfFE1CAcd8,
+                aavePoolAddressesProvider: 0xc314344EA3676CD43EAc7c9B02B00e6cfE1Af774,
                 comet: 0x43a5Ddb9561762D835B6c0f15Cb8a7ed02F6D958
             }),
             clf: CLFConfig({
                 functionsRouter: 0xA9d587a00A31A52Ed70D6026794a8FC5E2F5dCb0,
                 donId: 0x66756e2d6176616c616e6368652d66756a692d31000000000000000000000000,
                 clfSubId: 15593
+            }),
+            peers: PeersConfig({
+                localPeer: AVALANCHE_FUJI_PARENT_PEER,
+                localChainSelector: AVALANCHE_FUJI_CHAIN_SELECTOR,
+                remotePeers: remotePeers,
+                remoteChainSelectors: remoteChainSelectors,
+                localSharePool: AVALANCHE_FUJI_SHARE_POOL,
+                remoteSharePools: remoteSharePools,
+                localShare: AVALANCHE_FUJI_SHARE_TOKEN,
+                remoteShares: remoteShares
             })
         });
     }
@@ -322,6 +467,16 @@ contract HelperConfig is Script {
                 functionsRouter: address(functionsRouter),
                 donId: "",
                 clfSubId: 0 // @review dummy value
+            }),
+            peers: PeersConfig({
+                localPeer: 0x0000000000000000000000000000000000000000,
+                localChainSelector: 0,
+                remotePeers: new address[](0),
+                remoteChainSelectors: new uint64[](0),
+                localSharePool: 0x0000000000000000000000000000000000000000,
+                remoteSharePools: new address[](0),
+                localShare: 0x0000000000000000000000000000000000000000,
+                remoteShares: new address[](0)
             })
         });
     }
