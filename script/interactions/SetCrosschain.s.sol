@@ -14,6 +14,8 @@ contract SetCrosschain is Script {
 
     function run() public {
         HelperConfig config = new HelperConfig();
+
+        vm.startBroadcast();
         HelperConfig.NetworkConfig memory networkConfig = config.getActiveNetworkConfig();
         address localPeer = networkConfig.peers.localPeer;
         address localPool = networkConfig.peers.localSharePool;
@@ -21,8 +23,6 @@ contract SetCrosschain is Script {
         uint64[] memory remoteChainSelectors = networkConfig.peers.remoteChainSelectors;
         address[] memory remotePools = networkConfig.peers.remoteSharePools;
         address[] memory remoteTokens = networkConfig.peers.remoteShares;
-
-        vm.startBroadcast();
 
         _applyChainUpdates(localPool, remoteChainSelectors, remotePools, remoteTokens);
 
@@ -56,6 +56,9 @@ contract SetCrosschain is Script {
             "Length mismatch"
         );
 
+        // Get all existing chain selectors to remove
+        uint64[] memory existingChainSelectors = SharePool(localPool).getSupportedChains();
+
         TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](remoteChainSelectors.length);
         for (uint256 i = 0; i < remoteChainSelectors.length; i++) {
             chainUpdates[i] = TokenPool.ChainUpdate({
@@ -68,6 +71,6 @@ contract SetCrosschain is Script {
             chainUpdates[i].remotePoolAddresses[0] = abi.encode(remotePoolAddresses[i]);
         }
 
-        SharePool(localPool).applyChainUpdates(new uint64[](0), chainUpdates);
+        SharePool(localPool).applyChainUpdates(existingChainSelectors, chainUpdates);
     }
 }

@@ -75,17 +75,17 @@ contract HelperConfig is Script {
     uint64 public constant BASE_SEPOLIA_CHAIN_SELECTOR = 10344971235874465080;
     uint64 public constant ETH_SEPOLIA_CHAIN_SELECTOR = 16015286601757825753;
 
-    address public constant AVALANCHE_FUJI_PARENT_PEER = 0x7406dBE173967a005585129Df7728caB243BF235;
-    address public constant AVALANCHE_FUJI_SHARE_TOKEN = 0xc84fAcbCEaaB9dbc27C14fB553b2c25C1b794497;
-    address public constant AVALANCHE_FUJI_SHARE_POOL = 0xAFbfb8e05c865213FdF795eA520C6D2241537Cb1;
+    address public constant AVALANCHE_FUJI_PEER = 0x0b87C25427da8bf1408642D5BC7DaA8246bf60c3;
+    address public constant AVALANCHE_FUJI_SHARE_TOKEN = 0x7396A6424479b5EfA37601ac90959e8e684750Cf;
+    address public constant AVALANCHE_FUJI_SHARE_POOL = 0x69ddcF861d49C4d157332aa5854D69E11e0C2d8f;
 
-    address public constant ETH_SEPOLIA_CHILD_PEER = 0xF07A080C018AC30a274CD5c9aDc1433078F9541B;
-    address public constant ETH_SEPOLIA_SHARE_TOKEN = 0xdaB4AA006F411C5BCA2bF3D7561f3f00C1EB2717;
-    address public constant ETH_SEPOLIA_SHARE_POOL = 0x97cD63e0b8645A9a40B4a86327b9ed9e8EBFF8A0;
+    address public constant ETH_SEPOLIA_PEER = 0xEF394A35140cfbcD0AdCD83334524688b327fD5d;
+    address public constant ETH_SEPOLIA_SHARE_TOKEN = 0xFF86A7bf3faD9c09AD0BAD7C81FFF95704CA3fF8;
+    address public constant ETH_SEPOLIA_SHARE_POOL = 0x878782d1AA5E5C2F05acB3f78A63641eBd6FD3B9;
 
-    address public constant BASE_SEPOLIA_CHILD_PEER = 0x9eBa292a8933EA353364C7e5b16498941ac76319;
-    address public constant BASE_SEPOLIA_SHARE_TOKEN = 0x41a80C30B1DdC0752871393e68D4773E16Ae2fD2;
-    address public constant BASE_SEPOLIA_SHARE_POOL = 0xAF1B97Bb3f6809813a50cB99c892872b3F0B6EFb;
+    address public constant BASE_SEPOLIA_PEER = 0x2eCAa0b9724C369EF913af8459561643eC78FAd8;
+    address public constant BASE_SEPOLIA_SHARE_TOKEN = 0x9f02a7bD79Be3BeaFd1847BD6B308342D6201512;
+    address public constant BASE_SEPOLIA_SHARE_POOL = 0xC6c48022e8091A091fd0eFcce69234aF45dc9Fb4;
 
     /*//////////////////////////////////////////////////////////////
                                  ARRAYS
@@ -279,8 +279,8 @@ contract HelperConfig is Script {
                                 TESTNETS
     //////////////////////////////////////////////////////////////*/
     function getEthSepoliaConfig() public returns (NetworkConfig memory) {
-        remotePeers[0] = BASE_SEPOLIA_CHILD_PEER;
-        remotePeers[1] = AVALANCHE_FUJI_PARENT_PEER;
+        remotePeers[0] = BASE_SEPOLIA_PEER;
+        remotePeers[1] = AVALANCHE_FUJI_PEER;
 
         remoteChainSelectors[0] = BASE_SEPOLIA_CHAIN_SELECTOR;
         remoteChainSelectors[1] = AVALANCHE_FUJI_CHAIN_SELECTOR;
@@ -295,7 +295,7 @@ contract HelperConfig is Script {
             ccip: CCIPConfig({
                 ccipRouter: 0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59,
                 thisChainSelector: 16015286601757825753,
-                parentChainSelector: TESTNET_PARENT_CHAIN_SELECTOR,
+                parentChainSelector: BASE_SEPOLIA_CHAIN_SELECTOR,
                 rmnProxy: 0xba3f6251de62dED61Ff98590cB2fDf6871FbB991,
                 usdcTokenPool: 0xAff3fE524ea94118EF09DaDBE3c77ba6AA0005EC,
                 cctpMessageTransmitter: 0x7865fAfC2db2093669d92c0F33AeEF291086BEFD,
@@ -305,7 +305,7 @@ contract HelperConfig is Script {
             tokens: TokensConfig({
                 link: 0x779877A7B0D9E8603169DdbD7836e478b4624789,
                 usdc: 0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238,
-                share: 0xdaB4AA006F411C5BCA2bF3D7561f3f00C1EB2717
+                share: ETH_SEPOLIA_SHARE_TOKEN
             }),
             protocols: ProtocolsConfig({
                 aavePoolAddressesProvider: 0x012bAC54348C0E635dCAc9D5FB99f06F24136C9A,
@@ -317,7 +317,7 @@ contract HelperConfig is Script {
                 clfSubId: 0 // dummy value
             }),
             peers: PeersConfig({
-                localPeer: ETH_SEPOLIA_CHILD_PEER,
+                localPeer: ETH_SEPOLIA_PEER,
                 localChainSelector: ETH_SEPOLIA_CHAIN_SELECTOR,
                 remotePeers: remotePeers,
                 remoteChainSelectors: remoteChainSelectors,
@@ -330,8 +330,8 @@ contract HelperConfig is Script {
     }
 
     function getBaseSepoliaConfig() public returns (NetworkConfig memory) {
-        remotePeers[0] = ETH_SEPOLIA_CHILD_PEER;
-        remotePeers[1] = AVALANCHE_FUJI_PARENT_PEER;
+        remotePeers[0] = ETH_SEPOLIA_PEER;
+        remotePeers[1] = AVALANCHE_FUJI_PEER;
 
         remoteChainSelectors[0] = ETH_SEPOLIA_CHAIN_SELECTOR;
         remoteChainSelectors[1] = AVALANCHE_FUJI_CHAIN_SELECTOR;
@@ -346,7 +346,7 @@ contract HelperConfig is Script {
             ccip: CCIPConfig({
                 ccipRouter: 0xD3b06cEbF099CE7DA4AcCf578aaebFDBd6e88a93,
                 thisChainSelector: 10344971235874465080,
-                parentChainSelector: TESTNET_PARENT_CHAIN_SELECTOR,
+                parentChainSelector: BASE_SEPOLIA_CHAIN_SELECTOR,
                 rmnProxy: 0x99360767a4705f68CcCb9533195B761648d6d807,
                 usdcTokenPool: 0x5931822f394baBC2AACF4588E98FC77a9f5aa8C9,
                 cctpMessageTransmitter: 0x7865fAfC2db2093669d92c0F33AeEF291086BEFD,
@@ -368,7 +368,7 @@ contract HelperConfig is Script {
                 clfSubId: 333
             }),
             peers: PeersConfig({
-                localPeer: BASE_SEPOLIA_CHILD_PEER,
+                localPeer: BASE_SEPOLIA_PEER,
                 localChainSelector: BASE_SEPOLIA_CHAIN_SELECTOR,
                 remotePeers: remotePeers,
                 remoteChainSelectors: remoteChainSelectors,
@@ -381,8 +381,8 @@ contract HelperConfig is Script {
     }
 
     function getAvalancheFujiConfig() public returns (NetworkConfig memory) {
-        remotePeers[0] = ETH_SEPOLIA_CHILD_PEER;
-        remotePeers[1] = BASE_SEPOLIA_CHILD_PEER;
+        remotePeers[0] = ETH_SEPOLIA_PEER;
+        remotePeers[1] = BASE_SEPOLIA_PEER;
 
         remoteChainSelectors[0] = ETH_SEPOLIA_CHAIN_SELECTOR;
         remoteChainSelectors[1] = BASE_SEPOLIA_CHAIN_SELECTOR;
@@ -397,7 +397,7 @@ contract HelperConfig is Script {
             ccip: CCIPConfig({
                 ccipRouter: 0xF694E193200268f9a4868e4Aa017A0118C9a8177,
                 thisChainSelector: 14767482510784806043,
-                parentChainSelector: TESTNET_PARENT_CHAIN_SELECTOR,
+                parentChainSelector: BASE_SEPOLIA_CHAIN_SELECTOR,
                 rmnProxy: 0xAc8CFc3762a979628334a0E4C1026244498E821b,
                 usdcTokenPool: 0x5931822f394baBC2AACF4588E98FC77a9f5aa8C9,
                 cctpMessageTransmitter: 0xa9fB1b3009DCb79E2fe346c16a604B8Fa8aE0a79,
@@ -419,7 +419,7 @@ contract HelperConfig is Script {
                 clfSubId: 15593
             }),
             peers: PeersConfig({
-                localPeer: AVALANCHE_FUJI_PARENT_PEER,
+                localPeer: AVALANCHE_FUJI_PEER,
                 localChainSelector: AVALANCHE_FUJI_CHAIN_SELECTOR,
                 remotePeers: remotePeers,
                 remoteChainSelectors: remoteChainSelectors,
