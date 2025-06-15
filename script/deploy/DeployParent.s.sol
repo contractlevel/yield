@@ -22,8 +22,11 @@ contract DeployParent is Script {
         HelperConfig.NetworkConfig memory networkConfig = config.getActiveNetworkConfig();
 
         vm.startBroadcast();
-        // uint64 clfSubId = IFunctionsSubscriptions(networkConfig.clf.functionsRouter).createSubscription();
-        uint64 clfSubId = networkConfig.clf.clfSubId;
+        // Unit tests:
+        // @review: move this to unit test
+        uint64 clfSubId = IFunctionsSubscriptions(networkConfig.clf.functionsRouter).createSubscription();
+        // Deployment:
+        // uint64 clfSubId = networkConfig.clf.clfSubId;
 
         Share share = new Share();
         SharePool sharePool = new SharePool(address(share), networkConfig.ccip.rmnProxy, networkConfig.ccip.ccipRouter);
