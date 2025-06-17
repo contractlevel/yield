@@ -22,14 +22,14 @@ contract MockAaveNoYield is Ownable {
     }
 
     function supply(address, uint256 amount, address onBehalfOf, uint16) external {
-        s_balances[onBehalfOf] += amount;
+        // s_balances[onBehalfOf] += amount;
         IERC20(i_usdc).transferFrom(msg.sender, address(this), amount);
     }
 
     function withdraw(address, uint256 amount, address to) external returns (uint256) {
         if (msg.sender != s_peer) revert MockAaveNoYield__OnlyPeer();
-        require(s_balances[msg.sender] >= amount, "Insufficient balance");
-        s_balances[msg.sender] -= amount;
+        // require(s_balances[msg.sender] >= amount, "Insufficient balance");
+        // s_balances[msg.sender] -= amount;
         IERC20(i_usdc).transfer(to, amount);
         return amount;
     }

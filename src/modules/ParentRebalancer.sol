@@ -39,6 +39,7 @@ contract ParentRebalancer is AutomationBase, ILogAutomation, Ownable2Step {
         bytes32 eventSignature = keccak256("StrategyUpdated(uint64,uint8,uint64)");
         address parentPeer = s_parentPeer;
         uint64 thisChainSelector = IParentPeer(parentPeer).getThisChainSelector();
+        address forwarder = s_forwarder;
 
         if (log.source == parentPeer && log.topics[0] == eventSignature) {
             uint64 chainSelector = uint64(uint256(log.topics[1]));
@@ -50,16 +51,21 @@ contract ParentRebalancer is AutomationBase, ILogAutomation, Ownable2Step {
                 upkeepNeeded = false;
             }
 
-            IYieldPeer.Strategy memory strategy =
+            IYieldPeer.Strategy memory newStrategy =
                 IYieldPeer.Strategy({chainSelector: chainSelector, protocol: IYieldPeer.Protocol(protocolEnum)});
             IYieldPeer.CcipTxType txType;
+            address oldStrategyPool = IYieldPeer(parentPeer).getStrategyPool();
+            uint256 totalValue;
+
             if (oldChainSelector == thisChainSelector && chainSelector != thisChainSelector) {
                 txType = IYieldPeer.CcipTxType.RebalanceNewStrategy;
+                totalValue = IYieldPeer(parentPeer).getTotalValue();
             } else {
                 txType = IYieldPeer.CcipTxType.RebalanceOldStrategy;
             }
 
-            performData = abi.encode(parentPeer, strategy, txType, oldChainSelector);
+            performData =
+                abi.encode(forwarder, parentPeer, newStrategy, txType, oldChainSelector, oldStrategyPool, totalValue);
             upkeepNeeded = true;
         } else {
             performData = "";
@@ -68,13 +74,22 @@ contract ParentRebalancer is AutomationBase, ILogAutomation, Ownable2Step {
     }
 
     function performUpkeep(bytes calldata performData) external {
-        if (msg.sender != s_forwarder) revert ParentRebalancer__OnlyForwarder();
+        (
+            address forwarder,
+            address parentPeer,
+            IYieldPeer.Strategy memory strategy,
+            IYieldPeer.CcipTxType txType,
+            uint64 oldChainSelector,
+            address oldStrategyPool,
+            uint256 totalValue
+        ) = abi.decode(
+            performData, (address, address, IYieldPeer.Strategy, IYieldPeer.CcipTxType, uint64, address, uint256)
+        );
 
-        (address parentPeer, IYieldPeer.Strategy memory strategy, IYieldPeer.CcipTxType txType, uint64 oldChainSelector)
-        = abi.decode(performData, (address, IYieldPeer.Strategy, IYieldPeer.CcipTxType, uint64));
+        if (msg.sender != forwarder) revert ParentRebalancer__OnlyForwarder();
 
         if (txType == IYieldPeer.CcipTxType.RebalanceNewStrategy) {
-            IParentPeer(parentPeer).rebalanceNewStrategy(strategy);
+            IParentPeer(parentPeer).rebalanceNewStrategy(oldStrategyPool, totalValue, strategy);
         } else {
             IParentPeer(parentPeer).rebalanceOldStrategy(oldChainSelector, strategy);
         }
@@ -85,5 +100,9 @@ contract ParentRebalancer is AutomationBase, ILogAutomation, Ownable2Step {
     //////////////////////////////////////////////////////////////*/
     function setForwarder(address forwarder) external onlyOwner {
         s_forwarder = forwarder;
+    }
+
+    function setParentPeer(address parentPeer) external onlyOwner {
+        s_parentPeer = parentPeer;
     }
 }

@@ -31,10 +31,10 @@ contract ParentCLF is ParentPeer, FunctionsClient {
     string internal constant SOURCE =
         "try { const r = await fetch('https://raw.githubusercontent.com/contractlevel/yield/main/functions/src.min.js'); if (!r.ok) throw Error('F:' + r.status); return eval(await r.text()); } catch (e) { return Functions.encodeString(e.message.slice(0,99)); }";
     /// @dev Encrypted secret for the Chainlink Functions request
-    bytes internal constant ENCRYPTED_SECRET =
-        hex"1b4e2d1a565a496c987dc6d8303c52370378b6dcecfd8c1a11b7141822be2b3cb96daba5632633858fe0f07fd5ac85b5293101588003a9f260b0c3d1134765de7b9b16bc1d9087affbf117c4b40a259bc618892ade4707190950fd320e239e36e1f16d577e8c9ed52bad67544530dbca3d846dc4b1f3f8eb6c7a6346172762f449be0d5bcfac35dde9a342db2e009d19c87facf05164b6a3ea257c5a687190b38ec8fd117bfc6a27d7da08abb980afb3aca40b71adbf1cf823b6a3b7bda583e3dc76f1e828bb991398c0b0ee96a2b6c5414c86f62e317286480850e80e8d6ab32718640ef44135f7a875b29e757566a823";
-    // bytes internal constant AVALANCHE_ENCRYPTED_SECRET =
-    //     hex"c37b08028a80330e0fb5c784f636424f03660be7ac1007bbdefe1a9456a3008634433ceccdb128bbd58b9c95125b3ad42751e7ba7b01f435833b30a07402ad44832b0110ad06a7c9f764cdb939292e1df97ee18ba46e93b3814ff7e205926ae072100aff074289c22d9eb342e8832790431accc8dd4e9dc868d21d944966f6c67a7574fa09c8d9c67119b0bec146f87f986d7ed9550cedef7e3c75b7feaee0722b4c82295f0c02eab7ecec08c1d22e27906179bc9dd2d11336b42793e13f24c43b2a9b993967551ff7fe619f0a31212538f973efd33d9955ac713b16717a899a17a58e8ee21160814b6464ebff934c35cdd5bd31b50a6074c08ecfb0330e435c2d";
+    // bytes internal constant ENCRYPTED_SECRET =
+    //     hex"1b4e2d1a565a496c987dc6d8303c52370378b6dcecfd8c1a11b7141822be2b3cb96daba5632633858fe0f07fd5ac85b5293101588003a9f260b0c3d1134765de7b9b16bc1d9087affbf117c4b40a259bc618892ade4707190950fd320e239e36e1f16d577e8c9ed52bad67544530dbca3d846dc4b1f3f8eb6c7a6346172762f449be0d5bcfac35dde9a342db2e009d19c87facf05164b6a3ea257c5a687190b38ec8fd117bfc6a27d7da08abb980afb3aca40b71adbf1cf823b6a3b7bda583e3dc76f1e828bb991398c0b0ee96a2b6c5414c86f62e317286480850e80e8d6ab32718640ef44135f7a875b29e757566a823";
+    bytes internal constant ETH_SEPOLIA_ENCRYPTED_SECRET =
+        hex"519ffb85c8bd90ed9f422f733082d43d03332a97459dec67e5922c64af61f22c8e0f872f324c884dc55d40cade8d28e111668f614eedb48adb5519e6f1c59cdea63470052378d9d51609209505c061e5c7d5c9a703b1d27f40697c944672b6d917ad539cc5bb5da1d1de79cc4508f4c82a3fb2cd8c8f20589039a372bc419ecdda561f94472033e3fd7d43610d639592653576f506c1d9185077ac3533333998538cfb478885da3ced87752b5bb213adb918d58791e083c59d94a580f2f568c2c35345815d3722f4675f18e4286a851f757e3f8582078c321dbf1193e30112540182260fef5bf97b08ab5565a0de2d0fc3";
 
     /// @dev Chainlink Functions DON ID
     bytes32 internal immutable i_donId;
@@ -90,9 +90,10 @@ contract ParentCLF is ParentPeer, FunctionsClient {
         address share,
         address functionsRouter,
         bytes32 donId,
-        uint64 clfSubId
+        uint64 clfSubId,
+        address parentRebalancer
     )
-        ParentPeer(ccipRouter, link, thisChainSelector, usdc, aavePoolAddressesProvider, comet, share)
+        ParentPeer(ccipRouter, link, thisChainSelector, usdc, aavePoolAddressesProvider, comet, share, parentRebalancer)
         FunctionsClient(functionsRouter)
     {
         i_donId = donId;
@@ -107,14 +108,13 @@ contract ParentCLF is ParentPeer, FunctionsClient {
     /// @notice The nature of the request is to fetch the strategy with the highest yield
     /// @dev Revert if the caller is not the Chainlink Automation upkeep address
     function sendCLFRequest() external {
-        // @review uncommet this check!
-        // if (msg.sender != s_upkeepAddress) revert ParentCLF__OnlyUpkeep();
+        if (msg.sender != s_upkeepAddress) revert ParentCLF__OnlyUpkeep();
 
         /// @dev Send CLF request
         //slither-disable-next-line uninitialized-local
         FunctionsRequest.Request memory req;
         req.initializeRequest(FunctionsRequest.Location.Inline, FunctionsRequest.CodeLanguage.JavaScript, SOURCE);
-        req.addSecretsReference(ENCRYPTED_SECRET);
+        req.addSecretsReference(ETH_SEPOLIA_ENCRYPTED_SECRET);
 
         bytes32 requestId = _sendRequest(req.encodeCBOR(), i_clfSubId, CLF_GAS_LIMIT, i_donId);
 

@@ -27,7 +27,7 @@ contract ParentPeer is YieldPeer {
     uint256 internal constant INITIAL_SHARE_PRECISION = SHARE_DECIMALS / USDC_DECIMALS;
 
     /// @dev This address handles automated CCIP rebalance calls because CLF runs out of gas
-    address internal s_parentRebalancer;
+    address internal immutable i_parentRebalancer;
 
     /// @dev total SHAREs minted across all chains
     // @invariant s_totalShares == ghost_totalSharesMinted - ghost_totalSharesBurned
@@ -69,7 +69,8 @@ contract ParentPeer is YieldPeer {
         address usdc,
         address aavePoolAddressesProvider,
         address comet,
-        address share
+        address share,
+        address parentRebalancer
     ) YieldPeer(ccipRouter, link, thisChainSelector, usdc, aavePoolAddressesProvider, comet, share) {
         // @review modularize this
         // @review CHANGE THIS TO COMPOUND IF PARENT IS BASE SEPOLIA - AAVE V3 IS NOT ON BASE SEPOLIA
@@ -78,6 +79,8 @@ contract ParentPeer is YieldPeer {
 
         // @review mint dead shares?
         // _mintShares(address(0), 1e18); // how would this affect the initial precision?
+
+        i_parentRebalancer = parentRebalancer;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -320,21 +323,18 @@ contract ParentPeer is YieldPeer {
             return;
         }
         // Handle strategy changes on the this parent chain
-        // @review we probably dont need this bit `&& protocol != oldStrategy.protocol` because the last check would've handled it
-        if (
-            chainSelector == i_thisChainSelector && oldStrategy.chainSelector == i_thisChainSelector
-                && protocol != oldStrategy.protocol
-        ) {
+        if (chainSelector == i_thisChainSelector && oldStrategy.chainSelector == i_thisChainSelector) {
             _handleLocalStrategyChange(newStrategy);
         }
-        // Handle moving strategy from this parent chain to a different chain
-        else if (oldStrategy.chainSelector == i_thisChainSelector && chainSelector != i_thisChainSelector) {
-            _handleStrategyMoveToNewChain(newStrategy);
-        }
-        // Handle rebalancing from a different chain (a child)
-        else {
-            _handleRebalanceFromDifferentChain(oldStrategy, newStrategy);
-        }
+        // @notice we are handling these cases with the ParentRebalancer
+        // // Handle moving strategy from this parent chain to a different chain
+        // else if (oldStrategy.chainSelector == i_thisChainSelector && chainSelector != i_thisChainSelector) {
+        //     _handleStrategyMoveToNewChain(newStrategy);
+        // }
+        // // Handle rebalancing from a different chain (a child)
+        // else {
+        //     _handleRebalanceFromDifferentChain(oldStrategy, newStrategy);
+        // }
     }
 
     /// @notice Internal helper to handle strategy updates
@@ -363,9 +363,9 @@ contract ParentPeer is YieldPeer {
 
     /// @notice Handles moving strategy to a different chain
     /// @param newStrategy The new strategy
-    function _handleStrategyMoveToNewChain(Strategy memory newStrategy) internal {
-        address oldStrategyPool = _getStrategyPool();
-        uint256 totalValue = _getTotalValueFromStrategy(oldStrategyPool);
+    function _handleStrategyMoveToNewChain(address oldStrategyPool, uint256 totalValue, Strategy memory newStrategy)
+        internal
+    {
         if (totalValue != 0) _withdrawFromStrategy(oldStrategyPool, totalValue);
         _updateStrategyPool(newStrategy.chainSelector, newStrategy.protocol);
         _ccipSend(
@@ -374,17 +374,7 @@ contract ParentPeer is YieldPeer {
             abi.encode(newStrategy),
             i_usdc.balanceOf(address(this))
         );
-        // emit CLFCompleted();
     }
-
-    // /// @notice TEST FUNCTION. address(this) needs to be funded with usdc to work.
-    // function ccipSend(uint64 dstChainSelector, CcipTxType txType, uint256 amount) external {
-    //     Strategy memory newStrategy = Strategy({chainSelector: dstChainSelector, protocol: Protocol.Aave});
-    //     bytes memory encodedNewStrategy = abi.encode(newStrategy);
-    //     _ccipSend(dstChainSelector, txType, encodedNewStrategy, amount);
-    // }
-
-    // event CLFCompleted();
 
     /// @notice Handles rebalancing when strategy is on a different chain
     /// @param oldStrategy The current strategy
@@ -395,9 +385,9 @@ contract ParentPeer is YieldPeer {
         );
     }
 
-    function rebalanceNewStrategy(Strategy memory newStrategy) external {
+    function rebalanceNewStrategy(address oldStrategyPool, uint256 totalValue, Strategy memory newStrategy) external {
         _revertIfMsgSenderIsNotParentRebalancer();
-        _handleStrategyMoveToNewChain(newStrategy);
+        _handleStrategyMoveToNewChain(oldStrategyPool, totalValue, newStrategy);
     }
 
     function rebalanceOldStrategy(uint64 oldChainSelector, Strategy memory newStrategy) external {
@@ -421,11 +411,7 @@ contract ParentPeer is YieldPeer {
     }
 
     function _revertIfMsgSenderIsNotParentRebalancer() internal view {
-        if (msg.sender != s_parentRebalancer) revert ParentPeer__OnlyParentRebalancer();
-    }
-
-    function setParentRebalancer(address parentRebalancer) external onlyOwner {
-        s_parentRebalancer = parentRebalancer;
+        if (msg.sender != i_parentRebalancer) revert ParentPeer__OnlyParentRebalancer();
     }
 
     /*//////////////////////////////////////////////////////////////

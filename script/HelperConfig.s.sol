@@ -61,6 +61,7 @@ contract HelperConfig is Script {
         address[] remoteSharePools;
         address localShare;
         address[] remoteShares;
+        address parentRebalancer;
     }
 
     NetworkConfig public activeNetworkConfig;
@@ -75,17 +76,17 @@ contract HelperConfig is Script {
     uint64 public constant BASE_SEPOLIA_CHAIN_SELECTOR = 10344971235874465080;
     uint64 public constant ETH_SEPOLIA_CHAIN_SELECTOR = 16015286601757825753;
 
-    address public constant AVALANCHE_FUJI_PEER = 0x0b87C25427da8bf1408642D5BC7DaA8246bf60c3;
-    address public constant AVALANCHE_FUJI_SHARE_TOKEN = 0x7396A6424479b5EfA37601ac90959e8e684750Cf;
-    address public constant AVALANCHE_FUJI_SHARE_POOL = 0x69ddcF861d49C4d157332aa5854D69E11e0C2d8f;
+    address public constant AVALANCHE_FUJI_PEER = 0xc19688E191dEB933B99cc78D94c227784c8062F9;
+    address public constant AVALANCHE_FUJI_SHARE_TOKEN = 0x2891C37D5104446d10dc29eA06c25C6f0cA233Ec;
+    address public constant AVALANCHE_FUJI_SHARE_POOL = 0x9bf12E915461A48bc61ddca5f295A0E20BBBa5D7;
 
-    address public constant ETH_SEPOLIA_PEER = 0x6fDbc908533d16983E3c0d91027eA78fd2A84E9B;
-    address public constant ETH_SEPOLIA_SHARE_TOKEN = 0x94740bf86f6fAf65020D397968b53eD132f0974f;
-    address public constant ETH_SEPOLIA_SHARE_POOL = 0x0b87C25427da8bf1408642D5BC7DaA8246bf60c3;
+    address public constant ETH_SEPOLIA_PEER = 0xBE679979Eaec355d1030d6f117Ce5B4b5388318E;
+    address public constant ETH_SEPOLIA_SHARE_TOKEN = 0x37D13c62D2FDe4A400e2018f2fA0e3da6b15718D;
+    address public constant ETH_SEPOLIA_SHARE_POOL = 0x9CF6491ace3FDD614FB8209ec98dcF98b1e70e4D;
 
-    address public constant BASE_SEPOLIA_PEER = 0x2642E586c52E35A7C44995ea74a8A025651ba6BD;
-    address public constant BASE_SEPOLIA_SHARE_TOKEN = 0x74eC127bAc1462FF639A12e3a7CB4601d5aB97DF;
-    address public constant BASE_SEPOLIA_SHARE_POOL = 0xE0C2598a1aC1D6ec120607F1e09caE229aaBD8c8;
+    address public constant BASE_SEPOLIA_PEER = 0x94563Bfe55D8Df522FE94e7D60D2D949ef21BF1c;
+    address public constant BASE_SEPOLIA_SHARE_TOKEN = 0x2DF8c615858B479cBC3Bfef3bBfE34842d7AaA90;
+    address public constant BASE_SEPOLIA_SHARE_POOL = 0xEF13904800eFA60BB1ea5f70645Fc55609F00320;
 
     /*//////////////////////////////////////////////////////////////
                                  ARRAYS
@@ -153,7 +154,8 @@ contract HelperConfig is Script {
                 localSharePool: 0x0000000000000000000000000000000000000000,
                 remoteSharePools: new address[](0),
                 localShare: 0x0000000000000000000000000000000000000000,
-                remoteShares: new address[](0)
+                remoteShares: new address[](0),
+                parentRebalancer: 0x0000000000000000000000000000000000000000
             })
         });
     }
@@ -192,7 +194,8 @@ contract HelperConfig is Script {
                 localSharePool: 0x0000000000000000000000000000000000000000,
                 remoteSharePools: new address[](0),
                 localShare: 0x0000000000000000000000000000000000000000,
-                remoteShares: new address[](0)
+                remoteShares: new address[](0),
+                parentRebalancer: 0x0000000000000000000000000000000000000000
             })
         });
     }
@@ -231,7 +234,8 @@ contract HelperConfig is Script {
                 localSharePool: 0x0000000000000000000000000000000000000000,
                 remoteSharePools: new address[](0),
                 localShare: 0x0000000000000000000000000000000000000000,
-                remoteShares: new address[](0)
+                remoteShares: new address[](0),
+                parentRebalancer: 0x0000000000000000000000000000000000000000
             })
         });
     }
@@ -270,7 +274,8 @@ contract HelperConfig is Script {
                 localSharePool: 0x0000000000000000000000000000000000000000,
                 remoteSharePools: new address[](0),
                 localShare: 0x0000000000000000000000000000000000000000,
-                remoteShares: new address[](0)
+                remoteShares: new address[](0),
+                parentRebalancer: 0x0000000000000000000000000000000000000000
             })
         });
     }
@@ -295,7 +300,7 @@ contract HelperConfig is Script {
             ccip: CCIPConfig({
                 ccipRouter: 0x0BF3dE8c5D3e8A2B34D2BEeB17ABfCeBaf363A59,
                 thisChainSelector: 16015286601757825753,
-                parentChainSelector: BASE_SEPOLIA_CHAIN_SELECTOR,
+                parentChainSelector: ETH_SEPOLIA_CHAIN_SELECTOR,
                 rmnProxy: 0xba3f6251de62dED61Ff98590cB2fDf6871FbB991,
                 usdcTokenPool: 0xAff3fE524ea94118EF09DaDBE3c77ba6AA0005EC,
                 cctpMessageTransmitter: 0x7865fAfC2db2093669d92c0F33AeEF291086BEFD,
@@ -314,7 +319,7 @@ contract HelperConfig is Script {
             clf: CLFConfig({
                 functionsRouter: 0xb83E47C2bC239B3bf370bc41e1459A34b41238D0,
                 donId: 0x66756e2d657468657265756d2d7365706f6c69612d3100000000000000000000,
-                clfSubId: 0 // dummy value
+                clfSubId: 5026
             }),
             peers: PeersConfig({
                 localPeer: ETH_SEPOLIA_PEER,
@@ -324,7 +329,8 @@ contract HelperConfig is Script {
                 localSharePool: ETH_SEPOLIA_SHARE_POOL,
                 remoteSharePools: remoteSharePools,
                 localShare: ETH_SEPOLIA_SHARE_TOKEN,
-                remoteShares: remoteShares
+                remoteShares: remoteShares,
+                parentRebalancer: 0x107C9A78c447c99289B84476f53620236114AbAa
             })
         });
     }
@@ -346,7 +352,7 @@ contract HelperConfig is Script {
             ccip: CCIPConfig({
                 ccipRouter: 0xD3b06cEbF099CE7DA4AcCf578aaebFDBd6e88a93,
                 thisChainSelector: 10344971235874465080,
-                parentChainSelector: BASE_SEPOLIA_CHAIN_SELECTOR,
+                parentChainSelector: ETH_SEPOLIA_CHAIN_SELECTOR,
                 rmnProxy: 0x99360767a4705f68CcCb9533195B761648d6d807,
                 usdcTokenPool: 0x5931822f394baBC2AACF4588E98FC77a9f5aa8C9,
                 cctpMessageTransmitter: 0x7865fAfC2db2093669d92c0F33AeEF291086BEFD,
@@ -375,7 +381,8 @@ contract HelperConfig is Script {
                 localSharePool: BASE_SEPOLIA_SHARE_POOL,
                 remoteSharePools: remoteSharePools,
                 localShare: BASE_SEPOLIA_SHARE_TOKEN,
-                remoteShares: remoteShares
+                remoteShares: remoteShares,
+                parentRebalancer: 0x0000000000000000000000000000000000000000
             })
         });
     }
@@ -397,7 +404,7 @@ contract HelperConfig is Script {
             ccip: CCIPConfig({
                 ccipRouter: 0xF694E193200268f9a4868e4Aa017A0118C9a8177,
                 thisChainSelector: 14767482510784806043,
-                parentChainSelector: BASE_SEPOLIA_CHAIN_SELECTOR,
+                parentChainSelector: ETH_SEPOLIA_CHAIN_SELECTOR,
                 rmnProxy: 0xAc8CFc3762a979628334a0E4C1026244498E821b,
                 usdcTokenPool: 0x5931822f394baBC2AACF4588E98FC77a9f5aa8C9,
                 cctpMessageTransmitter: 0xa9fB1b3009DCb79E2fe346c16a604B8Fa8aE0a79,
@@ -426,7 +433,8 @@ contract HelperConfig is Script {
                 localSharePool: AVALANCHE_FUJI_SHARE_POOL,
                 remoteSharePools: remoteSharePools,
                 localShare: AVALANCHE_FUJI_SHARE_TOKEN,
-                remoteShares: remoteShares
+                remoteShares: remoteShares,
+                parentRebalancer: 0x0000000000000000000000000000000000000000
             })
         });
     }
@@ -476,7 +484,8 @@ contract HelperConfig is Script {
                 localSharePool: 0x0000000000000000000000000000000000000000,
                 remoteSharePools: new address[](0),
                 localShare: 0x0000000000000000000000000000000000000000,
-                remoteShares: new address[](0)
+                remoteShares: new address[](0),
+                parentRebalancer: 0x0000000000000000000000000000000000000000
             })
         });
     }
