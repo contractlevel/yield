@@ -79,13 +79,13 @@ contract HelperConfig is Script {
     address public constant AVALANCHE_FUJI_SHARE_TOKEN = 0x7396A6424479b5EfA37601ac90959e8e684750Cf;
     address public constant AVALANCHE_FUJI_SHARE_POOL = 0x69ddcF861d49C4d157332aa5854D69E11e0C2d8f;
 
-    address public constant ETH_SEPOLIA_PEER = 0xEF394A35140cfbcD0AdCD83334524688b327fD5d;
-    address public constant ETH_SEPOLIA_SHARE_TOKEN = 0xFF86A7bf3faD9c09AD0BAD7C81FFF95704CA3fF8;
-    address public constant ETH_SEPOLIA_SHARE_POOL = 0x878782d1AA5E5C2F05acB3f78A63641eBd6FD3B9;
+    address public constant ETH_SEPOLIA_PEER = 0x6fDbc908533d16983E3c0d91027eA78fd2A84E9B;
+    address public constant ETH_SEPOLIA_SHARE_TOKEN = 0x94740bf86f6fAf65020D397968b53eD132f0974f;
+    address public constant ETH_SEPOLIA_SHARE_POOL = 0x0b87C25427da8bf1408642D5BC7DaA8246bf60c3;
 
-    address public constant BASE_SEPOLIA_PEER = 0x2eCAa0b9724C369EF913af8459561643eC78FAd8;
-    address public constant BASE_SEPOLIA_SHARE_TOKEN = 0x9f02a7bD79Be3BeaFd1847BD6B308342D6201512;
-    address public constant BASE_SEPOLIA_SHARE_POOL = 0xC6c48022e8091A091fd0eFcce69234aF45dc9Fb4;
+    address public constant BASE_SEPOLIA_PEER = 0x2642E586c52E35A7C44995ea74a8A025651ba6BD;
+    address public constant BASE_SEPOLIA_SHARE_TOKEN = 0x74eC127bAc1462FF639A12e3a7CB4601d5aB97DF;
+    address public constant BASE_SEPOLIA_SHARE_POOL = 0xE0C2598a1aC1D6ec120607F1e09caE229aaBD8c8;
 
     /*//////////////////////////////////////////////////////////////
                                  ARRAYS
@@ -308,7 +308,7 @@ contract HelperConfig is Script {
                 share: ETH_SEPOLIA_SHARE_TOKEN
             }),
             protocols: ProtocolsConfig({
-                aavePoolAddressesProvider: 0x012bAC54348C0E635dCAc9D5FB99f06F24136C9A,
+                aavePoolAddressesProvider: 0xf7869E9D4227c53AbCD5b4964fC7f502C2FC7A58,
                 comet: 0xAec1F48e02Cfb822Be958B68C7957156EB3F0b6e
             }),
             clf: CLFConfig({

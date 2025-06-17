@@ -107,7 +107,8 @@ contract ParentCLF is ParentPeer, FunctionsClient {
     /// @notice The nature of the request is to fetch the strategy with the highest yield
     /// @dev Revert if the caller is not the Chainlink Automation upkeep address
     function sendCLFRequest() external {
-        if (msg.sender != s_upkeepAddress) revert ParentCLF__OnlyUpkeep();
+        // @review uncommet this check!
+        // if (msg.sender != s_upkeepAddress) revert ParentCLF__OnlyUpkeep();
 
         /// @dev Send CLF request
         //slither-disable-next-line uninitialized-local

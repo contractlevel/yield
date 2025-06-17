@@ -12,6 +12,11 @@ import {YieldPeer, Client, IRouterClient, CCIPOperations} from "./YieldPeer.sol"
 /// @notice This version of ParentPeer is incomplete - ParentCLF must be used as it inherits this and implements Automation and Functions
 contract ParentPeer is YieldPeer {
     /*//////////////////////////////////////////////////////////////
+                                 ERRORS
+    //////////////////////////////////////////////////////////////*/
+    error ParentPeer__OnlyParentRebalancer();
+
+    /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
     /// @dev Constant for the USDC decimals
@@ -20,6 +25,9 @@ contract ParentPeer is YieldPeer {
     uint256 internal constant SHARE_DECIMALS = 1e18;
     /// @dev Constant for the initial share precision used to calculate the mint amount for first deposit
     uint256 internal constant INITIAL_SHARE_PRECISION = SHARE_DECIMALS / USDC_DECIMALS;
+
+    /// @dev This address handles automated CCIP rebalance calls because CLF runs out of gas
+    address internal s_parentRebalancer;
 
     /// @dev total SHAREs minted across all chains
     // @invariant s_totalShares == ghost_totalSharesMinted - ghost_totalSharesBurned
@@ -33,7 +41,7 @@ contract ParentPeer is YieldPeer {
     /// @notice Emitted when the current strategy is optimal
     event CurrentStrategyOptimal(uint64 indexed chainSelector, Protocol indexed protocol);
     /// @notice Emitted when the strategy is updated
-    event StrategyUpdated(uint64 indexed chainSelector, Protocol indexed protocol);
+    event StrategyUpdated(uint64 indexed chainSelector, Protocol indexed protocol, uint64 indexed oldChainSelector);
     /// @notice Emitted when the amount of shares minted is updated
     event ShareMintUpdate(uint256 indexed shareMintAmount, uint64 indexed chainSelector, uint256 indexed totalShares);
     /// @notice Emitted when the amount of shares burned is updated
@@ -339,7 +347,7 @@ contract ParentPeer is YieldPeer {
             return false;
         }
         s_strategy = newStrategy;
-        emit StrategyUpdated(newStrategy.chainSelector, newStrategy.protocol);
+        emit StrategyUpdated(newStrategy.chainSelector, newStrategy.protocol, oldStrategy.chainSelector);
         return true;
     }
 
@@ -366,7 +374,17 @@ contract ParentPeer is YieldPeer {
             abi.encode(newStrategy),
             i_usdc.balanceOf(address(this))
         );
+        // emit CLFCompleted();
     }
+
+    // /// @notice TEST FUNCTION. address(this) needs to be funded with usdc to work.
+    // function ccipSend(uint64 dstChainSelector, CcipTxType txType, uint256 amount) external {
+    //     Strategy memory newStrategy = Strategy({chainSelector: dstChainSelector, protocol: Protocol.Aave});
+    //     bytes memory encodedNewStrategy = abi.encode(newStrategy);
+    //     _ccipSend(dstChainSelector, txType, encodedNewStrategy, amount);
+    // }
+
+    // event CLFCompleted();
 
     /// @notice Handles rebalancing when strategy is on a different chain
     /// @param oldStrategy The current strategy
@@ -375,6 +393,17 @@ contract ParentPeer is YieldPeer {
         _ccipSend(
             oldStrategy.chainSelector, CcipTxType.RebalanceOldStrategy, abi.encode(newStrategy), ZERO_BRIDGE_AMOUNT
         );
+    }
+
+    function rebalanceNewStrategy(Strategy memory newStrategy) external {
+        _revertIfMsgSenderIsNotParentRebalancer();
+        _handleStrategyMoveToNewChain(newStrategy);
+    }
+
+    function rebalanceOldStrategy(uint64 oldChainSelector, Strategy memory newStrategy) external {
+        _revertIfMsgSenderIsNotParentRebalancer();
+        Strategy memory oldStrategy = Strategy({chainSelector: oldChainSelector, protocol: Protocol.Aave});
+        _handleRebalanceFromDifferentChain(oldStrategy, newStrategy);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -389,6 +418,14 @@ contract ParentPeer is YieldPeer {
         // @review if totalShares isn't 0, then totalValue shouldn't be either.
         if (totalShares == 0 || totalValue == 0) shareMintAmount = amount * INITIAL_SHARE_PRECISION;
         else shareMintAmount = (amount * totalShares) / totalValue;
+    }
+
+    function _revertIfMsgSenderIsNotParentRebalancer() internal view {
+        if (msg.sender != s_parentRebalancer) revert ParentPeer__OnlyParentRebalancer();
+    }
+
+    function setParentRebalancer(address parentRebalancer) external onlyOwner {
+        s_parentRebalancer = parentRebalancer;
     }
 
     /*//////////////////////////////////////////////////////////////

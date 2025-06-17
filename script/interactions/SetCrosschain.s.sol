@@ -10,7 +10,7 @@ import {TokenPool} from "@chainlink/contracts/src/v0.8/ccip/pools/TokenPool.sol"
 import {RateLimiter} from "@chainlink/contracts/src/v0.8/ccip/libraries/RateLimiter.sol";
 
 contract SetCrosschain is Script {
-    uint256 public constant INITIAL_CCIP_GAS_LIMIT = 1_000_000;
+    uint256 public constant INITIAL_CCIP_GAS_LIMIT = 3_000_000;
 
     function run() public {
         HelperConfig config = new HelperConfig();

@@ -19,6 +19,8 @@ import {CCIPOperations} from "../libraries/CCIPOperations.sol";
 /// @author @contractlevel
 /// @notice YieldPeer is the base contract for the Parent and Child Peers in the Contract Level Yield system
 abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYieldPeer {
+    // @review use SafeERC20
+
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
@@ -165,7 +167,28 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         override
         onlyAllowed(message.sourceChainSelector, abi.decode(message.sender, (address)))
     {
-        (CcipTxType txType, bytes memory data) = abi.decode(message.data, (CcipTxType, bytes));
+        // (CcipTxType txType, bytes memory data) = abi.decode(message.data, (CcipTxType, bytes));
+        // emit CCIPMessageReceived(message.messageId, txType, message.sourceChainSelector);
+
+        // _handleCCIPMessage(txType, message.destTokenAmounts, data);
+
+        try this.processMessage(message) {
+            // Intentionally empty in this example; no action needed if processMessage succeeds
+        } catch (bytes memory err) {
+            emit MessageFailed(message.messageId, err);
+            return;
+        }
+    }
+
+    event MessageFailed(bytes32 indexed messageId, bytes err);
+
+    error OnlySelf();
+
+    function processMessage(Client.Any2EVMMessage calldata message) external {
+        if (msg.sender != address(this)) revert OnlySelf();
+        // (CcipTxType txType, bytes memory data) = abi.decode(message.data, (CcipTxType, bytes));
+        (uint8 txTypeEnum, bytes memory data) = abi.decode(message.data, (uint8, bytes));
+        CcipTxType txType = CcipTxType(txTypeEnum);
         emit CCIPMessageReceived(message.messageId, txType, message.sourceChainSelector);
 
         _handleCCIPMessage(txType, message.destTokenAmounts, data);
