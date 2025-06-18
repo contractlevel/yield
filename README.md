@@ -14,11 +14,19 @@ Whatever the highest yield is for stablecoins across chains is what users can ea
     - [ParentPeer](#parentpeer)
   - [DefiLlama Proxy API](#defillama-proxy-api)
   - [Testing](#testing)
+    - [Unit Tests](#unit-tests)
+    - [Invariant Tests](#invariant-tests)
+    - [Other Tests](#other-tests)
   - [Formal Verification](#formal-verification)
+  - [Testnet Deployments](#testnet-deployments)
+    - [Eth Sepolia](#eth-sepolia)
+    - [Base Sepolia](#base-sepolia)
+    - [Avalanche Fuji](#avalanche-fuji)
   - [Testnet Transactions](#testnet-transactions)
     - [Rebalance](#rebalance)
-    - [Deposit tx from avalanche (chain c) → parent (eth) → strategy (base)](#deposit-tx-from-avalanche-chain-c--parent-eth--strategy-base)
+    - [Deposit tx from chain c (avalanche) → parent (eth) → strategy (base)](#deposit-tx-from-chain-c-avalanche--parent-eth--strategy-base)
     - [Withdraw tx from chain c (avalanche) → parent (eth) → strategy (base)](#withdraw-tx-from-chain-c-avalanche--parent-eth--strategy-base)
+    - [YieldCoin Bridge tx (eth -\> aval)](#yieldcoin-bridge-tx-eth---aval)
   - [Future Developments](#future-developments)
 
 ## Overview
@@ -77,6 +85,8 @@ foundryup
 forge install
 ```
 
+### Unit Tests
+
 The unit tests fork three mainnets, and as such require `RPC_URL`s in a `.env`.
 
 ```
@@ -85,13 +95,21 @@ OPTIMISM_MAINNET_RPC_URL=<your_rpc_url_here>
 BASE_MAINNET_RPC_URL=<your_rpc_url_here>
 ```
 
-The unit tests use a [fork of chainlink-local](https://github.com/contractlevel/chainlink-local). GO INTO MORE DETAIL ABOUT CHAINLINK LOCAL FORK HERE
+The unit tests use a [fork of chainlink-local](https://github.com/contractlevel/chainlink-local). Since the unit tests are performed on forked mainnets, additional functionality was required from chainlink-local in order to facilitate USDC transfers. USDC transfers on CCIP integrate [Circle's CCTP](https://www.circle.com/cross-chain-transfer-protocol), which comes with additional checks that weren't included in the original chainlink-local. The CCTP architecture requires USDC transfer messages to be "validated by attesters". These messages need to be in a [specific format](https://github.com/circlefin/evm-cctp-contracts/blob/6e7513cdb2bee6bb0cddf331fe972600fc5017c9/src/MessageTransmitter.sol#L228-L247) and the attester's signatures need to be in a [specific order](https://github.com/circlefin/evm-cctp-contracts/blob/6e7513cdb2bee6bb0cddf331fe972600fc5017c9/src/MessageTransmitter.sol#L246-L247).
 
-For the unit tests for the Contract Level Yield contracts, run:
+To achieve this, the changes were made to the [CCIPLocalSimulatorFork](https://github.com/contractlevel/chainlink-local/blob/main/src/ccip/CCIPLocalSimulatorFork.sol). A new function, [switchChainAndRouteMessageWithUSDC](https://github.com/contractlevel/chainlink-local/blob/519e854caaf1291c03bda3928674c922195fd629/src/ccip/CCIPLocalSimulatorFork.sol#L126-L155) was added, which is based on the original `switchChainAndRouteMessage`, except it also listens for CCTP's `MessageSent` event, and takes two arrays of attester addresses, and their private keys - values that can be easily simulated with [Foundry's makeAddrAndKey](https://getfoundry.sh/reference/forge-std/make-addr-and-key/).
+
+The `offchainTokenData` array passed to the offRamp needed to contain the USDCTokenPool's `MessageAndAttestation` struct, which contains the message retrieved from the `MessageSent` event and the `attestation` created with the attester's and their private keys. To achieve this, another function was added, [\_createOffchainTokenData](https://github.com/contractlevel/chainlink-local/blob/519e854caaf1291c03bda3928674c922195fd629/src/ccip/CCIPLocalSimulatorFork.sol#L181-L238).
+
+The unit tests for the Contract Level Yield contracts can be run with:
 
 ```
 forge test --mt test_yield
 ```
+
+### Invariant Tests
+
+DISCUSS https://github.com/contractlevel/chainlink-local/commit/f56369e24807796e6bd636970d145bb6394a33f6 CHAINLINK-LOCAL FORK HERE
 
 The invariant test suite also uses the fork of chainlink-local, and can be run with:
 
@@ -99,7 +117,9 @@ The invariant test suite also uses the fork of chainlink-local, and can be run w
 forge test --mt invariant
 ```
 
-For the full Foundry test suite (which includes tests for mock contracts), run:
+### Other Tests
+
+For the full Foundry test suite (which includes tests for mock contracts and scripts), run:
 
 ```
 forge test
@@ -141,27 +161,55 @@ certoraRun ./certora/conf/parent/ParentCLF.conf --nondet_difficult_funcs
 
 The `--nondet_difficult_funcs` flag is required for `ParentCLF` to [automatically summarize functions](https://docs.certora.com/en/latest/docs/prover/cli/options.html#nondet-difficult-funcs) in the `FunctionsRequest` library because otherwise the Certora Prover will timeout. The Certora Prover explores all possible paths and the `FunctionsRequest::encodeCBOR` includes an extremely high path count, making it difficult to verify.
 
+## Testnet Deployments
+
+### Eth Sepolia
+
+ParentRebalancer: https://sepolia.etherscan.io/address/0x107C9A78c447c99289B84476f53620236114AbAa#code
+
+ParentCLF: https://sepolia.etherscan.io/address/0xBE679979Eaec355d1030d6f117Ce5B4b5388318E#code
+
+YieldCoin/share token: https://sepolia.etherscan.io/address/0x37D13c62D2FDe4A400e2018f2fA0e3da6b15718D#code
+
+SharePool (YieldCoin CCIP pool): https://sepolia.etherscan.io/address/0x9CF6491ace3FDD614FB8209ec98dcF98b1e70e4D#code
+
+### Base Sepolia
+
+Child: https://sepolia.basescan.org/address/0x94563Bfe55D8Df522FE94e7D60D2D949ef21BF1c#code
+
+YieldCoin/share token: https://sepolia.basescan.org/address/0x2DF8c615858B479cBC3Bfef3bBfE34842d7AaA90#code
+
+SharePool (YieldCoin CCIP pool): https://sepolia.basescan.org/address/0xEF13904800eFA60BB1ea5f70645Fc55609F00320#code
+
+### Avalanche Fuji
+
+Child: https://testnet.snowtrace.io/address/0xc19688E191dEB933B99cc78D94c227784c8062F9/contract/43113/code
+
+YieldCoin/share token: https://testnet.snowtrace.io/address/0x2891C37D5104446d10dc29eA06c25C6f0cA233Ec/contract/43113/code
+
+SharePool (YieldCoin CCIP pool): https://testnet.snowtrace.io/address/0x9bf12E915461A48bc61ddca5f295A0E20BBBa5D7/contract/43113/code
+
 ## Testnet Transactions
 
 ### Rebalance
 
-time based auto worked https://sepolia.etherscan.io/tx/0xc8159327d9c76b118c2caa10c9db513cc38c2c7a00e3c2f026df12d2b5e6190a
+time based auto triggers CLF https://sepolia.etherscan.io/tx/0xc8159327d9c76b118c2caa10c9db513cc38c2c7a00e3c2f026df12d2b5e6190a
 
-clf request worked https://sepolia.etherscan.io/tx/0x2521aea1c73c8ace2b5630b74c60857788944479e8dcd8a7a8362a74f8970a8b
+clf request callback https://sepolia.etherscan.io/tx/0x2521aea1c73c8ace2b5630b74c60857788944479e8dcd8a7a8362a74f8970a8b
 
-log trigger auto worked https://sepolia.etherscan.io/tx/0x1099dbd2cd04403635b820cd17508aa7c56929bc99187b39a543a7b36cd50e4d
+log trigger auto https://sepolia.etherscan.io/tx/0x1099dbd2cd04403635b820cd17508aa7c56929bc99187b39a543a7b36cd50e4d
 
 ccip rebalance https://ccip.chain.link/#/side-drawer/msg/0xb01894363f416f83171ee994cd043eacf4cc487bc2d8a589229d02c2649ed10b
 
 dst tx: https://sepolia.basescan.org/tx/0x35f97388d654b63d80f4d9b88eab11fb4ee16a909862dd19338c8a758565a70c
 
-### Deposit tx from avalanche (chain c) → parent (eth) → strategy (base)
+### Deposit tx from chain c (avalanche) → parent (eth) → strategy (base)
 
 deposit tx: https://testnet.snowtrace.io/tx/0x68b8118e9e9115e8f8956cc05edc06d8fe281f0955a762c830d98a7f87230a06?chainid=43113
 
 deposit to parent: https://ccip.chain.link/#/side-drawer/msg/0x2a996da193b64a4c4c719921655e5fe57d8292914a48572cfafec02c5349bfc7
 
-dst tx: [https://sepolia.etherscan.io/tx/0x6685ae8f7c883ab2f83ea43afe838f51b1b8270eab16ebb26cc1782012766fc4](https://ccip.chain.link/tx/0x6685ae8f7c883ab2f83ea43afe838f51b1b8270eab16ebb26cc1782012766fc4)
+dst tx: https://sepolia.etherscan.io/tx/0x6685ae8f7c883ab2f83ea43afe838f51b1b8270eab16ebb26cc1782012766fc4
 
 deposit to parent and deposit to strategy: https://ccip.chain.link/tx/0x6685ae8f7c883ab2f83ea43afe838f51b1b8270eab16ebb26cc1782012766fc4
 
@@ -192,6 +240,10 @@ withdraw from strategy: https://sepolia.basescan.org/tx/0x67271c1cf24250bb942c4e
 withdraw callback: https://ccip.chain.link/tx/0x67271c1cf24250bb942c4e3bc3179ecda9b5bdaa46bda7671a3b4b9415953f70#/side-drawer/msg/0x1e5b3ddf52d453d81d4e1c0ec3c0532c90de025391a7f10b483f3c1083b497a0
 
 withdraw success: https://testnet.snowtrace.io/tx/0xbf9a7952bfda2561dcc92e07fe0ca58fd50bc2e88f2920fc9f22a0e96f394162
+
+### YieldCoin Bridge tx (eth -> aval)
+
+ccip: https://ccip.chain.link/tx/0xd0c3e338c66bad81412c92ad7b76681b977464fa85350201b9830bfaf5250956#/side-drawer/msg/0x7f91c48fe14b5d9c6f472afa45551be29d4ff930e51711c99c8e61a980f0ed58
 
 ## Future Developments
 
