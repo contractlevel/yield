@@ -20,8 +20,18 @@ contract ParentRebalancer is AutomationBase, ILogAutomation, Ownable2Step {
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
+    /// @dev Chainlink Automation forwarder
     address internal s_forwarder;
+    /// @dev ParentPeer contract address
     address internal s_parentPeer;
+
+    /*//////////////////////////////////////////////////////////////
+                                 EVENTS
+    //////////////////////////////////////////////////////////////*/
+    /// @notice Emitted when the Chainlink Automation forwarder is set
+    event ForwarderSet(address indexed forwarder);
+    /// @notice Emitted when the ParentPeer contract address is set
+    event ParentPeerSet(address indexed parentPeer);
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -31,9 +41,16 @@ contract ParentRebalancer is AutomationBase, ILogAutomation, Ownable2Step {
     /*//////////////////////////////////////////////////////////////
                                 EXTERNAL
     //////////////////////////////////////////////////////////////*/
+    /// @notice Simulated offchain by Chainlink Automation nodes
+    /// @notice Checks if the log is a StrategyUpdated event from the ParentPeer
+    /// @notice If the emitted log is a StrategyUpdated event from ParentPeer, returns the performData to be used by the performUpkeep function
+    /// @param log The log emitted by the ParentPeer
+    /// @return upkeepNeeded Whether performUpkeep should be called by the Chainlink Automation forwarder
+    /// @return performData The performData to be used by the performUpkeep function
     function checkLog(Log calldata log, bytes memory)
         external
         view
+        cannotExecute
         returns (bool upkeepNeeded, bytes memory performData)
     {
         bytes32 eventSignature = keccak256("StrategyUpdated(uint64,uint8,uint64)");
@@ -73,6 +90,10 @@ contract ParentRebalancer is AutomationBase, ILogAutomation, Ownable2Step {
         }
     }
 
+    /// @notice Called by the Chainlink Automation forwarder
+    /// @notice Triggers CCIP rebalance messages from the ParentPeer
+    /// @dev Revert if caller is not the Chainlink Automation forwarder
+    /// @param performData The performData returned by the checkLog function
     function performUpkeep(bytes calldata performData) external {
         (
             address forwarder,
@@ -98,11 +119,17 @@ contract ParentRebalancer is AutomationBase, ILogAutomation, Ownable2Step {
     /*//////////////////////////////////////////////////////////////
                                  SETTER
     //////////////////////////////////////////////////////////////*/
+    /// @notice Sets the Chainlink Automation forwarder
+    /// @param forwarder The address of the Chainlink Automation forwarder
     function setForwarder(address forwarder) external onlyOwner {
         s_forwarder = forwarder;
+        emit ForwarderSet(forwarder);
     }
 
+    /// @notice Sets the ParentPeer contract address
+    /// @param parentPeer The address of the ParentPeer contract
     function setParentPeer(address parentPeer) external onlyOwner {
         s_parentPeer = parentPeer;
+        emit ParentPeerSet(parentPeer);
     }
 }

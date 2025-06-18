@@ -12,6 +12,7 @@ Whatever the highest yield is for stablecoins across chains is what users can ea
   - [YieldCoin](#yieldcoin)
   - [Architecture](#architecture)
     - [ParentPeer](#parentpeer)
+    - [ChildPeer](#childpeer)
   - [DefiLlama Proxy API](#defillama-proxy-api)
   - [Testing](#testing)
     - [Unit Tests](#unit-tests)
@@ -41,7 +42,7 @@ key invariant: a user must be able to withdraw the usdc amount they deposited - 
 
 ## YieldCoin
 
-YieldCoin follows the [ERC677](https://github.com/ethereum/EIPs/issues/677) and [CCT](https://docs.chain.link/ccip/concepts/cross-chain-token) standards for maximum efficiency and interoperability. The YieldCoin CCIP pools are permissionless, allowing holders to move freely across chains. `ERC677.transferAndCall()` enables holders to withdraw USDC in a single tx, without having to approve the CLY infrastructure to transfer their YIELD first.
+YieldCoin follows the [ERC677](https://github.com/ethereum/EIPs/issues/677) and [CCT](https://docs.chain.link/ccip/concepts/cross-chain-token) standards for maximum efficiency and interoperability. The YieldCoin CCIP pools are permissionless, allowing holders to move freely across chains. `ERC677.transferAndCall()` enables holders to withdraw USDC in a single tx, without having to approve the CLY infrastructure to transfer their YIELD first. See [./src/token/Share.sol](https://github.com/contractlevel/yield/blob/main/src/token/Share.sol).
 
 The more fees CLY generates, ie the more YieldCoin is bought, the more frequent the checks for the highest APY can become, as Chainlink fees are covered.
 
@@ -66,6 +67,8 @@ The `ParentPeer` tracks system wide state for Contract Level Yield, specifically
 The `ParentPeer` contract is extended with the `ParentCLF` contract - see [./src/peers/extensions/ParentCLF.sol](https://github.com/contractlevel/yield/blob/main/src/peers/extensions/ParentCLF.sol). `ParentCLF` inherits `ParentPeer` and implements Chainlink Functions functionality. As such, `ParentCLF` is the single `ParentPeer` instantiation deployed in the system. `ParentCLF` also implements functionality to make it compatible with Chainlink Automation.
 
 `ParentRebalancer` - see [./src/modules/ParentRebalancer.sol](https://github.com/contractlevel/yield/blob/main/src/modules/ParentRebalancer.sol) - is deployed on the same chain as `ParentCLF`. The `ParentRebalancer` contract provides supplementary log trigger automation functionality to `ParentCLF`, as the `ParentCLF` contract is unfortunately too big to contain it all itself.
+
+### ChildPeer
 
 ## DefiLlama Proxy API
 
