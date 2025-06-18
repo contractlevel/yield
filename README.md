@@ -4,6 +4,8 @@ This project is being built for the Chainlink Chromion Hackathon, and is an auto
 
 Whatever the highest yield is for stablecoins across chains is what users can earn in one click with Contract Level Yield.
 
+A live demo site with Ethereum, Base and Avalanche testnets is available at [contractlevel.com](https://contractlevel.com).
+
 ## Table of Contents
 
 - [YieldCoin aka Contract Level Yield (CLY)](#yieldcoin-aka-contract-level-yield-cly)
@@ -13,18 +15,39 @@ Whatever the highest yield is for stablecoins across chains is what users can ea
   - [Architecture](#architecture)
     - [ParentPeer](#parentpeer)
     - [ChildPeer](#childpeer)
-  - [DefiLlama Proxy API](#defillama-proxy-api)
+  - [Chainlink Integrations](#chainlink-integrations)
+    - [Chainlink Automation](#chainlink-automation)
+      - [Time-Based](#time-based)
+      - [Log-Trigger](#log-trigger)
+    - [Chainlink Functions](#chainlink-functions)
+      - [DefiLlama Proxy API](#defillama-proxy-api)
+    - [CCIP](#ccip)
+  - [Transaction Flows](#transaction-flows)
+    - [Rebalance](#rebalance)
+    - [Deposit](#deposit)
+      - [Deposit on Parent when Parent is Strategy](#deposit-on-parent-when-parent-is-strategy)
+      - [Deposit on Parent when Child is Strategy](#deposit-on-parent-when-child-is-strategy)
+      - [Deposit on Child when Parent is Strategy](#deposit-on-child-when-parent-is-strategy)
+      - [Deposit on Child when Local Child is Strategy](#deposit-on-child-when-local-child-is-strategy)
+      - [Deposit on Child when Remote Child is Strategy](#deposit-on-child-when-remote-child-is-strategy)
+    - [Withdraw](#withdraw)
+      - [Withdraw on Parent when Parent is Strategy](#withdraw-on-parent-when-parent-is-strategy)
+      - [Withdraw on Parent when Child is Strategy](#withdraw-on-parent-when-child-is-strategy)
+      - [Withdraw on Child when Parent is Strategy](#withdraw-on-child-when-parent-is-strategy)
+      - [Withdraw on Child when Local Child is Strategy](#withdraw-on-child-when-local-child-is-strategy)
+      - [Withdraw on Child when Remote Child is Strategy](#withdraw-on-child-when-remote-child-is-strategy)
   - [Testing](#testing)
     - [Unit Tests](#unit-tests)
     - [Invariant Tests](#invariant-tests)
     - [Other Tests](#other-tests)
   - [Formal Verification](#formal-verification)
+  - [Known Issues](#known-issues)
   - [Testnet Deployments](#testnet-deployments)
     - [Eth Sepolia](#eth-sepolia)
     - [Base Sepolia](#base-sepolia)
     - [Avalanche Fuji](#avalanche-fuji)
   - [Testnet Transactions](#testnet-transactions)
-    - [Rebalance](#rebalance)
+    - [Rebalance](#rebalance-1)
     - [Deposit tx from chain c (avalanche) → parent (eth) → strategy (base)](#deposit-tx-from-chain-c-avalanche--parent-eth--strategy-base)
     - [Withdraw tx from chain c (avalanche) → parent (eth) → strategy (base)](#withdraw-tx-from-chain-c-avalanche--parent-eth--strategy-base)
     - [YieldCoin Bridge tx (eth -\> aval)](#yieldcoin-bridge-tx-eth---aval)
@@ -39,6 +62,8 @@ Whatever the highest yield is for stablecoins across chains is what users can ea
 Stablecoin depositors receive a share token in return for their deposits, representing their share of the total value (deposits + yield) in the system. Depositing a stablecoin can also be considered buying YieldCoin. YieldCoin is the share received for depositing into the system, with the basic idea being that a holder will be able to sell (their YieldCoin) for a higher USD value than they bought it. This is because the stablecoin deposits will not go down in value, and reliable yield will be generated. Hence the name YieldCoin.
 
 key invariant: a user must be able to withdraw the usdc amount they deposited - fees. this is definitely broken by the precision loss bug we already know
+
+The protocol and chain with the highest APY where the system funds are allocated is known as the `Strategy`.
 
 ## YieldCoin
 
@@ -70,7 +95,19 @@ The `ParentPeer` contract is extended with the `ParentCLF` contract - see [./src
 
 ### ChildPeer
 
-## DefiLlama Proxy API
+## Chainlink Integrations
+
+Chainlink services provide essential functionality to the Contract Level Yield system (obviously). Automation, Functions and CCIP are combined to automated rebalances, and CCIP is used where applicable in stablecoin deposits and withdraws.
+
+### Chainlink Automation
+
+#### Time-Based
+
+#### Log-Trigger
+
+### Chainlink Functions
+
+#### DefiLlama Proxy API
 
 ```
 cd functions/defillama-proxy
@@ -78,6 +115,46 @@ npm i
 ```
 
 The `function.zip` file located in `functions/defillama-proxy` has been uploaded to AWS Lambda and deployed. This was needed because we are using the DefiLlama API to fetch data about APYs, but the payload response was too large for Chainlink Functions, so we filter on the server side via our proxy API.
+
+### CCIP
+
+## Transaction Flows
+
+### Rebalance
+
+![Rebalance Flow](./diagrams/rebalance.jpg)
+
+### Deposit
+
+#### Deposit on Parent when Parent is Strategy
+
+#### Deposit on Parent when Child is Strategy
+
+#### Deposit on Child when Parent is Strategy
+
+#### Deposit on Child when Local Child is Strategy
+
+#### Deposit on Child when Remote Child is Strategy
+
+### Withdraw
+
+Withdrawals are executed using the YieldCoin/share token's `ERC677::transferAndCall()`, which checks if the receiving address has implemented `IERC677Receiver::onTokenTransfer()`, which the `YieldPeer`, `ParentPeer`, and `ChildPeer` contracts have.
+
+See [Parent Withdraw](https://github.com/contractlevel/yield/blob/b9f9ae814852bf2744fbede6ca4fda29d69ef7e3/src/peers/ParentPeer.sol#L119-L180) and [Child Withdraw](https://github.com/contractlevel/yield/blob/b9f9ae814852bf2744fbede6ca4fda29d69ef7e3/src/peers/ChildPeer.sol#L75-L95).
+
+The chain to receive the withdrawn USDC on can be different to the chain the withdrawal was initiated on, by passing an encoded chain selector as the `data` param in `transferAndCall()`. The tx will revert if the data does not decode to an allowed chain. If the data is left empty, the USDC will be withdrawn to the chain the withdrawal tx was initiated on.
+
+Similar to deposits, the system will handle withdrawals depending on the chain of initiation and location of the current strategy.
+
+#### Withdraw on Parent when Parent is Strategy
+
+#### Withdraw on Parent when Child is Strategy
+
+#### Withdraw on Child when Parent is Strategy
+
+#### Withdraw on Child when Local Child is Strategy
+
+#### Withdraw on Child when Remote Child is Strategy
 
 ## Testing
 
@@ -163,6 +240,8 @@ certoraRun ./certora/conf/parent/ParentCLF.conf --nondet_difficult_funcs
 ```
 
 The `--nondet_difficult_funcs` flag is required for `ParentCLF` to [automatically summarize functions](https://docs.certora.com/en/latest/docs/prover/cli/options.html#nondet-difficult-funcs) in the `FunctionsRequest` library because otherwise the Certora Prover will timeout. The Certora Prover explores all possible paths and the `FunctionsRequest::encodeCBOR` includes an extremely high path count, making it difficult to verify.
+
+## Known Issues
 
 ## Testnet Deployments
 
