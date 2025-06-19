@@ -95,7 +95,8 @@ contract Invariant is StdInvariant, BaseTest {
             networkConfig.tokens.share,
             networkConfig.clf.functionsRouter,
             networkConfig.clf.donId, // 0x0
-            networkConfig.clf.clfSubId // 0
+            networkConfig.clf.clfSubId, // 0
+            networkConfig.peers.parentRebalancer
         );
         parent.setUpkeepAddress(upkeep);
         /// @dev deploy at least 2 child peers to cover all CCIP tx types

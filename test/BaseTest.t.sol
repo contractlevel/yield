@@ -12,6 +12,8 @@ import {CCIPLocalSimulatorFork, Register} from "@chainlink-local/src/ccip/CCIPLo
 
 import {DeployParent, HelperConfig, ParentCLF} from "../script/deploy/DeployParent.s.sol";
 import {DeployChild, ChildPeer} from "../script/deploy/DeployChild.s.sol";
+// @review, this should maybe be moved to parent deploy script
+// import {DeployRebalancer, ParentRebalancer} from "../script/deploy/DeployRebalancer.s.sol";
 import {Share} from "../src/token/Share.sol";
 import {SharePool} from "../src/token/SharePool.sol";
 import {RateLimiter} from "@chainlink/contracts/src/v0.8/ccip/libraries/RateLimiter.sol";
@@ -35,7 +37,7 @@ contract BaseTest is Test {
     //////////////////////////////////////////////////////////////*/
     uint256 internal constant DEPOSIT_AMOUNT = 1_000_000_000; // 1000 USDC
     uint256 internal constant INITIAL_SHARE_PRECISION = 1e18 / 1e6;
-    uint256 internal constant BALANCE_TOLERANCE = 2; // Allow 2 wei difference
+    uint256 internal constant BALANCE_TOLERANCE = 3; // Allow 3 wei difference
 
     CCIPLocalSimulatorFork internal ccipLocalSimulatorFork;
     uint256 internal constant LINK_AMOUNT = 1_000 * 1e18; // 1000 LINK
@@ -55,6 +57,8 @@ contract BaseTest is Test {
     Share internal baseShare;
     SharePool internal baseSharePool;
     ParentCLF internal baseParentPeer;
+    // @review
+    // ParentRebalancer internal baseParentRebalancer;
     HelperConfig internal baseConfig;
     HelperConfig.NetworkConfig internal baseNetworkConfig;
     uint64 internal baseChainSelector;

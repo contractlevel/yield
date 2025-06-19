@@ -6,8 +6,6 @@ Whatever the highest yield is for stablecoins across chains is what users can ea
 
 A live demo site with Ethereum, Base and Avalanche testnets is available at [contractlevel.com](https://contractlevel.com).
 
-“one click highest yield”
-
 ## Table of Contents
 
 - [YieldCoin aka Contract Level Yield (CLY)](#yieldcoin-aka-contract-level-yield-cly)
@@ -78,7 +76,7 @@ A live demo site with Ethereum, Base and Avalanche testnets is available at [con
 
 Stablecoin depositors receive a share token in return for their deposits, representing their share of the total value (deposits + yield) in the system. Depositing a stablecoin can also be considered "buying" YieldCoin. YieldCoin is the share received for depositing into the system, with the basic idea being that a holder will be able to "sell" (their YieldCoin) for a higher USD value than they bought it. This is because the stablecoin deposits will not go down in value, and reliable yield will be generated. Hence the name YieldCoin.
 
-key invariant: a user must be able to withdraw the usdc amount they deposited - fees. this is definitely broken by the precision loss bug we already know
+key invariant: a user must be able to withdraw the usdc amount they deposited - fees. this is definitely broken by the precision loss bug we already know // @review
 
 The protocol and chain with the highest APY, where the system funds are allocated is known as the `Strategy`.
 
@@ -307,7 +305,35 @@ _Note: These withdrawal diagrams assume the chain to withdraw to is the one the 
 
 ## Deploying
 
-MENTION DEPLOY SCRIPT, HELPER CONFIG AND SETCROSSCHAIN SCRIPT
+`ParentRebalancer` should be deployed first on the Parent chain.
+
+```
+forge script script/deploy/DeployRebalancer.s.sol --broadcast --account <YOUR_FOUNDRY_KEYSTORE> --rpc-url <PARENT_CHAIN_RPC_URL>
+```
+
+The `ParentRebalancer` address returned from running that script should be added to `NetworkConfig.peers.parentRebalancer` for the Parent chain in the [`HelperConfig`](https://github.com/contractlevel/yield/blob/main/script/HelperConfig.s.sol).
+
+Next deploy the `ParentPeer` (`ParentCLF`). This script will also deploy the YieldCoin `Share` and `SharePool` contracts, as well as call the necessary functions to make the pool permissionless and integrate it with CCIP. It also grants mint and burn roles for YieldCoin to the `ParentPeer` and CCIP pool.
+
+```
+forge script script/deploy/DeployParent.s.sol --broadcast --account <YOUR_FOUNDRY_KEYSTORE> --rpc-url <PARENT_CHAIN_RPC_URL>
+```
+
+The `ParentCLF`, `Share`, and `SharePool` addresses returned from running that script should be added to `NetworkConfig.peers` for both the Parent chain and any child chains.
+
+Next deploy the `ChildPeer` and its YieldCoin `Share` and `SharePool` contracts. This will also perform the necessary actions to enable permissionless CCIP pool functionality and grant appropriate mint and burn roles for `YieldCoin`. This script should be run for every child chain.
+
+```
+forge script script/deploy/DeployChild.s.sol --broadcast --account <YOUR_FOUNDRY_KEYSTORE> --rpc-url <CHILD_CHAIN_RPC_URL>
+```
+
+For every deployed Child, take the `ChildPeer`, `Share`, and `SharePool` addresses and add them to the `NetworkConfig.peer` for all applicable chains, including the Parent.
+
+Finally run the [`SetCrosschain`](https://github.com/contractlevel/yield/blob/main/script/interactions/SetCrosschain.s.sol) script for every chain. This will set the allowed chain selectors and peers for each chain, as well as enable the CCIP pools to work with each other.
+
+```
+forge script script/interactions/SetCrosschain.s.sol --broadcast --account <YOUR_FOUNDRY_KEYSTORE> --rpc-url <CHAIN_RPC_URL>
+```
 
 ### LINK Token Funding
 
@@ -351,15 +377,19 @@ forge test --mt test_yield
 
 ### Invariant Tests
 
-DISCUSS https://github.com/contractlevel/chainlink-local/commit/f56369e24807796e6bd636970d145bb6394a33f6 CHAINLINK-LOCAL FORK HERE
+The invariant test suite also uses the fork of chainlink-local.
 
-The invariant test suite also uses the fork of chainlink-local, and can be run with:
+Given the nature of invariant fuzz runs, the invariant tests do not use the `CCIPLocalSimulatorFork` or forked mainnets, as the rpc calls would've been too excessive. These tests deploy the infrastructure locally and use chainlink-local's `CCIPLocalSimulator`. However the [`MockRouter`](https://github.com/contractlevel/chainlink-local/blob/main/test/mocks/MockRouter.sol) used needed to be forked, to enable [dynamic source chain selectors](https://github.com/contractlevel/chainlink-local/blob/519e854caaf1291c03bda3928674c922195fd629/test/mocks/MockRouter.sol#L117), otherwise the system wouldn't work because the security and functionality of the crosschain communication hinges on the validation of allowed chain selectors and peer contracts.
+
+A gas check has been [bypassed](https://github.com/contractlevel/chainlink-local/blob/519e854caaf1291c03bda3928674c922195fd629/test/mocks/MockRouter.sol#L227-L230) in these tests because no matter what value was set for the CCIP gas limit, one of the fuzz runs would eventually fail with either `Not enough gas` or `Out of gas`. These mocked gas checks were not critical to the functionality that required testing, particularly when forked mainnets with non-mocked gas checks were already confirmed to be working, so instead of spending additional time on this detail, it was bypassed altogether.
+
+The invariant tests can be run with:
 
 ```
 forge test --mt invariant
 ```
 
-DISCUSS INVARIANT RUNS AND FOUNDRY.TOML SETTINGS
+Invariant runs are set to 3000 and fail on revert is true.
 
 ### Other Tests
 

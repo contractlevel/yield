@@ -25,9 +25,9 @@ contract DeployParent is Script {
         vm.startBroadcast();
         // Unit tests:
         // @review: move this to unit test
-        // uint64 clfSubId = IFunctionsSubscriptions(networkConfig.clf.functionsRouter).createSubscription();
+        uint64 clfSubId = IFunctionsSubscriptions(networkConfig.clf.functionsRouter).createSubscription();
         // Deployment:
-        uint64 clfSubId = networkConfig.clf.clfSubId;
+        // uint64 clfSubId = networkConfig.clf.clfSubId;
 
         Share share = new Share();
         SharePool sharePool = new SharePool(address(share), networkConfig.ccip.rmnProxy, networkConfig.ccip.ccipRouter);
