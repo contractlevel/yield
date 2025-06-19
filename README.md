@@ -94,6 +94,10 @@ The "[Strategy](https://github.com/contractlevel/yield/blob/726c449fb57a0cdb6d77
 
 "Strategy rebalancing" or simply "rebalancing" refers to the automated process of withdrawing funds from the previous strategy and depositing them into the new strategy, to earn a higher yield.
 
+The terms "current strategy" and "active strategy" are used interchangably.
+
+"Old Strategy" refers to the Strategy funds are being withdrawn from during the rebalance process, and "New Strategy" refers to the Strategy those funds are being deposited to during the rebalance.
+
 ## Contracts/Architecture
 
 The Contract Level Yield system that powers YieldCoin consists of a crosschain network of "Peer" contracts. `YieldPeer` contracts are deployed on each compatible chain, and act as entry points to the system. Currently the only supported stablecoin is `USDC` (due partially to its availability across chains with CCIP and the time constraints of the hackathon).
@@ -204,7 +208,7 @@ CCIP faciliates secure crosschain communication and value transfer for rebalance
 - **4 - WithdrawToParent**: A withdraw from a `ChildPeer` to the `ParentPeer`. This forwards the withdrawal to the active strategy and updates `s_totalShares` to reflect the amount of YieldCoin burned when initiating the withdrawal.
 - **5 - WithdrawToStrategy**: A withdraw from the `ParentPeer` to the active Strategy. This calculates the `usdcWithdrawAmount` and withdraws it from the active Strategy.
 - **6 - WithdrawCallback**: A callback from the active Strategy to the withdraw chain. This sends the withdrawn USDC to the withdrawer.
-- **7 - RebalanceOldStrategy**: A message from the `ParentPeer` to the old Strategy. This is to move funds to the new Strategy.
+- **7 - RebalanceOldStrategy**: A message from the `ParentPeer` to the old Strategy. This is to withdraw funds from the old Strategy to move to the new Strategy.
 - **8 - RebalanceNewStrategy**: A value transfer from the old Strategy to the new Strategy. This is to deposit funds into the new Strategy.
 
 ## Transaction Flows
@@ -241,15 +245,33 @@ The following diagrams show individual rebalance flows for different scenarios.
 
 ### Deposit
 
+Deposits are initiated with `YieldPeer::deposit()` and require the `YieldPeer` being used to have been approved for spending the USDC to deposit.
+
+See [Parent Deposit](https://github.com/contractlevel/yield/blob/79f6b87cebe078300ac3d084b9576023ea5f3987/src/peers/ParentPeer.sol#L89-L117) and [Child Deposit](https://github.com/contractlevel/yield/blob/79f6b87cebe078300ac3d084b9576023ea5f3987/src/peers/ChildPeer.sol#L44-L73).
+
+Deposits will be handled differently depending on the chain of initiation and the location of the current strategy.
+
+Deposits are required to include the `ParentPeer`, even if the deposit was made on the `ChildPeer` with the current strategy because the `ParentPeer`'s state must be updated to reflect the total shares/YieldCoin in the system.
+
 #### Deposit on Parent when Parent is Strategy
+
+![Deposit on Parent when Parent is Strategy](./diagrams/deposit/onParent-isParent.jpg)
 
 #### Deposit on Parent when Child is Strategy
 
+![Deposit on Parent when Child is Strategy](./diagrams/deposit/onParent-isChild.jpg)
+
 #### Deposit on Child when Parent is Strategy
+
+![Deposit on Child when Parent is Strategy](./diagrams/deposit/onChild-isParent.jpg)
 
 #### Deposit on Child when Local Child is Strategy
 
+![Deposit on Child when Local Child is Strategy](./diagrams/deposit/onChild-isLocalChild.jpg)
+
 #### Deposit on Child when Remote Child is Strategy
+
+![Deposit on Child when Remote Child is Strategy](./diagrams/deposit/onChild-isRemoteChild.jpg)
 
 ### Withdraw
 
@@ -259,7 +281,7 @@ See [Parent Withdraw](https://github.com/contractlevel/yield/blob/b9f9ae814852bf
 
 The chain to receive the withdrawn USDC on can be different to the chain the withdrawal was initiated on, by passing an encoded chain selector as the `data` param in `transferAndCall()`. The tx will revert if the data does not decode to an allowed chain. If the data is left empty, the USDC will be withdrawn to the chain the withdrawal tx was initiated on.
 
-Similar to deposits, the system will handle withdrawals depending on the chain of initiation and location of the current strategy.
+Similar to deposits, the system will handle withdrawals differently depending on the chain of initiation and location of the current strategy.
 
 #### Withdraw on Parent when Parent is Strategy
 
@@ -324,6 +346,8 @@ The invariant test suite also uses the fork of chainlink-local, and can be run w
 ```
 forge test --mt invariant
 ```
+
+DISCUSS INVARIANT RUNS AND FOUNDRY.TOML SETTINGS
 
 ### Other Tests
 
@@ -465,7 +489,7 @@ ccip: https://ccip.chain.link/tx/0xd0c3e338c66bad81412c92ad7b76681b977464fa85350
 
 ## Future Developments
 
-- more stablecoin support (swapping to one with highest yield, such as USD1, USDT, etc.)
+- more stablecoin support (swapping to one with higher yield opportunities, such as USD1, USDT, etc.)
 - more chains
 - more yield strategies/protocols (such as Euler)
 - fees (and automated Chainlink service payments)
