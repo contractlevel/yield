@@ -6,24 +6,38 @@ Whatever the highest yield is for stablecoins across chains is what users can ea
 
 A live demo site with Ethereum, Base and Avalanche testnets is available at [contractlevel.com](https://contractlevel.com).
 
+“one click highest yield”
+
 ## Table of Contents
 
 - [YieldCoin aka Contract Level Yield (CLY)](#yieldcoin-aka-contract-level-yield-cly)
   - [Table of Contents](#table-of-contents)
   - [Overview](#overview)
   - [YieldCoin](#yieldcoin)
-  - [Architecture](#architecture)
+  - [Strategy](#strategy)
+  - [Contracts/Architecture](#contractsarchitecture)
+    - [YieldPeer](#yieldpeer)
+      - [IYieldPeer Interface](#iyieldpeer-interface)
+      - [Libraries](#libraries)
     - [ParentPeer](#parentpeer)
     - [ChildPeer](#childpeer)
+  - [System Actors](#system-actors)
   - [Chainlink Integrations](#chainlink-integrations)
     - [Chainlink Automation](#chainlink-automation)
       - [Time-Based](#time-based)
       - [Log-Trigger](#log-trigger)
     - [Chainlink Functions](#chainlink-functions)
-      - [DefiLlama Proxy API](#defillama-proxy-api)
+      - [Javascript](#javascript)
+      - [Proxy API](#proxy-api)
     - [CCIP](#ccip)
+      - [Custom CCIP Transaction Types](#custom-ccip-transaction-types)
   - [Transaction Flows](#transaction-flows)
     - [Rebalance](#rebalance)
+      - [Rebalance when Old Strategy is Parent and New Strategy is Parent](#rebalance-when-old-strategy-is-parent-and-new-strategy-is-parent)
+      - [Rebalance when Old Strategy is Parent and New Strategy is Child](#rebalance-when-old-strategy-is-parent-and-new-strategy-is-child)
+      - [Rebalance when Old Strategy is Child and New Strategy is Parent](#rebalance-when-old-strategy-is-child-and-new-strategy-is-parent)
+      - [Rebalance when Old Strategy is Child and New Strategy is Local Child](#rebalance-when-old-strategy-is-child-and-new-strategy-is-local-child)
+      - [Rebalance when Old Strategy is Child and New Strategy is Remote Child](#rebalance-when-old-strategy-is-child-and-new-strategy-is-remote-child)
     - [Deposit](#deposit)
       - [Deposit on Parent when Parent is Strategy](#deposit-on-parent-when-parent-is-strategy)
       - [Deposit on Parent when Child is Strategy](#deposit-on-parent-when-child-is-strategy)
@@ -36,6 +50,8 @@ A live demo site with Ethereum, Base and Avalanche testnets is available at [con
       - [Withdraw on Child when Parent is Strategy](#withdraw-on-child-when-parent-is-strategy)
       - [Withdraw on Child when Local Child is Strategy](#withdraw-on-child-when-local-child-is-strategy)
       - [Withdraw on Child when Remote Child is Strategy](#withdraw-on-child-when-remote-child-is-strategy)
+  - [Deploying](#deploying)
+    - [LINK Token Funding](#link-token-funding)
   - [Testing](#testing)
     - [Unit Tests](#unit-tests)
     - [Invariant Tests](#invariant-tests)
@@ -52,18 +68,19 @@ A live demo site with Ethereum, Base and Avalanche testnets is available at [con
     - [Withdraw tx from chain c (avalanche) → parent (eth) → strategy (base)](#withdraw-tx-from-chain-c-avalanche--parent-eth--strategy-base)
     - [YieldCoin Bridge tx (eth -\> aval)](#yieldcoin-bridge-tx-eth---aval)
   - [Future Developments](#future-developments)
+  - [Acknowledgement](#acknowledgement)
 
 ## Overview
 
 **Problem statement**: "I want my stablecoins to earn the highest possible yield without having to monitor opportunities, then manually withdraw, bridge and deposit."
 
-**Solution**: YieldCoin abstracts ALL of that crap away. Deposit your stablecoin into the CLY system from your chain of choice to earn the highest yield from the safest, most reliable services across the web3 ecosystem.
+**Solution**: YieldCoin abstracts ALL of that away. Deposit your stablecoin into the CLY system from your chain of choice to earn the highest yield from the safest, most reliable services across the web3 ecosystem.
 
-Stablecoin depositors receive a share token in return for their deposits, representing their share of the total value (deposits + yield) in the system. Depositing a stablecoin can also be considered buying YieldCoin. YieldCoin is the share received for depositing into the system, with the basic idea being that a holder will be able to sell (their YieldCoin) for a higher USD value than they bought it. This is because the stablecoin deposits will not go down in value, and reliable yield will be generated. Hence the name YieldCoin.
+Stablecoin depositors receive a share token in return for their deposits, representing their share of the total value (deposits + yield) in the system. Depositing a stablecoin can also be considered "buying" YieldCoin. YieldCoin is the share received for depositing into the system, with the basic idea being that a holder will be able to "sell" (their YieldCoin) for a higher USD value than they bought it. This is because the stablecoin deposits will not go down in value, and reliable yield will be generated. Hence the name YieldCoin.
 
 key invariant: a user must be able to withdraw the usdc amount they deposited - fees. this is definitely broken by the precision loss bug we already know
 
-The protocol and chain with the highest APY where the system funds are allocated is known as the `Strategy`.
+The protocol and chain with the highest APY, where the system funds are allocated is known as the `Strategy`.
 
 ## YieldCoin
 
@@ -71,58 +88,156 @@ YieldCoin follows the [ERC677](https://github.com/ethereum/EIPs/issues/677) and 
 
 The more fees CLY generates, ie the more YieldCoin is bought, the more frequent the checks for the highest APY can become, as Chainlink fees are covered.
 
-“one click highest yield”
+## Strategy
 
-## Architecture
+The "[Strategy](https://github.com/contractlevel/yield/blob/726c449fb57a0cdb6d77ad9234014f49032a8d33/src/interfaces/IYieldPeer.sol#L5-L8)" refers to the chain and protocol the total system funds are allocated to generate the optimal yield. Low-risk, time-tested, and secure protocols have been selected for this initial prototype. For now the system supports Aave and Compound. As development progresses, the plan is to integrate as many strategy protocols as possible, without risking user funds. The system should always be able to withdraw all user deposits + yield generated. Therefore supplying USDC to earn APY from protocols like Aave and Compound is seen as a safe, low-risk yield strategy.
+
+"Strategy rebalancing" or simply "rebalancing" refers to the automated process of withdrawing funds from the previous strategy and depositing them into the new strategy, to earn a higher yield.
+
+## Contracts/Architecture
 
 The Contract Level Yield system that powers YieldCoin consists of a crosschain network of "Peer" contracts. `YieldPeer` contracts are deployed on each compatible chain, and act as entry points to the system. Currently the only supported stablecoin is `USDC` (due partially to its availability across chains with CCIP and the time constraints of the hackathon).
 
 Users deposit their `USDC` into the CLY infrastructure from their chain of choice. In return they receive YieldCoin ($YIELD) tokens. The amount of YieldCoin a depositor is minted in exchange for their stablecoin deposit is proportional to how much of the system's total value (total deposits + generated yield) their stablecoin deposit is worth. The basic idea is that a user will always be able to redeem their YieldCoin for the stablecoin they deposited plus yield (minus fees, but fees haven't been implemented yet).
 
-THAT LAST PARAGRAPH IS A BIT REPETITIVE WITH THE PREVIOUS SECTION // @review
-
 There are two types of `YieldPeer` contracts: a `ParentPeer` and a `ChildPeer`. There is a single `ParentPeer` contract deployed across chains, with every other compatible chain hosting a `ChildPeer`. See [./src/peers](https://github.com/contractlevel/yield/tree/main/src/peers).
 
-`YieldPeer` is an abstract contract that acts as the "base" for both the `ParentPeer` and `ChildPeer` contracts. The Parent and Child peers share some functionality, but also have functionality unique to their particular roles in the system. The shared `YieldPeer` functionality consists primarily of CCIP integrations and yield strategy interactions.
+### YieldPeer
+
+[`YieldPeer`](https://github.com/contractlevel/yield/blob/main/src/peers/YieldPeer.sol) is an abstract contract that acts as the "base" for both the `ParentPeer` and `ChildPeer` contracts. The Parent and Child peers share some functionality, but also have functionality unique to their particular roles in the system. The shared `YieldPeer` functionality consists primarily of CCIP integrations and yield strategy interactions.
+
+Contracts that inherit `YieldPeer` must implement the following functions:
+
+- `deposit(uint256)` - user entry point for the system where USDC is deposited and YieldCoin is minted
+- `onTokenTransfer(address,uint256,bytes)` - user exit point for the system where YieldCoin is burned and USDC is withdrawn
+- `_handleCCIPMessage(CcipTxType,Client.EVMTokenAmount[],bytes)` - executed following `_ccipReceive` checks to handle various CCIP tx types
+
+The Peer with the current active strategy will return a non-zero address from `YieldPeer::getStrategyPool()`.
+
+#### IYieldPeer Interface
+
+The [IYieldPeer interface](https://github.com/contractlevel/yield/blob/main/src/interfaces/IYieldPeer.sol) defines important structs and enums for the system, related to Strategy protocol and CCIP message handling, such as compatible strategies, custom types of CCIP txs, and what data is sent across chains for deposits and withdraws.
+
+#### Libraries
+
+Some logic from `YieldPeer` has been delegated to distinct libraries to improve maintainability.
+
+[CCIPOperations](https://github.com/contractlevel/yield/blob/main/src/libraries/CCIPOperations.sol) contains logic for facilitating CCIP fees, creating CCIP messages, and handling bridged USDC token amounts.
+
+[ProtocolOperations](https://github.com/contractlevel/yield/blob/main/src/libraries/ProtocolOperations.sol) contains logic for interacting with strategy protocols such as depositing, withdrawing, and querying the total value of the system.
+
+[DataStructures](https://github.com/contractlevel/yield/blob/main/src/libraries/DataStructures.sol) contains logic for creating [DepositData](https://github.com/contractlevel/yield/blob/726c449fb57a0cdb6d77ad9234014f49032a8d33/src/interfaces/IYieldPeer.sol#L28-L34) and [WithdrawData](https://github.com/contractlevel/yield/blob/726c449fb57a0cdb6d77ad9234014f49032a8d33/src/interfaces/IYieldPeer.sol#L36-L42) structs, which are used in CCIP messages for deposits and withdraw respectively.
 
 ### ParentPeer
 
-The `ParentPeer` tracks system wide state for Contract Level Yield, specifically the total shares (YieldCoin) minted, and the current yield strategy. `ParentPeer::s_totalShares` is the sum of all shares/YieldCoin that exists across chains. `ParentPeer::s_strategy` is a struct containing the chain selector and protocol of the current yield generating strategy.
+The [`ParentPeer`](https://github.com/contractlevel/yield/blob/main/src/peers/ParentPeer.sol) contract tracks system wide state for Contract Level Yield, specifically the total shares (YieldCoin) minted, and the current yield strategy. `ParentPeer::s_totalShares` is the sum of all shares/YieldCoin that exists across chains. `ParentPeer::s_strategy` is a struct containing the chain selector and protocol of the current yield generating strategy.
 
-The `ParentPeer` contract is extended with the `ParentCLF` contract - see [./src/peers/extensions/ParentCLF.sol](https://github.com/contractlevel/yield/blob/main/src/peers/extensions/ParentCLF.sol). `ParentCLF` inherits `ParentPeer` and implements Chainlink Functions functionality. As such, `ParentCLF` is the single `ParentPeer` instantiation deployed in the system. `ParentCLF` also implements functionality to make it compatible with Chainlink Automation.
+The `ParentPeer` contract is extended with the [`ParentCLF`](https://github.com/contractlevel/yield/blob/main/src/peers/extensions/ParentCLF.sol) contract. `ParentCLF` inherits `ParentPeer` and implements Chainlink Functions functionality. As such, `ParentCLF` is the single `ParentPeer` instantiation deployed in the system. `ParentCLF` also implements functionality to make it compatible with Chainlink Automation.
 
-`ParentRebalancer` - see [./src/modules/ParentRebalancer.sol](https://github.com/contractlevel/yield/blob/main/src/modules/ParentRebalancer.sol) - is deployed on the same chain as `ParentCLF`. The `ParentRebalancer` contract provides supplementary log trigger automation functionality to `ParentCLF`, as the `ParentCLF` contract is unfortunately too big to contain it all itself.
+[`ParentRebalancer`](https://github.com/contractlevel/yield/blob/main/src/modules/ParentRebalancer.sol) is deployed on the same chain as `ParentCLF`. The `ParentRebalancer` contract provides supplementary log trigger automation functionality to `ParentCLF`, as the `ParentCLF` contract is unfortunately too big to contain it all itself.
 
 ### ChildPeer
 
+The [`ChildPeer`](https://github.com/contractlevel/yield/blob/main/src/peers/ChildPeer.sol) is deployed on every chain except for the chain hosting the `ParentPeer`. Similar to `ParentPeer`, `ChildPeer` facilitates deposits, withdraws, and handling CCIP rebalance messages.
+
+## System Actors
+
+The only two actors in this system are stablecoin depositors and the owner of the contracts.
+
+**Stablecoin depositors** deposit USDC and receive YieldCoin. They can then move their YieldCoin around chains or `transferAndCall()` it to a `YieldPeer` to redeem their USDC + yield.
+
+The **Owner** sets various values required for the system to function, such as CCIP gas limit, Automation Forwarder and Upkeep addresses, and allowed chains and peers.
+
 ## Chainlink Integrations
 
-Chainlink services provide essential functionality to the Contract Level Yield system (obviously). Automation, Functions and CCIP are combined to automated rebalances, and CCIP is used where applicable in stablecoin deposits and withdraws.
+Chainlink services provide essential functionality to the Contract Level Yield system. Automation, Functions and CCIP are combined to automate rebalances, and CCIP is also used where applicable in stablecoin deposits and withdraws.
 
 ### Chainlink Automation
 
+Automation removes the need for any human/manual intervention for the system to consistently maintain the highest yield available.
+
 #### Time-Based
+
+The strategy rebalancing process starts with a pre-scheduled call from the Chainlink Automation service, to request the optimal strategy via Chainlink Functions. [`ParentCLF::sendCLFRequest()`](https://github.com/contractlevel/yield/blob/726c449fb57a0cdb6d77ad9234014f49032a8d33/src/peers/extensions/ParentCLF.sol#L110-L111) is called by the Chainlink Automation `upkeep` address and requires no further configuration in the contract, other than access control preventing non-upkeep addresses from calling.
 
 #### Log-Trigger
 
+When a new strategy is set by the Chainlink Functions [`fulfillRequest()` callback](https://github.com/contractlevel/yield/blob/726c449fb57a0cdb6d77ad9234014f49032a8d33/src/peers/extensions/ParentCLF.sol#L128-L157), a [`StrategyUpdated`](https://github.com/contractlevel/yield/blob/726c449fb57a0cdb6d77ad9234014f49032a8d33/src/peers/ParentPeer.sol#L350) event is emitted. The `ParentRebalancer` will [check for this event](https://github.com/contractlevel/yield/blob/726c449fb57a0cdb6d77ad9234014f49032a8d33/src/modules/ParentRebalancer.sol#L44-L91) and initiate CCIP rebalance txs when applicable.
+
 ### Chainlink Functions
 
-#### DefiLlama Proxy API
+Chainlink Functions is used to securely fetch and return the protocol and chain with the highest APY available, to update the current strategy.
+
+#### Javascript
+
+The inline Javascript `SOURCE` code passed to Chainlink Functions is defined as [a constant in `ParentCLF`](https://github.com/contractlevel/yield/blob/726c449fb57a0cdb6d77ad9234014f49032a8d33/src/peers/extensions/ParentCLF.sol#L30-L32) and runs a remote script from the [project repo](https://github.com/contractlevel/yield/blob/main/functions/src.min.js).
+
+[src.js](https://github.com/contractlevel/yield/blob/main/functions/src.js) demonstrates the logic of the remote script performed by the Chainlink Functions DON. To increase efficiency, the actual script that is run, is a [minimized equivalent](https://github.com/contractlevel/yield/blob/main/functions/src.min.js). The script queries and handles API data from the [DefiLlama Yield API](https://yields.llama.fi/pools).
+
+Javascript logic related to Functions can be found in the [./functions directory](https://github.com/contractlevel/yield/tree/main/functions).
+
+#### Proxy API
+
+A proxy API was required for communicating between Chainlink Functions and the DefiLlama API, because the DefiLlama API payload response was too large for Chainlink Functions, so we filter on the server side via our proxy API.
+
+To prepare the proxy API, navigate to its directory and install the dependencies:
 
 ```
 cd functions/defillama-proxy
 npm i
 ```
 
-The `function.zip` file located in `functions/defillama-proxy` has been uploaded to AWS Lambda and deployed. This was needed because we are using the DefiLlama API to fetch data about APYs, but the payload response was too large for Chainlink Functions, so we filter on the server side via our proxy API.
+The `function.zip` file located in `functions/defillama-proxy` has been uploaded to AWS Lambda and deployed.
+
+To prevent abuse, the url of the proxy API has been encrypted as an [offchain secret](https://www.npmjs.com/package/@chainlink/functions-toolkit#off-chain-hosted-secrets) and stored as [a constant in `ParentCLF`](https://github.com/contractlevel/yield/blob/726c449fb57a0cdb6d77ad9234014f49032a8d33/src/peers/extensions/ParentCLF.sol#L33-L37).
 
 ### CCIP
 
+CCIP faciliates secure crosschain communication and value transfer for rebalances, and, where applicable, deposits and withdraws. [Custom CCIP tx types have been defined](https://github.com/contractlevel/yield/blob/726c449fb57a0cdb6d77ad9234014f49032a8d33/src/interfaces/IYieldPeer.sol#L15-L26) and are used to ensure receiving contracts correctly handle data and/or value.
+
+#### Custom CCIP Transaction Types
+
+- **0 - DepositToParent**: A deposit transaction from a `ChildPeer` to the `ParentPeer`. This is necessary to forward deposits to remote strategy chains.
+- **1 - DepositToStrategy**: A deposit transaction from the `ParentPeer` to the active Strategy. This deposits funds in the strategy protocol and gets the `totalValue` of the system.
+- **2 - DepositCallbackParent**: A callback transaction from the active Strategy to the `ParentPeer`. This returns the `totalValue`, which is used to calculate the `shareMintAmount` (how many YieldCoin a depositor should receive) and update `s_totalShares`.
+- **3 - DepositCallbackChild**: A callback from the `ParentPeer` to the `ChildPeer` the deposit was initiated on. This mints shares/YieldCoin to the depositor.
+- **4 - WithdrawToParent**: A withdraw from a `ChildPeer` to the `ParentPeer`. This forwards the withdrawal to the active strategy and updates `s_totalShares` to reflect the amount of YieldCoin burned when initiating the withdrawal.
+- **5 - WithdrawToStrategy**: A withdraw from the `ParentPeer` to the active Strategy. This calculates the `usdcWithdrawAmount` and withdraws it from the active Strategy.
+- **6 - WithdrawCallback**: A callback from the active Strategy to the withdraw chain. This sends the withdrawn USDC to the withdrawer.
+- **7 - RebalanceOldStrategy**: A message from the `ParentPeer` to the old Strategy. This is to move funds to the new Strategy.
+- **8 - RebalanceNewStrategy**: A value transfer from the old Strategy to the new Strategy. This is to deposit funds into the new Strategy.
+
 ## Transaction Flows
+
+Transaction flows differ based on the nature of the transaction, its point of origin, and the location of the active Strategy.
 
 ### Rebalance
 
-![Rebalance Flow](./diagrams/rebalance.jpg)
+This diagram shows a (rough) high-level overview of the entire rebalance process.
+
+![Rebalance Flow](./diagrams/rebalance/rebalance.jpg)
+
+The following diagrams show individual rebalance flows for different scenarios.
+
+#### Rebalance when Old Strategy is Parent and New Strategy is Parent
+
+![Rebalance Local Parent Change](./diagrams/rebalance/oldParent-newParent.jpg)
+
+#### Rebalance when Old Strategy is Parent and New Strategy is Child
+
+![Rebalance Parent to Child](./diagrams/rebalance/oldParent-newChild.jpg)
+
+#### Rebalance when Old Strategy is Child and New Strategy is Parent
+
+![Rebalance Child to Parent](./diagrams/rebalance/oldChild-newParent.jpg)
+
+#### Rebalance when Old Strategy is Child and New Strategy is Local Child
+
+![Rebalance Child to Local Child](./diagrams/rebalance/oldChild-newLocalChild.jpg)
+
+#### Rebalance when Old Strategy is Child and New Strategy is Remote Child
+
+![Rebalance Child to Remote Child](./diagrams/rebalance/oldChild-newRemoteChild.jpg)
 
 ### Deposit
 
@@ -155,6 +270,19 @@ Similar to deposits, the system will handle withdrawals depending on the chain o
 #### Withdraw on Child when Local Child is Strategy
 
 #### Withdraw on Child when Remote Child is Strategy
+
+## Deploying
+
+MENTION DEPLOY SCRIPT, HELPER CONFIG AND SETCROSSCHAIN SCRIPT
+
+### LINK Token Funding
+
+For the Contract Level Yield infrastructure to function, LINK is required for the following:
+
+- Time-based Automation subscription on Parent chain
+- Log-trigger Automation subscription on Parent chain
+- Chainlink Functions subscription on Parent chain
+- Every `YieldPeer` on every chain for CCIP txs
 
 ## Testing
 
@@ -243,7 +371,17 @@ The `--nondet_difficult_funcs` flag is required for `ParentCLF` to [automaticall
 
 ## Known Issues
 
+The invariant testing and formal verification revealed a critical precision loss bug, that can cause insufficient amounts of YieldCoin minted in exchange for USDC. If this project had been developed outside the context of the hackathon, this would've been the top priority. Given the time constraints, other more demonstrative elements of this project were completed first. Once the hackathon submission for this project is done, fixing this issue will be the next step.
+
 ## Testnet Deployments
+
+The Contract Level Yield infrastructure has been deployed across three testnets (Ethereum Sepolia, Base Sepolia, and Avalanche Fuji), in order to test the various scenarios using Chainlink - all of which are successful.
+
+Ethereum Sepolia is the Parent chain purely because it has open access to Log-trigger Automation (although access was granted to Log-trigger Automation on Base Sepolia after these deployments - thanks!).
+
+[Mock contracts](https://github.com/contractlevel/yield/tree/main/test/mocks/testnet) were used in place of some strategy contracts either due to their unavailability on testnets or their testnet equivalents not behaving as expected. These mocks do not generate any yield, but otherwise behave as their mainnet counterparts would in terms of depositing and withdrawing funds in the context of the Contract Level Yield system.
+
+The DefiLlama API does not provide testnet data, so mainnet data was used to set the strategy protocol and chain.
 
 ### Eth Sepolia
 
@@ -299,9 +437,7 @@ strategy chain deposit: https://sepolia.basescan.org/tx/0x75e0f2ec96dde84126c8ec
 
 deposit callback parent: https://ccip.chain.link/tx/0x75e0f2ec96dde84126c8ec36f1bc5467c69bdb0b41e5c211e8ab99c65189baa3
 
-parent callback:
-
-https://sepolia.etherscan.io/tx/0x905c386823c1bceeb07a51c4d67effff82f8db7e1d16f2349fe2ffd053263f8f
+parent callback: https://sepolia.etherscan.io/tx/0x905c386823c1bceeb07a51c4d67effff82f8db7e1d16f2349fe2ffd053263f8f
 
 deposit callback child: https://ccip.chain.link/tx/0x905c386823c1bceeb07a51c4d67effff82f8db7e1d16f2349fe2ffd053263f8f
 
@@ -329,10 +465,14 @@ ccip: https://ccip.chain.link/tx/0xd0c3e338c66bad81412c92ad7b76681b977464fa85350
 
 ## Future Developments
 
-- more stablecoin support (swapping to one with highest yield)
+- more stablecoin support (swapping to one with highest yield, such as USD1, USDT, etc.)
 - more chains
-- more yield strategies/protocols
-- fees
+- more yield strategies/protocols (such as Euler)
+- fees (and automated Chainlink service payments)
 - svm compatability
 - ccip calldata compression (should use solady.libZip for compressing/decompressing depositData, withdrawData and strategy struct)
 - uniswap integration to allow users to "buy" yieldcoin with any asset, ie they pay with eth and it gets swapped to the usdc amount then deposited
+
+## Acknowledgement
+
+The idea for this project came from the [Concero V2 Whitepaper, Section 7.1](https://concero.io/v2_whitepaper.pdf).
