@@ -283,15 +283,27 @@ The chain to receive the withdrawn USDC on can be different to the chain the wit
 
 Similar to deposits, the system will handle withdrawals differently depending on the chain of initiation and location of the current strategy.
 
+_Note: These withdrawal diagrams assume the chain to withdraw to is the one the withdrawal initiated on. If the withdrawn USDC is requested to be sent to the withdrawer on another chain, the final USDC transfer and ccipReceive will pass through the `YieldPeer` on that chain._
+
 #### Withdraw on Parent when Parent is Strategy
+
+![Withdraw on Parent when Parent is Strategy](./diagrams/withdraw/onParent-isParent.jpg)
 
 #### Withdraw on Parent when Child is Strategy
 
+![Withdraw on Parent when Child is Strategy](./diagrams/withdraw/onParent-isChild.jpg)
+
 #### Withdraw on Child when Parent is Strategy
+
+![Withdraw on Child when Parent is Strategy](./diagrams/withdraw/onChild-isParent.jpg)
 
 #### Withdraw on Child when Local Child is Strategy
 
+![Withdraw on Child when Local Child is Strategy](./diagrams/withdraw/onChild-isLocalChild.jpg)
+
 #### Withdraw on Child when Remote Child is Strategy
+
+![Withdraw on Child when Remote Child is Strategy](./diagrams/withdraw/onChild-isRemoteChild.jpg)
 
 ## Deploying
 
@@ -499,4 +511,4 @@ ccip: https://ccip.chain.link/tx/0xd0c3e338c66bad81412c92ad7b76681b977464fa85350
 
 ## Acknowledgement
 
-The idea for this project came from the [Concero V2 Whitepaper, Section 7.1](https://concero.io/v2_whitepaper.pdf).
+The idea for this project was inspired by the [Concero V2 Whitepaper, Section 7.1](https://concero.io/v2_whitepaper.pdf).
