@@ -47,6 +47,7 @@ contract ParentRebalancer is AutomationBase, ILogAutomation, Ownable2Step {
     /// @param log The log emitted by the ParentPeer
     /// @return upkeepNeeded Whether performUpkeep should be called by the Chainlink Automation forwarder
     /// @return performData The performData to be used by the performUpkeep function
+    /// @notice The cannotExecute modifier will need to be commented out for some unit tests to pass
     function checkLog(Log calldata log, bytes memory)
         external
         view
@@ -66,6 +67,7 @@ contract ParentRebalancer is AutomationBase, ILogAutomation, Ownable2Step {
             if (chainSelector == thisChainSelector && oldChainSelector == thisChainSelector) {
                 performData = "";
                 upkeepNeeded = false;
+                return (upkeepNeeded, performData);
             }
 
             IYieldPeer.Strategy memory newStrategy =
@@ -131,5 +133,18 @@ contract ParentRebalancer is AutomationBase, ILogAutomation, Ownable2Step {
     function setParentPeer(address parentPeer) external onlyOwner {
         s_parentPeer = parentPeer;
         emit ParentPeerSet(parentPeer);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                 GETTER
+    //////////////////////////////////////////////////////////////*/
+    /// @notice Returns the Chainlink Automation forwarder
+    function getForwarder() external view returns (address) {
+        return s_forwarder;
+    }
+
+    /// @notice Returns the ParentPeer contract address
+    function getParentPeer() external view returns (address) {
+        return s_parentPeer;
     }
 }

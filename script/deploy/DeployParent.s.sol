@@ -2,7 +2,7 @@
 pragma solidity 0.8.26;
 
 import {ParentCLF} from "../../src/peers/extensions/ParentCLF.sol";
-// import {ParentCLA} from "../../src/peers/extensions/ParentCLA.sol";
+import {ParentRebalancer} from "../../src/modules/ParentRebalancer.sol";
 import {Script} from "forge-std/Script.sol";
 import {HelperConfig} from "../HelperConfig.s.sol";
 import {Share} from "../../src/token/Share.sol";
@@ -18,15 +18,14 @@ contract DeployParent is Script {
     /*//////////////////////////////////////////////////////////////
                                   RUN
     //////////////////////////////////////////////////////////////*/
-    function run() public returns (Share, SharePool, ParentCLF, HelperConfig, uint64) {
+    function run() public returns (Share, SharePool, ParentCLF, ParentRebalancer, HelperConfig, uint64) {
         HelperConfig config = new HelperConfig();
         HelperConfig.NetworkConfig memory networkConfig = config.getActiveNetworkConfig();
 
         vm.startBroadcast();
         // Unit tests:
-        // @review: move this to unit test
         uint64 clfSubId = IFunctionsSubscriptions(networkConfig.clf.functionsRouter).createSubscription();
-        // Deployment:
+        /// @notice Use this instead of the above line for premade subscription:
         // uint64 clfSubId = networkConfig.clf.clfSubId;
 
         Share share = new Share();
@@ -34,6 +33,7 @@ contract DeployParent is Script {
         RegistryModuleOwnerCustom(networkConfig.ccip.registryModuleOwnerCustom).registerAdminViaOwner(address(share));
         ITokenAdminRegistry(networkConfig.ccip.tokenAdminRegistry).acceptAdminRole(address(share));
         ITokenAdminRegistry(networkConfig.ccip.tokenAdminRegistry).setPool(address(share), address(sharePool));
+        ParentRebalancer parentRebalancer = new ParentRebalancer();
 
         ParentCLF parentPeer = new ParentCLF(
             networkConfig.ccip.ccipRouter,
@@ -46,14 +46,15 @@ contract DeployParent is Script {
             networkConfig.clf.functionsRouter,
             networkConfig.clf.donId,
             clfSubId,
-            networkConfig.peers.parentRebalancer
+            address(parentRebalancer)
         );
 
         share.grantMintAndBurnRoles(address(sharePool));
         share.grantMintAndBurnRoles(address(parentPeer));
+        parentRebalancer.setParentPeer(address(parentPeer));
 
         vm.stopBroadcast();
 
-        return (share, sharePool, parentPeer, config, clfSubId);
+        return (share, sharePool, parentPeer, parentRebalancer, config, clfSubId);
     }
 }

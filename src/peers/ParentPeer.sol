@@ -73,7 +73,6 @@ contract ParentPeer is YieldPeer {
         address parentRebalancer
     ) YieldPeer(ccipRouter, link, thisChainSelector, usdc, aavePoolAddressesProvider, comet, share) {
         // @review modularize this
-        // @review CHANGE THIS TO COMPOUND IF PARENT IS BASE SEPOLIA - AAVE V3 IS NOT ON BASE SEPOLIA
         s_strategy = Strategy({chainSelector: thisChainSelector, protocol: Protocol.Aave});
         _updateStrategyPool(thisChainSelector, Protocol.Aave);
 
@@ -327,14 +326,17 @@ contract ParentPeer is YieldPeer {
             _handleLocalStrategyChange(newStrategy);
         }
         // @notice we are handling these cases with the ParentRebalancer
-        // // Handle moving strategy from this parent chain to a different chain
-        // else if (oldStrategy.chainSelector == i_thisChainSelector && chainSelector != i_thisChainSelector) {
-        //     _handleStrategyMoveToNewChain(newStrategy);
-        // }
-        // // Handle rebalancing from a different chain (a child)
-        // else {
-        //     _handleRebalanceFromDifferentChain(oldStrategy, newStrategy);
-        // }
+        // @review remove everything below here and refactor tests
+        // Handle moving strategy from this parent chain to a different chain
+        else if (oldStrategy.chainSelector == i_thisChainSelector && chainSelector != i_thisChainSelector) {
+            address oldStrategyPool = _getStrategyPool();
+            uint256 totalValue = _getTotalValueFromStrategy(oldStrategyPool);
+            _handleStrategyMoveToNewChain(oldStrategyPool, totalValue, newStrategy);
+        }
+        // Handle rebalancing from a different chain (a child)
+        else {
+            _handleRebalanceFromDifferentChain(oldStrategy, newStrategy);
+        }
     }
 
     /// @notice Internal helper to handle strategy updates
@@ -385,11 +387,22 @@ contract ParentPeer is YieldPeer {
         );
     }
 
+    /// @dev Revert if msg.sender is not the ParentRebalancer
+    /// @dev Handle moving strategy from this parent chain to a different chain
+    /// @param oldStrategyPool The address of the old strategy pool
+    /// @param totalValue The total value of the system
+    /// @param newStrategy The new strategy
+    /// @notice This function is called by the ParentRebalancer's Log-trigger Automation performUpkeep
     function rebalanceNewStrategy(address oldStrategyPool, uint256 totalValue, Strategy memory newStrategy) external {
         _revertIfMsgSenderIsNotParentRebalancer();
         _handleStrategyMoveToNewChain(oldStrategyPool, totalValue, newStrategy);
     }
 
+    /// @dev Revert if msg.sender is not the ParentRebalancer
+    /// @dev Handle rebalancing from a different chain
+    /// @param oldChainSelector The chain selector of the old strategy
+    /// @param newStrategy The new strategy
+    /// @notice This function is called by the ParentRebalancer's Log-trigger Automation performUpkeep
     function rebalanceOldStrategy(uint64 oldChainSelector, Strategy memory newStrategy) external {
         _revertIfMsgSenderIsNotParentRebalancer();
         Strategy memory oldStrategy = Strategy({chainSelector: oldChainSelector, protocol: Protocol.Aave});
@@ -410,6 +423,7 @@ contract ParentPeer is YieldPeer {
         else shareMintAmount = (amount * totalShares) / totalValue;
     }
 
+    /// @dev Revert if msg.sender is not the ParentRebalancer
     function _revertIfMsgSenderIsNotParentRebalancer() internal view {
         if (msg.sender != i_parentRebalancer) revert ParentPeer__OnlyParentRebalancer();
     }

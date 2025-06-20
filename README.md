@@ -306,21 +306,13 @@ _Note: These withdrawal diagrams assume the chain to withdraw to is the one the 
 
 ## Deploying
 
-// @review ParentRebalancer should be deployed in DeployParent now
-
-`ParentRebalancer` should be deployed first on the Parent chain.
-
-```
-forge script script/deploy/DeployRebalancer.s.sol --broadcast --account <YOUR_FOUNDRY_KEYSTORE> --rpc-url <PARENT_CHAIN_RPC_URL>
-```
-
-The `ParentRebalancer` address returned from running that script should be added to `NetworkConfig.peers.parentRebalancer` for the Parent chain in the [`HelperConfig`](https://github.com/contractlevel/yield/blob/main/script/HelperConfig.s.sol).
-
-Next deploy the `ParentPeer` (`ParentCLF`). This script will also deploy the YieldCoin `Share` and `SharePool` contracts, as well as call the necessary functions to make the pool permissionless and integrate it with CCIP. It also grants mint and burn roles for YieldCoin to the `ParentPeer` and CCIP pool.
+The `ParentPeer` (`ParentCLF`) should be deployed first. This script will also deploy the `ParentRebalancer`, and YieldCoin `Share` and `SharePool` contracts, as well as call the necessary functions to make the pool permissionless and integrate it with CCIP. It also grants mint and burn roles for YieldCoin to the `ParentPeer` and CCIP pool, as well as setting storage in `ParentRebalancer`.
 
 ```
 forge script script/deploy/DeployParent.s.sol --broadcast --account <YOUR_FOUNDRY_KEYSTORE> --rpc-url <PARENT_CHAIN_RPC_URL>
 ```
+
+The Chainlink Automation forwarder address should be set in `ParentRebalancer::setForwarder()` and the Chainlink Automation upkeep address should be set in `ParentCLF::setUpkeepAddress()`.
 
 The `ParentCLF`, `Share`, and `SharePool` addresses returned from running that script should be added to `NetworkConfig.peers` for both the Parent chain and any child chains.
 
@@ -371,6 +363,8 @@ The unit tests use a [fork of chainlink-local](https://github.com/contractlevel/
 To achieve this, the changes were made to the [CCIPLocalSimulatorFork](https://github.com/contractlevel/chainlink-local/blob/main/src/ccip/CCIPLocalSimulatorFork.sol). A new function, [switchChainAndRouteMessageWithUSDC](https://github.com/contractlevel/chainlink-local/blob/519e854caaf1291c03bda3928674c922195fd629/src/ccip/CCIPLocalSimulatorFork.sol#L126-L155) was added, which is based on the original `switchChainAndRouteMessage`, except it also listens for CCTP's `MessageSent` event, and takes two arrays of attester addresses, and their private keys - values that can be easily simulated with [Foundry's makeAddrAndKey](https://getfoundry.sh/reference/forge-std/make-addr-and-key/).
 
 The `offchainTokenData` array passed to the offRamp needed to contain the USDCTokenPool's `MessageAndAttestation` struct, which contains the message retrieved from the `MessageSent` event and the `attestation` created with the attester's and their private keys. To achieve this, another function was added, [\_createOffchainTokenData](https://github.com/contractlevel/chainlink-local/blob/519e854caaf1291c03bda3928674c922195fd629/src/ccip/CCIPLocalSimulatorFork.sol#L181-L238).
+
+_NOTE: Some unit tests in [`CheckLog.t.sol`]() will fail unless the [`cannotExecute` modifier](https://github.com/contractlevel/yield/blob/main/src/modules/ParentRebalancer.sol#L53) has been temporarily commented out._ // @review external links
 
 The unit tests for the Contract Level Yield contracts can be run with:
 

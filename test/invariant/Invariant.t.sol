@@ -2,7 +2,7 @@
 pragma solidity 0.8.26;
 
 import {StdInvariant} from "forge-std/StdInvariant.sol";
-import {BaseTest, Vm, console2, ParentCLF, ChildPeer, Share, IYieldPeer} from "../BaseTest.t.sol";
+import {BaseTest, Vm, console2, ParentCLF, ChildPeer, Share, IYieldPeer, ParentRebalancer} from "../BaseTest.t.sol";
 import {Handler} from "./Handler.t.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {IRouterClient} from "@chainlink/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
@@ -29,6 +29,8 @@ contract Invariant is StdInvariant, BaseTest {
     HelperConfig.NetworkConfig internal networkConfig;
     /// @dev Parent Peer contract
     ParentCLF internal parent;
+    /// @dev Parent Rebalancer contract
+    ParentRebalancer internal parentRebalancer;
     /// @dev Child Peer contract
     ChildPeer internal child1;
     /// @dev Child Peer contract
@@ -80,6 +82,7 @@ contract Invariant is StdInvariant, BaseTest {
         networkConfig = helperConfig.getOrCreateAnvilEthConfig();
         share = Share(networkConfig.tokens.share);
         aavePool = IPoolAddressesProvider(networkConfig.protocols.aavePoolAddressesProvider).getPool();
+        parentRebalancer = new ParentRebalancer();
 
         /// @dev since we are not forking mainnets, we will deploy contracts locally
         /// the deployed peers will interact via the ccip local simulator as if they were crosschain
@@ -96,9 +99,10 @@ contract Invariant is StdInvariant, BaseTest {
             networkConfig.clf.functionsRouter,
             networkConfig.clf.donId, // 0x0
             networkConfig.clf.clfSubId, // 0
-            networkConfig.peers.parentRebalancer
+            address(parentRebalancer)
         );
         parent.setUpkeepAddress(upkeep);
+        parentRebalancer.setParentPeer(address(parent));
         /// @dev deploy at least 2 child peers to cover all CCIP tx types
         child1 = new ChildPeer(
             networkConfig.ccip.ccipRouter,

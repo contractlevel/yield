@@ -7,6 +7,7 @@ import {IRouterClient, Client} from "@chainlink/contracts/src/v0.8/ccip/interfac
 import {IERC677Receiver} from "@chainlink/contracts/src/v0.8/shared/interfaces/IERC677Receiver.sol";
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IComet} from "../interfaces/IComet.sol";
 import {IShare} from "../interfaces/IShare.sol";
 import {IYieldPeer} from "../interfaces/IYieldPeer.sol";
@@ -19,7 +20,10 @@ import {CCIPOperations} from "../libraries/CCIPOperations.sol";
 /// @author @contractlevel
 /// @notice YieldPeer is the base contract for the Parent and Child Peers in the Contract Level Yield system
 abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYieldPeer {
-    // @review use SafeERC20
+    /*//////////////////////////////////////////////////////////////
+                           TYPE DECLARATIONS
+    //////////////////////////////////////////////////////////////*/
+    using SafeERC20 for IERC20;
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -296,9 +300,9 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @dev Emit DepositInitiated event
     function _initiateDeposit(uint256 amountToDeposit) internal {
         // @review should we add a minimum deposit amount check? ie if (amountToDeposit < 1e6) revert;
-        // _revertIfZeroAmount(amountToDeposit);
+        _revertIfZeroAmount(amountToDeposit);
         // @review rename this error (if keeping it) and refactor relevant tests
-        if (amountToDeposit < 1e6) revert YieldPeer__NoZeroAmount();
+        // if (amountToDeposit < 1e6) revert YieldPeer__NoZeroAmount();
         _transferUsdcFrom(msg.sender, address(this), amountToDeposit);
         emit DepositInitiated(msg.sender, amountToDeposit, i_thisChainSelector);
     }
@@ -414,7 +418,6 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
 
     /// @dev Revert if the amount is 0
     /// @param amount The amount to check
-    // @review currently not in coverage report
     function _revertIfZeroAmount(uint256 amount) internal pure {
         if (amount == 0) revert YieldPeer__NoZeroAmount();
     }

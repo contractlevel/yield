@@ -11,6 +11,8 @@ import {MockUsdc} from "../test/mocks/MockUsdc.sol";
 import {MockFunctionsRouter} from "../test/mocks/MockFunctionsRouter.sol";
 import {CCIPLocalSimulator, LinkToken, IRouterClient} from "@chainlink-local/src/ccip/CCIPLocalSimulator.sol";
 import {Share} from "../src/token/Share.sol";
+import {ParentPeer} from "../src/peers/ParentPeer.sol";
+import {ChildPeer} from "../src/peers/ChildPeer.sol";
 
 contract HelperConfig is Script {
     /*//////////////////////////////////////////////////////////////
@@ -61,7 +63,6 @@ contract HelperConfig is Script {
         address[] remoteSharePools;
         address localShare;
         address[] remoteShares;
-        address parentRebalancer;
     }
 
     NetworkConfig public activeNetworkConfig;
@@ -154,8 +155,7 @@ contract HelperConfig is Script {
                 localSharePool: 0x0000000000000000000000000000000000000000,
                 remoteSharePools: new address[](0),
                 localShare: 0x0000000000000000000000000000000000000000,
-                remoteShares: new address[](0),
-                parentRebalancer: 0x0000000000000000000000000000000000000000
+                remoteShares: new address[](0)
             })
         });
     }
@@ -194,8 +194,7 @@ contract HelperConfig is Script {
                 localSharePool: 0x0000000000000000000000000000000000000000,
                 remoteSharePools: new address[](0),
                 localShare: 0x0000000000000000000000000000000000000000,
-                remoteShares: new address[](0),
-                parentRebalancer: 0x0000000000000000000000000000000000000000
+                remoteShares: new address[](0)
             })
         });
     }
@@ -224,7 +223,7 @@ contract HelperConfig is Script {
             clf: CLFConfig({
                 functionsRouter: 0x97083E831F8F0638855e2A515c90EdCF158DF238,
                 donId: 0x66756e2d617262697472756d2d6d61696e6e65742d3100000000000000000000,
-                clfSubId: 0 // @review dummy value
+                clfSubId: 0 // dummy value
             }),
             peers: PeersConfig({
                 localPeer: 0x0000000000000000000000000000000000000000,
@@ -234,8 +233,7 @@ contract HelperConfig is Script {
                 localSharePool: 0x0000000000000000000000000000000000000000,
                 remoteSharePools: new address[](0),
                 localShare: 0x0000000000000000000000000000000000000000,
-                remoteShares: new address[](0),
-                parentRebalancer: 0x0000000000000000000000000000000000000000
+                remoteShares: new address[](0)
             })
         });
     }
@@ -264,7 +262,7 @@ contract HelperConfig is Script {
             clf: CLFConfig({
                 functionsRouter: 0xf9B8fc078197181C841c296C876945aaa425B278,
                 donId: 0x66756e2d626173652d6d61696e6e65742d310000000000000000000000000000,
-                clfSubId: 0 // @review dummy value
+                clfSubId: 0 // dummy value
             }),
             peers: PeersConfig({
                 localPeer: 0x0000000000000000000000000000000000000000,
@@ -274,8 +272,7 @@ contract HelperConfig is Script {
                 localSharePool: 0x0000000000000000000000000000000000000000,
                 remoteSharePools: new address[](0),
                 localShare: 0x0000000000000000000000000000000000000000,
-                remoteShares: new address[](0),
-                parentRebalancer: 0x0000000000000000000000000000000000000000
+                remoteShares: new address[](0)
             })
         });
     }
@@ -329,10 +326,10 @@ contract HelperConfig is Script {
                 localSharePool: ETH_SEPOLIA_SHARE_POOL,
                 remoteSharePools: remoteSharePools,
                 localShare: ETH_SEPOLIA_SHARE_TOKEN,
-                remoteShares: remoteShares,
-                parentRebalancer: 0x107C9A78c447c99289B84476f53620236114AbAa
+                remoteShares: remoteShares
             })
         });
+        // parentRebalancer: 0x107C9A78c447c99289B84476f53620236114AbAa
     }
 
     function getBaseSepoliaConfig() public returns (NetworkConfig memory) {
@@ -381,8 +378,7 @@ contract HelperConfig is Script {
                 localSharePool: BASE_SEPOLIA_SHARE_POOL,
                 remoteSharePools: remoteSharePools,
                 localShare: BASE_SEPOLIA_SHARE_TOKEN,
-                remoteShares: remoteShares,
-                parentRebalancer: 0x0000000000000000000000000000000000000000
+                remoteShares: remoteShares
             })
         });
     }
@@ -433,8 +429,7 @@ contract HelperConfig is Script {
                 localSharePool: AVALANCHE_FUJI_SHARE_POOL,
                 remoteSharePools: remoteSharePools,
                 localShare: AVALANCHE_FUJI_SHARE_TOKEN,
-                remoteShares: remoteShares,
-                parentRebalancer: 0x0000000000000000000000000000000000000000
+                remoteShares: remoteShares
             })
         });
     }
@@ -461,20 +456,20 @@ contract HelperConfig is Script {
         return NetworkConfig({
             ccip: CCIPConfig({
                 ccipRouter: address(ccipRouter),
-                thisChainSelector: 0, // @review dummy value
+                thisChainSelector: 0, // dummy value
                 parentChainSelector: 0, // set these with separate values
                 rmnProxy: 0x411dE17f12D1A34ecC7F45f49844626267c75e81,
-                usdcTokenPool: address(0), // @review
-                cctpMessageTransmitter: address(0), // @review
-                tokenAdminRegistry: address(0), // @review
-                registryModuleOwnerCustom: address(0) // @review
+                usdcTokenPool: address(0), // dummy value
+                cctpMessageTransmitter: address(0), // dummy value
+                tokenAdminRegistry: address(0), // dummy value
+                registryModuleOwnerCustom: address(0) // dummy value
             }),
             tokens: TokensConfig({link: address(link), usdc: address(usdc), share: address(share)}),
             protocols: ProtocolsConfig({aavePoolAddressesProvider: address(poolAddressesProvider), comet: address(comet)}),
             clf: CLFConfig({
                 functionsRouter: address(functionsRouter),
                 donId: "",
-                clfSubId: 0 // @review dummy value
+                clfSubId: 0 // dummy value
             }),
             peers: PeersConfig({
                 localPeer: 0x0000000000000000000000000000000000000000,
@@ -484,8 +479,7 @@ contract HelperConfig is Script {
                 localSharePool: 0x0000000000000000000000000000000000000000,
                 remoteSharePools: new address[](0),
                 localShare: 0x0000000000000000000000000000000000000000,
-                remoteShares: new address[](0),
-                parentRebalancer: 0x0000000000000000000000000000000000000000
+                remoteShares: new address[](0)
             })
         });
     }

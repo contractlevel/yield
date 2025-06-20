@@ -1,4 +1,4 @@
-// @review - script works but test cant run because prank and broadcast are incompatible
+// // @review - script works but test cant run because prank and broadcast are incompatible
 // // SPDX-License-Identifier: MIT
 // pragma solidity 0.8.26;
 
@@ -10,19 +10,19 @@
 
 // contract SetCrossChainTest is Test {
 //     SetCrosschain internal setCrosschain;
-//     uint256 internal fujiFork;
+//     uint256 internal ethFork;
 //     HelperConfig.NetworkConfig internal networkConfig;
 //     address internal localPeer;
 //     address internal localPool;
 
 //     function setUp() public {
-//         fujiFork = vm.createSelectFork(vm.envString("AVALANCHE_FUJI_RPC_URL"));
+//         ethFork = vm.createSelectFork(vm.envString("ETH_SEPOLIA_RPC_URL"));
 //         HelperConfig helperConfig = new HelperConfig();
 //         networkConfig = helperConfig.getActiveNetworkConfig();
 //         localPeer = networkConfig.peers.localPeer;
 //         localPool = networkConfig.peers.localSharePool;
-//         // vm.allowCheatcodes(0xC88b1A38eEF111FFBAc4118ac2e6afa82C58773c);
-//         // vm.startPrank(0xD208335060493C8f3f5a3626Ac057BD231abF235);
+//         vm.allowCheatcodes(0xEEf7A554C51f7F19ADbE9116d7238cd2d96F514B);
+//         vm.startPrank(0xD208335060493C8f3f5a3626Ac057BD231abF235);
 
 //         setCrosschain = new SetCrosschain();
 //         setCrosschain.run();

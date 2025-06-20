@@ -15,8 +15,9 @@ contract ParentHarness is ParentPeer, HelperHarness {
         address usdc,
         address aavePoolAddressesProvider,
         address comet,
-        address share
-    ) ParentPeer(ccipRouter, link, thisChainSelector, usdc, aavePoolAddressesProvider, comet, share) {}
+        address share,
+        address parentRebalancer    
+    ) ParentPeer(ccipRouter, link, thisChainSelector, usdc, aavePoolAddressesProvider, comet, share, parentRebalancer) {}
 
     function buildCCIPMessage(
         address receiver,

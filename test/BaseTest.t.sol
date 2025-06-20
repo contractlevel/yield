@@ -9,11 +9,10 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {CCIPLocalSimulatorFork, Register} from "@chainlink-local/src/ccip/CCIPLocalSimulatorFork.sol";
+import {Log} from "@chainlink/contracts/src/v0.8/automation/interfaces/ILogAutomation.sol";
 
-import {DeployParent, HelperConfig, ParentCLF} from "../script/deploy/DeployParent.s.sol";
+import {DeployParent, HelperConfig, ParentCLF, ParentRebalancer} from "../script/deploy/DeployParent.s.sol";
 import {DeployChild, ChildPeer} from "../script/deploy/DeployChild.s.sol";
-// @review, this should maybe be moved to parent deploy script
-// import {DeployRebalancer, ParentRebalancer} from "../script/deploy/DeployRebalancer.s.sol";
 import {Share} from "../src/token/Share.sol";
 import {SharePool} from "../src/token/SharePool.sol";
 import {RateLimiter} from "@chainlink/contracts/src/v0.8/ccip/libraries/RateLimiter.sol";
@@ -57,8 +56,7 @@ contract BaseTest is Test {
     Share internal baseShare;
     SharePool internal baseSharePool;
     ParentCLF internal baseParentPeer;
-    // @review
-    // ParentRebalancer internal baseParentRebalancer;
+    ParentRebalancer internal baseParentRebalancer;
     HelperConfig internal baseConfig;
     HelperConfig.NetworkConfig internal baseNetworkConfig;
     uint64 internal baseChainSelector;
@@ -91,6 +89,7 @@ contract BaseTest is Test {
     address internal withdrawer = makeAddr("withdrawer");
     address internal holder = makeAddr("holder");
     address internal upkeepAddress = makeAddr("upkeepAddress");
+    address internal forwarder = makeAddr("forwarder");
     address[] internal attesters = new address[](4);
     address internal cctpAttester1;
     address internal cctpAttester2;
@@ -138,10 +137,11 @@ contract BaseTest is Test {
         _bypassClfTermsOfService();
 
         DeployParent baseDeployParent = new DeployParent();
-        (baseShare, baseSharePool, baseParentPeer, baseConfig, clfSubId) = baseDeployParent.run();
+        (baseShare, baseSharePool, baseParentPeer, baseParentRebalancer, baseConfig, clfSubId) = baseDeployParent.run();
         vm.makePersistent(address(baseShare));
         vm.makePersistent(address(baseSharePool));
         vm.makePersistent(address(baseParentPeer));
+        vm.makePersistent(address(baseParentRebalancer));
 
         baseNetworkConfig = baseConfig.getActiveNetworkConfig();
         baseChainSelector = baseNetworkConfig.ccip.thisChainSelector;
@@ -539,5 +539,18 @@ contract BaseTest is Test {
         deal(address(baseUsdc), approver, amount);
         _changePrank(approver);
         baseUsdc.approve(approvee, amount);
+    }
+
+    function _createLog(address source, bytes32[] memory topics) internal view returns (Log memory) {
+        return Log({
+            index: 0,
+            timestamp: block.timestamp,
+            txHash: bytes32(0),
+            blockNumber: block.number,
+            blockHash: bytes32(0),
+            source: source,
+            topics: topics,
+            data: ""
+        });
     }
 }

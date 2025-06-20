@@ -178,6 +178,9 @@ contract Handler is Test {
         uint256 withdrawChainSelectorSeed,
         uint256 usdcDepositAmount
     ) public {
+        /// @dev ensure the pools have enough liquidity
+        _dealPoolsUsdc();
+
         /// @dev create or get the withdrawer
         address withdrawer = _createOrGetUser(addressSeed);
         uint256 withdrawerShareBalance = share.balanceOf(withdrawer);
@@ -385,4 +388,7 @@ contract Handler is Test {
     function getAdminShareBalance() external view returns (uint256) {
         return share.balanceOf(admin);
     }
+
+    /// @dev empty test to ignore in coverage report
+    function test_emptyTest() public {}
 }
