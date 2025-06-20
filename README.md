@@ -61,7 +61,8 @@ A live demo site with Ethereum, Base and Avalanche testnets is available at [con
     - [Base Sepolia](#base-sepolia)
     - [Avalanche Fuji](#avalanche-fuji)
   - [Testnet Transactions](#testnet-transactions)
-    - [Rebalance](#rebalance-1)
+    - [Rebalance New Strategy](#rebalance-new-strategy)
+    - [Rebalance Old Strategy](#rebalance-old-strategy)
     - [Deposit tx from chain c (avalanche) → parent (eth) → strategy (base)](#deposit-tx-from-chain-c-avalanche--parent-eth--strategy-base)
     - [Withdraw tx from chain c (avalanche) → parent (eth) → strategy (base)](#withdraw-tx-from-chain-c-avalanche--parent-eth--strategy-base)
     - [YieldCoin Bridge tx (eth -\> aval)](#yieldcoin-bridge-tx-eth---aval)
@@ -84,7 +85,7 @@ The protocol and chain with the highest APY, where the system funds are allocate
 
 YieldCoin follows the [ERC677](https://github.com/ethereum/EIPs/issues/677) and [CCT](https://docs.chain.link/ccip/concepts/cross-chain-token) standards for maximum efficiency and interoperability. The YieldCoin CCIP pools are permissionless, allowing holders to move freely across chains. `ERC677.transferAndCall()` enables holders to withdraw USDC in a single tx, without having to approve the CLY infrastructure to transfer their YIELD first. See [./src/token/Share.sol](https://github.com/contractlevel/yield/blob/main/src/token/Share.sol).
 
-The more fees CLY generates, ie the more YieldCoin is bought, the more frequent the checks for the highest APY can become, as Chainlink fees are covered.
+The more fees CLY generates, ie the more YieldCoin is bought, the more frequent the checks for the highest APY can become, as Chainlink fees are covered. // @review
 
 ## Strategy
 
@@ -305,6 +306,8 @@ _Note: These withdrawal diagrams assume the chain to withdraw to is the one the 
 
 ## Deploying
 
+// @review ParentRebalancer should be deployed in DeployParent now
+
 `ParentRebalancer` should be deployed first on the Parent chain.
 
 ```
@@ -477,7 +480,7 @@ SharePool (YieldCoin CCIP pool): https://testnet.snowtrace.io/address/0x9bf12E91
 
 ## Testnet Transactions
 
-### Rebalance
+### Rebalance New Strategy
 
 time based auto triggers CLF https://sepolia.etherscan.io/tx/0xc8159327d9c76b118c2caa10c9db513cc38c2c7a00e3c2f026df12d2b5e6190a
 
@@ -488,6 +491,18 @@ log trigger auto https://sepolia.etherscan.io/tx/0x1099dbd2cd04403635b820cd17508
 ccip rebalance https://ccip.chain.link/#/side-drawer/msg/0xb01894363f416f83171ee994cd043eacf4cc487bc2d8a589229d02c2649ed10b
 
 dst tx: https://sepolia.basescan.org/tx/0x35f97388d654b63d80f4d9b88eab11fb4ee16a909862dd19338c8a758565a70c
+
+### Rebalance Old Strategy
+
+time based: https://sepolia.etherscan.io/tx/0xfb4413c2b8aeb0f2b849c2c962da3407334af3693d63b2112d005438eb1e114b
+
+functions: https://sepolia.etherscan.io/tx/0x99a22014821e742f247cfae3c66b363eae0022b1b8dd5516415ec26ee8389028
+
+log trigger: https://sepolia.etherscan.io/tx/0x90af2045da5f9c65037f8337409cb2c369b1bfd084db965bbc5685e07bcf5d3f
+
+rebalance old strategy: https://ccip.chain.link/#/side-drawer/msg/0x86a09a3f8c59d325703a8d7936834641fdf1b4cab3c25e1a64e38bf5e63d4210
+
+rebalance new strategy: https://ccip.chain.link/tx/0x08689dcb0cb6cc6149788a107e089d811f598ed79867536105280f01d12f8abe#/side-drawer/msg/0xe219bc33fbd5b23d4a564ca3bc0cc917be75cd52d16a850a23a85fbf619ebe86
 
 ### Deposit tx from chain c (avalanche) → parent (eth) → strategy (base)
 
