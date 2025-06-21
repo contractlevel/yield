@@ -56,6 +56,8 @@ A live demo site with Ethereum, Base and Avalanche testnets is available at [con
     - [Other Tests](#other-tests)
   - [Formal Verification](#formal-verification)
   - [Known Issues](#known-issues)
+    - [Precision loss/share calculation logic can result in 0 YieldCoin minted in exchange for USDC deposit](#precision-lossshare-calculation-logic-can-result-in-0-yieldcoin-minted-in-exchange-for-usdc-deposit)
+    - [Burning small amounts of shares can result in 0 usdc withdrawn](#burning-small-amounts-of-shares-can-result-in-0-usdc-withdrawn)
   - [Testnet Deployments](#testnet-deployments)
     - [Eth Sepolia](#eth-sepolia)
     - [Base Sepolia](#base-sepolia)
@@ -434,7 +436,27 @@ The `--nondet_difficult_funcs` flag is required for `ParentCLF` to [automaticall
 
 ## Known Issues
 
+### Precision loss/share calculation logic can result in 0 YieldCoin minted in exchange for USDC deposit
+
 The invariant testing and formal verification revealed a critical precision loss bug, that can cause insufficient amounts of YieldCoin minted in exchange for USDC. If this project had been developed outside the context of the hackathon, this would've been the top priority. Given the time constraints, other more demonstrative elements of this project were completed first. Once the hackathon submission for this project is done, fixing this issue will be the next step.
+
+### Burning small amounts of shares can result in 0 usdc withdrawn
+
+It can take up to 3 CCIP txs to calculate the `usdcWithdrawAmount` based on the `shareBurnAmount`
+
+Consider this scenario:
+
+- `shareBurnAmount`withdrawal initiated on child1
+- `totalShares` is on parent
+- `totalValue` is on child2 (strategy)
+
+These 3 values are required to calculate the `usdcWithdrawAmount`. When the `shareBurnAmount` is significantly small, the calculation can return less than the minimum amount of USDC to 6 decimals $1.000000 (.000000). This value is a significantly small fraction of a cent. If we tried to calculate this amount, it would return 0. Then if we try to withdraw this amount (0) from a yield strategy and send it across ccip to be transferred to the withdrawer, it would cause issues such as the transfer failing because the transferAmount is 0.
+
+Therefore the current, unfortunate solution (at least for the time constrained context of the hackathon) is to not withdraw or transfer anything if someone burns an amount of shares small enough that it is worth less than the 6th decimal after a $.
+
+It is unlikely to expect anyone to want to withdraw such a small amount of dust, but this edge case still needs to be acknowledged, and is handled as such by simply allowing the small amount of shares to be burnt without any redemption of USDC.
+
+We could add a min burn amount, and revert if this amount is not provided when a burn is attempted, but to do so would require the same above CCIP txs + extra ones just to tell the withdrawer that no, we cant burn your insignificant amount of shares.
 
 ## Testnet Deployments
 
@@ -547,6 +569,8 @@ ccip: https://ccip.chain.link/tx/0xd0c3e338c66bad81412c92ad7b76681b977464fa85350
 - svm compatability
 - ccip calldata compression (should use solady.libZip for compressing/decompressing depositData, withdrawData and strategy struct)
 - uniswap integration to allow users to "buy" yieldcoin with any asset, ie they pay with eth and it gets swapped to the usdc amount then deposited
+- test suite needs improving (event params have not been verified and no mutation testing has been done yet)
+- fix precision loss/share calculation logic bug (biggest priority, all ready started)
 
 ## Acknowledgement
 
