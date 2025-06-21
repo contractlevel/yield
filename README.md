@@ -69,6 +69,17 @@ A live demo site with Ethereum, Base and Avalanche testnets is available at [con
     - [Withdraw tx from chain c (avalanche) → parent (eth) → strategy (base)](#withdraw-tx-from-chain-c-avalanche--parent-eth--strategy-base)
     - [YieldCoin Bridge tx (eth -\> aval)](#yieldcoin-bridge-tx-eth---aval)
   - [Future Developments](#future-developments)
+  - [Challenges I ran into](#challenges-i-ran-into)
+    - [Precision Loss/Share Calculation Logic Bug](#precision-lossshare-calculation-logic-bug)
+    - [Burning small amounts of shares (YieldCoin) can result in no USDC redeemed](#burning-small-amounts-of-shares-yieldcoin-can-result-in-no-usdc-redeemed)
+    - [USDC chainlink-local fork](#usdc-chainlink-local-fork)
+    - [Proxy API](#proxy-api-1)
+    - [Time management/knowing what to prioritize](#time-managementknowing-what-to-prioritize)
+    - [Functions callback with max gas limit not being able to execute ccip sends](#functions-callback-with-max-gas-limit-not-being-able-to-execute-ccip-sends)
+    - [Certora Formal Verification of contracts that use Chainlink FunctionsRequest library](#certora-formal-verification-of-contracts-that-use-chainlink-functionsrequest-library)
+    - [Yield generating strategy protocols either not working on testnet or not existing](#yield-generating-strategy-protocols-either-not-working-on-testnet-or-not-existing)
+    - [DefiLlama API not providing testnet data](#defillama-api-not-providing-testnet-data)
+    - [Incorrect placement of `networkConfig` cache before `vm.startBroadcast` in deploy script](#incorrect-placement-of-networkconfig-cache-before-vmstartbroadcast-in-deploy-script)
   - [Acknowledgement](#acknowledgement)
 
 ## Overview
@@ -571,6 +582,90 @@ ccip: https://ccip.chain.link/tx/0xd0c3e338c66bad81412c92ad7b76681b977464fa85350
 - uniswap integration to allow users to "buy" yieldcoin with any asset, ie they pay with eth and it gets swapped to the usdc amount then deposited
 - test suite needs improving (event params have not been verified and no mutation testing has been done yet)
 - fix precision loss/share calculation logic bug (biggest priority, all ready started)
+
+## Challenges I ran into
+
+There were many roadblocks of varying size for this submission. The most significant of which is a precision loss/calculation logic bug that became apparent during invariant testing and formal verification.
+
+### Precision Loss/Share Calculation Logic Bug
+
+The invariant testing (which began after initially achieving full unit coverage) revealed cases where the amount of YieldCoin minted in exchange for USDC deposits was significantly less than it should have been.
+
+I thought the issue was mitigated with “initial admin deposits” which would go untouched, something like [dead shares inflation attack mitigation](https://solodit.cyfrin.io/issues/l-18-vault-is-susceptible-to-inflation-attack-by-first-depositor-pashov-audit-group-none-hyperstable_2025-02-26-markdown) because the invariant tests were then passing. (I actually need to try minting to address(0) - note to self for after this submission is done).
+
+The issue came up again during formal verification with Certora. Even though initial admin shares were minted, there were still scenarios where the total value of the system and the total shares (YieldCoin) minted (values used to calculate the `shareMintAmount` of YieldCoin, in exchange for USDC deposits) resulted in 0 YieldCoin minted despite the user depositing USDC - breaking a key invariant of the system: “user’s should always be able to withdraw their deposited amount (minus any fees) shortly after depositing into the system”.
+
+This issue has so far gone unresolved (today is 21st) because of how much a deep rabbit hole it could be, I wanted to get an eligible submission done before focusing on it - because there really is no way to know what other issues would’ve appeared during the testnet deployments and transactions phase.
+
+Other than this bug, the testnet deployments and transactions behaved as intended. All of the Chainlink integrations performed their roles correctly.
+
+Once this submission is done, the rest of the hackathon will be spent on this bug (and hopefully have solved it by the 29th).
+
+### Burning small amounts of shares (YieldCoin) can result in no USDC redeemed
+
+I don’t know how closely related the root cause of this is to the previous bug described, but it’s definitely similar, and was made apparent during testing.
+
+The issue is this: if an amount of YieldCoin (18 decimals) worth less than the lowest possible value of USDC (6 decimals) is burned in an attempt to withdraw USDC, no USDC will be withdrawn even though the YieldCoin has been burned.
+
+It’s debatable how critical this issue is, given the unlikelyhood of someone attempting a withdrawal of such a small amount, and ends up benefiting other YieldCoin holders. However it is still unintended behavior of the system, and results in (an insignificant) loss of value.
+
+Further research is required - it may end up being resolved with the previous issue, or it may have a different root cause. Either way, it is a top priority once this submission is done.
+
+### USDC chainlink-local fork
+
+This is actually an issue I’ve had with writing ccip tests before. The current chainlink-local ccip simulator is amazing, but unfortunately doesn’t have support for USDC - the stablecoin with the most lanes on CCIP.
+
+To fully test the system on forked mainnets, additional functionality in the `CCIPLocalSimulatorFork` was required to get past the additional CCTP checks for USDC. CCTP is Circle’s crosschain infrastructure for USDC that works alongside CCIP onchain.
+
+Ultimately the [additional functionality](https://github.com/contractlevel/chainlink-local/blob/519e854caaf1291c03bda3928674c922195fd629/src/ccip/CCIPLocalSimulatorFork.sol#L125-L238) required was the monitoring for a CCTP event and [pranking](https://getfoundry.sh/reference/cheatcodes/prank/) the CCTP [attesters](https://github.com/circlefin/evm-cctp-contracts/blob/6e7513cdb2bee6bb0cddf331fe972600fc5017c9/src/roles/Attestable.sol#L212-L230).
+
+### Proxy API
+
+Information pertaining to the “strategy” with the highest yield (ie the chain and the protocol) is fetched from the [DefiLlama API](https://yields.llama.fi/pools) which returns a HUGE response. The response was too much for Chainlink Functions, so a proxy API to filter for the relevant data was required.
+
+I made one and deployed it to AWS Lambda. The url for the API could have been abused (unlikely for a hackathon project, but a required consideration for a production ready project) so the url had to be properly encrypted with the [functions-toolkit](<[https://www.npmjs.com/package/@chainlink/functions-toolkit#functions-utilities](https://www.npmjs.com/package/@chainlink/functions-toolkit#encrypting-secrets)>) and then stored as a [constant](https://github.com/contractlevel/yield/blob/575ee3cb5f9ae11b7921728a40e0590f678dd05c/src/peers/extensions/ParentCLF.sol#L33-L37) in the YieldCoin FunctionsClient contract. This value needed to be different for different chains due to the chain-specific parameters required when executing the encrypted secrets process.
+
+### Time management/knowing what to prioritize
+
+There were a lot of parts to this project and knowing which bit to prioritize and when was a challenge. Once the unit coverage was complete I played around with adding more yield strategies and implementing fees, before deciding to focus on invariant tests. More yield strategies wasn’t exactly essential to demonstrate the full functionality of the system itself, and implementing fees was much the same.
+
+As security is so integral to smart contract development, I decided more testing of the system so far was a higher priority than additional features that wouldn’t showcase any more Chainlink use and could be added later.
+
+As previously mentioned, juggling the precision loss/share calculation logic bug and getting an eligible submission done was a time management/priority challenge too.
+
+I didn’t get to implement everything I would’ve liked due to the time constraints, but that just means this project now has a [roadmap of future developments](https://github.com/contractlevel/yield?tab=readme-ov-file#future-developments).
+
+### Functions callback with max gas limit not being able to execute ccip sends
+
+This was a big issue that didn’t become apparent until the testnet stage. The original idea for the rebalancing process went like this: Time-based Automation sends request via Chainlink Functions to fetch yield strategy with highest APY, and then the fulfillRequest callback triggers CCIP rebalance messages.
+
+I suspected the Functions max gas limit may have been the cause of the issue, however the Tenderly calltrace showed the transaction failing on an unrelated revert - very confusing! I ended up asking in the discord hackathon support channel and received a response which led to the confirmation of my initial suspicions.
+
+Solving this issue required a second Automation implementation, to trigger the CCIP rebalance messaged based on the Functions request callback. This could have been done with Custom Logic Automation, but that likely would’ve meant using additional, redundant storage slots, so I opted for Log-trigger Automation. The idea for this being when a better strategy was returned by Chainlink Functions, an event detailing this would be emitted, and then Log-trigger Automation would listen for this event, and execute CCIP rebalance messages based on it.
+
+The chain that would have required the Log-trigger Automation was Base Sepolia, because that is where the ParentPeer/CLF contract (the one that interacts with Chainlink Functions) was deployed.
+
+Log-trigger Automation on Base Sepolia required approval from the Chainlink team, which I applied for and was granted (thanks). However efficiently using the time between needing this functionality and being granted access to it was crucial. I redeployed the entire infrastructure, so that the Parent peer contract was now on Ethereum Sepolia because Log-trigger Automation on that chain did not require preapproval. A few hours after successfully executing the full rebalance transaction, I was granted access on Base Sepolia. I appreciated the fast approval from Chainlink, but the project needed to move ahead.
+
+### Certora Formal Verification of contracts that use Chainlink FunctionsRequest library
+
+The Certora prover is a formal verification tool that attempts to explore all paths of a transaction, however it has its limitations - particularly when verifying contracts with “high path count”, because it causes the prover to “timeout” and the verification job stops, incomplete.
+
+In the past I mostly ran into this problem using it on contracts with significant assembly usage, but due to the heavy use of strings and bytes in `FunctionsRequest::encodeCBOR()`, the prover timed out.
+
+This was solved by adding the [`nondet_difficult_funcs`](https://docs.certora.com/en/latest/docs/prover/cli/options.html#nondet-difficult-funcs) flag when running Certora, which automatically summarized view/pure functions that were previously non-summarized and difficult for the Prover to verify.
+
+### Yield generating strategy protocols either not working on testnet or not existing
+
+Aave and Compound were the protocols chosen as yield generating strategies for this initial prototype. Unfortunately they were not fully available across all required testnets, so I had to use mocks in their place on testnets. These mocks function identically to their official production equivalents, but do not actually generate any yield. They are merely used to demonstrate depositing and withdrawing from these strategies.
+
+### DefiLlama API not providing testnet data
+
+Mainnet data was used for the strategy with the highest APY and testnet transactions were based on this.
+
+### Incorrect placement of `networkConfig` cache before `vm.startBroadcast` in deploy script
+
+This issue caused the wrong USDC address to be set in the constructor for a testnet deployment and was fixed by moving the line caching the `networkConfig` to after the `vm.startBroadcast`.
 
 ## Acknowledgement
 
