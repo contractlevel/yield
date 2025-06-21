@@ -585,6 +585,8 @@ ccip: https://ccip.chain.link/tx/0xd0c3e338c66bad81412c92ad7b76681b977464fa85350
 
 ## Challenges I ran into
 
+This section has been added to the README because it would not all fit in the submission page for the hackathon.
+
 There were many roadblocks of varying size for this submission. The most significant of which is a precision loss/calculation logic bug that became apparent during invariant testing and formal verification.
 
 ### Precision Loss/Share Calculation Logic Bug
