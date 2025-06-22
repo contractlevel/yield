@@ -71,7 +71,7 @@ A live demo site with Ethereum, Base and Avalanche testnets is available at [con
   - [Future Developments](#future-developments)
   - [Challenges I ran into](#challenges-i-ran-into)
     - [Precision Loss/Share Calculation Logic Bug](#precision-lossshare-calculation-logic-bug)
-    - [Burning small amounts of shares (YieldCoin) can result in no USDC redeemed](#burning-small-amounts-of-shares-yieldcoin-can-result-in-no-usdc-redeemed)
+    - [Burning small amounts of shares (YieldCoin), worth less than the lowest possible value of USDC (6 decimals) resulted in reverts](#burning-small-amounts-of-shares-yieldcoin-worth-less-than-the-lowest-possible-value-of-usdc-6-decimals-resulted-in-reverts)
     - [USDC chainlink-local fork](#usdc-chainlink-local-fork)
     - [Proxy API](#proxy-api-1)
     - [Time management/knowing what to prioritize](#time-managementknowing-what-to-prioritize)
@@ -575,7 +575,7 @@ ccip: https://ccip.chain.link/tx/0xd0c3e338c66bad81412c92ad7b76681b977464fa85350
 
 - more stablecoin support (swapping to one with higher yield opportunities, such as USD1, USDT, etc.)
 - more chains
-- more yield strategies/protocols (such as Euler)
+- more yield strategies/protocols (such as Euler, Morpho)
 - fees (and automated Chainlink service payments)
 - svm compatability
 - ccip calldata compression (should use solady.libZip for compressing/decompressing depositData, withdrawData and strategy struct)
@@ -603,15 +603,13 @@ Other than this bug, the testnet deployments and transactions behaved as intende
 
 Once this submission is done, the rest of the hackathon will be spent on this bug (and hopefully have solved it by the 29th).
 
-### Burning small amounts of shares (YieldCoin) can result in no USDC redeemed
+### Burning small amounts of shares (YieldCoin), worth less than the lowest possible value of USDC (6 decimals) resulted in reverts
 
-I don’t know how closely related the root cause of this is to the previous bug described, but it’s definitely similar, and was made apparent during testing.
+If a user attempted to withdraw USDC by burning an amount of shares/YieldCoin worth _less_ than the lowest possible value of USDC (6 decimals), solidity would calculate the amount of USDC to withdraw as 0. This caused reverts when the smart contracts attempted to withdraw 0 from strategy protocols and transfer it to the withdrawer.
 
-The issue is this: if an amount of YieldCoin (18 decimals) worth less than the lowest possible value of USDC (6 decimals) is burned in an attempt to withdraw USDC, no USDC will be withdrawn even though the YieldCoin has been burned.
+To mitigate this, the current approach is a bit of a compromise, but if someone tries to withdraw less than the lowest possible value of USDC, they receive nothing in exchange for burning their shares. This of course is not ideal, and is considered a [known issue](https://github.com/contractlevel/yield?tab=readme-ov-file#burning-small-amounts-of-shares-can-result-in-0-usdc-withdrawn), however it is unexpected that a user will attempt to withdraw such an insignificant amount, and doing so would benefit all other YieldCoin holders. Most importantly, this mitigation means the system doesn't revert/experience any weird DoS.
 
-It’s debatable how critical this issue is, given the unlikelyhood of someone attempting a withdrawal of such a small amount, and ends up benefiting other YieldCoin holders. However it is still unintended behavior of the system, and results in (an insignificant) loss of value.
-
-Further research is required - it may end up being resolved with the previous issue, or it may have a different root cause. Either way, it is a top priority once this submission is done.
+Further research is will be conducted on this issue. It is essentially mitigated, but it is not perfect.
 
 ### USDC chainlink-local fork
 
@@ -619,7 +617,7 @@ This is actually an issue I’ve had with writing ccip tests before. The current
 
 To fully test the system on forked mainnets, additional functionality in the `CCIPLocalSimulatorFork` was required to get past the additional CCTP checks for USDC. CCTP is Circle’s crosschain infrastructure for USDC that works alongside CCIP onchain.
 
-Ultimately the [additional functionality](https://github.com/contractlevel/chainlink-local/blob/519e854caaf1291c03bda3928674c922195fd629/src/ccip/CCIPLocalSimulatorFork.sol#L125-L238) required was the monitoring for a CCTP event and [pranking](https://getfoundry.sh/reference/cheatcodes/prank/) the CCTP [attesters](https://github.com/circlefin/evm-cctp-contracts/blob/6e7513cdb2bee6bb0cddf331fe972600fc5017c9/src/roles/Attestable.sol#L212-L230).
+Ultimately the [additional functionality](https://github.com/contractlevel/chainlink-local/blob/519e854caaf1291c03bda3928674c922195fd629/src/ccip/CCIPLocalSimulatorFork.sol#L125-L238) required was the monitoring for a [CCTP event](https://github.com/circlefin/evm-cctp-contracts/blob/6e7513cdb2bee6bb0cddf331fe972600fc5017c9/src/MessageTransmitter.sol#L362) and [pranking](https://getfoundry.sh/reference/cheatcodes/prank/) the CCTP [attesters](https://github.com/circlefin/evm-cctp-contracts/blob/6e7513cdb2bee6bb0cddf331fe972600fc5017c9/src/roles/Attestable.sol#L212-L230).
 
 ### Proxy API
 

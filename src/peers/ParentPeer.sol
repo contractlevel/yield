@@ -26,13 +26,14 @@ contract ParentPeer is YieldPeer {
     /// @dev Constant for the initial share precision used to calculate the mint amount for first deposit
     uint256 internal constant INITIAL_SHARE_PRECISION = SHARE_DECIMALS / USDC_DECIMALS;
 
-    /// @dev This address handles automated CCIP rebalance calls because CLF runs out of gas
+    /// @dev This address handles automated CCIP rebalance calls with Log-trigger Automation, based on Function request callbacks
+    /// @notice See ./src/modules/ParentRebalancer.sol
     address internal immutable i_parentRebalancer;
 
-    /// @dev total SHAREs minted across all chains
+    /// @dev total share tokens (YieldCoin) minted across all chains
     // @invariant s_totalShares == ghost_totalSharesMinted - ghost_totalSharesBurned
     uint256 internal s_totalShares;
-    /// @dev The current strategy - chainSelector and protocol
+    /// @dev The current strategy: chainSelector and protocol
     Strategy internal s_strategy;
 
     /*//////////////////////////////////////////////////////////////
@@ -60,7 +61,7 @@ contract ParentPeer is YieldPeer {
     /// @param usdc The address of the USDC token
     /// @param aavePoolAddressesProvider The address of the Aave pool addresses provider
     /// @param comet The address of the Compound v3 cUSDCv3 contract
-    /// @param share The address of the SHARE token native to this system that is minted in exchange for USDC deposits
+    /// @param share The address of the share token native to this system that is minted in exchange for USDC deposits (YieldCoin)
     /// @dev Initial Strategy is set to Aave on this chain
     constructor(
         address ccipRouter,
@@ -72,7 +73,6 @@ contract ParentPeer is YieldPeer {
         address share,
         address parentRebalancer
     ) YieldPeer(ccipRouter, link, thisChainSelector, usdc, aavePoolAddressesProvider, comet, share) {
-        // @review modularize this
         s_strategy = Strategy({chainSelector: thisChainSelector, protocol: Protocol.Aave});
         _updateStrategyPool(thisChainSelector, Protocol.Aave);
 
@@ -103,7 +103,7 @@ contract ParentPeer is YieldPeer {
             uint256 shareMintAmount = _calculateMintAmount(totalValue, amountToDeposit);
             s_totalShares += shareMintAmount;
 
-            /// @dev mint SHAREs to msg.sender based on amount deposited and total value of the system
+            /// @dev mint share tokens (YieldCoin) to msg.sender based on amount deposited and total value of the system
             _mintShares(msg.sender, shareMintAmount);
             emit ShareMintUpdate(shareMintAmount, i_thisChainSelector, s_totalShares);
         }
@@ -223,7 +223,7 @@ contract ParentPeer is YieldPeer {
         if (strategy.chainSelector == i_thisChainSelector || strategy.chainSelector == depositData.chainSelector) {
             depositData.shareMintAmount = _calculateMintAmount(depositData.totalValue, depositData.amount);
             s_totalShares += depositData.shareMintAmount;
-            emit ShareMintUpdate(depositData.shareMintAmount, i_thisChainSelector, s_totalShares);
+            emit ShareMintUpdate(depositData.shareMintAmount, depositData.chainSelector, s_totalShares);
 
             _ccipSend(
                 depositData.chainSelector, CcipTxType.DepositCallbackChild, abi.encode(depositData), ZERO_BRIDGE_AMOUNT
@@ -254,6 +254,7 @@ contract ParentPeer is YieldPeer {
         /// @dev handle the case where the deposit was made on this parent chain
         if (depositData.chainSelector == i_thisChainSelector) {
             _mintShares(depositData.depositor, depositData.shareMintAmount);
+            emit ShareMintUpdate(depositData.shareMintAmount, i_thisChainSelector, s_totalShares);
         }
         /// @dev handle the case where the deposit was made on a child chain
         else {
@@ -261,9 +262,8 @@ contract ParentPeer is YieldPeer {
             _ccipSend(
                 depositData.chainSelector, CcipTxType.DepositCallbackChild, abi.encode(depositData), ZERO_BRIDGE_AMOUNT
             );
+            emit ShareMintUpdate(depositData.shareMintAmount, depositData.chainSelector, s_totalShares);
         }
-
-        emit ShareMintUpdate(depositData.shareMintAmount, i_thisChainSelector, s_totalShares);
     }
 
     /// @notice This function handles a withdraw tx that initiated on another chain.
@@ -275,8 +275,13 @@ contract ParentPeer is YieldPeer {
         WithdrawData memory withdrawData = _decodeWithdrawData(data);
         withdrawData.totalShares = s_totalShares;
         s_totalShares -= withdrawData.shareBurnAmount;
+        // @review the chain selector emitted in this event is not necessarily the chain selector of where the shares were burned
+        // because the withdrawData.chainSelector is where the USDC is withdrawn to
+        // @review could pass message.sourceChainSelector to this event but would require refactoring YieldPeer::_handleCCIPMessage
         emit ShareBurnUpdate(
-            withdrawData.shareBurnAmount, i_thisChainSelector, withdrawData.totalShares - withdrawData.shareBurnAmount
+            withdrawData.shareBurnAmount,
+            withdrawData.chainSelector,
+            withdrawData.totalShares - withdrawData.shareBurnAmount
         );
 
         Strategy memory strategy = s_strategy;
@@ -326,7 +331,7 @@ contract ParentPeer is YieldPeer {
             _handleLocalStrategyChange(newStrategy);
         }
         // @notice we are handling these cases with the ParentRebalancer
-        // @review remove everything below here and refactor tests
+        // @review! remove everything below here and refactor tests
         // Handle moving strategy from this parent chain to a different chain
         else if (oldStrategy.chainSelector == i_thisChainSelector && chainSelector != i_thisChainSelector) {
             address oldStrategyPool = _getStrategyPool();
