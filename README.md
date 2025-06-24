@@ -86,19 +86,15 @@ A live demo site with Ethereum, Base and Avalanche testnets is available at [con
 
 **Problem statement**: "I want my stablecoins to earn the highest possible yield without having to monitor opportunities, then manually withdraw, bridge and deposit."
 
-**Solution**: YieldCoin abstracts ALL of that away. Deposit your stablecoin into the CLY system from your chain of choice to earn the highest yield from the safest, most reliable services across the web3 ecosystem.
+**Solution**: YieldCoin abstracts ALL of that away. Deposit your stablecoin into the Contract Level Yield system, from your chain of choice, to earn the highest yield from the safest, most reliable services across the web3 ecosystem.
 
 Stablecoin depositors receive a share token in return for their deposits, representing their share of the total value (deposits + yield) in the system. Depositing a stablecoin can also be considered "buying" YieldCoin. YieldCoin is the share received for depositing into the system, with the basic idea being that a holder will be able to "sell" (their YieldCoin) for a higher USD value than they bought it. This is because the stablecoin deposits will not go down in value, and reliable yield will be generated. Hence the name YieldCoin.
-
-key invariant: a user must be able to withdraw the usdc amount they deposited - fees. this is definitely broken by the precision loss bug we already know // @review
 
 The protocol and chain with the highest APY, where the system funds are allocated is known as the `Strategy`.
 
 ## YieldCoin
 
 YieldCoin follows the [ERC677](https://github.com/ethereum/EIPs/issues/677) and [CCT](https://docs.chain.link/ccip/concepts/cross-chain-token) standards for maximum efficiency and interoperability. The YieldCoin CCIP pools are permissionless, allowing holders to move freely across chains. `ERC677.transferAndCall()` enables holders to withdraw USDC in a single tx, without having to approve the CLY infrastructure to transfer their YIELD first. See [./src/token/Share.sol](https://github.com/contractlevel/yield/blob/main/src/token/Share.sol).
-
-The more fees CLY generates, ie the more YieldCoin is bought, the more frequent the checks for the highest APY can become, as Chainlink fees are covered. // @review
 
 ## Strategy
 
@@ -393,6 +389,12 @@ Given the nature of invariant fuzz runs, the invariant tests do not use the `CCI
 
 A gas check has been [bypassed](https://github.com/contractlevel/chainlink-local/blob/519e854caaf1291c03bda3928674c922195fd629/test/mocks/MockRouter.sol#L227-L230) in these tests because no matter what value was set for the CCIP gas limit, one of the fuzz runs would eventually fail with either `Not enough gas` or `Out of gas`. These mocked gas checks were not critical to the functionality that required testing, particularly when forked mainnets with non-mocked gas checks were already confirmed to be working, so instead of spending additional time on this detail, it was bypassed altogether.
 
+Key invariants identified include:
+
+- a user must be able to withdraw the usdc amount they deposited minus fees
+- total YieldCoin minted across chains should be accurately tracked in Parent storage
+- TVL should be more than or equal to net deposits
+
 The invariant tests can be run with:
 
 ```
@@ -602,6 +604,14 @@ This issue has so far gone unresolved (today is 21st) because of how much a deep
 Other than this bug, the testnet deployments and transactions behaved as intended. All of the Chainlink integrations performed their roles correctly.
 
 Once this submission is done, the rest of the hackathon will be spent on this bug (and hopefully have solved it by the 29th).
+
+Update: (Today is 24th). There was a problem with the yieldcoin mint amount calculation in `ParentPeer::_calculateMintAmount`. That problem was the `totalValue` being passed included the deposit `amount`. Both of these values are required to calculate the amount to mint. The fix to this was to subtract the amount from totalValue (still needs to be cleaned up, and explored deeper for other inconsistencies across the codebase).
+
+I also introduced decimal conversions where appropriate.
+
+The invariant discussed above is now fixed.
+
+There are still extremely [rare edgecases](https://x.com/contractlevel/status/1937522221552906668) uncovered by Certora when the TVL and yieldCoin.totalSupply() are unrealistic values. I strongly suspect the initial admin mint mitigation and organic use will nullify these edgecases naturally, but further research will be conducted to confirm this.
 
 ### Burning small amounts of shares (YieldCoin), worth less than the lowest possible value of USDC (6 decimals) resulted in reverts
 

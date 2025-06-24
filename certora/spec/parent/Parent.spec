@@ -270,7 +270,7 @@ rule deposit_transfersUsdcToStrategy_when_parent_is_strategy() {
     assert usdc.balanceOf(e.msg.sender) == depositorBalanceBefore - amountToDeposit;
 }
 
-// @review this is uncovering a critical edgecase bug and needs to be revisited.
+// @review this is uncovering a special edgecase bug and needs to be revisited.
 rule deposit_mintsShares_when_parent_is_strategy() {
     env e;
     calldataarg args;
@@ -279,14 +279,11 @@ rule deposit_mintsShares_when_parent_is_strategy() {
     uint256 shareSupplyBefore = share.totalSupply();
     uint256 totalSharesBefore = getTotalShares();
 
-    /// @notice simulating initial admin deposit to mitigate inflation attack
-    // // require getTotalValue(e) >= 1000000 && totalSharesBefore >= 1000000000000; // 1 usdc
-    // require getTotalValue(e) >= 100000000 && totalSharesBefore >= 100000000000000; // 1 usdc
-    // require share.balanceOf(0) == 10000000000000000000;
-    /// @notice this rule passes with these ==
+    /// @notice this rule passes with ==
     /// edgecase uncovered with >=
-    require getTotalValue(e) == 100000000 &&
-        totalSharesBefore == 100000000000000000000;
+    /// @notice simulating initial admin deposit to mitigate inflation attack
+    require getTotalValue(e) >= 100000000 &&
+        totalSharesBefore >= 100000000000000000000; // 100 usdc
 
     deposit(e, args);
 
