@@ -449,6 +449,8 @@ contract ParentPeer is YieldPeer {
         } else {
             shareMintAmount = amount * INITIAL_SHARE_PRECISION;
         }
+
+        if (shareMintAmount == 0) shareMintAmount = 1;
     }
 
     /// @dev Revert if msg.sender is not the ParentRebalancer

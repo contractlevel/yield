@@ -270,7 +270,6 @@ rule deposit_transfersUsdcToStrategy_when_parent_is_strategy() {
     assert usdc.balanceOf(e.msg.sender) == depositorBalanceBefore - amountToDeposit;
 }
 
-// @review this is uncovering a special edgecase bug and needs to be revisited.
 rule deposit_mintsShares_when_parent_is_strategy() {
     env e;
     calldataarg args;
@@ -279,16 +278,28 @@ rule deposit_mintsShares_when_parent_is_strategy() {
     uint256 shareSupplyBefore = share.totalSupply();
     uint256 totalSharesBefore = getTotalShares();
 
-    /// @notice this rule passes with ==
-    /// edgecase uncovered with >=
-    /// @notice simulating initial admin deposit to mitigate inflation attack
-    require getTotalValue(e) >= 100000000 &&
-        totalSharesBefore >= 100000000000000000000; // 100 usdc
-
     deposit(e, args);
 
     assert share.totalSupply() > shareSupplyBefore;
     assert getTotalShares() > totalSharesBefore;
+}
+
+rule withdraw_edgecase() {
+    env e;
+    address user;
+    bytes encodedWithdrawChainSelector = encodeUint64(getThisChainSelector());
+    require getStrategy().chainSelector == getThisChainSelector();
+    require getTotalValue(e) == 100000000000000000002000001;
+    require getTotalShares() == 100000000000000000001;
+    require share.balanceOf(user) == 1;
+    require user != getCompound() && user != addressesProvider.getPool();
+
+    uint256 balanceBefore = usdc.balanceOf(user);
+    require balanceBefore + 1000000 <= max_uint256;
+
+    onTokenTransfer(e, user, 1, encodedWithdrawChainSelector);
+
+    assert usdc.balanceOf(user) == balanceBefore + 1000000;
 }
 
 rule deposit_emits_SharesMinted_when_parent_is_strategy() {
