@@ -441,14 +441,10 @@ contract ParentPeer is YieldPeer {
     /// @notice Returns amount * (SHARE_DECIMALS / USDC_DECIMALS) if there are no shares minted yet
     function _calculateMintAmount(uint256 totalValue, uint256 amount) internal view returns (uint256 shareMintAmount) {
         uint256 totalShares = s_totalShares;
-        // @review if totalShares isn't 0, then totalValue shouldn't be either.
-        // what if totalValue is 0? at this point it wont be because it includes the deposited amount
-        // what if it is 0 before including the deposited amount?
-        // if (totalShares != 0) shareMintAmount = (amount * totalShares) / totalValue - amount;
-        // else shareMintAmount = amount * INITIAL_SHARE_PRECISION;
 
-        // ------------------------------------------------------------
         if (totalShares != 0) {
+            /// @notice totalValue includes the deposited amount so thats why its being subtracted.
+            // @review
             shareMintAmount = (_convertUsdcToShare(amount) * totalShares) / _convertUsdcToShare(totalValue - amount);
         } else {
             shareMintAmount = amount * INITIAL_SHARE_PRECISION;
