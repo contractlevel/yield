@@ -224,14 +224,16 @@ contract Invariant is StdInvariant, BaseTest {
 
     /// @notice Total Value Accountancy: The total value in the system should be more than or equal to total USDC deposited minus total USDC withdrawn
     function invariant_totalValue_integrity() public {
-        handler.forEachChainSelector(this.checkTotalValuePerChainSelector);
+        handler.forEachChainSelector(this.checkTotalDepositsAgainstTotalValuePerChainSelector);
     }
 
-    function checkTotalValuePerChainSelector(uint64 chainSelector) external view {
+    function checkTotalDepositsAgainstTotalValuePerChainSelector(uint64 chainSelector) external view {
+        uint256 totalDeposited = handler.ghost_state_totalUsdcDeposited();
+        uint256 totalWithdrawn = handler.ghost_event_totalUsdcWithdrawn();
+        uint256 netDeposits = totalDeposited > totalWithdrawn ? totalDeposited - totalWithdrawn : 0;
         if (chainSelector == parent.getStrategy().chainSelector) {
             assertTrue(
-                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getTotalValue()
-                    >= handler.ghost_state_totalUsdcDeposited() - handler.ghost_event_totalUsdcWithdrawn(),
+                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getTotalValue() >= netDeposits,
                 "Invariant violated: Total value in the system should be more than or equal to total USDC deposited minus total USDC withdrawn"
             );
         }
@@ -270,5 +272,57 @@ contract Invariant is StdInvariant, BaseTest {
             handler.ghost_event_shareMintUpdate_emissions(),
             "Invariant violated: The number of DepositInitiated events should be equal to the number of ShareMintUpdate events"
         );
+    }
+
+    /// @notice Users should always be able to withdraw what they deposited (minus fees, but those arent implemented yet)
+    /// @dev this is a critical invariant that ensures the integrity of user deposit redemption
+    function invariant_stablecoinRedemptionIntegrity() public {
+        handler.forEachUser(this.checkRedemptionIntegrityPerUser);
+    }
+
+    function checkRedemptionIntegrityPerUser(address user) external view {
+        uint256 deposited = handler.ghost_state_totalUsdcDepositedPerUser(user);
+        uint256 withdrawn = handler.ghost_event_totalUsdcWithdrawnPerUser(user);
+        uint256 netDeposits = deposited > withdrawn ? deposited - withdrawn : 0;
+        uint256 userShares = share.balanceOf(user);
+
+        uint256 totalValue =
+            IYieldPeer(handler.chainSelectorsToPeers(parent.getStrategy().chainSelector)).getTotalValue();
+        uint256 totalValueConverted = _convertUsdcToShare(totalValue);
+        uint256 minUsdcValueInShares = _convertUsdcToShare(1);
+        uint256 totalShares = parent.getTotalShares();
+
+        if (totalShares > 0) {
+            uint256 withdrawable = (userShares * totalValueConverted) / totalShares;
+            uint256 withdrawableConverted = _convertShareToUsdc(withdrawable);
+            uint256 minWithdrawable = netDeposits * 990 / 1000; // Allow 1% slippage
+            if (withdrawableConverted < minWithdrawable) {
+                console2.log("User:", user);
+                console2.log("Deposited:", deposited);
+                console2.log("Withdrawn:", withdrawn);
+                console2.log("Net Deposits:", netDeposits);
+                console2.log("User Shares:", userShares);
+                console2.log("Total Value:", totalValue);
+                console2.log("Total Shares:", totalShares);
+                console2.log("Withdrawable:", withdrawable);
+                console2.log("Min Withdrawable:", minWithdrawable);
+            }
+            assertTrue(
+                withdrawableConverted >= minWithdrawable || netDeposits < minUsdcValueInShares,
+                "Invariant violated: User should be able to withdraw what they deposited, except for left over dust"
+            );
+        } else {
+            assertTrue(netDeposits == 0, "Invariant violated: User should be able to withdraw what they deposited");
+        }
+    }
+
+    // @review move these to a helper library/base test and replace magic numbers
+    function _convertUsdcToShare(uint256 amountInUsdc) internal pure returns (uint256 amountInShare) {
+        amountInShare = amountInUsdc * 1e12;
+    }
+
+    function _convertShareToUsdc(uint256 amountInShare) internal pure returns (uint256 amountInUsdc) {
+        // amountInUsdc = amountInShare / INITIAL_SHARE_PRECISION;
+        amountInUsdc = (amountInShare * 1e6) / 1e18;
     }
 }

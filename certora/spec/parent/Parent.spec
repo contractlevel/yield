@@ -83,6 +83,14 @@ definition StrategyUpdatedEvent() returns bytes32 =
 // keccak256(abi.encodePacked("StrategyUpdated(uint64,uint8)"))
     to_bytes32(0xf1b69356f06248ee3b44d6cec660b1ee7a29922a4c362493c95e81ed4bd4319d);
 
+definition DepositUpdateEvent() returns bytes32 =
+// keccak256(abi.encodePacked("DepositUpdate(uint256,uint64)"))
+    to_bytes32(0xff215d791a3a0e5766702c21a1a751625c5cc59035448abd88eb5c21433f4b08);
+
+definition WithdrawUpdateEvent() returns bytes32 =
+// keccak256(abi.encodePacked("WithdrawUpdate(uint256,uint64)"))
+    to_bytes32(0x9db6cf034e2aa9870048958883ccb4eb967e2adf2ec79fd388f384b5ebcd4310);
+
 /*//////////////////////////////////////////////////////////////
                              GHOSTS
 //////////////////////////////////////////////////////////////*/
@@ -161,6 +169,17 @@ ghost mathint ghost_ccipMessageSent_bridgeAmount_emitted {
     init_state axiom ghost_ccipMessageSent_bridgeAmount_emitted == 0;
 }
 
+// ------------------------------------------------------------//
+/// @notice Tracks the total USDC deposited into the system
+ghost mathint ghost_totalUsdcDeposited {
+    init_state axiom ghost_totalUsdcDeposited == 0;
+}
+
+/// @notice Tracks the total USDC withdrawn from the system
+ghost mathint ghost_totalUsdcWithdrawn {
+    init_state axiom ghost_totalUsdcWithdrawn == 0;
+}
+
 /*//////////////////////////////////////////////////////////////
                              HOOKS
 //////////////////////////////////////////////////////////////*/
@@ -198,13 +217,30 @@ hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
         ghost_currentStrategyOptimal_eventCount = ghost_currentStrategyOptimal_eventCount + 1;
     if (t0 == StrategyUpdatedEvent())
         ghost_strategyUpdated_eventCount = ghost_strategyUpdated_eventCount + 1;
+
+    // ------------------------------------------------------------//
+    if (t0 == DepositUpdateEvent()) ghost_totalUsdcDeposited = ghost_totalUsdcDeposited + bytes32ToUint256(t1);
+    if (t0 == WithdrawUpdateEvent()) ghost_totalUsdcWithdrawn = ghost_totalUsdcWithdrawn + bytes32ToUint256(t1);
 }
+
+/*//////////////////////////////////////////////////////////////
+                           FUNCTIONS
+//////////////////////////////////////////////////////////////*/
+// function 
 
 /*//////////////////////////////////////////////////////////////
                            INVARIANTS
 //////////////////////////////////////////////////////////////*/
 invariant totalShares_consistency()
     getTotalShares() == ghost_shareMintUpdate_totalAmount_emitted - ghost_shareBurnUpdate_totalAmount_emitted;
+
+// this wont work with crosschain certora and havocing (unless values passed to contract that emits events are constrained)
+// invariant totalValue_consistency(env e)
+//     getStrategy().chainSelector == getThisChainSelector() => 
+//         getTotalValue(e) >= ghost_totalUsdcDeposited - ghost_totalUsdcWithdrawn;
+
+// invariant stablecoinRedemptionIntegrity() 
+
 
 /*//////////////////////////////////////////////////////////////
                              RULES

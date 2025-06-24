@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {BaseTest} from "../../BaseTest.t.sol";
+import {BaseTest, console2} from "../../BaseTest.t.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IComet} from "../../../src/interfaces/IComet.sol";
 import {IYieldPeer} from "../../../src/interfaces/IYieldPeer.sol";
@@ -199,5 +199,58 @@ contract ParentWithdrawTest is BaseTest {
         /// @dev act/assert
         vm.expectRevert(abi.encodeWithSignature("YieldPeer__ChainNotAllowed(uint64)", uint64(1)));
         baseShare.transferAndCall(address(baseParentPeer), expectedShareBalance, invalidWithdrawChainSelector);
+    }
+
+    //----------------------------------------------------------//
+    function test_withdrawIntegrity_multipleUsers() public {
+        address user1 = makeAddr("user1");
+        address user2 = makeAddr("user2");
+        address user3 = makeAddr("user3");
+
+        uint256 halfMax = type(uint256).max / 2;
+        deal(address(baseUsdc), 0x6EF6B6176091F94A8aD52C08e571F81598b226A2, halfMax);
+        deal(address(baseUsdc), user1, DEPOSIT_AMOUNT);
+        deal(address(baseUsdc), user2, DEPOSIT_AMOUNT);
+        deal(address(baseUsdc), user3, DEPOSIT_AMOUNT);
+
+        _changePrank(user1);
+        baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+
+        uint256 expectedShareBalance = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
+        assertEq(baseShare.balanceOf(user1), expectedShareBalance);
+        console2.log("user1 share balance", baseShare.balanceOf(user1));
+
+        _changePrank(user2);
+        baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        console2.log("user2 share balance", baseShare.balanceOf(user2));
+
+        _changePrank(user3);
+        baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        console2.log("user3 share balance", baseShare.balanceOf(user3));
+
+        uint256 user3ShareBalance = baseShare.balanceOf(user3);
+
+        baseShare.transferAndCall(address(baseParentPeer), user3ShareBalance, "");
+
+        // assertEq(baseUsdc.balanceOf(user3), DEPOSIT_AMOUNT);
+        uint256 slippageTolerance = DEPOSIT_AMOUNT * 99 / 100;
+
+        assertApproxEqAbs(
+            baseUsdc.balanceOf(user3),
+            DEPOSIT_AMOUNT,
+            slippageTolerance,
+            "USDC balance should be approximately equal to deposit amount"
+        );
+
+        address user4 = makeAddr("user4");
+        uint256 user4Deposit = DEPOSIT_AMOUNT / 2;
+        deal(address(baseUsdc), user4, user4Deposit);
+        _changePrank(user4);
+        baseUsdc.approve(address(baseParentPeer), user4Deposit);
+        baseParentPeer.deposit(user4Deposit);
+        console2.log("user4 share balance", baseShare.balanceOf(user4));
     }
 }

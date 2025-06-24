@@ -40,6 +40,12 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     //////////////////////////////////////////////////////////////*/
     /// @dev Constant for the zero bridge amount - some CCIP messages don't need to send any USDC
     uint256 internal constant ZERO_BRIDGE_AMOUNT = 0;
+    /// @dev Constant for the USDC decimals
+    uint256 internal constant USDC_DECIMALS = 1e6;
+    /// @dev Constant for the Share decimals
+    uint256 internal constant SHARE_DECIMALS = 1e18;
+    /// @dev Constant for the initial share precision used to calculate the mint amount for first deposit
+    uint256 internal constant INITIAL_SHARE_PRECISION = SHARE_DECIMALS / USDC_DECIMALS;
 
     /// @dev Chainlink token
     LinkTokenInterface internal immutable i_link;
@@ -268,9 +274,10 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
 
     /// @notice Deposits USDC to the strategy and returns the total value of the system
     /// @param amount The amount of USDC to deposit
-    /// @return totalValue The total value of the system
+    /// @return totalValue The total value of the system // _getTotalValueAndDepositToStrategy
     function _depositToStrategyAndGetTotalValue(uint256 amount) internal returns (uint256 totalValue) {
         address strategyPool = _getStrategyPool();
+        // @review
         _depositToStrategy(strategyPool, amount);
         totalValue = _getTotalValueFromStrategy(strategyPool);
         // @review this event
@@ -302,7 +309,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         // @review should we add a minimum deposit amount check? ie if (amountToDeposit < 1e6) revert;
         _revertIfZeroAmount(amountToDeposit);
         // @review rename this error (if keeping it) and refactor relevant tests
-        // if (amountToDeposit < 1e6) revert YieldPeer__NoZeroAmount();
+        if (amountToDeposit < 1e6) revert YieldPeer__NoZeroAmount();
         _transferUsdcFrom(msg.sender, address(this), amountToDeposit);
         emit DepositInitiated(msg.sender, amountToDeposit, i_thisChainSelector);
     }
@@ -413,7 +420,23 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         pure
         returns (uint256 usdcWithdrawAmount)
     {
-        usdcWithdrawAmount = (shareBurnAmount * totalValue) / totalShares;
+        uint256 shareWithdrawAmount = ((_convertUsdcToShare(totalValue) * shareBurnAmount) / totalShares);
+        usdcWithdrawAmount = _convertShareToUsdc(shareWithdrawAmount);
+    }
+
+    /// @notice Convert USDC decimals to Share decimals
+    /// @param amountInUsdc The amount in USDC decimals
+    /// @return amountInShare The amount in Share decimals
+    function _convertUsdcToShare(uint256 amountInUsdc) internal pure returns (uint256 amountInShare) {
+        amountInShare = amountInUsdc * INITIAL_SHARE_PRECISION;
+    }
+
+    /// @notice Convert Share decimals to USDC decimals
+    /// @param amountInShare The amount in Share decimals
+    /// @return amountInUsdc The amount in USDC decimals
+    function _convertShareToUsdc(uint256 amountInShare) internal pure returns (uint256 amountInUsdc) {
+        amountInUsdc = amountInShare / INITIAL_SHARE_PRECISION;
+        // amountInUsdc = (amountInShare * 1e6) / 1e18;
     }
 
     /// @dev Revert if the amount is 0

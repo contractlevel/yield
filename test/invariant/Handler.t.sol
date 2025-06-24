@@ -75,8 +75,8 @@ contract Handler is Test {
     // 1
     mapping(address user => uint256 usdcWithdrawAmount) public ghost_state_totalUsdcWithdrawnPerUser;
 
-    /// @dev track total shares burnt per user
-    mapping(address user => uint256 shareBurnAmount) public ghost_state_totalSharesBurnedPerUser;
+    /// @dev tracks the total usdc withdrawn per user emitted by WithdrawCompleted events
+    mapping(address user => uint256 usdcWithdrawAmount) public ghost_event_totalUsdcWithdrawnPerUser;
 
     /// @dev incremented by 1 everytime a DepositInitiated event is emitted
     uint256 public ghost_event_depositInitiated_emissions;
@@ -87,6 +87,14 @@ contract Handler is Test {
     uint256 public ghost_event_withdrawCompleted_emissions;
     /// @dev incremented by 1 everytime a ShareBurnUpdate event is emitted
     uint256 public ghost_event_shareBurnUpdate_emissions;
+
+    /// @dev tracks the number of deposits per user
+    mapping(address user => uint256 numOfDeposits) public ghost_numOfDepositsPerUser;
+
+    /// @dev tracks the total shares minted per user - based on ShareMintUpdate events
+    mapping(address user => uint256 totalSharesMinted) public ghost_event_totalSharesMintedPerUser;
+    /// @dev track total shares burnt per user - based on value passed to share.transferAndCall
+    mapping(address user => uint256 shareBurnAmount) public ghost_state_totalSharesBurnedPerUser;
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -128,6 +136,10 @@ contract Handler is Test {
 
         /// @dev admin deposits USDC to the system to mitigate share inflation attacks
         _adminDeposit();
+
+        uint256 halfMax = type(uint256).max / 2;
+        deal(address(usdc), aavePool, halfMax);
+        deal(address(usdc), compoundPool, halfMax);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -158,6 +170,8 @@ contract Handler is Test {
         /// @dev deposit the USDC to the peer
         address peer = chainSelectorsToPeers[chainSelector];
         _deposit(depositor, depositAmount, peer);
+        console2.log("depositor:", depositor);
+        console2.log("depositAmount:", depositAmount);
 
         /// @dev update the ghost state
         _updateDepositGhosts(depositor, depositAmount);
@@ -204,6 +218,8 @@ contract Handler is Test {
         bytes memory encodedWithdrawChainSelector = abi.encode(withdrawChainSelector);
         _changePrank(withdrawer);
         share.transferAndCall(peer, shareBurnAmount, encodedWithdrawChainSelector);
+        console2.log("withdrawer:", withdrawer);
+        console2.log("shareBurnAmount:", shareBurnAmount);
 
         /// @dev update the ghost state
         _updateWithdrawGhosts(withdrawer, shareBurnAmount);
@@ -258,6 +274,7 @@ contract Handler is Test {
     function _updateDepositGhosts(address depositor, uint256 depositAmount) internal {
         ghost_state_totalUsdcDeposited += depositAmount;
         ghost_state_totalUsdcDepositedPerUser[depositor] += depositAmount;
+        console2.log("total deposited:", ghost_state_totalUsdcDeposited);
     }
 
     function _updateWithdrawGhosts(address withdrawer, uint256 shareBurnAmount) internal {
@@ -273,18 +290,22 @@ contract Handler is Test {
         bytes32 shareMintUpdateEvent = keccak256("ShareMintUpdate(uint256,uint64,uint256)");
         bool depositInitiatedEventFound = false;
         bool shareMintUpdateEventFound = false;
+        address depositor;
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i = 0; i < logs.length; i++) {
             if (logs[i].topics[0] == depositInitiatedEvent) {
                 depositInitiatedEventFound = true;
                 ghost_event_depositInitiated_emissions++;
+                depositor = address(uint160(uint256(logs[i].topics[1])));
             }
             if (logs[i].topics[0] == shareMintUpdateEvent) {
                 shareMintUpdateEventFound = true;
                 ghost_event_shareMintUpdate_emissions++;
                 uint256 shareMintAmount = uint256(logs[i].topics[1]);
                 ghost_event_totalSharesMinted += shareMintAmount;
+                ghost_event_totalSharesMintedPerUser[depositor] += shareMintAmount;
+                console2.log("shareMintAmount:", shareMintAmount);
             }
         }
         assertTrue(depositInitiatedEventFound, "DepositInitiated log not found");
@@ -302,7 +323,12 @@ contract Handler is Test {
             if (logs[i].topics[0] == withdrawCompletedEvent) {
                 withdrawCompletedEventFound = true;
                 ghost_event_withdrawCompleted_emissions++;
-                ghost_event_totalUsdcWithdrawn += uint256(logs[i].topics[2]);
+                address user = address(uint160(uint256(logs[i].topics[1])));
+                uint256 amount = uint256(logs[i].topics[2]);
+                ghost_event_totalUsdcWithdrawn += amount;
+                ghost_event_totalUsdcWithdrawnPerUser[user] += amount;
+                console2.log("usdc withdraw amount:", amount);
+                console2.log("total withdrawn:", ghost_event_totalUsdcWithdrawn);
             }
             if (logs[i].topics[0] == shareBurnUpdateEvent) {
                 shareBurnUpdateEventFound = true;
@@ -345,6 +371,13 @@ contract Handler is Test {
     function forEachChainSelector(function(uint64) external func) external {
         for (uint256 i; i < chainSelectors.length(); ++i) {
             func(uint64(chainSelectors.at(i)));
+        }
+    }
+
+    /// @dev helper function for looping through users in the system
+    function forEachUser(function(address) external func) external {
+        for (uint256 i; i < users.length(); ++i) {
+            func(users.at(i));
         }
     }
 
