@@ -348,18 +348,18 @@ contract ParentPeer is YieldPeer {
         if (chainSelector == i_thisChainSelector && oldStrategy.chainSelector == i_thisChainSelector) {
             _handleLocalStrategyChange(newStrategy);
         }
-        // @notice we are handling these cases with the ParentRebalancer
-        // @review! remove everything below here and refactor tests
-        // Handle moving strategy from this parent chain to a different chain
-        else if (oldStrategy.chainSelector == i_thisChainSelector && chainSelector != i_thisChainSelector) {
-            address oldStrategyPool = _getStrategyPool();
-            uint256 totalValue = _getTotalValueFromStrategy(oldStrategyPool);
-            _handleStrategyMoveToNewChain(oldStrategyPool, totalValue, newStrategy);
-        }
-        // Handle rebalancing from a different chain (a child)
-        else {
-            _handleRebalanceFromDifferentChain(oldStrategy, newStrategy);
-        }
+        // // @notice we are handling these cases with the ParentRebalancer
+        // // @review! remove everything below here and refactor tests
+        // // Handle moving strategy from this parent chain to a different chain
+        // else if (oldStrategy.chainSelector == i_thisChainSelector && chainSelector != i_thisChainSelector) {
+        //     address oldStrategyPool = _getStrategyPool();
+        //     uint256 totalValue = _getTotalValueFromStrategy(oldStrategyPool);
+        //     _handleStrategyMoveToNewChain(oldStrategyPool, totalValue, newStrategy);
+        // }
+        // // Handle rebalancing from a different chain (a child)
+        // else {
+        //     _handleRebalanceFromDifferentChain(oldStrategy, newStrategy);
+        // }
     }
 
     /// @notice Internal helper to handle strategy updates
@@ -443,8 +443,7 @@ contract ParentPeer is YieldPeer {
         uint256 totalShares = s_totalShares;
 
         if (totalShares != 0) {
-            /// @notice totalValue includes the deposited amount so thats why its being subtracted.
-            // @review
+            /// @notice totalValue includes the deposited amount so thats why its being subtracted. // @review changing this
             shareMintAmount = (_convertUsdcToShare(amount) * totalShares) / _convertUsdcToShare(totalValue - amount);
         } else {
             shareMintAmount = amount * INITIAL_SHARE_PRECISION;

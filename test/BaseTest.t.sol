@@ -527,6 +527,20 @@ contract BaseTest is Test {
         bytes memory response = abi.encode(uint256(chainSelector), uint256(uint8(protocol)));
         _fulfillRequest(requestId, response, "");
 
+        if (chainSelector != baseChainSelector) {
+            bytes memory performData = _createPerformData(
+                chainSelector,
+                uint8(protocol),
+                IYieldPeer.CcipTxType.RebalanceNewStrategy,
+                baseChainSelector,
+                baseParentPeer.getStrategyPool(),
+                baseParentPeer.getTotalValue()
+            );
+            _changePrank(forwarder);
+            baseParentRebalancer.performUpkeep(performData);
+            _stopPrank();
+        }
+
         if (chainSelector == optChainSelector) {
             ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
         } else if (chainSelector == ethChainSelector) {
@@ -552,5 +566,19 @@ contract BaseTest is Test {
             topics: topics,
             data: ""
         });
+    }
+
+    function _createPerformData(
+        uint64 chainSelector,
+        uint8 protocolEnum,
+        IYieldPeer.CcipTxType txType,
+        uint64 oldChainSelector,
+        address oldStrategyPool,
+        uint256 totalValue
+    ) internal view returns (bytes memory) {
+        address parentPeer = address(baseParentRebalancer.getParentPeer());
+        IYieldPeer.Strategy memory newStrategy =
+            IYieldPeer.Strategy({chainSelector: chainSelector, protocol: IYieldPeer.Protocol(protocolEnum)});
+        return abi.encode(forwarder, parentPeer, newStrategy, txType, oldChainSelector, oldStrategyPool, totalValue);
     }
 }
