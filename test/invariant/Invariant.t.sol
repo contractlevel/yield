@@ -297,18 +297,7 @@ contract Invariant is StdInvariant, BaseTest {
             uint256 withdrawable = (userShares * totalValueConverted) / totalShares;
             uint256 withdrawableConverted = _convertShareToUsdc(withdrawable);
             uint256 minWithdrawable = netDeposits * 990 / 1000; // Allow 1% slippage
-            if (withdrawableConverted < minWithdrawable) {
-                console2.log("User:", user);
-                console2.log("Deposited:", deposited);
-                console2.log("Withdrawn:", withdrawn);
-                console2.log("Net Deposits:", netDeposits);
-                console2.log("User Shares:", userShares);
-                console2.log("Total Value:", totalValue);
-                console2.log("Total Shares:", totalShares);
-                console2.log("Withdrawable:", withdrawable);
-                console2.log("WithdrawableConverted:", withdrawableConverted);
-                console2.log("Min Withdrawable:", minWithdrawable);
-            }
+            if (withdrawableConverted < minWithdrawable) {}
             assertTrue(
                 withdrawableConverted >= minWithdrawable || netDeposits < minUsdcValueInShares,
                 "Invariant violated: User should be able to withdraw what they deposited, except for left over dust"

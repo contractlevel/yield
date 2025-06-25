@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-// @review remove this later
-import {console2} from "forge-std/console2.sol";
-
 import {YieldPeer, Client, IRouterClient, CCIPOperations} from "./YieldPeer.sol";
 
 /// @title CLY ParentPeer
@@ -225,7 +222,7 @@ contract ParentPeer is YieldPeer {
 
         /// @dev If Strategy is on this Parent, deposit into strategy and get totalValue
         if (strategy.chainSelector == i_thisChainSelector) {
-            // @review totalValue should be totalValue - amount
+            // @review totalValue/ totalValue - amount order of operations
             depositData.totalValue = _depositToStrategyAndGetTotalValue(depositData.amount);
         }
         /// @dev If the Strategy is this Parent or where the deposit originated, calculate and CCIP send shareMintAmount
@@ -329,16 +326,17 @@ contract ParentPeer is YieldPeer {
             emit WithdrawForwardedToStrategy(withdrawData.usdcWithdrawAmount, strategy.chainSelector);
         }
 
-        // we should emit WithdrawUpdate event in this function, but where?
+        // @review we should emit WithdrawUpdate event in this function, but where?
     }
 
     /// @notice This function sets the strategy on the parent
     /// @notice This function uses ccipSend to send the rebalance message to the old strategy
     /// @notice Rebalances funds from the old strategy to the new strategy
     /// @notice Handles the case where both the old and new strategy are on this chain
-    /// @notice Handles the case where the old or new strategies are on different chains with ccipSend
     /// @param chainSelector The chain selector of the new strategy
     /// @param protocol The protocol of the new strategy
+    /// @dev StrategyUpdated event emitted in _updateStrategy will trigger ParentRebalancer::performUpkeep ccip rebalances
+    /// @notice performUpkeep handles the case where the old or new strategies are on different chains with ccipSend
     function _setStrategy(uint64 chainSelector, Protocol protocol) internal {
         Strategy memory oldStrategy = s_strategy;
         Strategy memory newStrategy = Strategy({chainSelector: chainSelector, protocol: protocol});
@@ -351,18 +349,6 @@ contract ParentPeer is YieldPeer {
         if (chainSelector == i_thisChainSelector && oldStrategy.chainSelector == i_thisChainSelector) {
             _handleLocalStrategyChange(newStrategy);
         }
-        // // @notice we are handling these cases with the ParentRebalancer
-        // // @review! remove everything below here and refactor tests
-        // // Handle moving strategy from this parent chain to a different chain
-        // else if (oldStrategy.chainSelector == i_thisChainSelector && chainSelector != i_thisChainSelector) {
-        //     address oldStrategyPool = _getStrategyPool();
-        //     uint256 totalValue = _getTotalValueFromStrategy(oldStrategyPool);
-        //     _handleStrategyMoveToNewChain(oldStrategyPool, totalValue, newStrategy);
-        // }
-        // // Handle rebalancing from a different chain (a child)
-        // else {
-        //     _handleRebalanceFromDifferentChain(oldStrategy, newStrategy);
-        // }
     }
 
     /// @notice Internal helper to handle strategy updates
@@ -445,20 +431,10 @@ contract ParentPeer is YieldPeer {
     function _calculateMintAmount(uint256 totalValue, uint256 amount) internal view returns (uint256 shareMintAmount) {
         uint256 totalShares = s_totalShares;
 
-        console2.log("_calculateMintAmount called with totalValue:", totalValue);
-        console2.log("_calculateMintAmount called with amount:", amount);
-        console2.log("_calculateMintAmount called with totalShares:", totalShares);
-
         if (totalShares != 0) {
-            // if (totalShares != 0 || (totalShares != 0 && totalValue != 0)) {
-            // if (totalShares != 0 || totalValue != 0) {
-            console2.log("totalValue", totalValue);
-            console2.log("amount", amount);
-            console2.log("totalShares", totalShares);
             /// @notice totalValue includes the deposited amount so thats why its being subtracted. // @review changing this
             shareMintAmount = (_convertUsdcToShare(amount) * totalShares) / _convertUsdcToShare(totalValue - amount);
         } else {
-            console2.log("Using initial deposit calculation");
             shareMintAmount = amount * INITIAL_SHARE_PRECISION;
         }
 

@@ -277,7 +277,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @return totalValue The total value of the system // _getTotalValueAndDepositToStrategy
     function _depositToStrategyAndGetTotalValue(uint256 amount) internal returns (uint256 totalValue) {
         address strategyPool = _getStrategyPool();
-        // @review
+        // @review order of operations
         _depositToStrategy(strategyPool, amount);
         totalValue = _getTotalValueFromStrategy(strategyPool);
         // @review this event

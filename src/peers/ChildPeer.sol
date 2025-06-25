@@ -124,7 +124,7 @@ contract ChildPeer is YieldPeer {
         DepositData memory depositData = _decodeDepositData(data);
         CCIPOperations._validateTokenAmounts(tokenAmounts, address(i_usdc), depositData.amount);
 
-        // @review totalValue - amount bug
+        // @review totalValue - amount order of operations
         depositData.totalValue = _depositToStrategyAndGetTotalValue(depositData.amount);
 
         /// @dev send a message to parent with totalValue to calculate shareMintAmount
