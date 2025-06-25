@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
+// @review remove this later
+import {console2} from "forge-std/console2.sol";
+
 import {YieldPeer, Client, IRouterClient, CCIPOperations} from "./YieldPeer.sol";
 
 /// @title CLY ParentPeer
@@ -442,10 +445,20 @@ contract ParentPeer is YieldPeer {
     function _calculateMintAmount(uint256 totalValue, uint256 amount) internal view returns (uint256 shareMintAmount) {
         uint256 totalShares = s_totalShares;
 
+        console2.log("_calculateMintAmount called with totalValue:", totalValue);
+        console2.log("_calculateMintAmount called with amount:", amount);
+        console2.log("_calculateMintAmount called with totalShares:", totalShares);
+
         if (totalShares != 0) {
+            // if (totalShares != 0 || (totalShares != 0 && totalValue != 0)) {
+            // if (totalShares != 0 || totalValue != 0) {
+            console2.log("totalValue", totalValue);
+            console2.log("amount", amount);
+            console2.log("totalShares", totalShares);
             /// @notice totalValue includes the deposited amount so thats why its being subtracted. // @review changing this
             shareMintAmount = (_convertUsdcToShare(amount) * totalShares) / _convertUsdcToShare(totalValue - amount);
         } else {
+            console2.log("Using initial deposit calculation");
             shareMintAmount = amount * INITIAL_SHARE_PRECISION;
         }
 

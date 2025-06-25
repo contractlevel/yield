@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {Test, Vm, console2, ParentCLF, ChildPeer, IERC20, Share, IYieldPeer} from "../BaseTest.t.sol";
+import {
+    Test, Vm, console2, ParentCLF, ChildPeer, IERC20, Share, IYieldPeer, ParentRebalancer
+} from "../BaseTest.t.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice This contract is used to handle fuzzed interactions with the external functions of the system to test invariants.
@@ -31,6 +33,8 @@ contract Handler is Test {
     address internal admin = makeAddr("admin");
     address internal aavePool;
     address internal compoundPool;
+    ParentRebalancer internal rebalancer;
+    address internal forwarder = makeAddr("forwarder");
 
     uint64 internal parentChainSelector;
     uint64 internal child1ChainSelector;
@@ -109,7 +113,8 @@ contract Handler is Test {
         address _upkeep,
         address _functionsRouter,
         address _aavePool,
-        address _compoundPool
+        address _compoundPool,
+        ParentRebalancer _rebalancer
     ) {
         parent = _parent;
         child1 = _child1;
@@ -121,6 +126,9 @@ contract Handler is Test {
         functionsRouter = _functionsRouter;
         aavePool = _aavePool;
         compoundPool = _compoundPool;
+        rebalancer = _rebalancer;
+        vm.prank(rebalancer.owner());
+        rebalancer.setForwarder(forwarder);
 
         parentChainSelector = parent.getThisChainSelector();
         child1ChainSelector = child1.getThisChainSelector();
@@ -254,8 +262,11 @@ contract Handler is Test {
         }
 
         /// @dev simulate fulfilling request from CLF don to update the strategy
+        vm.recordLogs();
         _changePrank(functionsRouter);
         parent.handleOracleFulfillment(requestId, response, "");
+        /// @dev if the logs contain a StrategyUpdated event with relevant data, perform upkeep
+        _handleCLFLogs();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -266,6 +277,28 @@ contract Handler is Test {
         usdc.approve(peer, depositAmount);
         IYieldPeer(peer).deposit(depositAmount);
         _stopPrank();
+    }
+
+    function _performUpkeep(uint64 newChainSelector, uint8 protocolEnum, uint64 oldChainSelector) internal {
+        if (newChainSelector == parentChainSelector && oldChainSelector == parentChainSelector) return;
+
+        IYieldPeer.Strategy memory newStrategy =
+            IYieldPeer.Strategy({chainSelector: newChainSelector, protocol: IYieldPeer.Protocol(protocolEnum)});
+        IYieldPeer.CcipTxType txType;
+        if (oldChainSelector == parentChainSelector && newChainSelector != parentChainSelector) {
+            txType = IYieldPeer.CcipTxType.RebalanceNewStrategy;
+        } else {
+            txType = IYieldPeer.CcipTxType.RebalanceOldStrategy;
+        }
+
+        address oldStrategyPool = parent.getStrategyPool();
+        uint256 totalValue;
+        if (oldStrategyPool != address(0)) totalValue = parent.getTotalValue();
+
+        bytes memory performData =
+            abi.encode(forwarder, address(parent), newStrategy, txType, oldChainSelector, oldStrategyPool, totalValue);
+        _changePrank(forwarder);
+        rebalancer.performUpkeep(performData);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -338,6 +371,22 @@ contract Handler is Test {
             }
         }
         assertTrue(withdrawCompletedEventFound, "WithdrawCompleted log not found");
+    }
+
+    /// @notice Handle the logs emitted during Chainlink Functions callback
+    /// @dev If the logs contain a StrategyUpdated event with relevant data, perform upkeep
+    function _handleCLFLogs() internal {
+        bytes32 strategyUpdatedEvent = keccak256("StrategyUpdated(uint64,uint8,uint64)");
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == strategyUpdatedEvent) {
+                uint64 newChainSelector = uint64(uint256(logs[i].topics[1]));
+                uint8 protocolEnum = uint8(uint256(logs[i].topics[2]));
+                uint64 oldChainSelector = uint64(uint256(logs[i].topics[3]));
+
+                _performUpkeep(newChainSelector, protocolEnum, oldChainSelector);
+            }
+        }
     }
 
     /*//////////////////////////////////////////////////////////////

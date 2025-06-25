@@ -28,7 +28,7 @@ contract PerformUpkeepTest is BaseTest {
             newStrategyPool,
             totalValue
         );
-        _changePrank(baseParentRebalancer.getForwarder());
+        _changePrank(forwarder);
         vm.recordLogs();
         baseParentRebalancer.performUpkeep(performData);
 
@@ -62,7 +62,7 @@ contract PerformUpkeepTest is BaseTest {
             newStrategyPool,
             totalValue
         );
-        _changePrank(baseParentRebalancer.getForwarder());
+        _changePrank(forwarder);
         vm.recordLogs();
         baseParentRebalancer.performUpkeep(performData);
 
