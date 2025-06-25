@@ -14,8 +14,9 @@ contract ParentCLFHarness is ParentCLF {
         address share,
         address functionsRouter,
         bytes32 donId,
-        uint64 clfSubId
-    ) ParentCLF(ccipRouter, link, thisChainSelector, usdc, aavePoolAddressesProvider, comet, share, functionsRouter, donId, clfSubId) {}
+        uint64 clfSubId,
+        address parentRebalancer
+    ) ParentCLF(ccipRouter, link, thisChainSelector, usdc, aavePoolAddressesProvider, comet, share, functionsRouter, donId, clfSubId, parentRebalancer) {}
 
     function createCLFResponse(uint64 chainSelector, uint8 protocolEnum) public pure returns (bytes memory) {
         return abi.encode(chainSelector, protocolEnum);

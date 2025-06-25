@@ -34,6 +34,7 @@ methods {
     function prepareTokenAmounts(address,uint256) external returns (Client.EVMTokenAmount[] memory) envfree;
     function calculateMintAmount(uint256,uint256) external returns (uint256) envfree;
     function calculateTotalValue(uint256) external returns (uint256);
+    function createStrategy(uint64,IYieldPeer.Protocol) external returns (IYieldPeer.Strategy memory) envfree;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -743,10 +744,22 @@ rule setStrategy_handlesLocalStrategyChange() {
         aaveBalanceBefore - totalValue && usdc.balanceOf(getCompound()) == compoundBalanceBefore + totalValue;
 }
 
-rule setStrategy_movesStrategyToNewChain() {
+// --- RebalanceNewStrategy --- //
+rule rebalanceNewStrategy_revertsWhen_notParentRebalancer() {
+    env e;
+    calldataarg args;
+
+    require e.msg.sender != currentContract.i_parentRebalancer;
+
+    rebalanceNewStrategy@withrevert(e, args);
+    assert lastReverted;
+}
+
+rule rebalanceNewStrategy_movesStrategyToNewChain() {
     env e;
     uint64 chainSelector;
     IYieldPeer.Protocol protocol;
+    IYieldPeer.Strategy newStrategy = createStrategy(chainSelector, protocol);
 
     IYieldPeer.Strategy oldStrategy = getStrategy();
 
@@ -763,10 +776,8 @@ rule setStrategy_movesStrategyToNewChain() {
     require strategyPool == getAave() => aaveBalanceBefore - totalValue >= 0;
     require usdc.balanceOf(currentContract) == 0;
 
-    require ghost_strategyUpdated_eventCount == 0;
     require ghost_ccipMessageSent_eventCount == 0;
-    setStrategy(e, chainSelector, protocol);
-    assert ghost_strategyUpdated_eventCount == 1;
+    rebalanceNewStrategy(e, strategyPool, totalValue, newStrategy);
     assert ghost_ccipMessageSent_eventCount == 1;
     assert ghost_ccipMessageSent_txType_emitted == 8; // RebalanceNewStrategy
     assert ghost_ccipMessageSent_bridgeAmount_emitted == totalValue;
@@ -775,7 +786,18 @@ rule setStrategy_movesStrategyToNewChain() {
     assert strategyPool == getAave() => usdc.balanceOf(addressesProvider.getPool()) == aaveBalanceBefore - totalValue;
 }
 
-rule setStrategy_forwardsRebalanceToOldStrategy() {
+// --- RebalanceOldStrategy --- //
+rule rebalanceOldStrategy_revertsWhen_notParentRebalancer() {
+    env e;
+    calldataarg args;
+
+    require e.msg.sender != currentContract.i_parentRebalancer;
+
+    rebalanceOldStrategy@withrevert(e, args);
+    assert lastReverted;
+}
+
+rule rebalanceOldStrategy_forwardsRebalanceToOldStrategy() {
     env e;
     uint64 chainSelector;
     IYieldPeer.Protocol protocol;
@@ -786,7 +808,7 @@ rule setStrategy_forwardsRebalanceToOldStrategy() {
             oldStrategy.chainSelector != chainSelector;
 
     require ghost_ccipMessageSent_eventCount == 0;
-    setStrategy(e, chainSelector, protocol);
+    rebalanceOldStrategy(e, oldStrategy.chainSelector, createStrategy(chainSelector, protocol));
     assert ghost_ccipMessageSent_eventCount == 1;
     assert ghost_ccipMessageSent_txType_emitted == 7; // RebalanceOldStrategy
     assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;

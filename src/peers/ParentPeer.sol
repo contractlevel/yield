@@ -183,6 +183,28 @@ contract ParentPeer is YieldPeer {
         if (withdrawChainSelector != i_thisChainSelector) emit WithdrawUpdate(shareBurnAmount, withdrawChainSelector);
     }
 
+    /// @dev Revert if msg.sender is not the ParentRebalancer
+    /// @dev Handle moving strategy from this parent chain to a different chain
+    /// @param oldStrategyPool The address of the old strategy pool
+    /// @param totalValue The total value of the system
+    /// @param newStrategy The new strategy
+    /// @notice This function is called by the ParentRebalancer's Log-trigger Automation performUpkeep
+    function rebalanceNewStrategy(address oldStrategyPool, uint256 totalValue, Strategy memory newStrategy) external {
+        _revertIfMsgSenderIsNotParentRebalancer();
+        _handleStrategyMoveToNewChain(oldStrategyPool, totalValue, newStrategy);
+    }
+
+    /// @dev Revert if msg.sender is not the ParentRebalancer
+    /// @dev Handle rebalancing from a different chain
+    /// @param oldChainSelector The chain selector of the old strategy
+    /// @param newStrategy The new strategy
+    /// @notice This function is called by the ParentRebalancer's Log-trigger Automation performUpkeep
+    function rebalanceOldStrategy(uint64 oldChainSelector, Strategy memory newStrategy) external {
+        _revertIfMsgSenderIsNotParentRebalancer();
+        Strategy memory oldStrategy = Strategy({chainSelector: oldChainSelector, protocol: Protocol.Aave});
+        _handleRebalanceFromDifferentChain(oldStrategy, newStrategy);
+    }
+
     /*//////////////////////////////////////////////////////////////
                                 INTERNAL
     //////////////////////////////////////////////////////////////*/
@@ -397,28 +419,6 @@ contract ParentPeer is YieldPeer {
         _ccipSend(
             oldStrategy.chainSelector, CcipTxType.RebalanceOldStrategy, abi.encode(newStrategy), ZERO_BRIDGE_AMOUNT
         );
-    }
-
-    /// @dev Revert if msg.sender is not the ParentRebalancer
-    /// @dev Handle moving strategy from this parent chain to a different chain
-    /// @param oldStrategyPool The address of the old strategy pool
-    /// @param totalValue The total value of the system
-    /// @param newStrategy The new strategy
-    /// @notice This function is called by the ParentRebalancer's Log-trigger Automation performUpkeep
-    function rebalanceNewStrategy(address oldStrategyPool, uint256 totalValue, Strategy memory newStrategy) external {
-        _revertIfMsgSenderIsNotParentRebalancer();
-        _handleStrategyMoveToNewChain(oldStrategyPool, totalValue, newStrategy);
-    }
-
-    /// @dev Revert if msg.sender is not the ParentRebalancer
-    /// @dev Handle rebalancing from a different chain
-    /// @param oldChainSelector The chain selector of the old strategy
-    /// @param newStrategy The new strategy
-    /// @notice This function is called by the ParentRebalancer's Log-trigger Automation performUpkeep
-    function rebalanceOldStrategy(uint64 oldChainSelector, Strategy memory newStrategy) external {
-        _revertIfMsgSenderIsNotParentRebalancer();
-        Strategy memory oldStrategy = Strategy({chainSelector: oldChainSelector, protocol: Protocol.Aave});
-        _handleRebalanceFromDifferentChain(oldStrategy, newStrategy);
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -75,4 +75,8 @@ contract HelperHarness {
     ) public pure returns (uint256) {
         return (shareBurnAmount * totalValue) / totalShares;
     }
+
+    function createStrategy(uint64 chainSelector, IYieldPeer.Protocol protocol) public pure returns (IYieldPeer.Strategy memory) {
+        return IYieldPeer.Strategy({chainSelector: chainSelector, protocol: protocol});
+    }
 }

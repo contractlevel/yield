@@ -231,30 +231,28 @@ rule handleCCIPWithdrawToStrategy_withdrawsFromStrategy() {
     address withdrawer;
     uint256 shareBurnAmount;
     uint256 totalShares;
-    uint256 usdcWithdrawAmount;
+    uint256 usdcWithdrawAmountPlaceholder; // dummy value, set during this function we are verifying
     uint64 chainSelector;
     bytes encodedWithdrawData = 
-        buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
+        buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmountPlaceholder, chainSelector);
     
     address aave = addressesProvider.getPool();
     address compound = getCompound();
 
-    uint256 usdcBalanceBefore = usdc.balanceOf(withdrawer);
+    uint256 expectedUsdcWithdrawAmount = calculateWithdrawAmount(getTotalValue(e), totalShares, shareBurnAmount);
+
     uint256 compoundBalanceBefore = usdc.balanceOf(compound);
     uint256 aaveBalanceBefore = usdc.balanceOf(aave);
 
-    require usdcBalanceBefore + usdcWithdrawAmount <= max_uint256, "should not cause overflow";
-    require compoundBalanceBefore - usdcWithdrawAmount >= 0, "should not cause underflow";
-    require aaveBalanceBefore - usdcWithdrawAmount >= 0, "should not cause underflow";
+    require compoundBalanceBefore - expectedUsdcWithdrawAmount >= 0, "should not cause underflow";
+    require aaveBalanceBefore - expectedUsdcWithdrawAmount >= 0, "should not cause underflow";
     require withdrawer != compound && withdrawer != aave && withdrawer != currentContract,
         "withdrawer should not be the compound or aave pool or current contract";
     
     handleCCIPWithdrawToStrategy(e, encodedWithdrawData);
 
-    assert usdc.balanceOf(withdrawer) == usdcBalanceBefore + usdcWithdrawAmount;
-
-    assert getStrategyPool() == compound => usdc.balanceOf(compound) == compoundBalanceBefore - usdcWithdrawAmount;
-    assert getStrategyPool() == addressesProvider => usdc.balanceOf(aave) == aaveBalanceBefore - usdcWithdrawAmount;
+    assert getStrategyPool() == compound => usdc.balanceOf(compound) == compoundBalanceBefore - expectedUsdcWithdrawAmount;
+    assert getStrategyPool() == addressesProvider => usdc.balanceOf(aave) == aaveBalanceBefore - expectedUsdcWithdrawAmount;
 }
 
 rule handleCCIPWithdrawToStrategy_completesWithdrawal_when_sameChain() {
