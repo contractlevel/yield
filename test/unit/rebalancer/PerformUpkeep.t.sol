@@ -28,7 +28,7 @@ contract PerformUpkeepTest is BaseTest {
             newStrategyPool,
             totalValue
         );
-        _changePrank(baseParentRebalancer.getForwarder());
+        _changePrank(forwarder);
         vm.recordLogs();
         baseParentRebalancer.performUpkeep(performData);
 
@@ -62,7 +62,7 @@ contract PerformUpkeepTest is BaseTest {
             newStrategyPool,
             totalValue
         );
-        _changePrank(baseParentRebalancer.getForwarder());
+        _changePrank(forwarder);
         vm.recordLogs();
         baseParentRebalancer.performUpkeep(performData);
 
@@ -77,23 +77,5 @@ contract PerformUpkeepTest is BaseTest {
             }
         }
         assertTrue(ccipMessageSentEventFound, "CCIPMessageSent log not found");
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                                UTILITY
-    //////////////////////////////////////////////////////////////*/
-    function _createPerformData(
-        uint64 chainSelector,
-        uint8 protocolEnum,
-        IYieldPeer.CcipTxType txType,
-        uint64 oldChainSelector,
-        address oldStrategyPool,
-        uint256 totalValue
-    ) internal view returns (bytes memory) {
-        address parentPeer = address(baseParentRebalancer.getParentPeer());
-        address forwarder = address(baseParentRebalancer.getForwarder());
-        IYieldPeer.Strategy memory newStrategy =
-            IYieldPeer.Strategy({chainSelector: chainSelector, protocol: IYieldPeer.Protocol(protocolEnum)});
-        return abi.encode(forwarder, parentPeer, newStrategy, txType, oldChainSelector, oldStrategyPool, totalValue);
     }
 }

@@ -8,4 +8,6 @@ interface IParentPeer {
         external;
     function rebalanceOldStrategy(uint64 oldStrategyChainSelector, IYieldPeer.Strategy calldata newStrategy) external;
     function getThisChainSelector() external view returns (uint64);
+    function getStrategyPool() external view returns (address);
+    function getTotalValue() external view returns (uint256);
 }

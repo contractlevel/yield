@@ -68,11 +68,27 @@ contract HelperHarness {
         return uint256(value);
     }
 
+    function bytes32ToAddress(bytes32 value) public pure returns (address) {
+        return address(uint160(uint256(value)));
+    }
+
+    function uint64ToBytes32(uint64 value) public pure returns (bytes32) {
+        return bytes32(uint256(value));
+    }
+
+    function uint8ToBytes32(uint8 value) public pure returns (bytes32) {
+        return bytes32(uint256(value));
+    }
+
     function calculateWithdrawAmount(
         uint256 totalValue,
         uint256 totalShares,
         uint256 shareBurnAmount
     ) public pure returns (uint256) {
         return (shareBurnAmount * totalValue) / totalShares;
+    }
+
+    function createStrategy(uint64 chainSelector, IYieldPeer.Protocol protocol) public pure returns (IYieldPeer.Strategy memory) {
+        return IYieldPeer.Strategy({chainSelector: chainSelector, protocol: protocol});
     }
 }

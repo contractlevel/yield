@@ -111,6 +111,14 @@ contract RebalanceTest is BaseTest {
         bytes32 requestId = keccak256("requestId");
         bytes memory response = abi.encode(uint256(optChainSelector), uint256(1)); // 1 is Compound
         _fulfillRequest(requestId, response, "");
+
+        /// @dev log trigger automation rebalancer happens here
+        bytes memory performData = _createPerformData(
+            optChainSelector, uint8(1), IYieldPeer.CcipTxType.RebalanceOldStrategy, optChainSelector, address(0), 0
+        );
+        _changePrank(forwarder);
+        baseParentRebalancer.performUpkeep(performData);
+
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
         /// @dev assert
@@ -147,6 +155,19 @@ contract RebalanceTest is BaseTest {
         bytes32 requestId = keccak256("requestId");
         bytes memory response = abi.encode(uint256(optChainSelector), uint256(0)); // 0 is Aave
         _fulfillRequest(requestId, response, "");
+
+        /// @dev here we need to prank the forwarder to call rebalancer.performUpkeep
+        bytes memory performData = _createPerformData(
+            optChainSelector,
+            uint8(0),
+            IYieldPeer.CcipTxType.RebalanceNewStrategy,
+            baseChainSelector,
+            baseParentPeer.getStrategyPool(),
+            baseParentPeer.getTotalValue()
+        );
+        _changePrank(forwarder);
+        baseParentRebalancer.performUpkeep(performData);
+
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
 
         /// @dev assert
@@ -184,6 +205,14 @@ contract RebalanceTest is BaseTest {
         bytes32 requestId = keccak256("requestId");
         bytes memory response = abi.encode(uint256(baseChainSelector), uint256(0)); // 0 is Aave
         _fulfillRequest(requestId, response, "");
+
+        /// @dev log trigger automation rebalancer happens here
+        bytes memory performData = _createPerformData(
+            baseChainSelector, uint8(0), IYieldPeer.CcipTxType.RebalanceOldStrategy, optChainSelector, address(0), 0
+        );
+        _changePrank(forwarder);
+        baseParentRebalancer.performUpkeep(performData);
+
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
 
@@ -223,6 +252,14 @@ contract RebalanceTest is BaseTest {
         bytes32 requestId = keccak256("requestId");
         bytes memory response = abi.encode(uint256(ethChainSelector), uint256(0));
         _fulfillRequest(requestId, response, "");
+
+        /// @dev log trigger automation rebalancer happens here
+        bytes memory performData = _createPerformData(
+            ethChainSelector, uint8(0), IYieldPeer.CcipTxType.RebalanceOldStrategy, optChainSelector, address(0), 0
+        );
+        _changePrank(forwarder);
+        baseParentRebalancer.performUpkeep(performData);
+
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(ethFork, attesters, attesterPks);
 

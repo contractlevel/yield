@@ -30,7 +30,7 @@ contract Invariant is StdInvariant, BaseTest {
     /// @dev Parent Peer contract
     ParentCLF internal parent;
     /// @dev Parent Rebalancer contract
-    ParentRebalancer internal parentRebalancer;
+    ParentRebalancer internal rebalancer;
     /// @dev Child Peer contract
     ChildPeer internal child1;
     /// @dev Child Peer contract
@@ -62,7 +62,8 @@ contract Invariant is StdInvariant, BaseTest {
             upkeep,
             networkConfig.clf.functionsRouter,
             aavePool,
-            networkConfig.protocols.comet
+            networkConfig.protocols.comet,
+            rebalancer
         );
 
         /// @dev define appropriate function selectors
@@ -82,7 +83,7 @@ contract Invariant is StdInvariant, BaseTest {
         networkConfig = helperConfig.getOrCreateAnvilEthConfig();
         share = Share(networkConfig.tokens.share);
         aavePool = IPoolAddressesProvider(networkConfig.protocols.aavePoolAddressesProvider).getPool();
-        parentRebalancer = new ParentRebalancer();
+        rebalancer = new ParentRebalancer();
 
         /// @dev since we are not forking mainnets, we will deploy contracts locally
         /// the deployed peers will interact via the ccip local simulator as if they were crosschain
@@ -99,10 +100,10 @@ contract Invariant is StdInvariant, BaseTest {
             networkConfig.clf.functionsRouter,
             networkConfig.clf.donId, // 0x0
             networkConfig.clf.clfSubId, // 0
-            address(parentRebalancer)
+            address(rebalancer)
         );
         parent.setUpkeepAddress(upkeep);
-        parentRebalancer.setParentPeer(address(parent));
+        rebalancer.setParentPeer(address(parent));
         /// @dev deploy at least 2 child peers to cover all CCIP tx types
         child1 = new ChildPeer(
             networkConfig.ccip.ccipRouter,
@@ -296,17 +297,7 @@ contract Invariant is StdInvariant, BaseTest {
             uint256 withdrawable = (userShares * totalValueConverted) / totalShares;
             uint256 withdrawableConverted = _convertShareToUsdc(withdrawable);
             uint256 minWithdrawable = netDeposits * 990 / 1000; // Allow 1% slippage
-            if (withdrawableConverted < minWithdrawable) {
-                console2.log("User:", user);
-                console2.log("Deposited:", deposited);
-                console2.log("Withdrawn:", withdrawn);
-                console2.log("Net Deposits:", netDeposits);
-                console2.log("User Shares:", userShares);
-                console2.log("Total Value:", totalValue);
-                console2.log("Total Shares:", totalShares);
-                console2.log("Withdrawable:", withdrawable);
-                console2.log("Min Withdrawable:", minWithdrawable);
-            }
+            if (withdrawableConverted < minWithdrawable) {}
             assertTrue(
                 withdrawableConverted >= minWithdrawable || netDeposits < minUsdcValueInShares,
                 "Invariant violated: User should be able to withdraw what they deposited, except for left over dust"

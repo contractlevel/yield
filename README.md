@@ -447,6 +447,12 @@ certoraRun ./certora/conf/parent/ParentCLF.conf --nondet_difficult_funcs
 
 The `--nondet_difficult_funcs` flag is required for `ParentCLF` to [automatically summarize functions](https://docs.certora.com/en/latest/docs/prover/cli/options.html#nondet-difficult-funcs) in the `FunctionsRequest` library because otherwise the Certora Prover will timeout. The Certora Prover explores all possible paths and the `FunctionsRequest::encodeCBOR` includes an extremely high path count, making it difficult to verify.
 
+The `Rebalancer` spec verifies the `ParentRebalancer` contract.
+
+```
+certoraRun ./certora/conf/parent/Rebalancer.conf
+```
+
 ## Known Issues
 
 ### Precision loss/share calculation logic can result in 0 YieldCoin minted in exchange for USDC deposit
