@@ -225,25 +225,10 @@ hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
 }
 
 /*//////////////////////////////////////////////////////////////
-                           FUNCTIONS
-//////////////////////////////////////////////////////////////*/
-// @review
-// function 
-
-/*//////////////////////////////////////////////////////////////
                            INVARIANTS
 //////////////////////////////////////////////////////////////*/
 invariant totalShares_consistency()
     getTotalShares() == ghost_shareMintUpdate_totalAmount_emitted - ghost_shareBurnUpdate_totalAmount_emitted;
-
-// @review
-// this wont work with crosschain certora and havocing (unless values passed to contract that emits events are constrained)
-// invariant totalValue_consistency(env e)
-//     getStrategy().chainSelector == getThisChainSelector() => 
-//         getTotalValue(e) >= ghost_totalUsdcDeposited - ghost_totalUsdcWithdrawn;
-
-// invariant stablecoinRedemptionIntegrity() 
-
 
 /*//////////////////////////////////////////////////////////////
                              RULES

@@ -306,14 +306,4 @@ contract Invariant is StdInvariant, BaseTest {
             assertTrue(netDeposits == 0, "Invariant violated: User should be able to withdraw what they deposited");
         }
     }
-
-    // @review move these to a helper library/base test and replace magic numbers
-    function _convertUsdcToShare(uint256 amountInUsdc) internal pure returns (uint256 amountInShare) {
-        amountInShare = amountInUsdc * 1e12;
-    }
-
-    function _convertShareToUsdc(uint256 amountInShare) internal pure returns (uint256 amountInUsdc) {
-        // amountInUsdc = amountInShare / INITIAL_SHARE_PRECISION;
-        amountInUsdc = (amountInShare * 1e6) / 1e18;
-    }
 }

@@ -187,12 +187,6 @@ contract ParentDepositTest is BaseTest {
         uint256 expectedSecondShareMintAmount =
             (_convertUsdcToShare(DEPOSIT_AMOUNT) * baseShare.totalSupply()) / _convertUsdcToShare(totalValue);
         assertEq(baseShare.totalSupply(), expectedShareMintAmount + expectedSecondShareMintAmount);
-        // @review might need approx eq abs
         assertEq(baseShare.balanceOf(depositor2), expectedSecondShareMintAmount);
-        // uint256 expectedSecondShareMintAmountWithSlippage = expectedSecondShareMintAmount * 99 / 100;
-    }
-
-    function _convertUsdcToShare(uint256 amountInUsdc) internal pure returns (uint256 amountInShare) {
-        amountInShare = amountInUsdc * 1e12;
     }
 }

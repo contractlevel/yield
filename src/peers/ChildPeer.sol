@@ -105,10 +105,12 @@ contract ChildPeer is YieldPeer {
     /// - CcipTxType WithdrawCallback: A tx from strategy to this-child to transfer USDC to withdrawer
     /// - CcipTxType RebalanceOldStrategy: A tx from parent to this-old-strategy to rebalance funds to the new strategy
     /// - CcipTxType RebalanceNewStrategy: A tx from the old strategy, sending rebalanced funds to this new strategy
-    function _handleCCIPMessage(CcipTxType txType, Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data)
-        internal
-        override
-    {
+    function _handleCCIPMessage(
+        CcipTxType txType,
+        Client.EVMTokenAmount[] memory tokenAmounts,
+        bytes memory data,
+        uint64 /* sourceChainSelector */
+    ) internal override {
         if (txType == CcipTxType.DepositToStrategy) _handleCCIPDepositToStrategy(tokenAmounts, data);
         if (txType == CcipTxType.DepositCallbackChild) _handleCCIPDepositCallbackChild(data);
         if (txType == CcipTxType.WithdrawToStrategy) _handleCCIPWithdrawToStrategy(data);

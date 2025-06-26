@@ -93,7 +93,7 @@ contract ParentPeer is YieldPeer {
 
         // 1. This Parent is the Strategy. Therefore the deposit is handled here and shares can be minted here.
         if (strategy.chainSelector == i_thisChainSelector) {
-            // @review totalValue - amount bug
+            // @review totalValue - amount order of operations
             uint256 totalValue = _depositToStrategyAndGetTotalValue(amountToDeposit);
 
             uint256 shareMintAmount = _calculateMintAmount(totalValue, amountToDeposit);
@@ -215,13 +215,15 @@ contract ParentPeer is YieldPeer {
     /// - CcipTxType WithdrawCallback: A tx from the strategy chain to send USDC to the withdrawer
     /// - CcipTxType WithdrawToParent: A tx from the withdraw chain to forward to the strategy chain
     /// - CcipTxType RebalanceNewStrategy: A tx from the old strategy, sending rebalanced funds to the new strategy
-    function _handleCCIPMessage(CcipTxType txType, Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data)
-        internal
-        override
-    {
+    function _handleCCIPMessage(
+        CcipTxType txType,
+        Client.EVMTokenAmount[] memory tokenAmounts,
+        bytes memory data,
+        uint64 sourceChainSelector
+    ) internal override {
         if (txType == CcipTxType.DepositToParent) _handleCCIPDepositToParent(tokenAmounts, data);
-        if (txType == CcipTxType.DepositCallbackParent) _handleCCIPDepositCallbackParent(data);
-        if (txType == CcipTxType.WithdrawToParent) _handleCCIPWithdrawToParent(data);
+        if (txType == CcipTxType.DepositCallbackParent) _handleCCIPDepositCallbackParent(data, sourceChainSelector);
+        if (txType == CcipTxType.WithdrawToParent) _handleCCIPWithdrawToParent(data, sourceChainSelector);
         if (txType == CcipTxType.WithdrawCallback) _handleCCIPWithdrawCallback(tokenAmounts, data);
         if (txType == CcipTxType.RebalanceNewStrategy) _handleCCIPRebalanceNewStrategy(data);
     }
@@ -272,7 +274,9 @@ contract ParentPeer is YieldPeer {
     /// @notice The two cases being handled here are:
     /// 1. Deposit was made on this parent chain, but strategy is on another chain, so share minting is done here after getting totalValue from strategy
     /// 2. Deposit was made on a child chain, so calculated shareMintAmount is passed to that child after getting totalValue from strategy
-    function _handleCCIPDepositCallbackParent(bytes memory data) internal {
+    /// @param data The encoded deposit data
+    /// @param sourceChainSelector The chain selector of the strategy chain where the tx came from
+    function _handleCCIPDepositCallbackParent(bytes memory data, uint64 sourceChainSelector) internal {
         /// @dev decode the deposit data and total value in the system
         DepositData memory depositData = _decodeDepositData(data);
 
@@ -295,8 +299,9 @@ contract ParentPeer is YieldPeer {
             emit ShareMintUpdate(depositData.shareMintAmount, depositData.chainSelector, s_totalShares);
         }
         /// @dev if the deposit was made on the strategy chain, we still need to emit an event
-        // @review the s_strategy.chainSelector should be replaced with message.sourceChainSelector
-        if (depositData.chainSelector == s_strategy.chainSelector) {
+        /// @notice the reason we are only doing this if the deposit was made on the strategy chain is because
+        /// the DepositUpdate event is already emitted in the _handleCCIPDepositToParent function
+        if (depositData.chainSelector == sourceChainSelector) {
             emit DepositUpdate(depositData.amount, depositData.chainSelector);
         }
     }
@@ -306,17 +311,15 @@ contract ParentPeer is YieldPeer {
     /// If this Parent is the strategy AND the withdrawer wants the USDC on this chain, we transfer it directly
     /// If this Parent is not the strategy, we forward the withdrawData to the strategy
     /// @dev Updates s_totalShares and emits ShareBurnUpdate
-    function _handleCCIPWithdrawToParent(bytes memory data) internal {
+    /// @param data The encoded withdraw data
+    /// @param sourceChainSelector The chain selector of the chain where the withdraw originated from
+    function _handleCCIPWithdrawToParent(bytes memory data, uint64 sourceChainSelector) internal {
         WithdrawData memory withdrawData = _decodeWithdrawData(data);
         withdrawData.totalShares = s_totalShares;
         s_totalShares -= withdrawData.shareBurnAmount;
-        // @review the chain selector emitted in this event is not necessarily the chain selector of where the shares were burned
-        // because the withdrawData.chainSelector is where the USDC is withdrawn to
-        // @review could pass message.sourceChainSelector to this event but would require refactoring YieldPeer::_handleCCIPMessage
+
         emit ShareBurnUpdate(
-            withdrawData.shareBurnAmount,
-            withdrawData.chainSelector,
-            withdrawData.totalShares - withdrawData.shareBurnAmount
+            withdrawData.shareBurnAmount, sourceChainSelector, withdrawData.totalShares - withdrawData.shareBurnAmount
         );
 
         Strategy memory strategy = s_strategy;

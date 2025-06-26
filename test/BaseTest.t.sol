@@ -581,4 +581,12 @@ contract BaseTest is Test {
             IYieldPeer.Strategy({chainSelector: chainSelector, protocol: IYieldPeer.Protocol(protocolEnum)});
         return abi.encode(forwarder, parentPeer, newStrategy, txType, oldChainSelector, oldStrategyPool, totalValue);
     }
+
+    function _convertUsdcToShare(uint256 amountInUsdc) internal pure returns (uint256 amountInShare) {
+        amountInShare = amountInUsdc * INITIAL_SHARE_PRECISION;
+    }
+
+    function _convertShareToUsdc(uint256 amountInShare) internal pure returns (uint256 amountInUsdc) {
+        amountInUsdc = amountInShare / INITIAL_SHARE_PRECISION;
+    }
 }
