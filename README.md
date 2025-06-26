@@ -373,7 +373,7 @@ To achieve this, the changes were made to the [CCIPLocalSimulatorFork](https://g
 
 The `offchainTokenData` array passed to the offRamp needed to contain the USDCTokenPool's `MessageAndAttestation` struct, which contains the message retrieved from the `MessageSent` event and the `attestation` created with the attester's and their private keys. To achieve this, another function was added, [\_createOffchainTokenData](https://github.com/contractlevel/chainlink-local/blob/519e854caaf1291c03bda3928674c922195fd629/src/ccip/CCIPLocalSimulatorFork.sol#L181-L238).
 
-_NOTE: Some unit tests in [`CheckLog.t.sol`](https://github.com/contractlevel/yield/blob/main/test/unit/rebalancer/CheckLog.t.sol) will fail unless the [`cannotExecute` modifier](https://github.com/contractlevel/yield/blob/main/src/modules/ParentRebalancer.sol#L53) has been temporarily commented out._
+_NOTE: Some unit tests in [`CheckLog.t.sol`](https://github.com/contractlevel/yield/blob/main/test/unit/rebalancer/CheckLog.t.sol) will fail with `OnlySimulatedBackend()` unless the [`cannotExecute` modifier](https://github.com/contractlevel/yield/blob/main/src/modules/ParentRebalancer.sol#L53) has been temporarily commented out._
 
 The unit tests for the Contract Level Yield contracts can be run with:
 

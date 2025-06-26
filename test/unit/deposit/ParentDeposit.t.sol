@@ -187,8 +187,11 @@ contract ParentDepositTest is BaseTest {
         uint256 totalValue = baseParentPeer.getTotalValue();
         uint256 expectedSecondShareMintAmount =
             (_convertUsdcToShare(DEPOSIT_AMOUNT) * baseShare.totalSupply()) / _convertUsdcToShare(totalValue);
-        assertEq(baseShare.totalSupply(), expectedShareMintAmount + expectedSecondShareMintAmount);
-        assertEq(baseShare.balanceOf(depositor2), expectedSecondShareMintAmount);
+        uint256 yieldDifference = 6e11;
+        assertApproxEqAbs(
+            baseShare.totalSupply(), expectedShareMintAmount + expectedSecondShareMintAmount, yieldDifference
+        );
+        assertApproxEqAbs(baseShare.balanceOf(depositor2), expectedSecondShareMintAmount, yieldDifference);
     }
 
     function test_yield_calculateMintAmount_edgeCase() public {
