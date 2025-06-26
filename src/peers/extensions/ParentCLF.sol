@@ -44,7 +44,7 @@ contract ParentCLF is ParentPeer, FunctionsClient {
     /// @dev Chainlink Automation upkeep address
     /// @notice This is not "forwarder" because we are using time-based Automation
     address internal s_upkeepAddress;
-    /// @dev Number of protocols
+    /// @dev Number of integrated strategy protocols beginning with 0 (ie 0 = Aave, 1 = Compound)
     /// @notice This is used to validate the protocol enum in the Chainlink Functions response
     uint8 internal s_numberOfProtocols;
 

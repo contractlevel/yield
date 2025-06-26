@@ -540,13 +540,14 @@ rule handleCCIPWithdrawToParent_updatesTotalShares_and_emits_ShareBurnUpdate() {
     uint256 shareBurnAmount;
     uint256 totalShares;
     uint256 usdcWithdrawAmount;
-    uint64 chainSelector;
-    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
+    uint64 withdrawChainSelector;
+    uint64 sourceChainSelector;
+    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, withdrawChainSelector);
 
     uint256 totalSharesBefore = getTotalShares();
 
     require ghost_shareBurnUpdate_eventCount == 0;
-    handleCCIPWithdrawToParent(e, encodedWithdrawData);
+    handleCCIPWithdrawToParent(e, encodedWithdrawData, sourceChainSelector);
     assert ghost_shareBurnUpdate_eventCount == 1;
     assert getTotalShares() == totalSharesBefore - shareBurnAmount;
 }
@@ -557,8 +558,9 @@ rule handleCCIPWithdrawToParent_withdrawsUsdc_when_parent_is_strategy() {
     uint256 shareBurnAmount;
     uint256 totalShares;
     uint256 usdcWithdrawAmount;
-    uint64 chainSelector;
-    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
+    uint64 withdrawChainSelector;
+    uint64 sourceChainSelector;
+    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, withdrawChainSelector);
     require getStrategy().chainSelector == getThisChainSelector();
 
     uint256 expectedWithdrawAmount = calculateWithdrawAmount(getTotalValue(e), getTotalShares(), shareBurnAmount);
@@ -570,7 +572,7 @@ rule handleCCIPWithdrawToParent_withdrawsUsdc_when_parent_is_strategy() {
     require strategyPool == getAave() => aaveBalanceBefore - expectedWithdrawAmount >= 0;
     require withdrawer != strategyPool && withdrawer != addressesProvider.getPool();
 
-    handleCCIPWithdrawToParent(e, encodedWithdrawData);
+    handleCCIPWithdrawToParent(e, encodedWithdrawData, sourceChainSelector);
 
     assert strategyPool == getCompound() => usdc.balanceOf(getCompound()) == compoundBalanceBefore - expectedWithdrawAmount;
     assert strategyPool == getAave() => usdc.balanceOf(addressesProvider.getPool()) == aaveBalanceBefore - expectedWithdrawAmount;
@@ -582,10 +584,11 @@ rule handleCCIPWithdrawToParent_transferUsdcToWithdrawer_when_parent_is_strategy
     uint256 shareBurnAmount;
     uint256 totalShares;
     uint256 usdcWithdrawAmount;
-    uint64 chainSelector;
-    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
+    uint64 withdrawChainSelector;
+    uint64 sourceChainSelector;
+    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, withdrawChainSelector);
     require getStrategy().chainSelector == getThisChainSelector();
-    require chainSelector == getThisChainSelector();
+    require withdrawChainSelector == getThisChainSelector();
 
     uint256 expectedWithdrawAmount = calculateWithdrawAmount(getTotalValue(e), getTotalShares(), shareBurnAmount);
 
@@ -594,7 +597,7 @@ rule handleCCIPWithdrawToParent_transferUsdcToWithdrawer_when_parent_is_strategy
     require withdrawer != getStrategyPool() && withdrawer != addressesProvider.getPool();
 
     require ghost_withdrawCompleted_eventCount == 0;
-    handleCCIPWithdrawToParent(e, encodedWithdrawData);
+    handleCCIPWithdrawToParent(e, encodedWithdrawData, sourceChainSelector);
     assert ghost_withdrawCompleted_eventCount == 1;
 
     assert usdc.balanceOf(withdrawer) == usdcBalanceBefore + expectedWithdrawAmount;
@@ -606,16 +609,17 @@ rule handleCCIPWithdrawToParent_sendsUsdc_to_withdrawChain_when_parent_is_strate
     uint256 shareBurnAmount;
     uint256 totalShares;
     uint256 usdcWithdrawAmount;
-    uint64 chainSelector;
-    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
+    uint64 withdrawChainSelector;
+    uint64 sourceChainSelector;
+    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, withdrawChainSelector);
 
     require getStrategy().chainSelector == getThisChainSelector();
-    require chainSelector != getThisChainSelector();
+    require withdrawChainSelector != getThisChainSelector();
 
     uint256 expectedWithdrawAmount = calculateWithdrawAmount(getTotalValue(e), getTotalShares(), shareBurnAmount);
 
     require ghost_ccipMessageSent_eventCount == 0;
-    handleCCIPWithdrawToParent(e, encodedWithdrawData);
+    handleCCIPWithdrawToParent(e, encodedWithdrawData, sourceChainSelector);
     assert ghost_ccipMessageSent_eventCount == 1;
     assert ghost_ccipMessageSent_txType_emitted == 6; // WithdrawCallback
     assert ghost_ccipMessageSent_bridgeAmount_emitted == expectedWithdrawAmount;
@@ -627,14 +631,15 @@ rule handleCCIPWithdrawToParent_forwardsToStrategy() {
     uint256 shareBurnAmount;
     uint256 totalShares;
     uint256 usdcWithdrawAmount;
-    uint64 chainSelector;
-    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
+    uint64 withdrawChainSelector;
+    uint64 sourceChainSelector;
+    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, withdrawChainSelector);
     require getStrategy().chainSelector != getThisChainSelector();
-    require getStrategy().chainSelector != chainSelector;
+    require getStrategy().chainSelector != withdrawChainSelector;
 
     require ghost_ccipMessageSent_eventCount == 0;
     require ghost_withdrawForwardedToStrategy_eventCount == 0;
-    handleCCIPWithdrawToParent(e, encodedWithdrawData);
+    handleCCIPWithdrawToParent(e, encodedWithdrawData, sourceChainSelector);
     assert ghost_withdrawForwardedToStrategy_eventCount == 1;
     assert ghost_ccipMessageSent_eventCount == 1;
     assert ghost_ccipMessageSent_txType_emitted == 5; // WithdrawToStrategy

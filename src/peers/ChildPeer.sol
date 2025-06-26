@@ -55,10 +55,8 @@ contract ChildPeer is YieldPeer {
 
         // 1. This Child is the Strategy
         if (strategyPool != address(0)) {
-            /// @dev deposit USDC in strategy pool
-            _depositToStrategy(strategyPool, amountToDeposit);
-            /// @dev get totalValue from strategyPool and update depositData
-            depositData.totalValue = _getTotalValueFromStrategy(strategyPool);
+            /// @dev deposit USDC in strategy pool and get totalValue
+            depositData.totalValue = _depositToStrategyAndGetTotalValue(amountToDeposit);
 
             /// @dev send a message to parent contract to request shareMintAmount
             _ccipSend(
@@ -126,7 +124,6 @@ contract ChildPeer is YieldPeer {
         DepositData memory depositData = _decodeDepositData(data);
         CCIPOperations._validateTokenAmounts(tokenAmounts, address(i_usdc), depositData.amount);
 
-        // @review totalValue - amount order of operations
         depositData.totalValue = _depositToStrategyAndGetTotalValue(depositData.amount);
 
         /// @dev send a message to parent with totalValue to calculate shareMintAmount

@@ -27,7 +27,8 @@ contract YieldHarness is YieldPeer, HelperHarness {
     function _handleCCIPMessage(
         IYieldPeer.CcipTxType txType,
         Client.EVMTokenAmount[] memory tokenAmounts,
-        bytes memory data
+        bytes memory data,
+        uint64 sourceChainSelector
     ) internal override {}
 
     /*//////////////////////////////////////////////////////////////

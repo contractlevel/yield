@@ -88,7 +88,6 @@ contract ParentPeer is YieldPeer {
 
         // 1. This Parent is the Strategy. Therefore the deposit is handled here and shares can be minted here.
         if (strategy.chainSelector == i_thisChainSelector) {
-            // @review totalValue - amount order of operations
             uint256 totalValue = _depositToStrategyAndGetTotalValue(amountToDeposit);
 
             uint256 shareMintAmount = _calculateMintAmount(totalValue, amountToDeposit);
@@ -232,7 +231,6 @@ contract ParentPeer is YieldPeer {
 
         /// @dev If Strategy is on this Parent, deposit into strategy and get totalValue
         if (strategy.chainSelector == i_thisChainSelector) {
-            // @review totalValue/ totalValue - amount order of operations
             depositData.totalValue = _depositToStrategyAndGetTotalValue(depositData.amount);
         }
         /// @dev If the Strategy is this Parent or where the deposit originated, calculate and CCIP send shareMintAmount
@@ -407,8 +405,7 @@ contract ParentPeer is YieldPeer {
         uint256 totalShares = s_totalShares;
 
         if (totalShares != 0) {
-            /// @notice totalValue includes the deposited amount so thats why its being subtracted. // @review changing this
-            shareMintAmount = (_convertUsdcToShare(amount) * totalShares) / _convertUsdcToShare(totalValue - amount);
+            shareMintAmount = (_convertUsdcToShare(amount) * totalShares) / _convertUsdcToShare(totalValue);
         } else {
             shareMintAmount = amount * INITIAL_SHARE_PRECISION;
         }
