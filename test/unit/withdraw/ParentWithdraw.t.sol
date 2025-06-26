@@ -253,4 +253,11 @@ contract ParentWithdrawTest is BaseTest {
         baseParentPeer.deposit(user4Deposit);
         console2.log("user4 share balance", baseShare.balanceOf(user4));
     }
+
+    // ----------------------------------------------------------//
+    function test_onTokenTransfer_revertsWhen_zeroAmount() public {
+        _changePrank(address(baseShare));
+        vm.expectRevert(abi.encodeWithSignature("YieldPeer__NoZeroAmount()"));
+        baseParentPeer.onTokenTransfer(withdrawer, 0, "");
+    }
 }

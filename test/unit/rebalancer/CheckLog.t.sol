@@ -11,6 +11,7 @@ contract CheckLogTest is BaseTest {
         baseParentRebalancer.checkLog(log, "");
     }
 
+    // @review uncomment these tests
     // /// @notice The cannotExecute modifier will need to be commented out for this test to pass
     // function test_yield_checkLog_returnsFalseWhen_wrongEvent() public view {
     //     bytes32 wrongEvent = keccak256("WrongEvent()");

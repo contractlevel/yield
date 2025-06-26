@@ -46,7 +46,7 @@ contract ChildPeer is YieldPeer {
     /// 1. This Child is the Strategy
     /// 2. This Child is not the Strategy
     /// @param amountToDeposit The amount of USDC to deposit into the system
-    /// @dev Revert if amountToDeposit is 0
+    /// @dev Revert if amountToDeposit is less than 1e6 (1 USDC)
     function deposit(uint256 amountToDeposit) external override {
         _initiateDeposit(amountToDeposit);
 

@@ -21,9 +21,9 @@ contract ParentDepositTest is BaseTest {
         baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
     }
 
-    function test_yield_parent_deposit_revertsWhen_zeroAmount() public {
-        vm.expectRevert(abi.encodeWithSignature("YieldPeer__NoZeroAmount()"));
-        baseParentPeer.deposit(0);
+    function test_yield_parent_deposit_revertsWhen_insufficientAmount() public {
+        vm.expectRevert(abi.encodeWithSignature("YieldPeer__InsufficientAmount()"));
+        baseParentPeer.deposit(1e6 - 1);
     }
 
     /// @notice Scenario: Deposit made on Parent chain, where the Strategy is, and the Strategy Protocol is Aave

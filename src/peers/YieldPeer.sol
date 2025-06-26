@@ -34,6 +34,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     error YieldPeer__PeerNotAllowed(address peer);
     error YieldPeer__NoZeroAmount();
     error YieldPeer__NotStrategyChain();
+    error YieldPeer__InsufficientAmount();
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
@@ -152,6 +153,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     //////////////////////////////////////////////////////////////*/
     /// @dev Depositors must approve address(this) for spending on USDC contract
     /// @notice This function is overridden and implemented in the ChildPeer and ParentPeer contracts
+    /// @dev Revert if amountToDeposit is less than 1e6 (1 USDC)
     function deposit(uint256 amountToDeposit) external virtual;
 
     /// @notice ERC677Receiver interface implementation
@@ -302,13 +304,11 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
 
     /// @notice Initiates a deposit
     /// @param amountToDeposit The amount of USDC to deposit
-    /// @dev Revert if amountToDeposit is 0
+    /// @dev Revert if amountToDeposit is less than 1e6 (1 USDC)
     /// @dev Transfer USDC from msg.sender to this contract
     /// @dev Emit DepositInitiated event
     function _initiateDeposit(uint256 amountToDeposit) internal {
-        _revertIfZeroAmount(amountToDeposit);
-        // @review rename this error (if keeping it) and refactor relevant tests
-        if (amountToDeposit < 1e6) revert YieldPeer__NoZeroAmount();
+        if (amountToDeposit < USDC_DECIMALS) revert YieldPeer__InsufficientAmount();
         _transferUsdcFrom(msg.sender, address(this), amountToDeposit);
         emit DepositInitiated(msg.sender, amountToDeposit, i_thisChainSelector);
     }
