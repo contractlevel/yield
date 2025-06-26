@@ -51,8 +51,6 @@ contract ParentCLF is ParentPeer, FunctionsClient {
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
-    /// @notice Emitted when a Chainlink Functions request is sent
-    event CLFRequestSent(bytes32 indexed requestId);
     /// @notice Emitted when a Chainlink Functions request returns an error
     event CLFRequestError(bytes32 indexed requestId, bytes err);
     /// @notice Emitted when a Chainlink Functions request is fulfilled
@@ -116,10 +114,7 @@ contract ParentCLF is ParentPeer, FunctionsClient {
         req.initializeRequest(FunctionsRequest.Location.Inline, FunctionsRequest.CodeLanguage.JavaScript, SOURCE);
         req.addSecretsReference(ETH_SEPOLIA_ENCRYPTED_SECRET);
 
-        bytes32 requestId = _sendRequest(req.encodeCBOR(), i_clfSubId, CLF_GAS_LIMIT, i_donId);
-
-        // @review I dont think we need this because _sendRequest emits an essentially identical event
-        emit CLFRequestSent(requestId);
+        _sendRequest(req.encodeCBOR(), i_clfSubId, CLF_GAS_LIMIT, i_donId);
     }
 
     /*//////////////////////////////////////////////////////////////

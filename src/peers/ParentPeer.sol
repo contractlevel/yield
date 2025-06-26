@@ -41,14 +41,9 @@ contract ParentPeer is YieldPeer {
     /// @notice Emitted when the amount of shares burned is updated
     event ShareBurnUpdate(uint256 indexed shareBurnAmount, uint64 indexed chainSelector, uint256 indexed totalShares);
     /// @notice Emitted when a deposit is forwarded to the strategy
-    event DepositForwardedToStrategy(uint256 indexed depositAmount, uint64 indexed chainSelector);
+    event DepositForwardedToStrategy(uint256 indexed depositAmount, uint64 indexed strategyChainSelector);
     /// @notice Emitted when a withdraw is forwarded to the strategy
-    event WithdrawForwardedToStrategy(uint256 indexed withdrawAmount, uint64 indexed chainSelector);
-
-    /// @notice Emitted for every deposit system wide (ie deposits here, deposits on strategy chains, deposits on child chains)
-    event DepositUpdate(uint256 indexed depositAmount, uint64 indexed chainSelector);
-    /// @notice Emitted for every withdraw system wide (ie withdraws here, withdraws on strategy chains, withdraws on child chains)
-    event WithdrawUpdate(uint256 indexed withdrawAmount, uint64 indexed chainSelector);
+    event WithdrawForwardedToStrategy(uint256 indexed shareBurnAmount, uint64 indexed strategyChainSelector);
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -109,7 +104,6 @@ contract ParentPeer is YieldPeer {
             _ccipSend(strategy.chainSelector, CcipTxType.DepositToStrategy, abi.encode(depositData), amountToDeposit);
             emit DepositForwardedToStrategy(amountToDeposit, strategy.chainSelector);
         }
-        emit DepositUpdate(amountToDeposit, i_thisChainSelector);
     }
 
     /// @notice This function is called when SHAREs are transferred to this peer
@@ -173,14 +167,6 @@ contract ParentPeer is YieldPeer {
                 strategy.chainSelector, CcipTxType.WithdrawToStrategy, abi.encode(withdrawData), ZERO_BRIDGE_AMOUNT
             );
         }
-
-        // if the withdraw.chainSelector is not this chain, we want to emit a WithdrawUpdate event here
-        // because we are emitting in the _handleCCIPWithdrawToParent
-        // @review, i dont think this is right but my brain can only handle so many things at once
-        // if the withdraw initiated here, then we'd get a withdraw callback and need to emit the event there(?)
-        // but its in yieldpeer
-        // maybe in _handleCCIPWithdrawToParent the event should not be emitted under certain conditions
-        if (withdrawChainSelector != i_thisChainSelector) emit WithdrawUpdate(shareBurnAmount, withdrawChainSelector);
     }
 
     /// @dev Revert if msg.sender is not the ParentRebalancer
@@ -222,7 +208,7 @@ contract ParentPeer is YieldPeer {
         uint64 sourceChainSelector
     ) internal override {
         if (txType == CcipTxType.DepositToParent) _handleCCIPDepositToParent(tokenAmounts, data);
-        if (txType == CcipTxType.DepositCallbackParent) _handleCCIPDepositCallbackParent(data, sourceChainSelector);
+        if (txType == CcipTxType.DepositCallbackParent) _handleCCIPDepositCallbackParent(data);
         if (txType == CcipTxType.WithdrawToParent) _handleCCIPWithdrawToParent(data, sourceChainSelector);
         if (txType == CcipTxType.WithdrawCallback) _handleCCIPWithdrawCallback(tokenAmounts, data);
         if (txType == CcipTxType.RebalanceNewStrategy) _handleCCIPRebalanceNewStrategy(data);
@@ -264,8 +250,6 @@ contract ParentPeer is YieldPeer {
             _ccipSend(strategy.chainSelector, CcipTxType.DepositToStrategy, encodedDepositData, depositData.amount);
             emit DepositForwardedToStrategy(depositData.amount, strategy.chainSelector);
         }
-        /// @dev we want to emit this event to make it easier to track system wide deposits
-        emit DepositUpdate(depositData.amount, depositData.chainSelector);
     }
 
     /// @notice This function handles a deposit callback from the strategy to this parent
@@ -275,8 +259,7 @@ contract ParentPeer is YieldPeer {
     /// 1. Deposit was made on this parent chain, but strategy is on another chain, so share minting is done here after getting totalValue from strategy
     /// 2. Deposit was made on a child chain, so calculated shareMintAmount is passed to that child after getting totalValue from strategy
     /// @param data The encoded deposit data
-    /// @param sourceChainSelector The chain selector of the strategy chain where the tx came from
-    function _handleCCIPDepositCallbackParent(bytes memory data, uint64 sourceChainSelector) internal {
+    function _handleCCIPDepositCallbackParent(bytes memory data) internal {
         /// @dev decode the deposit data and total value in the system
         DepositData memory depositData = _decodeDepositData(data);
 
@@ -298,12 +281,6 @@ contract ParentPeer is YieldPeer {
             );
             emit ShareMintUpdate(depositData.shareMintAmount, depositData.chainSelector, s_totalShares);
         }
-        /// @dev if the deposit was made on the strategy chain, we still need to emit an event
-        /// @notice the reason we are only doing this if the deposit was made on the strategy chain is because
-        /// the DepositUpdate event is already emitted in the _handleCCIPDepositToParent function
-        if (depositData.chainSelector == sourceChainSelector) {
-            emit DepositUpdate(depositData.amount, depositData.chainSelector);
-        }
     }
 
     /// @notice This function handles a withdraw tx that initiated on another chain.
@@ -312,7 +289,7 @@ contract ParentPeer is YieldPeer {
     /// If this Parent is not the strategy, we forward the withdrawData to the strategy
     /// @dev Updates s_totalShares and emits ShareBurnUpdate
     /// @param data The encoded withdraw data
-    /// @param sourceChainSelector The chain selector of the chain where the withdraw originated from
+    /// @param sourceChainSelector The chain selector of the chain where the withdraw originated from and shares were burned
     function _handleCCIPWithdrawToParent(bytes memory data, uint64 sourceChainSelector) internal {
         WithdrawData memory withdrawData = _decodeWithdrawData(data);
         withdrawData.totalShares = s_totalShares;
@@ -331,7 +308,6 @@ contract ParentPeer is YieldPeer {
             if (withdrawData.chainSelector == i_thisChainSelector) {
                 _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
                 emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
-                emit WithdrawUpdate(withdrawData.usdcWithdrawAmount, i_thisChainSelector);
             } else {
                 _ccipSend(
                     withdrawData.chainSelector,
@@ -339,7 +315,6 @@ contract ParentPeer is YieldPeer {
                     abi.encode(withdrawData),
                     withdrawData.usdcWithdrawAmount
                 );
-                emit WithdrawUpdate(withdrawData.usdcWithdrawAmount, withdrawData.chainSelector);
             }
         }
         // 2. If the parent is not the strategy, we want to forward the withdrawData to the strategy
@@ -347,11 +322,8 @@ contract ParentPeer is YieldPeer {
             _ccipSend(
                 strategy.chainSelector, CcipTxType.WithdrawToStrategy, abi.encode(withdrawData), ZERO_BRIDGE_AMOUNT
             );
-            // @review this withdrawData.usdcWithdrawAmount will be 0 at this point because its calculated in the strategy
-            emit WithdrawForwardedToStrategy(withdrawData.usdcWithdrawAmount, strategy.chainSelector);
+            emit WithdrawForwardedToStrategy(withdrawData.shareBurnAmount, strategy.chainSelector);
         }
-
-        // @review we should emit WithdrawUpdate event in this function, but where?
     }
 
     /// @notice This function sets the strategy on the parent

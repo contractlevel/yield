@@ -27,7 +27,7 @@ interface IYieldPeer {
 
     struct DepositData {
         address depositor; // user who deposited USDC and will receive shares
-        uint256 amount; // amount of USDC deposited // @review do we need this if we have tokenAmounts?
+        uint256 amount; // amount of USDC deposited
         uint256 totalValue; // total value of the system (this is updated on the strategy chain)
         uint256 shareMintAmount; // amount of shares minted to the depositor (this is updated on the parent chain callback)
         uint64 chainSelector; // chain selector of the chain the deposit originated from
@@ -37,7 +37,7 @@ interface IYieldPeer {
         address withdrawer; // user who is withdrawing USDC
         uint256 shareBurnAmount; // amount of shares burned
         uint256 totalShares; // total shares in the system (updated on the parent chain)
-        uint256 usdcWithdrawAmount; // amount of USDC to withdraw // @review do we need this if we have tokenAmounts?
+        uint256 usdcWithdrawAmount; // amount of USDC to withdraw
         uint64 chainSelector; // chain selector of the chain the withdrawal originated from
     }
 

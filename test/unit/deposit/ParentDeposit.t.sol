@@ -10,6 +10,7 @@ import {USDCTokenPool} from "@chainlink/contracts/src/v0.8/ccip/pools/USDC/USDCT
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {CCTPMessageTransmitterProxy} from
     "@chainlink/contracts/src/v0.8/ccip/pools/USDC/CCTPMessageTransmitterProxy.sol";
+import {ParentPeer} from "../../../src/peers/ParentPeer.sol";
 
 contract ParentDepositTest is BaseTest {
     function setUp() public override {
@@ -188,5 +189,27 @@ contract ParentDepositTest is BaseTest {
             (_convertUsdcToShare(DEPOSIT_AMOUNT) * baseShare.totalSupply()) / _convertUsdcToShare(totalValue);
         assertEq(baseShare.totalSupply(), expectedShareMintAmount + expectedSecondShareMintAmount);
         assertEq(baseShare.balanceOf(depositor2), expectedSecondShareMintAmount);
+    }
+
+    function test_yield_calculateMintAmount_edgeCase() public {
+        ParentWrapper parentWrapper = new ParentWrapper();
+        parentWrapper.setTotalShares(100000000000000000001);
+        uint256 totalValue = 100000000000000000001000001;
+        uint256 totalShares = 100000000000000000001;
+        uint256 amount = 1e6;
+        parentWrapper.setTotalShares(totalShares);
+        assertEq(parentWrapper.calculateMintAmount(totalValue, amount), 1);
+    }
+}
+
+contract ParentWrapper is ParentPeer {
+    constructor() ParentPeer(address(1), address(1), 1, address(1), address(1), address(1), address(1), address(1)) {}
+
+    function setTotalShares(uint256 totalShares) public {
+        s_totalShares = totalShares;
+    }
+
+    function calculateMintAmount(uint256 totalValue, uint256 amount) public view returns (uint256) {
+        return _calculateMintAmount(totalValue, amount);
     }
 }

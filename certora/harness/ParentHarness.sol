@@ -52,8 +52,8 @@ contract ParentHarness is ParentPeer, HelperHarness {
         _handleCCIPDepositCallbackParent(data);
     }
 
-    function handleCCIPWithdrawToParent(bytes memory data) public {
-        _handleCCIPWithdrawToParent(data);
+    function handleCCIPWithdrawToParent(bytes memory data, uint64 sourceChainSelector) public {
+        _handleCCIPWithdrawToParent(data, sourceChainSelector);
     }
 
     function setStrategy(uint64 chainSelector, Protocol protocol) public {
