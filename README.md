@@ -56,7 +56,6 @@ A live demo site with Ethereum, Base and Avalanche testnets is available at [con
     - [Other Tests](#other-tests)
   - [Formal Verification](#formal-verification)
   - [Known Issues](#known-issues)
-    - [Precision loss/share calculation logic can result in 0 YieldCoin minted in exchange for USDC deposit](#precision-lossshare-calculation-logic-can-result-in-0-yieldcoin-minted-in-exchange-for-usdc-deposit)
     - [Burning small amounts of shares can result in 0 usdc withdrawn](#burning-small-amounts-of-shares-can-result-in-0-usdc-withdrawn)
   - [Testnet Deployments](#testnet-deployments)
     - [Eth Sepolia](#eth-sepolia)
@@ -455,10 +454,6 @@ certoraRun ./certora/conf/parent/Rebalancer.conf
 ```
 
 ## Known Issues
-
-### Precision loss/share calculation logic can result in 0 YieldCoin minted in exchange for USDC deposit
-
-The invariant testing and formal verification revealed a critical precision loss bug, that can cause insufficient amounts of YieldCoin minted in exchange for USDC. If this project had been developed outside the context of the hackathon, this would've been the top priority. Given the time constraints, other more demonstrative elements of this project were completed first. Once the hackathon submission for this project is done, fixing this issue will be the next step.
 
 ### Burning small amounts of shares can result in 0 usdc withdrawn
 
