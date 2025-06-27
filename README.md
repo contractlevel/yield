@@ -70,7 +70,7 @@ A live demo site with Ethereum, Base and Avalanche testnets is available at [con
     - [YieldCoin Bridge tx (eth -\> aval)](#yieldcoin-bridge-tx-eth---aval)
   - [Future Developments](#future-developments)
   - [Challenges I ran into](#challenges-i-ran-into)
-    - [Precision Loss/Share Calculation Logic Bug](#precision-lossshare-calculation-logic-bug)
+    - [Share Mint Calculation Bug](#share-mint-calculation-bug)
     - [Burning small amounts of shares (YieldCoin), worth less than the lowest possible value of USDC (6 decimals) resulted in reverts](#burning-small-amounts-of-shares-yieldcoin-worth-less-than-the-lowest-possible-value-of-usdc-6-decimals-resulted-in-reverts)
     - [USDC chainlink-local fork](#usdc-chainlink-local-fork)
     - [Proxy API](#proxy-api-1)
@@ -80,6 +80,7 @@ A live demo site with Ethereum, Base and Avalanche testnets is available at [con
     - [Yield generating strategy protocols either not working on testnet or not existing](#yield-generating-strategy-protocols-either-not-working-on-testnet-or-not-existing)
     - [DefiLlama API not providing testnet data](#defillama-api-not-providing-testnet-data)
     - [Incorrect placement of `networkConfig` cache before `vm.startBroadcast` in deploy script](#incorrect-placement-of-networkconfig-cache-before-vmstartbroadcast-in-deploy-script)
+  - [Frontend](#frontend)
   - [Acknowledgement](#acknowledgement)
 
 ## Overview
@@ -597,7 +598,7 @@ _This section has been added to the README because it would not all fit in the s
 
 There were many roadblocks of varying size for this submission. The most significant of which is a precision loss/calculation logic bug that became apparent during invariant testing and formal verification.
 
-### Precision Loss/Share Calculation Logic Bug
+### Share Mint Calculation Bug
 
 The invariant testing (which began after initially achieving full unit coverage) revealed cases where the amount of YieldCoin minted in exchange for USDC deposits was significantly less than it should have been.
 
@@ -617,7 +618,7 @@ I also introduced decimal conversions where appropriate.
 
 The invariant discussed above is now fixed.
 
-There are still extremely [rare edgecases](https://x.com/contractlevel/status/1937522221552906668) uncovered by Certora when the TVL and yieldCoin.totalSupply() are unrealistic values. I strongly suspect the initial admin mint mitigation and organic use will nullify these edgecases naturally, but further research will be conducted to confirm this.
+26th - The root cause of this issue was a helper function in the abstract YieldPeer contract. The function deposited an amount to the active strategy, and returned the TVL. The order of operations for these was incorrect. TVL was being read after the deposit, which was wrong. This took time to fix because there was also a single instance of the same operation being done, outside the function.
 
 ### Burning small amounts of shares (YieldCoin), worth less than the lowest possible value of USDC (6 decimals) resulted in reverts
 
@@ -682,6 +683,18 @@ Mainnet data was used for the strategy with the highest APY and testnet transact
 ### Incorrect placement of `networkConfig` cache before `vm.startBroadcast` in deploy script
 
 This issue caused the wrong USDC address to be set in the constructor for a testnet deployment and was fixed by moving the line caching the `networkConfig` to after the `vm.startBroadcast`.
+
+## Frontend
+
+The frontend was built with [Next.js](https://nextjs.org/) and "vibe coded" with [v0.dev](https://v0.dev/). The AI integrated the [CCIP SDK](https://docs.chain.link/ccip/ccip-javascript-sdk) perfectly in 2 prompts, yet getting aesthetic elements correct such as text alignment in the footer was a struggle. The frontend is deployed directly from Vercel/v0.dev.
+
+To run the frontend locally:
+
+```
+cd frontend
+npm i
+npm run dev
+```
 
 ## Acknowledgement
 

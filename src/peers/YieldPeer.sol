@@ -69,7 +69,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @dev Mapping of peers (ie other Yield contracts)
     mapping(uint64 chainSelector => address peer) internal s_peers;
     /// @notice We use this as a flag to know if this chain is the strategy
-    /// @dev This is either i_aavePool, i_comet, or address(0)
+    /// @dev This is either i_aavePoolAddressesProvider, i_comet, or address(0)
     address internal s_strategyPool;
 
     /*//////////////////////////////////////////////////////////////
@@ -173,6 +173,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @dev Revert if message came from a chain that is not allowed
     /// @dev Revert if message came from a contract that is not allowed
     /// @dev _handleCCIPMessage is overridden and implemented in the ChildPeer and ParentPeer contracts
+    /// @param message The CCIP message received
     function _ccipReceive(Client.Any2EVMMessage memory message)
         internal
         override
@@ -434,7 +435,6 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @return amountInUsdc The amount in USDC decimals
     function _convertShareToUsdc(uint256 amountInShare) internal pure returns (uint256 amountInUsdc) {
         amountInUsdc = amountInShare / INITIAL_SHARE_PRECISION;
-        // amountInUsdc = (amountInShare * 1e6) / 1e18;
     }
 
     /// @dev Revert if the amount is 0

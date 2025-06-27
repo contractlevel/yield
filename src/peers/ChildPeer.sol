@@ -96,6 +96,7 @@ contract ChildPeer is YieldPeer {
                                 INTERNAL
     //////////////////////////////////////////////////////////////*/
     /// @notice Receives a CCIP message from a peer
+    /// @param txType The type of CCIP message received - see IYieldPeer.CcipTxType
     ///  The CCIP message received
     /// - CcipTxType DepositToStrategy: A tx from parent to this-child-strategy to deposit USDC in strategy and get totalValue
     /// - CcipTxType DepositCallbackChild: A tx from parent to this-child to mint shares to the depositor
@@ -103,6 +104,8 @@ contract ChildPeer is YieldPeer {
     /// - CcipTxType WithdrawCallback: A tx from strategy to this-child to transfer USDC to withdrawer
     /// - CcipTxType RebalanceOldStrategy: A tx from parent to this-old-strategy to rebalance funds to the new strategy
     /// - CcipTxType RebalanceNewStrategy: A tx from the old strategy, sending rebalanced funds to this new strategy
+    /// @param tokenAmounts The token amounts received in the CCIP message
+    /// @param data The data received in the CCIP message
     function _handleCCIPMessage(
         CcipTxType txType,
         Client.EVMTokenAmount[] memory tokenAmounts,
@@ -120,6 +123,8 @@ contract ChildPeer is YieldPeer {
     /// @notice This function handles a deposit sent from Parent to this Strategy-Child
     /// @notice The purpose of this tx is to deposit USDC in the strategy and return the totalValue so that the parent can calculate the shareMintAmount.
     /// deposit -> parent -> strategy (HERE) -> callback to parent -> possible callback to child
+    /// @param tokenAmounts The token amounts received in the CCIP message
+    /// @param data The encoded DepositData
     function _handleCCIPDepositToStrategy(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data) internal {
         DepositData memory depositData = _decodeDepositData(data);
         CCIPOperations._validateTokenAmounts(tokenAmounts, address(i_usdc), depositData.amount);
@@ -133,6 +138,7 @@ contract ChildPeer is YieldPeer {
     /// @notice This function handles a deposit callback from the parent chain
     /// @notice The purpose of this callback is to mint shares to the depositor on this chain
     /// deposit on this chain -> parent -> strategy -> callback to parent -> callback to child (HERE)
+    /// @param data The encoded DepositData
     function _handleCCIPDepositCallbackChild(bytes memory data) internal {
         DepositData memory depositData = _decodeDepositData(data);
         _mintShares(depositData.depositor, depositData.shareMintAmount);
@@ -142,6 +148,7 @@ contract ChildPeer is YieldPeer {
     /// @notice The purpose of this tx is to withdraw USDC from the strategy and then send it back to the withdraw chain
     /// withdraw -> parent -> strategy (HERE) -> callback to withdraw chain
     /// @notice If this strategy chain is the same as the withdraw chain, we transfer the USDC to the withdrawer, concluding the withdrawal process.
+    /// @param data The encoded WithdrawData
     function _handleCCIPWithdrawToStrategy(bytes memory data) internal {
         WithdrawData memory withdrawData = _decodeWithdrawData(data);
         withdrawData.usdcWithdrawAmount = _withdrawFromStrategyAndGetUsdcWithdrawAmount(withdrawData);
@@ -187,6 +194,7 @@ contract ChildPeer is YieldPeer {
     /*//////////////////////////////////////////////////////////////
                                  GETTER
     //////////////////////////////////////////////////////////////*/
+    /// @return The parent chain selector
     function getParentChainSelector() external view returns (uint64) {
         return i_parentChainSelector;
     }

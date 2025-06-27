@@ -78,6 +78,6 @@ contract SetCrosschain is Script {
 
     /// @notice impossible to test this script because of prank and broadcast incompatibility
     /// extremely frustrating and too much time wasted on this
-    /// it works perfectly on testnets. i just wanted full unit coverage.
+    /// it works perfectly on testnets
     function test_emptyTest() public {}
 }

@@ -194,12 +194,16 @@ contract ParentPeer is YieldPeer {
                                 INTERNAL
     //////////////////////////////////////////////////////////////*/
     /// @notice Receives a CCIP message from a peer
+    /// @param txType The type of CCIP message received - see IYieldPeer.CcipTxType
     /// The CCIP message received
     /// - CcipTxType DepositToParent: A tx from child to parent to deposit USDC in strategy
     /// - CcipTxType DepositCallbackParent: A tx from the strategy to parent to calculate shareMintAmount and mint shares to the depositor on this chain or another child chain
     /// - CcipTxType WithdrawCallback: A tx from the strategy chain to send USDC to the withdrawer
     /// - CcipTxType WithdrawToParent: A tx from the withdraw chain to forward to the strategy chain
     /// - CcipTxType RebalanceNewStrategy: A tx from the old strategy, sending rebalanced funds to the new strategy
+    /// @param tokenAmounts The token amounts received in the CCIP message
+    /// @param data The data received in the CCIP message
+    /// @param sourceChainSelector The chain selector of the chain where the message originated from
     function _handleCCIPMessage(
         CcipTxType txType,
         Client.EVMTokenAmount[] memory tokenAmounts,
@@ -218,6 +222,8 @@ contract ParentPeer is YieldPeer {
     /// 2. The Child where the deposit was made is the Strategy
     /// 3. The Strategy is on a third chain
     /// @notice Deposit txs need to be handled via the parent to read the state containing the strategy
+    /// @param tokenAmounts The token amounts received in the CCIP message
+    /// @param encodedDepositData The encoded deposit data
     function _handleCCIPDepositToParent(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory encodedDepositData)
         internal
     {
@@ -256,7 +262,7 @@ contract ParentPeer is YieldPeer {
     /// @notice The two cases being handled here are:
     /// 1. Deposit was made on this parent chain, but strategy is on another chain, so share minting is done here after getting totalValue from strategy
     /// 2. Deposit was made on a child chain, so calculated shareMintAmount is passed to that child after getting totalValue from strategy
-    /// @param data The encoded deposit data
+    /// @param data The encoded DepositData
     function _handleCCIPDepositCallbackParent(bytes memory data) internal {
         /// @dev decode the deposit data and total value in the system
         DepositData memory depositData = _decodeDepositData(data);
@@ -286,7 +292,7 @@ contract ParentPeer is YieldPeer {
     /// If this Parent is the strategy AND the withdrawer wants the USDC on this chain, we transfer it directly
     /// If this Parent is not the strategy, we forward the withdrawData to the strategy
     /// @dev Updates s_totalShares and emits ShareBurnUpdate
-    /// @param data The encoded withdraw data
+    /// @param data The encoded WithdrawData
     /// @param sourceChainSelector The chain selector of the chain where the withdraw originated from and shares were burned
     function _handleCCIPWithdrawToParent(bytes memory data, uint64 sourceChainSelector) internal {
         WithdrawData memory withdrawData = _decodeWithdrawData(data);
@@ -325,8 +331,8 @@ contract ParentPeer is YieldPeer {
     }
 
     /// @notice This function sets the strategy on the parent
-    /// @notice This function uses ccipSend to send the rebalance message to the old strategy
-    /// @notice Rebalances funds from the old strategy to the new strategy
+    /// @notice Called by Chainlink Functions callback - see ParentCLF.sol
+    /// @notice Rebalances funds from the old strategy to the new strategy if both are on this chain
     /// @notice Handles the case where both the old and new strategy are on this chain
     /// @param chainSelector The chain selector of the new strategy
     /// @param protocol The protocol of the new strategy
@@ -371,6 +377,8 @@ contract ParentPeer is YieldPeer {
     }
 
     /// @notice Handles moving strategy to a different chain
+    /// @param oldStrategyPool The address of the old strategy pool
+    /// @param totalValue The total value of the system
     /// @param newStrategy The new strategy
     function _handleStrategyMoveToNewChain(address oldStrategyPool, uint256 totalValue, Strategy memory newStrategy)
         internal
