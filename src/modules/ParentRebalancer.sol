@@ -74,6 +74,7 @@ contract ParentRebalancer is AutomationBase, ILogAutomation, Ownable2Step {
                 IYieldPeer.Strategy({chainSelector: chainSelector, protocol: IYieldPeer.Protocol(protocolEnum)});
             IYieldPeer.CcipTxType txType;
             address oldStrategyPool = IYieldPeer(parentPeer).getStrategyPool();
+            // slither-disable-next-line uninitialized-local
             uint256 totalValue;
 
             if (oldChainSelector == thisChainSelector && chainSelector != thisChainSelector) {
@@ -123,6 +124,7 @@ contract ParentRebalancer is AutomationBase, ILogAutomation, Ownable2Step {
     //////////////////////////////////////////////////////////////*/
     /// @notice Sets the Chainlink Automation forwarder
     /// @param forwarder The address of the Chainlink Automation forwarder
+    // slither-disable-next-line missing-zero-check
     function setForwarder(address forwarder) external onlyOwner {
         s_forwarder = forwarder;
         emit ForwarderSet(forwarder);
@@ -130,6 +132,7 @@ contract ParentRebalancer is AutomationBase, ILogAutomation, Ownable2Step {
 
     /// @notice Sets the ParentPeer contract address
     /// @param parentPeer The address of the ParentPeer contract
+    // slither-disable-next-line missing-zero-check
     function setParentPeer(address parentPeer) external onlyOwner {
         s_parentPeer = parentPeer;
         emit ParentPeerSet(parentPeer);

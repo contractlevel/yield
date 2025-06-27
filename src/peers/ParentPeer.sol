@@ -68,7 +68,7 @@ contract ParentPeer is YieldPeer {
     ) YieldPeer(ccipRouter, link, thisChainSelector, usdc, aavePoolAddressesProvider, comet, share) {
         s_strategy = Strategy({chainSelector: thisChainSelector, protocol: Protocol.Aave});
         _updateStrategyPool(thisChainSelector, Protocol.Aave);
-
+        // slither-disable-next-line missing-zero-check
         i_parentRebalancer = parentRebalancer;
     }
 
