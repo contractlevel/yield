@@ -13,6 +13,8 @@ import {CCIPLocalSimulator, LinkToken, IRouterClient} from "@chainlink-local/src
 import {Share} from "../src/token/Share.sol";
 import {ParentPeer} from "../src/peers/ParentPeer.sol";
 import {ChildPeer} from "../src/peers/ChildPeer.sol";
+import {ParentRebalancer} from "../src/modules/ParentRebalancer.sol";
+import {SharePool} from "../src/token/SharePool.sol";
 
 contract HelperConfig is Script {
     /*//////////////////////////////////////////////////////////////
@@ -438,20 +440,16 @@ contract HelperConfig is Script {
                                  LOCAL
     //////////////////////////////////////////////////////////////*/
     function getOrCreateAnvilEthConfig() public returns (NetworkConfig memory) {
-        MockUsdc usdc = new MockUsdc();
-        MockAavePool aavePool = new MockAavePool(address(usdc)); // need to set aToken address later
-        MockAToken aToken = new MockAToken(address(aavePool));
-        MockPoolAddressesProvider poolAddressesProvider = new MockPoolAddressesProvider(address(aavePool));
-        aavePool.setATokenAddress(address(aToken));
-        MockComet comet = new MockComet();
-        MockFunctionsRouter functionsRouter = new MockFunctionsRouter();
+        _deployLocalInfra();
 
-        CCIPLocalSimulator ccipLocalSimulator = new CCIPLocalSimulator();
-        (, IRouterClient ccipRouter,,, LinkToken link,,) = ccipLocalSimulator.configuration();
-
-        Share share = new Share();
-        ccipLocalSimulator.supportNewTokenViaOwner(address(usdc));
-        ccipLocalSimulator.supportNewTokenViaGetCCIPAdmin(address(share));
+        address[] memory localRemotePeers = new address[](1);
+        uint64[] memory localRemoteChainSelectors = new uint64[](1);
+        address[] memory localRemoteSharePools = new address[](1);
+        address[] memory localRemoteShares = new address[](1);
+        localRemotePeers[0] = address(child);
+        localRemoteChainSelectors[0] = 2;
+        localRemoteSharePools[0] = address(sharePool);
+        localRemoteShares[0] = address(share);
 
         return NetworkConfig({
             ccip: CCIPConfig({
@@ -472,15 +470,73 @@ contract HelperConfig is Script {
                 clfSubId: 0 // dummy value
             }),
             peers: PeersConfig({
-                localPeer: 0x0000000000000000000000000000000000000000,
-                localChainSelector: 0,
-                remotePeers: new address[](0),
-                remoteChainSelectors: new uint64[](0),
-                localSharePool: 0x0000000000000000000000000000000000000000,
-                remoteSharePools: new address[](0),
-                localShare: 0x0000000000000000000000000000000000000000,
-                remoteShares: new address[](0)
+                localPeer: address(parent),
+                localChainSelector: 1,
+                remotePeers: localRemotePeers,
+                remoteChainSelectors: localRemoteChainSelectors,
+                localSharePool: address(sharePool),
+                remoteSharePools: localRemoteSharePools,
+                localShare: address(share),
+                remoteShares: localRemoteShares
             })
         });
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           LOCAL DEPLOYMENTS
+    //////////////////////////////////////////////////////////////*/
+    MockUsdc internal usdc;
+    MockAavePool internal aavePool;
+    MockAToken internal aToken;
+    MockPoolAddressesProvider internal poolAddressesProvider;
+    MockComet internal comet;
+    MockFunctionsRouter internal functionsRouter;
+    CCIPLocalSimulator internal ccipLocalSimulator;
+    Share internal share;
+    SharePool internal sharePool;
+    ParentRebalancer internal rebalancer;
+    ParentPeer internal parent;
+    ChildPeer internal child;
+    IRouterClient internal ccipRouter;
+    LinkToken internal link;
+
+    function _deployLocalInfra() internal {
+        usdc = new MockUsdc();
+        aavePool = new MockAavePool(address(usdc)); // need to set aToken address later
+        aToken = new MockAToken(address(aavePool));
+        poolAddressesProvider = new MockPoolAddressesProvider(address(aavePool));
+        aavePool.setATokenAddress(address(aToken));
+        comet = new MockComet();
+        functionsRouter = new MockFunctionsRouter();
+
+        ccipLocalSimulator = new CCIPLocalSimulator();
+        (, ccipRouter,,, link,,) = ccipLocalSimulator.configuration();
+
+        share = new Share();
+        sharePool = new SharePool(address(share), address(1), address(ccipRouter));
+        ccipLocalSimulator.supportNewTokenViaOwner(address(usdc));
+        ccipLocalSimulator.supportNewTokenViaGetCCIPAdmin(address(share));
+
+        rebalancer = new ParentRebalancer();
+        parent = new ParentPeer(
+            address(ccipRouter),
+            address(link),
+            1,
+            address(usdc),
+            address(poolAddressesProvider),
+            address(comet),
+            address(share),
+            address(rebalancer)
+        );
+        child = new ChildPeer(
+            address(ccipRouter),
+            address(link),
+            2,
+            address(usdc),
+            address(poolAddressesProvider),
+            address(comet),
+            address(share),
+            1
+        );
     }
 }

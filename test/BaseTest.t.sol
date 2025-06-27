@@ -476,19 +476,27 @@ contract BaseTest is Test {
     /*//////////////////////////////////////////////////////////////
                                 UTILITY
     //////////////////////////////////////////////////////////////*/
+    /// @notice Helper function to change the prank
+    /// @param newPrank The address to change the prank to
     function _changePrank(address newPrank) internal {
         vm.stopPrank();
         vm.startPrank(newPrank);
     }
 
+    /// @notice Helper function to stop the prank
     function _stopPrank() internal {
         vm.stopPrank();
     }
 
+    /// @notice Helper function to select a fork
+    /// @param fork The fork to select
     function _selectFork(uint256 fork) internal {
         vm.selectFork(fork);
     }
 
+    /// @notice Helper function to assert that two arrays are equal
+    /// @param a The first array
+    /// @param b The second array
     function _assertArraysEqual(uint64[] memory a, uint64[] memory b) internal pure {
         assertEq(a.length, b.length, "Array lengths do not match");
         for (uint256 i = 0; i < a.length; i++) {
@@ -496,6 +504,10 @@ contract BaseTest is Test {
         }
     }
 
+    /// @notice Helper function to get the Aave aToken address
+    /// @param poolAddressesProvider The address of the Aave pool addresses provider
+    /// @param underlyingToken The address of the underlying token
+    /// @return aTokenAddress The address of the Aave aToken
     function _getATokenAddress(address poolAddressesProvider, address underlyingToken)
         internal
         view
@@ -548,6 +560,11 @@ contract BaseTest is Test {
         }
     }
 
+    /// @notice Helper function to deal and approve USDC
+    /// @param forkId The ID of the fork to select
+    /// @param approver The address to deal USDC to
+    /// @param approvee The address to approve USDC for
+    /// @param amount The amount of USDC to deal and approve
     function _dealAndApproveUsdc(uint256 forkId, address approver, address approvee, uint256 amount) internal {
         _selectFork(forkId);
         deal(address(baseUsdc), approver, amount);
@@ -555,6 +572,10 @@ contract BaseTest is Test {
         baseUsdc.approve(approvee, amount);
     }
 
+    /// @notice Helper function to create a log for Chainlink Automation checkLog
+    /// @param source The source of the log
+    /// @param topics The topics of the log
+    /// @return log The log
     function _createLog(address source, bytes32[] memory topics) internal view returns (Log memory) {
         return Log({
             index: 0,
@@ -568,6 +589,12 @@ contract BaseTest is Test {
         });
     }
 
+    /// @notice Helper function to create perform data for Chainlink Automation performUpkeep
+    /// @param chainSelector The chain selector of the new strategy
+    /// @param protocolEnum The protocol of the strategy
+    /// @param txType The type of CCIP message to send
+    /// @param oldChainSelector The chain selector of the old strategy
+    /// @param oldStrategyPool The address of the old strategy pool
     function _createPerformData(
         uint64 chainSelector,
         uint8 protocolEnum,
@@ -580,5 +607,19 @@ contract BaseTest is Test {
         IYieldPeer.Strategy memory newStrategy =
             IYieldPeer.Strategy({chainSelector: chainSelector, protocol: IYieldPeer.Protocol(protocolEnum)});
         return abi.encode(forwarder, parentPeer, newStrategy, txType, oldChainSelector, oldStrategyPool, totalValue);
+    }
+
+    /// @notice Helper function to convert USDC to Share
+    /// @param amountInUsdc The amount of USDC to convert
+    /// @return amountInShare The amount of Share
+    function _convertUsdcToShare(uint256 amountInUsdc) internal pure returns (uint256 amountInShare) {
+        amountInShare = amountInUsdc * INITIAL_SHARE_PRECISION;
+    }
+
+    /// @notice Helper function to convert Share to USDC
+    /// @param amountInShare The amount of Share to convert
+    /// @return amountInUsdc The amount of USDC
+    function _convertShareToUsdc(uint256 amountInShare) internal pure returns (uint256 amountInUsdc) {
+        amountInUsdc = amountInShare / INITIAL_SHARE_PRECISION;
     }
 }

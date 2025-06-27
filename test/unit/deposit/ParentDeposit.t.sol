@@ -10,6 +10,7 @@ import {USDCTokenPool} from "@chainlink/contracts/src/v0.8/ccip/pools/USDC/USDCT
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {CCTPMessageTransmitterProxy} from
     "@chainlink/contracts/src/v0.8/ccip/pools/USDC/CCTPMessageTransmitterProxy.sol";
+import {ParentPeer} from "../../../src/peers/ParentPeer.sol";
 
 contract ParentDepositTest is BaseTest {
     function setUp() public override {
@@ -21,9 +22,9 @@ contract ParentDepositTest is BaseTest {
         baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
     }
 
-    function test_yield_parent_deposit_revertsWhen_zeroAmount() public {
-        vm.expectRevert(abi.encodeWithSignature("YieldPeer__NoZeroAmount()"));
-        baseParentPeer.deposit(0);
+    function test_yield_parent_deposit_revertsWhen_insufficientAmount() public {
+        vm.expectRevert(abi.encodeWithSignature("YieldPeer__InsufficientAmount()"));
+        baseParentPeer.deposit(1e6 - 1);
     }
 
     /// @notice Scenario: Deposit made on Parent chain, where the Strategy is, and the Strategy Protocol is Aave
@@ -186,13 +187,32 @@ contract ParentDepositTest is BaseTest {
         uint256 totalValue = baseParentPeer.getTotalValue();
         uint256 expectedSecondShareMintAmount =
             (_convertUsdcToShare(DEPOSIT_AMOUNT) * baseShare.totalSupply()) / _convertUsdcToShare(totalValue);
-        assertEq(baseShare.totalSupply(), expectedShareMintAmount + expectedSecondShareMintAmount);
-        // @review might need approx eq abs
-        assertEq(baseShare.balanceOf(depositor2), expectedSecondShareMintAmount);
-        // uint256 expectedSecondShareMintAmountWithSlippage = expectedSecondShareMintAmount * 99 / 100;
+        uint256 yieldDifference = 6e11;
+        assertApproxEqAbs(
+            baseShare.totalSupply(), expectedShareMintAmount + expectedSecondShareMintAmount, yieldDifference
+        );
+        assertApproxEqAbs(baseShare.balanceOf(depositor2), expectedSecondShareMintAmount, yieldDifference);
     }
 
-    function _convertUsdcToShare(uint256 amountInUsdc) internal pure returns (uint256 amountInShare) {
-        amountInShare = amountInUsdc * 1e12;
+    function test_yield_calculateMintAmount_edgeCase() public {
+        ParentWrapper parentWrapper = new ParentWrapper();
+        parentWrapper.setTotalShares(100000000000000000001);
+        uint256 totalValue = 100000000000000000001000001;
+        uint256 totalShares = 100000000000000000001;
+        uint256 amount = 1e6;
+        parentWrapper.setTotalShares(totalShares);
+        assertEq(parentWrapper.calculateMintAmount(totalValue, amount), 1);
+    }
+}
+
+contract ParentWrapper is ParentPeer {
+    constructor() ParentPeer(address(1), address(1), 1, address(1), address(1), address(1), address(1), address(1)) {}
+
+    function setTotalShares(uint256 totalShares) public {
+        s_totalShares = totalShares;
+    }
+
+    function calculateMintAmount(uint256 totalValue, uint256 amount) public view returns (uint256) {
+        return _calculateMintAmount(totalValue, amount);
     }
 }

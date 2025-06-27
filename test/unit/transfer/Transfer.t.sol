@@ -81,10 +81,12 @@ contract ExamplePeer is YieldPeer {
         override
     {}
 
-    function _handleCCIPMessage(CcipTxType txType, Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data)
-        internal
-        override
-    {}
+    function _handleCCIPMessage(
+        CcipTxType txType,
+        Client.EVMTokenAmount[] memory tokenAmounts,
+        bytes memory data,
+        uint64 sourceChainSelector
+    ) internal override {}
 
     /// @notice empty test to skip file in coverage
     function test_emptyTest() public {}

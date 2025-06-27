@@ -84,14 +84,6 @@ definition StrategyUpdatedEvent() returns bytes32 =
 // keccak256(abi.encodePacked("StrategyUpdated(uint64,uint8,uint64)"))
     to_bytes32(0xcb31617872c52547b670aaf6e63c8f6be35dc74d4144db1b17f2e539b5475ac7);
 
-definition DepositUpdateEvent() returns bytes32 =
-// keccak256(abi.encodePacked("DepositUpdate(uint256,uint64)"))
-    to_bytes32(0xff215d791a3a0e5766702c21a1a751625c5cc59035448abd88eb5c21433f4b08);
-
-definition WithdrawUpdateEvent() returns bytes32 =
-// keccak256(abi.encodePacked("WithdrawUpdate(uint256,uint64)"))
-    to_bytes32(0x9db6cf034e2aa9870048958883ccb4eb967e2adf2ec79fd388f384b5ebcd4310);
-
 /*//////////////////////////////////////////////////////////////
                              GHOSTS
 //////////////////////////////////////////////////////////////*/
@@ -170,17 +162,6 @@ ghost mathint ghost_ccipMessageSent_bridgeAmount_emitted {
     init_state axiom ghost_ccipMessageSent_bridgeAmount_emitted == 0;
 }
 
-// ------------------------------------------------------------//
-/// @notice Tracks the total USDC deposited into the system
-ghost mathint ghost_totalUsdcDeposited {
-    init_state axiom ghost_totalUsdcDeposited == 0;
-}
-
-/// @notice Tracks the total USDC withdrawn from the system
-ghost mathint ghost_totalUsdcWithdrawn {
-    init_state axiom ghost_totalUsdcWithdrawn == 0;
-}
-
 /*//////////////////////////////////////////////////////////////
                              HOOKS
 //////////////////////////////////////////////////////////////*/
@@ -218,32 +199,13 @@ hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
         ghost_withdrawForwardedToStrategy_eventCount = ghost_withdrawForwardedToStrategy_eventCount + 1;
     if (t0 == CurrentStrategyOptimalEvent())
         ghost_currentStrategyOptimal_eventCount = ghost_currentStrategyOptimal_eventCount + 1;
-
-    // ------------------------------------------------------------//
-    if (t0 == DepositUpdateEvent()) ghost_totalUsdcDeposited = ghost_totalUsdcDeposited + bytes32ToUint256(t1);
-    if (t0 == WithdrawUpdateEvent()) ghost_totalUsdcWithdrawn = ghost_totalUsdcWithdrawn + bytes32ToUint256(t1);
 }
-
-/*//////////////////////////////////////////////////////////////
-                           FUNCTIONS
-//////////////////////////////////////////////////////////////*/
-// @review
-// function 
 
 /*//////////////////////////////////////////////////////////////
                            INVARIANTS
 //////////////////////////////////////////////////////////////*/
 invariant totalShares_consistency()
     getTotalShares() == ghost_shareMintUpdate_totalAmount_emitted - ghost_shareBurnUpdate_totalAmount_emitted;
-
-// @review
-// this wont work with crosschain certora and havocing (unless values passed to contract that emits events are constrained)
-// invariant totalValue_consistency(env e)
-//     getStrategy().chainSelector == getThisChainSelector() => 
-//         getTotalValue(e) >= ghost_totalUsdcDeposited - ghost_totalUsdcWithdrawn;
-
-// invariant stablecoinRedemptionIntegrity() 
-
 
 /*//////////////////////////////////////////////////////////////
                              RULES
@@ -578,13 +540,14 @@ rule handleCCIPWithdrawToParent_updatesTotalShares_and_emits_ShareBurnUpdate() {
     uint256 shareBurnAmount;
     uint256 totalShares;
     uint256 usdcWithdrawAmount;
-    uint64 chainSelector;
-    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
+    uint64 withdrawChainSelector;
+    uint64 sourceChainSelector;
+    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, withdrawChainSelector);
 
     uint256 totalSharesBefore = getTotalShares();
 
     require ghost_shareBurnUpdate_eventCount == 0;
-    handleCCIPWithdrawToParent(e, encodedWithdrawData);
+    handleCCIPWithdrawToParent(e, encodedWithdrawData, sourceChainSelector);
     assert ghost_shareBurnUpdate_eventCount == 1;
     assert getTotalShares() == totalSharesBefore - shareBurnAmount;
 }
@@ -595,8 +558,9 @@ rule handleCCIPWithdrawToParent_withdrawsUsdc_when_parent_is_strategy() {
     uint256 shareBurnAmount;
     uint256 totalShares;
     uint256 usdcWithdrawAmount;
-    uint64 chainSelector;
-    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
+    uint64 withdrawChainSelector;
+    uint64 sourceChainSelector;
+    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, withdrawChainSelector);
     require getStrategy().chainSelector == getThisChainSelector();
 
     uint256 expectedWithdrawAmount = calculateWithdrawAmount(getTotalValue(e), getTotalShares(), shareBurnAmount);
@@ -608,7 +572,7 @@ rule handleCCIPWithdrawToParent_withdrawsUsdc_when_parent_is_strategy() {
     require strategyPool == getAave() => aaveBalanceBefore - expectedWithdrawAmount >= 0;
     require withdrawer != strategyPool && withdrawer != addressesProvider.getPool();
 
-    handleCCIPWithdrawToParent(e, encodedWithdrawData);
+    handleCCIPWithdrawToParent(e, encodedWithdrawData, sourceChainSelector);
 
     assert strategyPool == getCompound() => usdc.balanceOf(getCompound()) == compoundBalanceBefore - expectedWithdrawAmount;
     assert strategyPool == getAave() => usdc.balanceOf(addressesProvider.getPool()) == aaveBalanceBefore - expectedWithdrawAmount;
@@ -620,10 +584,11 @@ rule handleCCIPWithdrawToParent_transferUsdcToWithdrawer_when_parent_is_strategy
     uint256 shareBurnAmount;
     uint256 totalShares;
     uint256 usdcWithdrawAmount;
-    uint64 chainSelector;
-    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
+    uint64 withdrawChainSelector;
+    uint64 sourceChainSelector;
+    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, withdrawChainSelector);
     require getStrategy().chainSelector == getThisChainSelector();
-    require chainSelector == getThisChainSelector();
+    require withdrawChainSelector == getThisChainSelector();
 
     uint256 expectedWithdrawAmount = calculateWithdrawAmount(getTotalValue(e), getTotalShares(), shareBurnAmount);
 
@@ -632,7 +597,7 @@ rule handleCCIPWithdrawToParent_transferUsdcToWithdrawer_when_parent_is_strategy
     require withdrawer != getStrategyPool() && withdrawer != addressesProvider.getPool();
 
     require ghost_withdrawCompleted_eventCount == 0;
-    handleCCIPWithdrawToParent(e, encodedWithdrawData);
+    handleCCIPWithdrawToParent(e, encodedWithdrawData, sourceChainSelector);
     assert ghost_withdrawCompleted_eventCount == 1;
 
     assert usdc.balanceOf(withdrawer) == usdcBalanceBefore + expectedWithdrawAmount;
@@ -644,16 +609,17 @@ rule handleCCIPWithdrawToParent_sendsUsdc_to_withdrawChain_when_parent_is_strate
     uint256 shareBurnAmount;
     uint256 totalShares;
     uint256 usdcWithdrawAmount;
-    uint64 chainSelector;
-    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
+    uint64 withdrawChainSelector;
+    uint64 sourceChainSelector;
+    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, withdrawChainSelector);
 
     require getStrategy().chainSelector == getThisChainSelector();
-    require chainSelector != getThisChainSelector();
+    require withdrawChainSelector != getThisChainSelector();
 
     uint256 expectedWithdrawAmount = calculateWithdrawAmount(getTotalValue(e), getTotalShares(), shareBurnAmount);
 
     require ghost_ccipMessageSent_eventCount == 0;
-    handleCCIPWithdrawToParent(e, encodedWithdrawData);
+    handleCCIPWithdrawToParent(e, encodedWithdrawData, sourceChainSelector);
     assert ghost_ccipMessageSent_eventCount == 1;
     assert ghost_ccipMessageSent_txType_emitted == 6; // WithdrawCallback
     assert ghost_ccipMessageSent_bridgeAmount_emitted == expectedWithdrawAmount;
@@ -665,14 +631,15 @@ rule handleCCIPWithdrawToParent_forwardsToStrategy() {
     uint256 shareBurnAmount;
     uint256 totalShares;
     uint256 usdcWithdrawAmount;
-    uint64 chainSelector;
-    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
+    uint64 withdrawChainSelector;
+    uint64 sourceChainSelector;
+    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, withdrawChainSelector);
     require getStrategy().chainSelector != getThisChainSelector();
-    require getStrategy().chainSelector != chainSelector;
+    require getStrategy().chainSelector != withdrawChainSelector;
 
     require ghost_ccipMessageSent_eventCount == 0;
     require ghost_withdrawForwardedToStrategy_eventCount == 0;
-    handleCCIPWithdrawToParent(e, encodedWithdrawData);
+    handleCCIPWithdrawToParent(e, encodedWithdrawData, sourceChainSelector);
     assert ghost_withdrawForwardedToStrategy_eventCount == 1;
     assert ghost_ccipMessageSent_eventCount == 1;
     assert ghost_ccipMessageSent_txType_emitted == 5; // WithdrawToStrategy

@@ -16,9 +16,9 @@ contract ChildDepositTest is BaseTest {
         optUsdc.approve(address(optChildPeer), DEPOSIT_AMOUNT);
     }
 
-    function test_yield_child_deposit_revertsWhen_zeroAmount() public {
-        vm.expectRevert(abi.encodeWithSignature("YieldPeer__NoZeroAmount()"));
-        optChildPeer.deposit(0);
+    function test_yield_child_deposit_revertsWhen_insufficientAmount() public {
+        vm.expectRevert(abi.encodeWithSignature("YieldPeer__InsufficientAmount()"));
+        optChildPeer.deposit(1e6 - 1);
     }
 
     // - child/deposit is strategy

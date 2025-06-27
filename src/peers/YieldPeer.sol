@@ -34,6 +34,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     error YieldPeer__PeerNotAllowed(address peer);
     error YieldPeer__NoZeroAmount();
     error YieldPeer__NotStrategyChain();
+    error YieldPeer__InsufficientAmount();
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
@@ -68,7 +69,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @dev Mapping of peers (ie other Yield contracts)
     mapping(uint64 chainSelector => address peer) internal s_peers;
     /// @notice We use this as a flag to know if this chain is the strategy
-    /// @dev This is either i_aavePool, i_comet, or address(0)
+    /// @dev This is either i_aavePoolAddressesProvider, i_comet, or address(0)
     address internal s_strategyPool;
 
     /*//////////////////////////////////////////////////////////////
@@ -92,7 +93,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @notice Emitted when a user deposits USDC into the system
     event DepositInitiated(address indexed depositor, uint256 indexed amount, uint64 indexed thisChainSelector);
     /// @notice Emitted when a deposit to the strategy is completed
-    event DepositCompleted(address indexed strategyPool, uint256 indexed amount, uint256 indexed totalValue);
+    event DepositToStrategyCompleted(address indexed strategyPool, uint256 indexed amount, uint256 indexed totalValue);
     /// @notice Emitted when a user initiates a withdrawal of USDC from the system
     event WithdrawInitiated(address indexed withdrawer, uint256 indexed amount, uint64 indexed thisChainSelector);
     /// @notice Emitted when a withdrawal is completed and the USDC is sent to the user
@@ -115,7 +116,6 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @param chainSelector The chain selector to check
     /// @param peer The peer to check
     modifier onlyAllowed(uint64 chainSelector, address peer) {
-        // @review is the chainSelector check needed if we are checking the peer for the chainSelector too?
         if (!s_allowedChains[chainSelector]) revert YieldPeer__ChainNotAllowed(chainSelector);
         if (peer != s_peers[chainSelector]) revert YieldPeer__PeerNotAllowed(peer);
         _;
@@ -153,6 +153,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     //////////////////////////////////////////////////////////////*/
     /// @dev Depositors must approve address(this) for spending on USDC contract
     /// @notice This function is overridden and implemented in the ChildPeer and ParentPeer contracts
+    /// @dev Revert if amountToDeposit is less than 1e6 (1 USDC)
     function deposit(uint256 amountToDeposit) external virtual;
 
     /// @notice ERC677Receiver interface implementation
@@ -172,6 +173,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @dev Revert if message came from a chain that is not allowed
     /// @dev Revert if message came from a contract that is not allowed
     /// @dev _handleCCIPMessage is overridden and implemented in the ChildPeer and ParentPeer contracts
+    /// @param message The CCIP message received
     function _ccipReceive(Client.Any2EVMMessage memory message)
         internal
         override
@@ -180,17 +182,21 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         (CcipTxType txType, bytes memory data) = abi.decode(message.data, (CcipTxType, bytes));
         emit CCIPMessageReceived(message.messageId, txType, message.sourceChainSelector);
 
-        _handleCCIPMessage(txType, message.destTokenAmounts, data);
+        _handleCCIPMessage(txType, message.destTokenAmounts, data, message.sourceChainSelector);
     }
 
     /// @notice Handles CCIP messages based on transaction type
     /// @param txType The type of transaction
     /// @param tokenAmounts The token amounts in the message
     /// @param data The message data - decodes to DepositData, WithdrawData, or Strategy
+    /// @param sourceChainSelector The chain selector of the chain where the tx originated from
     /// @notice This function is overridden and implemented in the ChildPeer and ParentPeer contracts
-    function _handleCCIPMessage(CcipTxType txType, Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data)
-        internal
-        virtual;
+    function _handleCCIPMessage(
+        CcipTxType txType,
+        Client.EVMTokenAmount[] memory tokenAmounts,
+        bytes memory data,
+        uint64 sourceChainSelector
+    ) internal virtual;
 
     /// @notice Send a CCIP message to a peer
     /// @param destChainSelector The chain selector of the peer
@@ -277,13 +283,9 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @return totalValue The total value of the system // _getTotalValueAndDepositToStrategy
     function _depositToStrategyAndGetTotalValue(uint256 amount) internal returns (uint256 totalValue) {
         address strategyPool = _getStrategyPool();
-        // @review order of operations
-        _depositToStrategy(strategyPool, amount);
         totalValue = _getTotalValueFromStrategy(strategyPool);
-        // @review this event
-        // is this event only emitted when a user deposits, and not a rebalance?
-        // we should have some rebalance events
-        emit DepositCompleted(strategyPool, amount, totalValue);
+        _depositToStrategy(strategyPool, amount);
+        emit DepositToStrategyCompleted(strategyPool, amount, totalValue);
     }
 
     /// @notice Withdraws from the strategy and returns the USDC withdraw amount
@@ -302,14 +304,11 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
 
     /// @notice Initiates a deposit
     /// @param amountToDeposit The amount of USDC to deposit
-    /// @dev Revert if amountToDeposit is 0
+    /// @dev Revert if amountToDeposit is less than 1e6 (1 USDC)
     /// @dev Transfer USDC from msg.sender to this contract
     /// @dev Emit DepositInitiated event
     function _initiateDeposit(uint256 amountToDeposit) internal {
-        // @review should we add a minimum deposit amount check? ie if (amountToDeposit < 1e6) revert;
-        _revertIfZeroAmount(amountToDeposit);
-        // @review rename this error (if keeping it) and refactor relevant tests
-        if (amountToDeposit < 1e6) revert YieldPeer__NoZeroAmount();
+        if (amountToDeposit < USDC_DECIMALS) revert YieldPeer__InsufficientAmount();
         _transferUsdcFrom(msg.sender, address(this), amountToDeposit);
         emit DepositInitiated(msg.sender, amountToDeposit, i_thisChainSelector);
     }
@@ -436,7 +435,6 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @return amountInUsdc The amount in USDC decimals
     function _convertShareToUsdc(uint256 amountInShare) internal pure returns (uint256 amountInUsdc) {
         amountInUsdc = amountInShare / INITIAL_SHARE_PRECISION;
-        // amountInUsdc = (amountInShare * 1e6) / 1e18;
     }
 
     /// @dev Revert if the amount is 0

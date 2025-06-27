@@ -19,7 +19,7 @@ contract SendCLFRequestTest is BaseTest {
         bytes32 requestId;
         bool found;
         for (uint256 i = 0; i < logs.length; i++) {
-            if (logs[i].topics[0] == keccak256(("CLFRequestSent(bytes32)"))) {
+            if (logs[i].topics[0] == keccak256(("RequestSent(bytes32)"))) {
                 requestId = bytes32(logs[i].topics[1]);
                 found = true;
                 break;
