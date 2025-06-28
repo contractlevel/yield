@@ -217,6 +217,7 @@ rule setParentPeer_success() {
 rule checkLog_reverts() {
     env e;
     calldataarg args;
+    require e.msg.value == 0;
     
     require e.tx.origin != 0;
     require e.tx.origin != 0x1111111111111111111111111111111111111111;
@@ -229,6 +230,8 @@ rule checkLog_revertsWhen_localParentRebalance() {
     env e;
     bytes data;
     uint8 protocolEnum;
+    require e.msg.value == 0;
+    require e.tx.origin == 0 || e.tx.origin == 0x1111111111111111111111111111111111111111;
     ParentRebalancer.Log log = createLog(
         getParentPeer(),
         StrategyUpdatedEvent(),
@@ -242,7 +245,7 @@ rule checkLog_revertsWhen_localParentRebalance() {
 }
 
 rule checkLog_revertsWhen_wrongEvent() {
-     env e;
+    env e;
     bytes data;
     uint8 protocolEnum;
     bytes32 wrongEvent;
@@ -250,7 +253,9 @@ rule checkLog_revertsWhen_wrongEvent() {
     uint64 newChainSelector;
     uint64 oldChainSelector;
     require e.tx.origin == 0 || e.tx.origin == 0x1111111111111111111111111111111111111111;
-    require newChainSelector != getParentChainSelector() || oldChainSelector != getParentChainSelector();
+    require newChainSelector == getParentChainSelector() => oldChainSelector != getParentChainSelector();
+    require oldChainSelector == getParentChainSelector() => newChainSelector != getParentChainSelector();
+    require e.msg.value == 0;
     ParentRebalancer.Log log = createLog(
         getParentPeer(),
         wrongEvent,
@@ -270,7 +275,9 @@ rule checkLog_revertsWhen_wrongSource() {
     uint64 newChainSelector;
     uint64 oldChainSelector;
     require e.tx.origin == 0 || e.tx.origin == 0x1111111111111111111111111111111111111111;
-    require newChainSelector != getParentChainSelector() || oldChainSelector != getParentChainSelector();
+    require newChainSelector == getParentChainSelector() => oldChainSelector != getParentChainSelector();
+    require oldChainSelector == getParentChainSelector() => newChainSelector != getParentChainSelector();
+    require e.msg.value == 0;
     address wrongSource;
     require wrongSource != getParentPeer();
     ParentRebalancer.Log log = createLog(
@@ -292,6 +299,7 @@ rule checkLog_returnsTrueWhen_oldStrategyChild() {
     uint64 newChainSelector;
     uint64 oldChainSelector;
     require oldChainSelector != getParentChainSelector();
+    
     ParentRebalancer.Log log = createLog(
         getParentPeer(),
         StrategyUpdatedEvent(),
