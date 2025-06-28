@@ -122,7 +122,7 @@ Contracts that inherit `YieldPeer` must implement the following functions:
 
 - `deposit(uint256)` - user entry point for the system where USDC is deposited and YieldCoin is minted
 - `onTokenTransfer(address,uint256,bytes)` - user exit point for the system where YieldCoin is burned and USDC is withdrawn
-- `_handleCCIPMessage(CcipTxType,Client.EVMTokenAmount[],bytes)` - executed following `_ccipReceive` checks to handle various CCIP tx types
+- `_handleCCIPMessage(CcipTxType,Client.EVMTokenAmount[],bytes,uint64)` - executed following `_ccipReceive` checks to handle various CCIP tx types
 
 The Peer with the current active strategy will return a non-zero address from `YieldPeer::getStrategyPool()`.
 
