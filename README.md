@@ -80,6 +80,7 @@ A live demo site with Ethereum, Base and Avalanche testnets is available at [con
     - [DefiLlama API not providing testnet data](#defillama-api-not-providing-testnet-data)
     - [Incorrect placement of `networkConfig` cache before `vm.startBroadcast` in deploy script](#incorrect-placement-of-networkconfig-cache-before-vmstartbroadcast-in-deploy-script)
   - [Frontend](#frontend)
+  - [Additional Comments](#additional-comments)
   - [Acknowledgement](#acknowledgement)
 
 ## Overview
@@ -690,6 +691,37 @@ cd frontend
 npm i
 npm run dev
 ```
+
+## Additional Comments
+
+The `DepositToStrategyCompleted` event is emitted in `YieldPeer::_depositToStrategyAndGetTotalValue()`.
+
+The `DepositToStrategy` event is emitted in `YieldPeer::_depositToStrategy()`.
+
+`_depositToStrategyAndGetTotalValue()` calls `_depositToStrategy()`.
+
+```
+    /// @notice Deposits USDC to the strategy and returns the total value of the system
+    /// @param amount The amount of USDC to deposit
+    /// @return totalValue The total value of the system // _getTotalValueAndDepositToStrategy
+    function _depositToStrategyAndGetTotalValue(uint256 amount) internal returns (uint256 totalValue) {
+        address strategyPool = _getStrategyPool();
+        totalValue = _getTotalValueFromStrategy(strategyPool);
+        _depositToStrategy(strategyPool, amount);
+        emit DepositToStrategyCompleted(strategyPool, amount, totalValue);
+    }
+
+    /// @notice Internal helper to deposit to the strategy
+    /// @param strategyPool The strategy pool to deposit to
+    /// @param amount The amount of USDC to deposit
+    /// @dev Emit DepositToStrategy event
+    function _depositToStrategy(address strategyPool, uint256 amount) internal {
+        ProtocolOperations._depositToStrategy(strategyPool, _getProtocolConfig(), amount);
+        emit DepositToStrategy(strategyPool, amount);
+    }
+```
+
+The naming of these events is slightly confusing (and needs further review), but their purposes differ in that `DepositToStrategyCompleted` is only emitted for user deposits. Whereas `DepositToStrategy` is emitted for both user deposits and rebalance deposits.
 
 ## Acknowledgement
 
