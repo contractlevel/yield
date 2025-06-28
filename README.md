@@ -316,6 +316,8 @@ _Note: These withdrawal diagrams assume the chain to withdraw to is the one the 
 
 ![Withdraw on Child when Remote Child is Strategy](./diagrams/withdraw/onChild-isRemoteChild.jpg)
 
+To clarify what is happening in this final image: when the withdraw is initiated by burning YieldCoin with `transferAndCall()`, the strategy is fetched from the parent, then the YieldCoin/share burn amount is sent to the strategy, and then `USDC` is sent to the withdrawer.
+
 ## Deploying
 
 The `ParentPeer` (`ParentCLF`) should be deployed first. This script will also deploy the `ParentRebalancer`, and YieldCoin `Share` and `SharePool` contracts, as well as call the necessary functions to make the pool permissionless and integrate it with CCIP. It also grants mint and burn roles for YieldCoin to the `ParentPeer` and CCIP pool, as well as setting storage in `ParentRebalancer`.
@@ -370,11 +372,11 @@ OPTIMISM_MAINNET_RPC_URL=<your_rpc_url_here>
 BASE_MAINNET_RPC_URL=<your_rpc_url_here>
 ```
 
-The unit tests use a [fork of chainlink-local](https://github.com/contractlevel/chainlink-local). Since the unit tests are performed on forked mainnets, additional functionality was required from chainlink-local in order to facilitate USDC transfers. USDC transfers on CCIP integrate [Circle's CCTP](https://www.circle.com/cross-chain-transfer-protocol), which comes with additional checks that weren't included in the original chainlink-local. The CCTP architecture requires USDC transfer messages to be "validated by attesters". These messages need to be in a [specific format](https://github.com/circlefin/evm-cctp-contracts/blob/6e7513cdb2bee6bb0cddf331fe972600fc5017c9/src/MessageTransmitter.sol#L228-L247) and the attester's signatures need to be in a [specific order](https://github.com/circlefin/evm-cctp-contracts/blob/6e7513cdb2bee6bb0cddf331fe972600fc5017c9/src/MessageTransmitter.sol#L246-L247).
+The unit tests use a [fork of chainlink-local](https://github.com/contractlevel/chainlink-local). Since the unit tests are performed on forked mainnets, additional functionality was required from chainlink-local in order to facilitate USDC transfers. USDC transfers on CCIP integrate [Circle's CCTP](https://www.circle.com/cross-chain-transfer-protocol), which comes with additional checks that weren't included in the original chainlink-local. The CCTP architecture requires USDC transfer messages to be "validated by attesters". These messages need to be in a [specific format](https://github.com/circlefin/evm-cctp-contracts/blob/6e7513cdb2bee6bb0cddf331fe972600fc5017c9/src/MessageTransmitter.sol#L228-L247) and the attesters' signatures need to be in a [specific order](https://github.com/circlefin/evm-cctp-contracts/blob/6e7513cdb2bee6bb0cddf331fe972600fc5017c9/src/MessageTransmitter.sol#L246-L247).
 
 To achieve this, the changes were made to the [CCIPLocalSimulatorFork](https://github.com/contractlevel/chainlink-local/blob/main/src/ccip/CCIPLocalSimulatorFork.sol). A new function, [switchChainAndRouteMessageWithUSDC](https://github.com/contractlevel/chainlink-local/blob/519e854caaf1291c03bda3928674c922195fd629/src/ccip/CCIPLocalSimulatorFork.sol#L126-L155) was added, which is based on the original `switchChainAndRouteMessage`, except it also listens for CCTP's `MessageSent` event, and takes two arrays of attester addresses, and their private keys - values that can be easily simulated with [Foundry's makeAddrAndKey](https://getfoundry.sh/reference/forge-std/make-addr-and-key/).
 
-The `offchainTokenData` array passed to the offRamp needed to contain the USDCTokenPool's `MessageAndAttestation` struct, which contains the message retrieved from the `MessageSent` event and the `attestation` created with the attester's and their private keys. To achieve this, another function was added, [\_createOffchainTokenData](https://github.com/contractlevel/chainlink-local/blob/519e854caaf1291c03bda3928674c922195fd629/src/ccip/CCIPLocalSimulatorFork.sol#L181-L238).
+The `offchainTokenData` array passed to the offRamp needed to contain the USDCTokenPool's `MessageAndAttestation` struct, which contains the message retrieved from the `MessageSent` event and the `attestation` created with the attesters and their private keys. To achieve this, another function was added, [\_createOffchainTokenData](https://github.com/contractlevel/chainlink-local/blob/519e854caaf1291c03bda3928674c922195fd629/src/ccip/CCIPLocalSimulatorFork.sol#L181-L238).
 
 _NOTE: Some unit tests in [`CheckLog.t.sol`](https://github.com/contractlevel/yield/blob/main/test/unit/rebalancer/CheckLog.t.sol) will fail with `OnlySimulatedBackend()` unless the [`cannotExecute` modifier](https://github.com/contractlevel/yield/blob/457267fcf8068e3b35dd31770640b9423595892d/src/modules/ParentRebalancer.sol#L54) has been temporarily commented out._
 
@@ -468,23 +470,23 @@ Consider this scenario:
 - `totalShares` is on parent
 - `totalValue` is on child2 (strategy)
 
-These 3 values are required to calculate the `usdcWithdrawAmount`. When the `shareBurnAmount` is significantly small, the calculation can return less than the minimum amount of USDC to 6 decimals $1.000000 (.000000). This value is a significantly small fraction of a cent. If we tried to calculate this amount, it would return 0. Then if we try to withdraw this amount (0) from a yield strategy and send it across ccip to be transferred to the withdrawer, it would cause issues such as the transfer failing because the transferAmount is 0.
+These 3 values are required to calculate the `usdcWithdrawAmount`. When the `shareBurnAmount` is significantly small, the calculation can return less than the minimum amount of USDC to 6 decimals ($0.000001). This value is a significantly small fraction of a cent. If we tried to calculate this amount, it would return 0. Then if we try to withdraw this amount (0) from a yield strategy and send it across ccip to be transferred to the withdrawer, it would cause issues such as the transfer failing because the transferAmount is 0.
 
-Therefore the current, unfortunate solution (at least for the time constrained context of the hackathon) is to not withdraw or transfer anything if someone burns an amount of shares small enough that it is worth less than the 6th decimal after a $.
+Therefore the current mitigation is to not withdraw or transfer anything if someone burns an amount of shares small enough that it is worth less than `0.000001 USDC`.
 
-It is unlikely to expect anyone to want to withdraw such a small amount of dust, but this edge case still needs to be acknowledged, and is handled as such by simply allowing the small amount of shares to be burnt without any redemption of USDC.
+It is unlikely to expect anyone to want to withdraw such a small amount of dust, but this issue still needs to be documented.
 
-We could add a min burn amount, and revert if this amount is not provided when a burn is attempted, but to do so would require the same above CCIP txs + extra ones just to tell the withdrawer that no, we cant burn your insignificant amount of shares.
+We could add a min burn amount, and revert if this amount is not provided when a burn is attempted, but to do so would require the same above CCIP txs + extra ones just to tell the withdrawer that "no, we cant burn your insignificant amount of shares".
 
 ## Testnet Deployments
 
-The Contract Level Yield infrastructure has been deployed across three testnets (Ethereum Sepolia, Base Sepolia, and Avalanche Fuji), in order to test the various scenarios using Chainlink - all of which are successful.
+The Contract Level Yield infrastructure has been deployed across three testnets (Ethereum Sepolia, Base Sepolia, and Avalanche Fuji), in order to test the various onchain scenarios using Chainlink - all of which are successful.
 
 Ethereum Sepolia is the Parent chain purely because it has open access to Log-trigger Automation (although access was granted to Log-trigger Automation on Base Sepolia after these deployments - thanks!).
 
 [Mock contracts](https://github.com/contractlevel/yield/tree/main/test/mocks/testnet) were used in place of some strategy contracts either due to their unavailability on testnets or their testnet equivalents not behaving as expected. These mocks do not generate any yield, but otherwise behave as their mainnet counterparts would in terms of depositing and withdrawing funds in the context of the Contract Level Yield system.
 
-The DefiLlama API does not provide testnet data, so mainnet data was used to set the strategy protocol and chain.
+The DefiLlama API does not provide testnet data, so mainnet data was used to determine the strategy protocol and chain.
 
 ### Eth Sepolia
 
