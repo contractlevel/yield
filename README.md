@@ -260,7 +260,7 @@ See [Parent Deposit](https://github.com/contractlevel/yield/blob/457267fcf8068e3
 
 Deposits will be handled differently depending on the chain of initiation and the location of the current strategy.
 
-Deposits are required to include the `ParentPeer`, even if the deposit was made on the `ChildPeer` with the current strategy because the `ParentPeer`'s state must be updated to reflect the total shares/YieldCoin in the system.
+Deposit traces required to include the `ParentPeer`, even if the deposit was made on the `ChildPeer` with the current strategy because the `ParentPeer`'s state must be updated to reflect the total shares/YieldCoin in the system.
 
 #### Deposit on Parent when Parent is Strategy
 
@@ -282,9 +282,11 @@ Deposits are required to include the `ParentPeer`, even if the deposit was made 
 
 ![Deposit on Child when Remote Child is Strategy](./diagrams/deposit/onChild-isRemoteChild.jpg)
 
+To clarify what is happening in this final image: when the deposit is made, the strategy is fetched from the parent, then the deposit is sent to the strategy, the tvl is returned to the parent, and then the parent returns the YieldCoin mint amount to the depositor.
+
 ### Withdraw
 
-Withdrawals are executed using the YieldCoin/share token's `ERC677::transferAndCall()`, which checks if the receiving address has implemented `IERC677Receiver::onTokenTransfer()`, which the `YieldPeer`, `ParentPeer`, and `ChildPeer` contracts have.
+Withdrawals are executed using the YieldCoin token's `ERC677::transferAndCall()`, which checks if the receiving address has implemented `IERC677Receiver::onTokenTransfer()`, which the `YieldPeer`, `ParentPeer`, and `ChildPeer` contracts have.
 
 See [Parent Withdraw](https://github.com/contractlevel/yield/blob/457267fcf8068e3b35dd31770640b9423595892d/src/peers/ParentPeer.sol#L108-L169) and [Child Withdraw](https://github.com/contractlevel/yield/blob/457267fcf8068e3b35dd31770640b9423595892d/src/peers/ChildPeer.sol#L73-L93).
 

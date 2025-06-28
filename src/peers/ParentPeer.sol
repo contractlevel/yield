@@ -105,13 +105,13 @@ contract ParentPeer is YieldPeer {
         }
     }
 
-    /// @notice This function is called when SHAREs are transferred to this peer
+    /// @notice This function is called when YieldCoin/share tokens are transferred to this peer
     /// @notice This function is used to withdraw USDC from the system
-    /// @param withdrawer The address that transferred the SHAREs to withdraw their USDC from the system
-    /// @param shareBurnAmount The amount of SHAREs transferred to be burned
+    /// @param withdrawer The address that transferred the YieldCoin to withdraw their USDC from the system
+    /// @param shareBurnAmount The amount of YieldCoin transferred to be burned
     /// @param encodedWithdrawChainSelector The encoded chain selector to withdraw USDC to. If this is empty, the withdrawn USDC will be sent back to this chain
     /// @dev Revert if encodedWithdrawChainSelector doesn't decode to an allowed chain selector
-    /// @dev Revert if msg.sender is not the SHARE token
+    /// @dev Revert if msg.sender is not the YieldCoin/share token
     /// @dev Revert if shareBurnAmount is 0
     /// @dev Update s_totalShares and burn shares from msg.sender
     /// @dev Handle the case where the parent is the strategy
