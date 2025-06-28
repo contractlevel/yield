@@ -582,43 +582,38 @@ ccip: https://ccip.chain.link/tx/0xd0c3e338c66bad81412c92ad7b76681b977464fa85350
 
 ## Future Developments
 
+- test suite needs improving (event params have not been fully verified and no mutation testing has not finished. there are still pathways to explore.)
+- fees (and automated Chainlink service payments)
 - more stablecoin support (swapping to one with higher yield opportunities, such as USD1, USDT, etc.)
 - more chains
 - more yield strategies/protocols (such as Euler, Morpho)
-- fees (and automated Chainlink service payments)
 - svm compatability
 - ccip calldata compression (should use solady.libZip for compressing/decompressing depositData, withdrawData and strategy struct)
 - uniswap integration to allow users to "buy" yieldcoin with any asset, ie they pay with eth and it gets swapped to the usdc amount then deposited
-- test suite needs improving (event params have not been verified and no mutation testing has been done yet)
-- fix precision loss/share calculation logic bug (biggest priority, all ready started)
 
 ## Challenges I ran into
 
 _This section has been added to the README because it would not all fit in the submission page for the hackathon._
 
-There were many roadblocks of varying size for this submission. The most significant of which is a precision loss/calculation logic bug that became apparent during invariant testing and formal verification.
+There were many roadblocks of varying size for this submission. The most significant of which was a YieldCoin/share mint calculation logic bug that became apparent during invariant testing and formal verification.
 
 ### Share Mint Calculation Bug
 
-The invariant testing (which began after initially achieving full unit coverage) revealed cases where the amount of YieldCoin minted in exchange for USDC deposits was significantly less than it should have been.
+This was the most significant challenge and went unresolved whilst prioritizing an eligible submission.
 
-I thought the issue was mitigated with “initial admin deposits” which would go untouched, something like [dead shares inflation attack mitigation](https://solodit.cyfrin.io/issues/l-18-vault-is-susceptible-to-inflation-attack-by-first-depositor-pashov-audit-group-none-hyperstable_2025-02-26-markdown) because the invariant tests were then passing. (I actually need to try minting to address(0) - note to self for after this submission is done).
+The invariant testing revealed cases where the amount of YieldCoin minted in exchange for USDC deposits was significantly less than it should have been, breaking a key invariant of the system: `users must always be able to withdraw their deposit`(minus fees when implemented).
 
-The issue came up again during formal verification with Certora. Even though initial admin shares were minted, there were still scenarios where the total value of the system and the total shares (YieldCoin) minted (values used to calculate the `shareMintAmount` of YieldCoin, in exchange for USDC deposits) resulted in 0 YieldCoin minted despite the user depositing USDC - breaking a key invariant of the system: “user’s should always be able to withdraw their deposited amount (minus any fees) shortly after depositing into the system”.
+I thought the issue was mitigated with something like [dead shares inflation attack mitigation](https://solodit.cyfrin.io/issues/l-18-vault-is-susceptible-to-inflation-attack-by-first-depositor-pashov-audit-group-none-hyperstable_2025-02-26-markdown) because the invariant tests were then passing.
 
-This issue has so far gone unresolved (today is 21st) because of how much a deep rabbit hole it could be, I wanted to get an eligible submission done before focusing on it - because there really is no way to know what other issues would’ve appeared during the testnet deployments and transactions phase.
+The issue came up again during formal verification with Certora. Even though initial admin shares were minted, Certora revealed scenarios where a depositor was not receiving enough YieldCoin to withdraw their deposit - bad!
 
-Other than this bug, the testnet deployments and transactions behaved as intended. All of the Chainlink integrations performed their roles correctly.
+22nd - Unresolved because an eligible submission was priority.
 
-Once this submission is done, the rest of the hackathon will be spent on this bug (and hopefully have solved it by the 29th).
-
-Update: (Today is 24th). There was a problem with the yieldcoin mint amount calculation in `ParentPeer::_calculateMintAmount`. That problem was the `totalValue` being passed included the deposit `amount`. Both of these values are required to calculate the amount to mint. The fix to this was to subtract the amount from totalValue (still needs to be cleaned up, and explored deeper for other inconsistencies across the codebase).
-
-I also introduced decimal conversions where appropriate.
+24th - There was a problem with the share mint amount calculation in [ParentPeer::\_calculateMintAmount](https://github.com/contractlevel/yield/blob/ca811e400894480e2bc6576b67b96c635f258405/src/peers/ParentPeer.sol#L416). That problem was the TVL being passed included the deposit amount. Both of these values are required to calculate the amount to mint. The fix to this was to subtract the amount from TVL.
 
 The invariant discussed above is now fixed.
 
-26th - The root cause of this issue was a helper function in the abstract YieldPeer contract. The function deposited an amount to the active strategy, and returned the TVL. The order of operations for these was incorrect. TVL was being read after the deposit, which was wrong. This took time to fix because there was also a single instance of the same operation being done, outside the function.
+26th - The root cause of this issue was a [helper function](https://github.com/contractlevel/yield/blob/ca811e400894480e2bc6576b67b96c635f258405/src/peers/YieldPeer.sol#L286-L287) in the abstract YieldPeer contract. The function deposited an amount to the active strategy, and returned the TVL. The order of operations for these was incorrect. TVL was being read after the deposit, which was wrong. This took time to fix because there was also a single instance of the same operation being done, outside the function.
 
 ### Burning small amounts of shares (YieldCoin), worth less than the lowest possible value of USDC (6 decimals) resulted in reverts
 
@@ -626,11 +621,11 @@ If a user attempted to withdraw USDC by burning an amount of shares/YieldCoin wo
 
 To mitigate this, the current approach is a bit of a compromise, but if someone tries to withdraw less than the lowest possible value of USDC, they receive nothing in exchange for burning their shares. This of course is not ideal, and is considered a [known issue](https://github.com/contractlevel/yield?tab=readme-ov-file#burning-small-amounts-of-shares-can-result-in-0-usdc-withdrawn), however it is unexpected that a user will attempt to withdraw such an insignificant amount, and doing so would benefit all other YieldCoin holders. Most importantly, this mitigation means the system doesn't revert/experience any weird DoS.
 
-Further research is will be conducted on this issue. It is mitigated, but it is not perfect.
+It is mitigated, but further research is will be conducted on this. An option being explored is enforcing a minimum share burn amount, but the crosschain nature of some withdraw paths makes this tricky to enforce at the contract level.
 
 ### USDC chainlink-local fork
 
-This is actually an issue I’ve had with writing ccip tests before. The current chainlink-local ccip simulator is amazing, but unfortunately doesn’t have support for USDC - the stablecoin with the most lanes on CCIP.
+The current chainlink-local ccip simulator is amazing, but unfortunately doesn’t have support for USDC - the stablecoin with the most lanes on CCIP.
 
 To fully test the system on forked mainnets, additional functionality in the `CCIPLocalSimulatorFork` was required to get past the additional CCTP checks for USDC. CCTP is Circle’s crosschain infrastructure for USDC that works alongside CCIP onchain.
 
@@ -640,15 +635,15 @@ Ultimately the [additional functionality](https://github.com/contractlevel/chain
 
 Information pertaining to the “strategy” with the highest yield (ie the chain and the protocol) is fetched from the [DefiLlama API](https://yields.llama.fi/pools) which returns a HUGE response. The response was too much for Chainlink Functions, so a proxy API to filter for the relevant data was required.
 
-I made one and deployed it to AWS Lambda. The url for the API could have been abused (unlikely for a hackathon project, but a required consideration for a production ready project) so the url had to be properly encrypted with the [functions-toolkit](<[https://www.npmjs.com/package/@chainlink/functions-toolkit#functions-utilities](https://www.npmjs.com/package/@chainlink/functions-toolkit#encrypting-secrets)>) and then stored as a [constant](https://github.com/contractlevel/yield/blob/575ee3cb5f9ae11b7921728a40e0590f678dd05c/src/peers/extensions/ParentCLF.sol#L33-L37) in the YieldCoin FunctionsClient contract. This value needed to be different for different chains due to the chain-specific parameters required when executing the encrypted secrets process.
+I made one and deployed it to AWS Lambda. The url for the API could have been abused (unlikely for a hackathon project, but a required consideration for a production ready project) so the url had to be properly encrypted with the [functions-toolkit](<[https://www.npmjs.com/package/@chainlink/functions-toolkit#functions-utilities](https://www.npmjs.com/package/@chainlink/functions-toolkit#encrypting-secrets)>) and then stored as a [constant](https://github.com/contractlevel/yield/blob/575ee3cb5f9ae11b7921728a40e0590f678dd05c/src/peers/extensions/ParentCLF.sol#L33-L37) in the YieldCoin FunctionsClient contract (`ParentCLF`). This value needed to be different for different chains due to the chain-specific parameters required when executing the encrypted secrets process. Even though Chainlink Functions is used on the Parent chain only, the Parent chain changed between testnet deployments, so the chain-specific parameters for secrets encryption had to be considered.
 
 ### Time management/knowing what to prioritize
 
-There were a lot of parts to this project and knowing which bit to prioritize and when was a challenge. Once the unit coverage was complete I played around with adding more yield strategies and implementing fees, before deciding to focus on invariant tests. More yield strategies wasn’t exactly essential to demonstrate the full functionality of the system itself, and implementing fees was much the same.
+There were a lot of parts to this project and knowing which bit to prioritize, and when, was a challenge. Once the unit coverage was complete I played around with adding more yield strategies and implementing fees, before deciding to focus on invariant tests. More yield strategies wasn’t exactly essential to demonstrate the full functionality of the Chainlink integrations and the system itself. Implementing fees was much the same.
 
 As security is so integral to smart contract development, I decided more testing of the system so far was a higher priority than additional features that wouldn’t showcase any more Chainlink use and could be added later.
 
-As previously mentioned, juggling the precision loss/share calculation logic bug and getting an eligible submission done was a time management/priority challenge too.
+Juggling researching and fixing the share mint calculation logic bug with getting an eligible submission done was a time management/priority challenge too.
 
 I didn’t get to implement everything I would’ve liked due to the time constraints, but that just means this project now has a [roadmap of future developments](https://github.com/contractlevel/yield?tab=readme-ov-file#future-developments).
 
@@ -658,7 +653,7 @@ This was a big issue that didn’t become apparent until the testnet stage. The 
 
 I suspected the Functions max gas limit may have been the cause of the issue, however the Tenderly calltrace showed the transaction failing on an unrelated revert - very confusing! I ended up asking in the discord hackathon support channel and received a response which led to the confirmation of my initial suspicions.
 
-Solving this issue required a second Automation implementation, to trigger the CCIP rebalance messaged based on the Functions request callback. This could have been done with Custom Logic Automation, but that likely would’ve meant using additional, redundant storage slots, so I opted for Log-trigger Automation. The idea for this being when a better strategy was returned by Chainlink Functions, an event detailing this would be emitted, and then Log-trigger Automation would listen for this event, and execute CCIP rebalance messages based on it.
+Solving this issue required a second Automation implementation, to trigger the CCIP rebalance messages based on the Functions request callback. This could have been done with Custom Logic Automation, but that likely would’ve meant using additional, redundant storage slots, so I opted for Log-trigger Automation. The idea for this being when a better strategy was returned by Chainlink Functions, an event detailing it would be emitted, and then Log-trigger Automation would listen for the event, then execute CCIP rebalance messages based on it.
 
 The chain that would have required the Log-trigger Automation was Base Sepolia, because that is where the ParentPeer/CLF contract (the one that interacts with Chainlink Functions) was deployed.
 
