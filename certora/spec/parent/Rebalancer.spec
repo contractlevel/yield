@@ -225,8 +225,7 @@ rule checkLog_reverts() {
     assert lastReverted;
 }
 
-// rule is vacuous
-rule checkLog_returnsFalseWhen_localParentRebalance() {
+rule checkLog_revertsWhen_localParentRebalance() {
     env e;
     bytes data;
     uint8 protocolEnum;
@@ -238,12 +237,51 @@ rule checkLog_returnsFalseWhen_localParentRebalance() {
         getParentChainSelector()
     );
 
-    bool upkeepNeeded = true;
-    bytes performData = createNonEmptyBytes();
+    checkLog@withrevert(e, log, data);
+    assert lastReverted;
+}
 
-    (upkeepNeeded, performData) = checkLog(e, log, data);
-    assert !upkeepNeeded;
-    assert performData.length == 0;
+rule checkLog_revertsWhen_wrongEvent() {
+     env e;
+    bytes data;
+    uint8 protocolEnum;
+    bytes32 wrongEvent;
+    require wrongEvent != StrategyUpdatedEvent();
+    uint64 newChainSelector;
+    uint64 oldChainSelector;
+    require e.tx.origin == 0 || e.tx.origin == 0x1111111111111111111111111111111111111111;
+    require newChainSelector != getParentChainSelector() || oldChainSelector != getParentChainSelector();
+    ParentRebalancer.Log log = createLog(
+        getParentPeer(),
+        wrongEvent,
+        newChainSelector,
+        protocolEnum,
+        oldChainSelector
+    );
+
+    checkLog@withrevert(e, log, data);
+    assert lastReverted;
+}
+
+rule checkLog_revertsWhen_wrongSource() {
+    env e;
+    bytes data;
+    uint8 protocolEnum;
+    uint64 newChainSelector;
+    uint64 oldChainSelector;
+    require e.tx.origin == 0 || e.tx.origin == 0x1111111111111111111111111111111111111111;
+    require newChainSelector != getParentChainSelector() || oldChainSelector != getParentChainSelector();
+    address wrongSource;
+    require wrongSource != getParentPeer();
+    ParentRebalancer.Log log = createLog(
+        wrongSource,
+        StrategyUpdatedEvent(),
+        newChainSelector,
+        protocolEnum,
+        oldChainSelector
+    );
+    checkLog@withrevert(e, log, data);
+    assert lastReverted;
 }
 
 // rule is vacuous
@@ -305,6 +343,7 @@ rule checkLog_returnsTrueWhen_oldStrategyParent_newStrategyChild() {
     uint64 newChainSelector;
     uint64 oldChainSelector;
     require oldChainSelector == getParentChainSelector();
+    require newChainSelector != getParentChainSelector();
     ParentRebalancer.Log log = createLog(
         getParentPeer(),
         StrategyUpdatedEvent(),

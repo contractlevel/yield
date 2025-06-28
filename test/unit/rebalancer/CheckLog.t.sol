@@ -12,31 +12,28 @@ contract CheckLogTest is BaseTest {
     }
 
     /// @notice The cannotExecute modifier will need to be commented out for this test to pass
-    function test_yield_checkLog_returnsFalseWhen_wrongEvent() public view {
+    function test_yield_checkLog_revertsWhen_wrongEvent() public {
         bytes32 wrongEvent = keccak256("WrongEvent()");
         bytes32[] memory topics = new bytes32[](1);
         topics[0] = wrongEvent;
         Log memory log = _createLog(address(baseParentPeer), topics);
-        (bool upkeepNeeded, bytes memory performData) = baseParentRebalancer.checkLog(log, "");
-        assertFalse(upkeepNeeded);
-        assertEq(performData, "");
+        vm.expectRevert(abi.encodeWithSignature("ParentRebalancer__UpkeepNotNeeded()"));
+        baseParentRebalancer.checkLog(log, "");
     }
 
     /// @notice The cannotExecute modifier will need to be commented out for this test to pass
-    function test_yield_checkLog_returnsFalseWhen_wrongSource() public view {
+    function test_yield_checkLog_revertsWhen_wrongSource() public {
         Log memory log = _createStrategyUpdatedLog(address(baseParentRebalancer), 1, 2, 3);
-        (bool upkeepNeeded, bytes memory performData) = baseParentRebalancer.checkLog(log, "");
-        assertFalse(upkeepNeeded);
-        assertEq(performData, "");
+        vm.expectRevert(abi.encodeWithSignature("ParentRebalancer__UpkeepNotNeeded()"));
+        baseParentRebalancer.checkLog(log, "");
     }
 
     /// @notice The cannotExecute modifier will need to be commented out for this test to pass
-    function test_yield_checkLog_returnsFalseWhen_localParentRebalance() public view {
+    function test_yield_checkLog_revertsWhen_localParentRebalance() public {
         uint64 parentChainSelector = baseParentPeer.getThisChainSelector();
         Log memory log = _createStrategyUpdatedLog(address(baseParentPeer), parentChainSelector, 0, parentChainSelector);
-        (bool upkeepNeeded, bytes memory performData) = baseParentRebalancer.checkLog(log, "");
-        assertFalse(upkeepNeeded);
-        assertEq(performData, "");
+        vm.expectRevert(abi.encodeWithSignature("ParentRebalancer__UpkeepNotNeeded()"));
+        baseParentRebalancer.checkLog(log, "");
     }
 
     /// @notice The cannotExecute modifier will need to be commented out for this test to pass
