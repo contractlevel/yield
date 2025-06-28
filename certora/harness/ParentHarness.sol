@@ -63,4 +63,8 @@ contract ParentHarness is ParentPeer, HelperHarness {
     function calculateMintAmount(uint256 totalValue, uint256 amount) public view returns (uint256) {
         return _calculateMintAmount(totalValue, amount);
     }
+
+    function convertUsdcToShare(uint256 amount) public pure returns (uint256) {
+        return _convertUsdcToShare(amount);
+    }
 }

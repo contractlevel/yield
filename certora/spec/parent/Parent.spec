@@ -35,6 +35,7 @@ methods {
     function calculateMintAmount(uint256,uint256) external returns (uint256) envfree;
     function calculateTotalValue(uint256) external returns (uint256);
     function createStrategy(uint64,IYieldPeer.Protocol) external returns (IYieldPeer.Strategy memory) envfree;
+    function convertUsdcToShare(uint256) external returns (uint256) envfree;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -83,6 +84,18 @@ definition CurrentStrategyOptimalEvent() returns bytes32 =
 definition StrategyUpdatedEvent() returns bytes32 =
 // keccak256(abi.encodePacked("StrategyUpdated(uint64,uint8,uint64)"))
     to_bytes32(0xcb31617872c52547b670aaf6e63c8f6be35dc74d4144db1b17f2e539b5475ac7);
+
+definition WithdrawFromStrategyEvent() returns bytes32 =
+// keccak256(abi.encodePacked("WithdrawFromStrategy(address,uint256)"))
+    to_bytes32(0xb28e99afed98b3607aeea074f84c346dc4135d86f35b1c28bc35ab6782e7ce30);
+
+definition StrategyPoolUpdatedEvent() returns bytes32 =
+// keccak256(abi.encodePacked("StrategyPoolUpdated(address)"))
+    to_bytes32(0xe93cbfefd912dc9a1b30a0c2333d11e2bffb32d29ae125c33bbdba59af9e387c);
+
+definition DepositToStrategyEvent() returns bytes32 =
+// keccak256(abi.encodePacked("DepositToStrategy(address,uint256)"))
+    to_bytes32(0x8125d05f0839eec6c1f6b1674833e01f11ab362bd9c60eb2e3b274fa3b47e4f4);
 
 /*//////////////////////////////////////////////////////////////
                              GHOSTS
@@ -162,6 +175,21 @@ ghost mathint ghost_ccipMessageSent_bridgeAmount_emitted {
     init_state axiom ghost_ccipMessageSent_bridgeAmount_emitted == 0;
 }
 
+/// @notice EventCount: track amount of WithdrawFromStrategy event is emitted
+ghost mathint ghost_withdrawFromStrategy_eventCount {
+    init_state axiom ghost_withdrawFromStrategy_eventCount == 0;
+}
+
+/// @notice EventCount: track amount of StrategyPoolUpdated event is emitted
+ghost mathint ghost_strategyPoolUpdated_eventCount {
+    init_state axiom ghost_strategyPoolUpdated_eventCount == 0;
+}
+
+/// @notice EventCount: track amount of DepositToStrategy event is emitted
+ghost mathint ghost_depositToStrategy_eventCount {
+    init_state axiom ghost_depositToStrategy_eventCount == 0;
+}
+
 /*//////////////////////////////////////////////////////////////
                              HOOKS
 //////////////////////////////////////////////////////////////*/
@@ -199,6 +227,14 @@ hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
         ghost_withdrawForwardedToStrategy_eventCount = ghost_withdrawForwardedToStrategy_eventCount + 1;
     if (t0 == CurrentStrategyOptimalEvent())
         ghost_currentStrategyOptimal_eventCount = ghost_currentStrategyOptimal_eventCount + 1;
+    if (t0 == WithdrawFromStrategyEvent()) 
+        ghost_withdrawFromStrategy_eventCount = ghost_withdrawFromStrategy_eventCount + 1;
+    if (t0 == DepositToStrategyEvent()) 
+        ghost_depositToStrategy_eventCount = ghost_depositToStrategy_eventCount + 1;
+}
+
+hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
+    if (t0 == StrategyPoolUpdatedEvent()) ghost_strategyPoolUpdated_eventCount = ghost_strategyPoolUpdated_eventCount + 1;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -711,6 +747,24 @@ rule setStrategy_handlesLocalStrategyChange() {
         aaveBalanceBefore - totalValue && usdc.balanceOf(getCompound()) == compoundBalanceBefore + totalValue;
 }
 
+rule setStrategy_no_localStrategyChange_when_newStrategy_is_different() {
+    env e;
+    uint64 newChainSelector;
+    IYieldPeer.Protocol newProtocol;
+
+    IYieldPeer.Strategy oldStrategy = getStrategy();
+
+    require oldStrategy.chainSelector != getThisChainSelector() && oldStrategy.protocol != newProtocol;
+
+    require ghost_withdrawFromStrategy_eventCount == 0;
+    require ghost_depositToStrategy_eventCount == 0;
+    require ghost_strategyPoolUpdated_eventCount == 0;
+    setStrategy(e, newChainSelector, newProtocol);
+    assert ghost_withdrawFromStrategy_eventCount == 0;
+    assert ghost_depositToStrategy_eventCount == 0;
+    assert ghost_strategyPoolUpdated_eventCount == 0;
+}
+
 // --- RebalanceNewStrategy --- //
 rule rebalanceNewStrategy_revertsWhen_notParentRebalancer() {
     env e;
@@ -779,4 +833,22 @@ rule rebalanceOldStrategy_forwardsRebalanceToOldStrategy() {
     assert ghost_ccipMessageSent_eventCount == 1;
     assert ghost_ccipMessageSent_txType_emitted == 7; // RebalanceOldStrategy
     assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;
+}
+
+// --- calculateMintAmount --- //
+rule calculateMintAmount_calculation() {
+    uint256 totalValue;
+    uint256 depositAmount;
+    require depositAmount > 0;
+    require totalValue > 0;
+
+    mathint expectedMintAmount = 
+        convertUsdcToShare(depositAmount) * currentContract.s_totalShares 
+            / convertUsdcToShare(totalValue);
+    require expectedMintAmount > 0;
+
+    uint256 actualMintAmount = calculateMintAmount(totalValue, depositAmount);
+    require actualMintAmount > 1;
+
+    assert actualMintAmount == assert_uint256(expectedMintAmount);
 }
