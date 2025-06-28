@@ -105,7 +105,7 @@ contract ChildPeer is YieldPeer {
     /// - CcipTxType RebalanceOldStrategy: A tx from parent to this-old-strategy to rebalance funds to the new strategy
     /// - CcipTxType RebalanceNewStrategy: A tx from the old strategy, sending rebalanced funds to this new strategy
     /// @param tokenAmounts The token amounts received in the CCIP message
-    /// @param data The data received in the CCIP message
+    /// @param data The data received in the CCIP message. It will be either DepositData, WithdrawData, or the encoded Strategy struct.
     function _handleCCIPMessage(
         CcipTxType txType,
         Client.EVMTokenAmount[] memory tokenAmounts,

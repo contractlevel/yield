@@ -34,5 +34,9 @@ contract ChildHarness is ChildPeer, HelperHarness {
 
     function handleCCIPRebalanceOldStrategy(bytes memory data) public {
         _handleCCIPRebalanceOldStrategy(data);
-    }   
+    }
+
+    function handleCCIPMessage(CcipTxType txType, Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data, uint64 sourceChainSelector) public {
+        _handleCCIPMessage(txType, tokenAmounts, data, sourceChainSelector);
+    }
 }

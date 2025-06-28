@@ -41,6 +41,11 @@ library ProtocolOperations {
         return ProtocolConfig({usdc: usdc, aavePoolAddressesProvider: aavePoolAddressesProvider, comet: comet});
     }
 
+    /// @notice Deposits USDC to the strategy pool
+    /// @param strategyPool The address of the strategy pool
+    /// @param config The ProtocolConfig struct
+    /// @param amount The amount of USDC to deposit
+    /// @dev Reverts if the strategy pool is invalid
     function _depositToStrategy(address strategyPool, ProtocolConfig memory config, uint256 amount) internal {
         if (strategyPool == address(config.aavePoolAddressesProvider)) {
             _depositToAave(config.usdc, config.aavePoolAddressesProvider, amount);
@@ -51,6 +56,11 @@ library ProtocolOperations {
         }
     }
 
+    /// @notice Withdraws USDC from the strategy pool
+    /// @param strategyPool The address of the strategy pool
+    /// @param config The ProtocolConfig struct
+    /// @param amount The amount of USDC to withdraw
+    /// @dev Reverts if the strategy pool is invalid
     function _withdrawFromStrategy(address strategyPool, ProtocolConfig memory config, uint256 amount) internal {
         if (strategyPool == address(config.aavePoolAddressesProvider)) {
             _withdrawFromAave(config.usdc, config.aavePoolAddressesProvider, amount);
@@ -64,6 +74,11 @@ library ProtocolOperations {
     /*//////////////////////////////////////////////////////////////
                                  GETTER
     //////////////////////////////////////////////////////////////*/
+    /// @notice Gets the total value from the strategy pool
+    /// @param strategyPool The address of the strategy pool
+    /// @param config The ProtocolConfig struct
+    /// @return The total value of the strategy pool
+    /// @dev Reverts if the strategy pool is invalid
     function _getTotalValueFromStrategy(address strategyPool, ProtocolConfig memory config)
         internal
         view
@@ -78,6 +93,11 @@ library ProtocolOperations {
         }
     }
 
+    /// @notice Gets the strategy pool from a protocol
+    /// @param protocol The protocol
+    /// @param config The ProtocolConfig struct
+    /// @return strategyPool The address of the strategy pool
+    /// @dev Reverts if the protocol is invalid
     function _getStrategyPoolFromProtocol(IYieldPeer.Protocol protocol, ProtocolConfig memory config)
         internal
         pure
@@ -90,22 +110,42 @@ library ProtocolOperations {
     /*//////////////////////////////////////////////////////////////
                                 INTERNAL
     //////////////////////////////////////////////////////////////*/
+    /// @notice Deposits USDC to the Aave pool
+    /// @param usdc The USDC token address
+    /// @param aavePoolAddressesProvider The address of the Aave v3 pool addresses provider
+    /// @param amount The amount of USDC to deposit
+    /// @dev Approves the USDC to the Aave pool and deposits the USDC to the Aave pool
     function _depositToAave(address usdc, address aavePoolAddressesProvider, uint256 amount) private {
         address aavePool = IPoolAddressesProvider(aavePoolAddressesProvider).getPool();
         IERC20(usdc).approve(aavePool, amount);
         IPool(aavePool).supply(usdc, amount, address(this), 0);
     }
 
+    /// @notice Deposits USDC to the Compound pool
+    /// @param usdc The USDC token address
+    /// @param comet The address of the Compound v3 pool
+    /// @param amount The amount of USDC to deposit
+    /// @dev Approves the USDC to the Compound pool and deposits the USDC to the Compound pool
     function _depositToCompound(address usdc, address comet, uint256 amount) private {
         IERC20(usdc).approve(comet, amount);
         IComet(comet).supply(usdc, amount);
     }
 
+    /// @notice Withdraws USDC from the Aave pool
+    /// @param usdc The USDC token address
+    /// @param aavePoolAddressesProvider The address of the Aave v3 pool addresses provider
+    /// @param amount The amount of USDC to withdraw
+    /// @dev Withdraws the USDC from the Aave pool
     function _withdrawFromAave(address usdc, address aavePoolAddressesProvider, uint256 amount) private {
         address aavePool = IPoolAddressesProvider(aavePoolAddressesProvider).getPool();
         IPool(aavePool).withdraw(usdc, amount, address(this));
     }
 
+    /// @notice Withdraws USDC from the Compound pool
+    /// @param usdc The USDC token address
+    /// @param comet The address of the Compound v3 pool
+    /// @param amount The amount of USDC to withdraw
+    /// @dev Withdraws the USDC from the Compound pool
     function _withdrawFromCompound(address usdc, address comet, uint256 amount) private {
         IComet(comet).withdraw(usdc, amount);
     }
@@ -113,6 +153,10 @@ library ProtocolOperations {
     /*//////////////////////////////////////////////////////////////
                              INTERNAL VIEW
     //////////////////////////////////////////////////////////////*/
+    /// @notice Gets the total value from the Aave pool
+    /// @param usdc The USDC token address
+    /// @param aavePoolAddressesProvider The address of the Aave v3 pool addresses provider
+    /// @return The total value from the Aave pool
     function _getTotalValueFromAave(address usdc, address aavePoolAddressesProvider) private view returns (uint256) {
         address aavePool = IPoolAddressesProvider(aavePoolAddressesProvider).getPool();
         DataTypes.ReserveData memory reserveData = IPool(aavePool).getReserveData(usdc);
@@ -120,6 +164,9 @@ library ProtocolOperations {
         return IERC20(aTokenAddress).balanceOf(address(this));
     }
 
+    /// @notice Gets the total value from the Compound pool
+    /// @param comet The address of the Compound v3 pool
+    /// @return The total value from the Compound pool
     function _getTotalValueFromCompound(address comet) private view returns (uint256) {
         return IComet(comet).balanceOf(address(this));
     }

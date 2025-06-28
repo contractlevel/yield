@@ -17,6 +17,13 @@ library CCIPOperations {
     /*//////////////////////////////////////////////////////////////
                                 INTERNAL
     //////////////////////////////////////////////////////////////*/
+    /// @notice Builds a CCIP message for a given transaction type, data, token amounts, gas limit, and link token
+    /// @param receiver The address of the receiver of the transaction
+    /// @param txType The type of transaction - see IYieldPeer.CcipTxType
+    /// @param data The data of the transaction
+    /// @param tokenAmounts The token amounts of the transaction
+    /// @param gasLimit The gas limit of the transaction in wei
+    /// @param link The LINK token address
     function _buildCCIPMessage(
         address receiver,
         IYieldPeer.CcipTxType txType,
@@ -34,6 +41,12 @@ library CCIPOperations {
         });
     }
 
+    /// @notice Handles the CCIP fees for a given message
+    /// @param ccipRouter The address of the CCIP router
+    /// @param link The LINK token address
+    /// @param dstChainSelector The destination chain selector
+    /// @param evm2AnyMessage The CCIP message
+    /// @dev Reverts if the contract doesn't have enough LINK to pay for the fees
     function _handleCCIPFees(
         address ccipRouter,
         address link,
@@ -46,6 +59,12 @@ library CCIPOperations {
         LinkTokenInterface(link).approve(ccipRouter, fees);
     }
 
+    /// @notice Prepares the token amounts for a given transaction
+    /// @param usdc The USDC token address
+    /// @param bridgeAmount The amount of USDC to bridge
+    /// @param ccipRouter The address of the CCIP router
+    /// @return tokenAmounts The token amounts of the transaction
+    /// @notice If the bridge amount is 0, the token amounts are set to 0
     function _prepareTokenAmounts(IERC20 usdc, uint256 bridgeAmount, address ccipRouter)
         internal
         returns (Client.EVMTokenAmount[] memory tokenAmounts)
@@ -62,6 +81,11 @@ library CCIPOperations {
     /*//////////////////////////////////////////////////////////////
                              INTERNAL VIEW
     //////////////////////////////////////////////////////////////*/
+    /// @notice Validates the token amounts for a given transaction
+    /// @param tokenAmounts The token amounts of the transaction
+    /// @param usdc The USDC token address
+    /// @param amount The amount of USDC to bridge
+    /// @dev Reverts if the token amounts are invalid
     function _validateTokenAmounts(Client.EVMTokenAmount[] memory tokenAmounts, address usdc, uint256 amount)
         internal
         pure
