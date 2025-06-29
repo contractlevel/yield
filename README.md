@@ -458,7 +458,7 @@ The [`Rebalancer`](https://github.com/contractlevel/yield/blob/main/certora/spec
 certoraRun ./certora/conf/parent/Rebalancer.conf
 ```
 
-Verifying behaviour in the `checkLog()` function would result in vacuous rules with basic sanity enabled. I thought this was because of returning false when upkeep wasn't needed, and that reverting instead would improve the verification, but that resulted in vacuous rules too. For now basic sanity has been left enabled, and comments in the spec indicate the vacuous rules. Reverts instead of returning false when upkeep is not needed has been kept in place. It doesn't make a difference either way and is a purely aesthetic, especially when both options deliver vacuous rules.
+Verifying behaviour in the `checkLog()` function would result in vacuous rules with basic sanity enabled. I thought this was because of returning false when upkeep wasn't needed, and that reverting instead would improve the verification, but that resulted in vacuous rules too. For now basic sanity has been left enabled, and comments in the spec indicate the vacuous rules. Reverts instead of returning false when upkeep is not needed has been kept in place. It doesn't make any functional difference either way and is purely aesthetic, especially when both options deliver vacuous rules.
 
 ## Known Issues
 
@@ -584,7 +584,7 @@ ccip: https://ccip.chain.link/tx/0xd0c3e338c66bad81412c92ad7b76681b977464fa85350
 
 ## Future Developments
 
-- test suite needs improving (event params have not been fully verified and no mutation testing has not finished. there are still pathways to explore.)
+- test suite needs improving (event params have not been fully verified and mutation testing has not finished. there are still pathways to explore.)
 - fees (and automated Chainlink service payments)
 - more stablecoin support (swapping to one with higher yield opportunities, such as USD1, USDT, etc.)
 - more chains
