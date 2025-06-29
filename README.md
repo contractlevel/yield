@@ -100,7 +100,7 @@ YieldCoin follows the [ERC677](https://github.com/ethereum/EIPs/issues/677) and 
 
 ## Strategy
 
-The "[Strategy](https://github.com/contractlevel/yield/blob/726c449fb57a0cdb6d77ad9234014f49032a8d33/src/interfaces/IYieldPeer.sol#L5-L8)" refers to the chain and protocol the total system funds are allocated to generate the optimal yield. Low-risk, time-tested, and secure protocols have been selected for this initial prototype. For now the system supports Aave and Compound. As development progresses, the plan is to integrate as many strategy protocols as possible, without risking user funds. The system should always be able to withdraw all user deposits + yield generated. Therefore supplying USDC to earn APY from protocols like Aave and Compound is seen as a safe, low-risk yield strategy.
+The "[Strategy](https://github.com/contractlevel/yield/blob/788c3c0a80279ee0f75e6977056173225cbc3f26/src/interfaces/IYieldPeer.sol#L5-L8)" refers to the chain and protocol the total system funds are allocated to generate the optimal yield. Low-risk, time-tested, and secure protocols have been selected for this initial prototype. For now the system supports Aave and Compound. As development progresses, the plan is to integrate as many strategy protocols as possible, without risking user funds. The system should always be able to withdraw all user deposits + yield generated. Therefore supplying USDC to earn APY from protocols like Aave and Compound is seen as a safe, low-risk yield strategy.
 
 "Strategy rebalancing" or simply "rebalancing" refers to the automated process of withdrawing funds from the previous strategy and depositing them into the new strategy, to earn a higher yield.
 
@@ -140,11 +140,11 @@ Some logic from `YieldPeer` has been delegated to distinct libraries to improve 
 
 [ProtocolOperations](https://github.com/contractlevel/yield/blob/main/src/libraries/ProtocolOperations.sol) contains logic for interacting with strategy protocols such as depositing, withdrawing, and querying the total value of the system.
 
-[DataStructures](https://github.com/contractlevel/yield/blob/main/src/libraries/DataStructures.sol) contains logic for creating [DepositData](https://github.com/contractlevel/yield/blob/457267fcf8068e3b35dd31770640b9423595892d/src/interfaces/IYieldPeer.sol#L28-L34) and [WithdrawData](https://github.com/contractlevel/yield/blob/457267fcf8068e3b35dd31770640b9423595892d/src/interfaces/IYieldPeer.sol#L36-L42) structs, which are used in CCIP messages for deposits and withdraw respectively.
+[DataStructures](https://github.com/contractlevel/yield/blob/main/src/libraries/DataStructures.sol) contains logic for creating [DepositData](https://github.com/contractlevel/yield/blob/788c3c0a80279ee0f75e6977056173225cbc3f26/src/interfaces/IYieldPeer.sol#L28-L34) and [WithdrawData](https://github.com/contractlevel/yield/blob/788c3c0a80279ee0f75e6977056173225cbc3f26/src/interfaces/IYieldPeer.sol#L36-L42) structs, which are used in CCIP messages for deposits and withdraw respectively.
 
 ### ParentPeer
 
-The [`ParentPeer`](https://github.com/contractlevel/yield/blob/main/src/peers/ParentPeer.sol) contract tracks system wide state for Contract Level Yield, specifically the total shares (YieldCoin) minted, and the current yield strategy. [`ParentPeer::s_totalShares`](https://github.com/contractlevel/yield/blob/22eb4cd8d9220a8f5eded3d9638be5d54504668f/src/peers/ParentPeer.sol#L26-L28) is the sum of all shares/YieldCoin that exists across chains. [`ParentPeer::s_strategy`](https://github.com/contractlevel/yield/blob/22eb4cd8d9220a8f5eded3d9638be5d54504668f/src/peers/ParentPeer.sol#L29-L30) is a struct containing the chain selector and protocol of the current yield generating strategy.
+The [`ParentPeer`](https://github.com/contractlevel/yield/blob/main/src/peers/ParentPeer.sol) contract tracks system wide state for Contract Level Yield, specifically the total shares (YieldCoin) minted, and the current yield strategy. [`ParentPeer::s_totalShares`](https://github.com/contractlevel/yield/blob/788c3c0a80279ee0f75e6977056173225cbc3f26/src/peers/ParentPeer.sol#L26-L28) is the sum of all shares/YieldCoin that exists across chains. [`ParentPeer::s_strategy`](https://github.com/contractlevel/yield/blob/788c3c0a80279ee0f75e6977056173225cbc3f26/src/peers/ParentPeer.sol#L29-L30) is a struct containing the chain selector and protocol of the current yield generating strategy.
 
 The `ParentPeer` contract is extended with the [`ParentCLF`](https://github.com/contractlevel/yield/blob/main/src/peers/extensions/ParentCLF.sol) contract. `ParentCLF` inherits `ParentPeer` and implements Chainlink Functions functionality. As such, `ParentCLF` is the single `ParentPeer` instantiation deployed in the system. `ParentCLF` also implements functionality to make it compatible with Chainlink Automation.
 
@@ -172,11 +172,11 @@ Automation removes the need for any human/manual intervention for the system to 
 
 #### Time-Based
 
-The strategy rebalancing process starts with a pre-scheduled call from the Chainlink Automation service, to request the optimal strategy via Chainlink Functions. [`ParentCLF::sendCLFRequest()`](https://github.com/contractlevel/yield/blob/457267fcf8068e3b35dd31770640b9423595892d/src/peers/extensions/ParentCLF.sol#L108-L109) is called by the Chainlink Automation `upkeep` address and requires no further configuration in the contract, other than access control preventing non-upkeep addresses from calling.
+The strategy rebalancing process starts with a pre-scheduled call from the Chainlink Automation service, to request the optimal strategy via Chainlink Functions. [`ParentCLF::sendCLFRequest()`](https://github.com/contractlevel/yield/blob/788c3c0a80279ee0f75e6977056173225cbc3f26/src/peers/extensions/ParentCLF.sol#L108-L109) is called by the Chainlink Automation `upkeep` address and requires no further configuration in the contract, other than access control preventing non-upkeep addresses from calling.
 
 #### Log-Trigger
 
-When a new strategy is set by the Chainlink Functions [`fulfillRequest()` callback](https://github.com/contractlevel/yield/blob/457267fcf8068e3b35dd31770640b9423595892d/src/peers/extensions/ParentCLF.sol#L123-L152), a [`StrategyUpdated`](https://github.com/contractlevel/yield/blob/457267fcf8068e3b35dd31770640b9423595892d/src/peers/ParentPeer.sol#L365) event is emitted. The `ParentRebalancer` will [check for this event](https://github.com/contractlevel/yield/blob/457267fcf8068e3b35dd31770640b9423595892d/src/modules/ParentRebalancer.sol#L44-L94) and initiate CCIP rebalance txs when applicable.
+When a new strategy is set by the Chainlink Functions [`fulfillRequest()` callback](https://github.com/contractlevel/yield/blob/788c3c0a80279ee0f75e6977056173225cbc3f26/src/peers/extensions/ParentCLF.sol#L123-L152), a [`StrategyUpdated`](https://github.com/contractlevel/yield/blob/788c3c0a80279ee0f75e6977056173225cbc3f26/src/peers/ParentPeer.sol#L359) event is emitted. The `ParentRebalancer` will [check for this event](https://github.com/contractlevel/yield/blob/788c3c0a80279ee0f75e6977056173225cbc3f26/src/modules/ParentRebalancer.sol#L45-L96) and initiate CCIP rebalance txs when applicable.
 
 ### Chainlink Functions
 
@@ -184,7 +184,7 @@ Chainlink Functions is used to securely fetch and return the protocol and chain 
 
 #### Javascript
 
-The inline Javascript `SOURCE` code passed to Chainlink Functions is defined as [a constant in `ParentCLF`](https://github.com/contractlevel/yield/blob/457267fcf8068e3b35dd31770640b9423595892d/src/peers/extensions/ParentCLF.sol#L29-L32) and runs a remote script from the [project repo](https://github.com/contractlevel/yield/blob/main/functions/src.min.js).
+The inline Javascript `SOURCE` code passed to Chainlink Functions is defined as [a constant in `ParentCLF`](https://github.com/contractlevel/yield/blob/788c3c0a80279ee0f75e6977056173225cbc3f26/src/peers/extensions/ParentCLF.sol#L29-L32) and runs a remote script from the [project repo](https://github.com/contractlevel/yield/blob/main/functions/src.min.js).
 
 [src.js](https://github.com/contractlevel/yield/blob/main/functions/src.js) demonstrates the logic of the remote script performed by the Chainlink Functions DON. To increase efficiency, the actual script that is run, is a [minimized equivalent](https://github.com/contractlevel/yield/blob/main/functions/src.min.js). The script queries and handles API data from the [DefiLlama Yield API](https://yields.llama.fi/pools).
 
@@ -203,11 +203,11 @@ npm i
 
 The `function.zip` file located in `functions/defillama-proxy` has been uploaded to AWS Lambda and deployed.
 
-To prevent abuse, the url of the proxy API has been encrypted as an [offchain secret](https://www.npmjs.com/package/@chainlink/functions-toolkit#off-chain-hosted-secrets) and stored as [a constant in `ParentCLF`](https://github.com/contractlevel/yield/blob/457267fcf8068e3b35dd31770640b9423595892d/src/peers/extensions/ParentCLF.sol#L33-L37).
+To prevent abuse, the url of the proxy API has been encrypted as an [offchain secret](https://www.npmjs.com/package/@chainlink/functions-toolkit#off-chain-hosted-secrets) and stored as [a constant in `ParentCLF`](https://github.com/contractlevel/yield/blob/788c3c0a80279ee0f75e6977056173225cbc3f26/src/peers/extensions/ParentCLF.sol#L33-L37).
 
 ### CCIP
 
-CCIP faciliates secure crosschain communication and value transfer for rebalances, and, where applicable, deposits and withdraws. [Custom CCIP tx types have been defined](https://github.com/contractlevel/yield/blob/457267fcf8068e3b35dd31770640b9423595892d/src/interfaces/IYieldPeer.sol#L15-L24) and are used to ensure receiving contracts correctly handle data and/or value.
+CCIP faciliates secure crosschain communication and value transfer for rebalances, and, where applicable, deposits and withdraws. [Custom CCIP tx types have been defined](https://github.com/contractlevel/yield/blob/788c3c0a80279ee0f75e6977056173225cbc3f26/src/interfaces/IYieldPeer.sol#L15-L24) and are used to ensure receiving contracts correctly handle data and/or value.
 
 #### Custom CCIP Transaction Types
 
@@ -257,7 +257,7 @@ The following diagrams show individual rebalance flows for different scenarios.
 
 Deposits are initiated with `YieldPeer::deposit()` and require the `YieldPeer` being used to have been approved for spending the USDC to deposit.
 
-See [Parent Deposit](https://github.com/contractlevel/yield/blob/457267fcf8068e3b35dd31770640b9423595892d/src/peers/ParentPeer.sol#L78-L106) and [Child Deposit](https://github.com/contractlevel/yield/blob/457267fcf8068e3b35dd31770640b9423595892d/src/peers/ChildPeer.sol#L44-L71).
+See [Parent Deposit](https://github.com/contractlevel/yield/blob/788c3c0a80279ee0f75e6977056173225cbc3f26/src/peers/ParentPeer.sol#L78-L106) and [Child Deposit](https://github.com/contractlevel/yield/blob/788c3c0a80279ee0f75e6977056173225cbc3f26/src/peers/ChildPeer.sol#L44-L71).
 
 Deposits will be handled differently depending on the chain of initiation and the location of the current strategy.
 
@@ -289,7 +289,7 @@ To clarify what is happening in this final image: when the deposit is made, the 
 
 Withdrawals are executed using the YieldCoin token's `ERC677::transferAndCall()`, which checks if the receiving address has implemented `IERC677Receiver::onTokenTransfer()`, which the `YieldPeer`, `ParentPeer`, and `ChildPeer` contracts have.
 
-See [Parent Withdraw](https://github.com/contractlevel/yield/blob/457267fcf8068e3b35dd31770640b9423595892d/src/peers/ParentPeer.sol#L108-L169) and [Child Withdraw](https://github.com/contractlevel/yield/blob/457267fcf8068e3b35dd31770640b9423595892d/src/peers/ChildPeer.sol#L73-L93).
+See [Parent Withdraw](https://github.com/contractlevel/yield/blob/788c3c0a80279ee0f75e6977056173225cbc3f26/src/peers/ParentPeer.sol#L108-L169) and [Child Withdraw](https://github.com/contractlevel/yield/blob/788c3c0a80279ee0f75e6977056173225cbc3f26/src/peers/ChildPeer.sol#L73-L93.
 
 The chain to receive the withdrawn USDC on can be different to the chain the withdrawal was initiated on, by passing an encoded chain selector as the `data` param in `transferAndCall()`. The tx will revert if the data does not decode to an allowed chain. If the data is left empty, the USDC will be withdrawn to the chain the withdrawal tx was initiated on.
 
@@ -381,7 +381,7 @@ The `offchainTokenData` array passed to the offRamp needed to contain the USDCTo
 
 #### Unit test note
 
-_NOTE: Some unit tests in [`CheckLog.t.sol`](https://github.com/contractlevel/yield/blob/main/test/unit/rebalancer/CheckLog.t.sol) will fail with `OnlySimulatedBackend()` unless the [`cannotExecute` modifier](https://github.com/contractlevel/yield/blob/457267fcf8068e3b35dd31770640b9423595892d/src/modules/ParentRebalancer.sol#L54) and [`test_yield_checkLog_revertsWhen_cannotExecute`](https://github.com/contractlevel/yield/blob/2ac67d415465ccb5553fc501d9dfa32c03180c4b/test/unit/rebalancer/CheckLog.t.sol#L7-L12) has been temporarily commented out._
+_NOTE: Some unit tests in [`CheckLog.t.sol`](https://github.com/contractlevel/yield/blob/main/test/unit/rebalancer/CheckLog.t.sol) will fail with `OnlySimulatedBackend()` unless the [`cannotExecute` modifier](https://github.com/contractlevel/yield/blob/0cd489dc7a2fb2b7f2f949db890038dd33925873/src/modules/ParentRebalancer.sol#L55) and [`test_yield_checkLog_revertsWhen_cannotExecute`](https://github.com/contractlevel/yield/blob/0cd489dc7a2fb2b7f2f949db890038dd33925873/test/unit/rebalancer/CheckLog.t.sol#L8-L12) has been temporarily commented out._
 
 The unit tests for the Contract Level Yield contracts can be run with:
 
@@ -614,11 +614,11 @@ The issue came up again during formal verification with Certora. Even though ini
 
 22nd - Unresolved because an eligible submission was priority.
 
-24th - There was a problem with the share mint amount calculation in [ParentPeer::\_calculateMintAmount](https://github.com/contractlevel/yield/blob/ca811e400894480e2bc6576b67b96c635f258405/src/peers/ParentPeer.sol#L416). That problem was the TVL being passed included the deposit amount. Both of these values are required to calculate the amount to mint. The fix to this was to subtract the amount from TVL.
+24th - There was a problem with the share mint amount calculation in [ParentPeer::\_calculateMintAmount](https://github.com/contractlevel/yield/blob/788c3c0a80279ee0f75e6977056173225cbc3f26/src/peers/ParentPeer.sol#L410). That problem was the TVL being passed included the deposit amount. Both of these values are required to calculate the amount to mint. The fix to this was to subtract the amount from TVL.
 
 The invariant discussed above is now fixed.
 
-26th - The root cause of this issue was a [helper function](https://github.com/contractlevel/yield/blob/ca811e400894480e2bc6576b67b96c635f258405/src/peers/YieldPeer.sol#L286-L287) in the abstract YieldPeer contract. The function deposited an amount to the active strategy, and returned the TVL. The order of operations for these was incorrect. TVL was being read after the deposit, which was wrong. This took time to fix because there was also a single instance of the same operation being done, outside the function.
+26th - The root cause of this issue was a [helper function](https://github.com/contractlevel/yield/blob/0cd489dc7a2fb2b7f2f949db890038dd33925873/src/peers/YieldPeer.sol#L286-L287) in the abstract YieldPeer contract. The function deposited an amount to the active strategy, and returned the TVL. The order of operations for these was incorrect. TVL was being read after the deposit, which was wrong. This took time to fix because there was also a single instance of the same operation being done, outside the function.
 
 ### Burning small amounts of shares (YieldCoin), worth less than the lowest possible value of USDC (6 decimals) resulted in reverts
 
@@ -640,7 +640,7 @@ Ultimately the [additional functionality](https://github.com/contractlevel/chain
 
 Information pertaining to the “strategy” with the highest yield (ie the chain and the protocol) is fetched from the [DefiLlama API](https://yields.llama.fi/pools) which returns a HUGE response. The response was too much for Chainlink Functions, so a proxy API to filter for the relevant data was required.
 
-I made one and deployed it to AWS Lambda. The url for the API could have been abused (unlikely for a hackathon project, but a required consideration for a production ready project) so the url had to be properly encrypted with the [functions-toolkit](<[https://www.npmjs.com/package/@chainlink/functions-toolkit#functions-utilities](https://www.npmjs.com/package/@chainlink/functions-toolkit#encrypting-secrets)>) and then stored as a [constant](https://github.com/contractlevel/yield/blob/575ee3cb5f9ae11b7921728a40e0590f678dd05c/src/peers/extensions/ParentCLF.sol#L33-L37) in the YieldCoin FunctionsClient contract (`ParentCLF`). This value needed to be different for different chains due to the chain-specific parameters required when executing the encrypted secrets process. Even though Chainlink Functions is used on the Parent chain only, the Parent chain changed between testnet deployments, so the chain-specific parameters for secrets encryption had to be considered.
+I made one and deployed it to AWS Lambda. The url for the API could have been abused (unlikely for a hackathon project, but a required consideration for a production ready project) so the url had to be properly encrypted with the [functions-toolkit](https://www.npmjs.com/package/@chainlink/functions-toolkit#functions-utilities](https://www.npmjs.com/package/@chainlink/functions-toolkit#encrypting-secrets) and then stored as a [constant](https://github.com/contractlevel/yield/blob/0cd489dc7a2fb2b7f2f949db890038dd33925873/src/peers/extensions/ParentCLF.sol#L33-L37) in the YieldCoin FunctionsClient contract (`ParentCLF`). This value needed to be different for different chains due to the chain-specific parameters required when executing the encrypted secrets process. Even though Chainlink Functions is used on the Parent chain only, the Parent chain changed between testnet deployments, so the chain-specific parameters for secrets encryption had to be considered.
 
 ### Time management/knowing what to prioritize
 
