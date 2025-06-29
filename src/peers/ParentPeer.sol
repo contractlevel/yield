@@ -229,6 +229,7 @@ contract ParentPeer is YieldPeer {
     {
         DepositData memory depositData = abi.decode(encodedDepositData, (DepositData));
         Strategy memory strategy = s_strategy;
+        CCIPOperations._validateTokenAmounts(tokenAmounts, address(i_usdc), depositData.amount);
 
         /// @dev If Strategy is on this Parent, deposit into strategy and get totalValue
         if (strategy.chainSelector == i_thisChainSelector) {
