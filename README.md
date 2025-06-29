@@ -289,7 +289,7 @@ To clarify what is happening in this final image: when the deposit is made, the 
 
 Withdrawals are executed using the YieldCoin token's `ERC677::transferAndCall()`, which checks if the receiving address has implemented `IERC677Receiver::onTokenTransfer()`, which the `YieldPeer`, `ParentPeer`, and `ChildPeer` contracts have.
 
-See [Parent Withdraw](https://github.com/contractlevel/yield/blob/788c3c0a80279ee0f75e6977056173225cbc3f26/src/peers/ParentPeer.sol#L108-L169) and [Child Withdraw](https://github.com/contractlevel/yield/blob/788c3c0a80279ee0f75e6977056173225cbc3f26/src/peers/ChildPeer.sol#L73-L93.
+See [Parent Withdraw](https://github.com/contractlevel/yield/blob/788c3c0a80279ee0f75e6977056173225cbc3f26/src/peers/ParentPeer.sol#L108-L169) and [Child Withdraw](https://github.com/contractlevel/yield/blob/788c3c0a80279ee0f75e6977056173225cbc3f26/src/peers/ChildPeer.sol#L73-L93).
 
 The chain to receive the withdrawn USDC on can be different to the chain the withdrawal was initiated on, by passing an encoded chain selector as the `data` param in `transferAndCall()`. The tx will revert if the data does not decode to an allowed chain. If the data is left empty, the USDC will be withdrawn to the chain the withdrawal tx was initiated on.
 
