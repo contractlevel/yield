@@ -261,7 +261,7 @@ See [Parent Deposit](https://github.com/contractlevel/yield/blob/788c3c0a80279ee
 
 Deposits will be handled differently depending on the chain of initiation and the location of the current strategy.
 
-Deposit traces required to include the `ParentPeer`, even if the deposit was made on the `ChildPeer` with the current strategy because the `ParentPeer`'s state must be updated to reflect the total shares/YieldCoin in the system.
+Deposit traces are required to include the `ParentPeer`, even if the deposit was made on the `ChildPeer` with the current strategy because the `ParentPeer`'s state must be updated to reflect the total shares/YieldCoin in the system.
 
 #### Deposit on Parent when Parent is Strategy
 
