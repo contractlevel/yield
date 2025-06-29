@@ -52,6 +52,7 @@ A live demo site with Ethereum, Base and Avalanche testnets is available at [con
     - [LINK Token Funding](#link-token-funding)
   - [Testing](#testing)
     - [Unit Tests](#unit-tests)
+      - [Unit test note](#unit-test-note)
     - [Invariant Tests](#invariant-tests)
     - [Other Tests](#other-tests)
   - [Formal Verification](#formal-verification)
@@ -378,7 +379,9 @@ To achieve this, the changes were made to the [CCIPLocalSimulatorFork](https://g
 
 The `offchainTokenData` array passed to the offRamp needed to contain the USDCTokenPool's `MessageAndAttestation` struct, which contains the message retrieved from the `MessageSent` event and the `attestation` created with the attesters and their private keys. To achieve this, another function was added, [\_createOffchainTokenData](https://github.com/contractlevel/chainlink-local/blob/519e854caaf1291c03bda3928674c922195fd629/src/ccip/CCIPLocalSimulatorFork.sol#L181-L238).
 
-_NOTE: Some unit tests in [`CheckLog.t.sol`](https://github.com/contractlevel/yield/blob/main/test/unit/rebalancer/CheckLog.t.sol) will fail with `OnlySimulatedBackend()` unless the [`cannotExecute` modifier](https://github.com/contractlevel/yield/blob/457267fcf8068e3b35dd31770640b9423595892d/src/modules/ParentRebalancer.sol#L54) has been temporarily commented out._
+#### Unit test note
+
+_NOTE: Some unit tests in [`CheckLog.t.sol`](https://github.com/contractlevel/yield/blob/main/test/unit/rebalancer/CheckLog.t.sol) will fail with `OnlySimulatedBackend()` unless the [`cannotExecute` modifier](https://github.com/contractlevel/yield/blob/457267fcf8068e3b35dd31770640b9423595892d/src/modules/ParentRebalancer.sol#L54) and [`test_yield_checkLog_revertsWhen_cannotExecute`](https://github.com/contractlevel/yield/blob/2ac67d415465ccb5553fc501d9dfa32c03180c4b/test/unit/rebalancer/CheckLog.t.sol#L7-L12) has been temporarily commented out._
 
 The unit tests for the Contract Level Yield contracts can be run with:
 
