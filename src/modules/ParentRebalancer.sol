@@ -16,6 +16,7 @@ contract ParentRebalancer is AutomationBase, ILogAutomation, Ownable2Step {
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
     error ParentRebalancer__OnlyForwarder();
+    error ParentRebalancer__UpkeepNotNeeded();
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
@@ -67,7 +68,7 @@ contract ParentRebalancer is AutomationBase, ILogAutomation, Ownable2Step {
             if (chainSelector == thisChainSelector && oldChainSelector == thisChainSelector) {
                 performData = "";
                 upkeepNeeded = false;
-                return (upkeepNeeded, performData);
+                revert ParentRebalancer__UpkeepNotNeeded();
             }
 
             IYieldPeer.Strategy memory newStrategy =
@@ -90,6 +91,7 @@ contract ParentRebalancer is AutomationBase, ILogAutomation, Ownable2Step {
         } else {
             performData = "";
             upkeepNeeded = false;
+            revert ParentRebalancer__UpkeepNotNeeded();
         }
     }
 
