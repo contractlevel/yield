@@ -23,7 +23,8 @@ contract CheckLogTest is BaseTest {
 
     /// @notice The cannotExecute modifier will need to be commented out for this test to pass
     function test_yield_checkLog_revertsWhen_wrongSource() public {
-        Log memory log = _createStrategyUpdatedLog(address(baseParentRebalancer), 1, 2, 3);
+        address wrongSource = makeAddr("wrongSource");
+        Log memory log = _createStrategyUpdatedLog(wrongSource, 1, 2, 3);
         vm.expectRevert(abi.encodeWithSignature("ParentRebalancer__UpkeepNotNeeded()"));
         baseParentRebalancer.checkLog(log, "");
     }

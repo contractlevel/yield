@@ -227,6 +227,7 @@ rule checkLog_reverts() {
     assert lastReverted;
 }
 
+// rule is vacuous
 rule checkLog_revertsWhen_localParentRebalance() {
     env e;
     uint8 protocolEnum;
@@ -246,6 +247,7 @@ rule checkLog_revertsWhen_localParentRebalance() {
     assert lastReverted;
 }
 
+// rule is vacuous
 rule checkLog_revertsWhen_wrongEvent() {
     env e;
     uint8 protocolEnum;
@@ -272,6 +274,7 @@ rule checkLog_revertsWhen_wrongEvent() {
     assert lastReverted;
 }
 
+// rule is vacuous
 rule checkLog_revertsWhen_wrongSource() {
     env e;
     uint8 protocolEnum;

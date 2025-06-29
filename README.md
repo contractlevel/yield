@@ -458,6 +458,8 @@ The [`Rebalancer`](https://github.com/contractlevel/yield/blob/main/certora/spec
 certoraRun ./certora/conf/parent/Rebalancer.conf
 ```
 
+Verifying behaviour in the `checkLog()` function would result in vacuous rules with basic sanity enabled. I thought this was because of returning false when upkeep wasn't needed, and that reverting instead would improve the verification, but that resulted in vacuous rules too. For now basic sanity has been left enabled, and comments in the spec indicate the vacuous rules. Reverts instead of returning false when upkeep is not needed has been kept in place. It doesn't make a difference either way and is a purely aesthetic, especially when both options deliver vacuous rules.
+
 ## Known Issues
 
 ### Burning small amounts of shares can result in 0 usdc withdrawn
