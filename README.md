@@ -139,7 +139,7 @@ Some logic from `YieldPeer` has been delegated to distinct libraries to improve 
 
 [ProtocolOperations](https://github.com/contractlevel/yield/blob/main/src/libraries/ProtocolOperations.sol) contains logic for interacting with strategy protocols such as depositing, withdrawing, and querying the total value of the system.
 
-[DataStructures](https://github.com/contractlevel/yield/blob/main/src/libraries/DataStructures.sol) contains logic for creating [DepositData](https://github.com/contractlevel/yield/blob/457267fcf8068e3b35dd31770640b9423595892d/src/interfaces/IYieldPeer.sol#L28-L34) and [WithdrawData](hhttps://github.com/contractlevel/yield/blob/457267fcf8068e3b35dd31770640b9423595892d/src/interfaces/IYieldPeer.sol#L36-L42) structs, which are used in CCIP messages for deposits and withdraw respectively.
+[DataStructures](https://github.com/contractlevel/yield/blob/main/src/libraries/DataStructures.sol) contains logic for creating [DepositData](https://github.com/contractlevel/yield/blob/457267fcf8068e3b35dd31770640b9423595892d/src/interfaces/IYieldPeer.sol#L28-L34) and [WithdrawData](https://github.com/contractlevel/yield/blob/457267fcf8068e3b35dd31770640b9423595892d/src/interfaces/IYieldPeer.sol#L36-L42) structs, which are used in CCIP messages for deposits and withdraw respectively.
 
 ### ParentPeer
 
