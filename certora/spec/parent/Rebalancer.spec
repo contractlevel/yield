@@ -165,6 +165,7 @@ function createLog(
     bytes32[] topics;
     bytes data;
 
+    require topics.length == 4;
     require topics[0] == eventSignature;
     require topics[1] == uint64ToBytes32(newChainSelector);
     require topics[2] == uint8ToBytes32(protocolEnum);
@@ -228,10 +229,10 @@ rule checkLog_reverts() {
 
 rule checkLog_revertsWhen_localParentRebalance() {
     env e;
-    bytes data;
     uint8 protocolEnum;
     require e.msg.value == 0;
     require e.tx.origin == 0 || e.tx.origin == 0x1111111111111111111111111111111111111111;
+
     ParentRebalancer.Log log = createLog(
         getParentPeer(),
         StrategyUpdatedEvent(),
@@ -239,6 +240,7 @@ rule checkLog_revertsWhen_localParentRebalance() {
         protocolEnum,
         getParentChainSelector()
     );
+    bytes data;
 
     checkLog@withrevert(e, log, data);
     assert lastReverted;
@@ -246,16 +248,17 @@ rule checkLog_revertsWhen_localParentRebalance() {
 
 rule checkLog_revertsWhen_wrongEvent() {
     env e;
-    bytes data;
     uint8 protocolEnum;
-    bytes32 wrongEvent;
-    require wrongEvent != StrategyUpdatedEvent();
     uint64 newChainSelector;
     uint64 oldChainSelector;
     require e.tx.origin == 0 || e.tx.origin == 0x1111111111111111111111111111111111111111;
     require newChainSelector == getParentChainSelector() => oldChainSelector != getParentChainSelector();
     require oldChainSelector == getParentChainSelector() => newChainSelector != getParentChainSelector();
     require e.msg.value == 0;
+
+    bytes32 wrongEvent;
+    require wrongEvent != StrategyUpdatedEvent();
+
     ParentRebalancer.Log log = createLog(
         getParentPeer(),
         wrongEvent,
@@ -263,6 +266,7 @@ rule checkLog_revertsWhen_wrongEvent() {
         protocolEnum,
         oldChainSelector
     );
+    bytes data;
 
     checkLog@withrevert(e, log, data);
     assert lastReverted;
@@ -270,16 +274,16 @@ rule checkLog_revertsWhen_wrongEvent() {
 
 rule checkLog_revertsWhen_wrongSource() {
     env e;
-    bytes data;
     uint8 protocolEnum;
     uint64 newChainSelector;
     uint64 oldChainSelector;
-    require e.tx.origin == 0 || e.tx.origin == 0x1111111111111111111111111111111111111111;
     require newChainSelector == getParentChainSelector() => oldChainSelector != getParentChainSelector();
     require oldChainSelector == getParentChainSelector() => newChainSelector != getParentChainSelector();
+    require e.tx.origin == 0 || e.tx.origin == 0x1111111111111111111111111111111111111111;
     require e.msg.value == 0;
     address wrongSource;
     require wrongSource != getParentPeer();
+
     ParentRebalancer.Log log = createLog(
         wrongSource,
         StrategyUpdatedEvent(),
@@ -287,6 +291,8 @@ rule checkLog_revertsWhen_wrongSource() {
         protocolEnum,
         oldChainSelector
     );
+    bytes data;
+
     checkLog@withrevert(e, log, data);
     assert lastReverted;
 }
@@ -294,12 +300,14 @@ rule checkLog_revertsWhen_wrongSource() {
 // rule is vacuous
 rule checkLog_returnsTrueWhen_oldStrategyChild() {
     env e;
-    bytes data;
     uint8 protocolEnum;
     uint64 newChainSelector;
     uint64 oldChainSelector;
     require oldChainSelector != getParentChainSelector();
-    
+
+    require e.tx.origin == 0 || e.tx.origin == 0x1111111111111111111111111111111111111111;
+    require e.msg.value == 0;
+
     ParentRebalancer.Log log = createLog(
         getParentPeer(),
         StrategyUpdatedEvent(),
@@ -307,11 +315,13 @@ rule checkLog_returnsTrueWhen_oldStrategyChild() {
         protocolEnum,
         oldChainSelector
     );
+    bytes data;
 
     bool upkeepNeeded = false;
     bytes performData = createEmptyBytes();
 
-    (upkeepNeeded, performData) = checkLog(e, log, data);
+    (upkeepNeeded, performData) = checkLog@withrevert(e, log, data);
+    assert !lastReverted;
     assert upkeepNeeded;
     assert performData.length > 0;
 
@@ -346,12 +356,15 @@ rule checkLog_returnsTrueWhen_oldStrategyChild() {
 // rule is vacuous
 rule checkLog_returnsTrueWhen_oldStrategyParent_newStrategyChild() {
     env e;
-    bytes data;
     uint8 protocolEnum;
     uint64 newChainSelector;
     uint64 oldChainSelector;
     require oldChainSelector == getParentChainSelector();
     require newChainSelector != getParentChainSelector();
+
+    require e.tx.origin == 0 || e.tx.origin == 0x1111111111111111111111111111111111111111;
+    require e.msg.value == 0;
+
     ParentRebalancer.Log log = createLog(
         getParentPeer(),
         StrategyUpdatedEvent(),
@@ -359,11 +372,13 @@ rule checkLog_returnsTrueWhen_oldStrategyParent_newStrategyChild() {
         protocolEnum,
         oldChainSelector
     );
+    bytes data;
 
     bool upkeepNeeded = false;
     bytes performData = createEmptyBytes();
 
-    (upkeepNeeded, performData) = checkLog(e, log, data);
+    (upkeepNeeded, performData) = checkLog@withrevert(e, log, data);
+    assert !lastReverted;
     assert upkeepNeeded;
     assert performData.length > 0;
 

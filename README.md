@@ -424,27 +424,27 @@ This project uses Certora for formal verification. A `CERTORAKEY` is required to
 export CERTORAKEY=<personal_access_key>
 ```
 
-The `BasePeer` spec verifies mutual behavior of the Parent and Child Peers, so there are separate `conf` files for verifying each of them against it.
+The [`BasePeer`](https://github.com/contractlevel/yield/blob/main/certora/spec/yield/BasePeer.spec) spec verifies mutual behavior of the Parent and Child Peers, so there are separate `conf` files for verifying each of them against it.
 
 ```
 certoraRun ./certora/conf/child/BaseChild.conf
 certoraRun ./certora/conf/parent/BaseParent.conf
 ```
 
-The `Parent` and `Child` specs verify behaviors particular to their respective peers.
+The [`Parent`](https://github.com/contractlevel/yield/blob/main/certora/spec/parent/Parent.spec) and [`Child`](https://github.com/contractlevel/yield/blob/main/certora/spec/child/Child.spec) specs verify behaviors particular to their respective peers.
 
 ```
 certoraRun ./certora/conf/parent/Parent.conf
 certoraRun ./certora/conf/child/Child.conf
 ```
 
-The `Yield` spec verifies internal properties of the abstract `YieldPeer` contract such as depositing to and withdrawing from strategies, as well as CCIP tx handling.
+The [`Yield`](https://github.com/contractlevel/yield/blob/main/certora/spec/yield/Yield.spec) spec verifies internal properties of the abstract `YieldPeer` contract such as depositing to and withdrawing from strategies, as well as CCIP tx handling.
 
 ```
 certoraRun ./certora/conf/Yield.conf
 ```
 
-The `ParentCLF` spec verifies logic related to Chainlink Functions and Automation.
+The [`ParentCLF`](https://github.com/contractlevel/yield/blob/main/certora/spec/parent/ParentCLF.spec) spec verifies logic related to Chainlink Functions and Automation.
 
 ```
 certoraRun ./certora/conf/parent/ParentCLF.conf --nondet_difficult_funcs
@@ -452,7 +452,7 @@ certoraRun ./certora/conf/parent/ParentCLF.conf --nondet_difficult_funcs
 
 The `--nondet_difficult_funcs` flag is required for `ParentCLF` to [automatically summarize functions](https://docs.certora.com/en/latest/docs/prover/cli/options.html#nondet-difficult-funcs) in the `FunctionsRequest` library because otherwise the Certora Prover will timeout. The Certora Prover explores all possible paths and the `FunctionsRequest::encodeCBOR` includes an extremely high path count, making it difficult to verify.
 
-The `Rebalancer` spec verifies the `ParentRebalancer` contract.
+The [`Rebalancer`](https://github.com/contractlevel/yield/blob/main/certora/spec/parent/Rebalancer.spec) spec verifies the `ParentRebalancer` contract.
 
 ```
 certoraRun ./certora/conf/parent/Rebalancer.conf
