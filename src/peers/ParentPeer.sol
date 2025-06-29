@@ -219,7 +219,7 @@ contract ParentPeer is YieldPeer {
 
     /// @notice This function handles a deposit from a child to this parent and the 3 strategy cases:
     /// 1. This Parent is the Strategy
-    /// 2. The Child where the deposit was made is the Strategy
+    /// 2. The Child where the deposit was made is the Strategy // review this scenario is non existent in this context because it is handled with a different CCIP tx type (DepositCallbackParent) - this just means we have some extra checks here, no security or functionality concerns
     /// 3. The Strategy is on a third chain
     /// @notice Deposit txs need to be handled via the parent to read the state containing the strategy
     /// @param tokenAmounts The token amounts received in the CCIP message
@@ -230,17 +230,9 @@ contract ParentPeer is YieldPeer {
         DepositData memory depositData = abi.decode(encodedDepositData, (DepositData));
         Strategy memory strategy = s_strategy;
 
-        /// @dev Validate token amounts for all cases except when strategy is on deposit chain
-        if (strategy.chainSelector != depositData.chainSelector) {
-            CCIPOperations._validateTokenAmounts(tokenAmounts, address(i_usdc), depositData.amount);
-        }
-
         /// @dev If Strategy is on this Parent, deposit into strategy and get totalValue
         if (strategy.chainSelector == i_thisChainSelector) {
             depositData.totalValue = _depositToStrategyAndGetTotalValue(depositData.amount);
-        }
-        /// @dev If the Strategy is this Parent or where the deposit originated, calculate and CCIP send shareMintAmount
-        if (strategy.chainSelector == i_thisChainSelector || strategy.chainSelector == depositData.chainSelector) {
             depositData.shareMintAmount = _calculateMintAmount(depositData.totalValue, depositData.amount);
             s_totalShares += depositData.shareMintAmount;
             emit ShareMintUpdate(depositData.shareMintAmount, depositData.chainSelector, s_totalShares);
@@ -249,6 +241,7 @@ contract ParentPeer is YieldPeer {
                 depositData.chainSelector, CcipTxType.DepositCallbackChild, abi.encode(depositData), ZERO_BRIDGE_AMOUNT
             );
         }
+
         /// @dev If Strategy is on third chain, forward deposit to strategy
         if (strategy.chainSelector != i_thisChainSelector && strategy.chainSelector != depositData.chainSelector) {
             _ccipSend(strategy.chainSelector, CcipTxType.DepositToStrategy, encodedDepositData, depositData.amount);

@@ -469,28 +469,6 @@ rule handleCCIPDepositToParent_updatesTotalShares_when_depositChain_is_strategyC
     assert getTotalShares() >= totalSharesBefore;
 }
 
-rule handleCCIPDepositToParent_emits_CCIPMessageSent_and_ShareMintUpdate_when_depositChain_is_strategyChain() {
-    env e;
-    address depositor;
-    uint256 usdcDepositAmount;
-    uint256 totalValue; // irrelevant placeholder
-    uint256 shareMintAmount; // irrelevant placeholder
-    uint64 chainSelector;
-    bytes encodedDepositData = buildEncodedDepositData(depositor, usdcDepositAmount, totalValue, shareMintAmount, chainSelector);
-    Client.EVMTokenAmount[] tokenAmounts;
-    require getStrategy().chainSelector != getThisChainSelector();
-    require getStrategy().chainSelector == chainSelector;
-
-    require ghost_ccipMessageSent_eventCount == 0;
-    require ghost_shareMintUpdate_eventCount == 0;
-    require ghost_shareMintUpdate_totalAmount_emitted == 0;
-    handleCCIPDepositToParent(e, tokenAmounts, encodedDepositData);
-    assert ghost_ccipMessageSent_eventCount == 1;
-    assert ghost_ccipMessageSent_txType_emitted == 3; // DepositCallbackChild
-    assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;
-    assert ghost_shareMintUpdate_eventCount == 1;
-}
-
 rule handleCCIPDepositToParent_forwardsToStrategy() {
     env e;
     address depositor;
