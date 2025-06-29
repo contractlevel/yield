@@ -217,10 +217,9 @@ contract ParentPeer is YieldPeer {
         if (txType == CcipTxType.RebalanceNewStrategy) _handleCCIPRebalanceNewStrategy(data);
     }
 
-    /// @notice This function handles a deposit from a child to this parent and the 3 strategy cases:
+    /// @notice This function handles a deposit from a child to this parent and the 2 strategy cases:
     /// 1. This Parent is the Strategy
-    /// 2. The Child where the deposit was made is the Strategy // review this scenario is non existent in this context because it is handled with a different CCIP tx type (DepositCallbackParent) - this just means we have some extra checks here, no security or functionality concerns
-    /// 3. The Strategy is on a third chain
+    /// 2. The Strategy is on a third chain
     /// @notice Deposit txs need to be handled via the parent to read the state containing the strategy
     /// @param tokenAmounts The token amounts received in the CCIP message
     /// @param encodedDepositData The encoded deposit data
@@ -229,6 +228,7 @@ contract ParentPeer is YieldPeer {
     {
         DepositData memory depositData = abi.decode(encodedDepositData, (DepositData));
         Strategy memory strategy = s_strategy;
+
         CCIPOperations._validateTokenAmounts(tokenAmounts, address(i_usdc), depositData.amount);
 
         /// @dev If Strategy is on this Parent, deposit into strategy and get totalValue
