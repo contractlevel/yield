@@ -1,8 +1,8 @@
 # YieldCoin aka Contract Level Yield (CLY)
 
-This project is being built for the Chainlink Chromion Hackathon, and is an automated, crosschain, stablecoin yield optimizer, powered by Chainlink Automation, Functions, and CCIP.
+This project has been built for the Chainlink Chromion Hackathon, and is an automated, crosschain, stablecoin yield optimizer, powered by Chainlink Automation, Functions, and CCIP.
 
-Whatever the highest yield is for stablecoins across chains is what users can earn in one click with Contract Level Yield.
+Whatever the highest yield is for stablecoins across chains is what users can earn in one click with Contract Level Yield (YieldCoin).
 
 A live demo site with Ethereum, Base and Avalanche testnets is available at [contractlevel.com](https://contractlevel.com).
 
@@ -89,7 +89,7 @@ A live demo site with Ethereum, Base and Avalanche testnets is available at [con
 
 **Solution**: YieldCoin abstracts ALL of that away. Deposit your stablecoin into the Contract Level Yield system, from your chain of choice, to earn the highest yield from the safest, most reliable services across the web3 ecosystem.
 
-Stablecoin depositors receive a share token in return for their deposits, representing their share of the total value (deposits + yield) in the system. Depositing a stablecoin can also be considered "buying" YieldCoin. YieldCoin is the share received for depositing into the system, with the basic idea being that a holder will be able to "sell" (their YieldCoin) for a higher USD value than they bought it. This is because the stablecoin deposits will not go down in value, and reliable yield will be generated. Hence the name YieldCoin.
+Stablecoin depositors receive YieldCoin, a share token, in return for their deposits, representing their share of the total value (deposits + yield) in the system. Depositing a stablecoin can also be considered "buying" YieldCoin. YieldCoin is the share received for depositing into the system, with the basic idea being that a holder will be able to "sell" (their YieldCoin) for a higher USD value than they bought it. This is because the stablecoin deposits will not go down in value, and reliable yield will be generated.
 
 The protocol and chain with the highest APY, where the system funds are allocated is known as the `Strategy`.
 
@@ -143,7 +143,7 @@ Some logic from `YieldPeer` has been delegated to distinct libraries to improve 
 
 ### ParentPeer
 
-The [`ParentPeer`](https://github.com/contractlevel/yield/blob/main/src/peers/ParentPeer.sol) contract tracks system wide state for Contract Level Yield, specifically the total shares (YieldCoin) minted, and the current yield strategy. `ParentPeer::s_totalShares` is the sum of all shares/YieldCoin that exists across chains. `ParentPeer::s_strategy` is a struct containing the chain selector and protocol of the current yield generating strategy.
+The [`ParentPeer`](https://github.com/contractlevel/yield/blob/main/src/peers/ParentPeer.sol) contract tracks system wide state for Contract Level Yield, specifically the total shares (YieldCoin) minted, and the current yield strategy. [`ParentPeer::s_totalShares`](https://github.com/contractlevel/yield/blob/22eb4cd8d9220a8f5eded3d9638be5d54504668f/src/peers/ParentPeer.sol#L26-L28) is the sum of all shares/YieldCoin that exists across chains. [`ParentPeer::s_strategy`](https://github.com/contractlevel/yield/blob/22eb4cd8d9220a8f5eded3d9638be5d54504668f/src/peers/ParentPeer.sol#L29-L30) is a struct containing the chain selector and protocol of the current yield generating strategy.
 
 The `ParentPeer` contract is extended with the [`ParentCLF`](https://github.com/contractlevel/yield/blob/main/src/peers/extensions/ParentCLF.sol) contract. `ParentCLF` inherits `ParentPeer` and implements Chainlink Functions functionality. As such, `ParentCLF` is the single `ParentPeer` instantiation deployed in the system. `ParentCLF` also implements functionality to make it compatible with Chainlink Automation.
 
@@ -623,7 +623,7 @@ If a user attempted to withdraw USDC by burning an amount of shares/YieldCoin wo
 
 To mitigate this, the current approach is a bit of a compromise, but if someone tries to withdraw less than the lowest possible value of USDC, they receive nothing in exchange for burning their shares. This of course is not ideal, and is considered a [known issue](https://github.com/contractlevel/yield?tab=readme-ov-file#burning-small-amounts-of-shares-can-result-in-0-usdc-withdrawn), however it is unexpected that a user will attempt to withdraw such an insignificant amount, and doing so would benefit all other YieldCoin holders. Most importantly, this mitigation means the system doesn't revert/experience any weird DoS.
 
-It is mitigated, but further research is will be conducted on this. An option being explored is enforcing a minimum share burn amount, but the crosschain nature of some withdraw paths makes this tricky to enforce at the contract level.
+It is mitigated, but further research will be conducted on this. An option being explored is enforcing a minimum share burn amount, but the crosschain nature of some withdraw paths makes this tricky to enforce at the contract level.
 
 ### USDC chainlink-local fork
 
