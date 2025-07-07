@@ -198,8 +198,8 @@ contract ParentPeer is YieldPeer {
     /// The CCIP message received
     /// - CcipTxType DepositToParent: A tx from child to parent to deposit USDC in strategy
     /// - CcipTxType DepositCallbackParent: A tx from the strategy to parent to calculate shareMintAmount and mint shares to the depositor on this chain or another child chain
-    /// - CcipTxType WithdrawCallback: A tx from the strategy chain to send USDC to the withdrawer
     /// - CcipTxType WithdrawToParent: A tx from the withdraw chain to forward to the strategy chain
+    /// - CcipTxType WithdrawCallback: A tx from the strategy chain to send USDC to the withdrawer
     /// - CcipTxType RebalanceNewStrategy: A tx from the old strategy, sending rebalanced funds to the new strategy
     /// @param tokenAmounts The token amounts received in the CCIP message
     /// @param data The data received in the CCIP message
