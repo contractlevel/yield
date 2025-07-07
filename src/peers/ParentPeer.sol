@@ -14,14 +14,14 @@ contract ParentPeer is YieldPeer {
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
-    error ParentPeer__OnlyParentRebalancer();
+    error ParentPeer__OnlyRebalancer();
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
     /// @dev This address handles automated CCIP rebalance calls with Log-trigger Automation, based on Function request callbacks
-    /// @notice See ./src/modules/ParentRebalancer.sol
-    address internal immutable i_parentRebalancer;
+    /// @notice See ./src/modules/Rebalancer.sol
+    address internal immutable i_rebalancer;
 
     /// @dev total share tokens (YieldCoin) minted across all chains
     // @invariant s_totalShares == ghost_totalSharesMinted - ghost_totalSharesBurned
@@ -64,12 +64,12 @@ contract ParentPeer is YieldPeer {
         address aavePoolAddressesProvider,
         address comet,
         address share,
-        address parentRebalancer
+        address rebalancer
     ) YieldPeer(ccipRouter, link, thisChainSelector, usdc, aavePoolAddressesProvider, comet, share) {
         s_strategy = Strategy({chainSelector: thisChainSelector, protocol: Protocol.Aave});
-        _updateStrategyPool(thisChainSelector, Protocol.Aave);
+        _updateActiveStrategyAdapter(thisChainSelector, Protocol.Aave);
         // slither-disable-next-line missing-zero-check
-        i_parentRebalancer = parentRebalancer;
+        i_rebalancer = rebalancer;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -139,12 +139,12 @@ contract ParentPeer is YieldPeer {
 
         // 1. This Parent is the Strategy. Therefore the usdcWithdrawAmount is calculated and withdrawal is handled here.
         if (strategy.chainSelector == i_thisChainSelector) {
-            address strategyPool = _getStrategyPool();
-            uint256 totalValue = _getTotalValueFromStrategy(strategyPool);
+            address activeStrategyAdapter = _getActiveStrategyAdapter();
+            uint256 totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, address(i_usdc));
 
             uint256 usdcWithdrawAmount = _calculateWithdrawAmount(totalValue, totalShares, shareBurnAmount);
 
-            if (usdcWithdrawAmount != 0) _withdrawFromStrategy(strategyPool, usdcWithdrawAmount);
+            if (usdcWithdrawAmount != 0) _withdrawFromStrategy(activeStrategyAdapter, usdcWithdrawAmount);
 
             if (withdrawChainSelector == i_thisChainSelector) {
                 if (usdcWithdrawAmount != 0) _transferUsdcTo(withdrawer, usdcWithdrawAmount);
@@ -175,7 +175,7 @@ contract ParentPeer is YieldPeer {
     /// @param newStrategy The new strategy
     /// @notice This function is called by the ParentRebalancer's Log-trigger Automation performUpkeep
     function rebalanceNewStrategy(address oldStrategyPool, uint256 totalValue, Strategy memory newStrategy) external {
-        _revertIfMsgSenderIsNotParentRebalancer();
+        _revertIfMsgSenderIsNotRebalancer();
         _handleStrategyMoveToNewChain(oldStrategyPool, totalValue, newStrategy);
     }
 
@@ -185,7 +185,7 @@ contract ParentPeer is YieldPeer {
     /// @param newStrategy The new strategy
     /// @notice This function is called by the ParentRebalancer's Log-trigger Automation performUpkeep
     function rebalanceOldStrategy(uint64 oldChainSelector, Strategy memory newStrategy) external {
-        _revertIfMsgSenderIsNotParentRebalancer();
+        _revertIfMsgSenderIsNotRebalancer();
         Strategy memory oldStrategy = Strategy({chainSelector: oldChainSelector, protocol: Protocol.Aave});
         _handleRebalanceFromDifferentChain(oldStrategy, newStrategy);
     }
@@ -363,11 +363,11 @@ contract ParentPeer is YieldPeer {
     /// @notice Handles strategy change when both old and new strategies are on this chain
     /// @param newStrategy The new strategy
     function _handleLocalStrategyChange(Strategy memory newStrategy) internal {
-        address oldStrategyPool = _getStrategyPool();
-        uint256 totalValue = _getTotalValueFromStrategy(oldStrategyPool);
-        if (totalValue != 0) _withdrawFromStrategy(oldStrategyPool, totalValue);
-        address newStrategyPool = _updateStrategyPool(newStrategy.chainSelector, newStrategy.protocol);
-        _depositToStrategy(newStrategyPool, i_usdc.balanceOf(address(this)));
+        address oldActiveStrategyAdapter = _getActiveStrategyAdapter();
+        uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, address(i_usdc));
+        if (totalValue != 0) _withdrawFromStrategy(oldActiveStrategyAdapter, totalValue);
+        address newActiveStrategyAdapter = _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocol);
+        _depositToStrategy(newActiveStrategyAdapter, i_usdc.balanceOf(address(this)));
     }
 
     /// @notice Handles moving strategy to a different chain
@@ -378,7 +378,7 @@ contract ParentPeer is YieldPeer {
         internal
     {
         if (totalValue != 0) _withdrawFromStrategy(oldStrategyPool, totalValue);
-        _updateStrategyPool(newStrategy.chainSelector, newStrategy.protocol);
+        _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocol);
         _ccipSend(
             newStrategy.chainSelector,
             CcipTxType.RebalanceNewStrategy,
@@ -415,9 +415,21 @@ contract ParentPeer is YieldPeer {
         if (shareMintAmount == 0) shareMintAmount = 1;
     }
 
+    /// @dev Revert if msg.sender is not the Rebalancer
+    function _revertIfMsgSenderIsNotRebalancer() internal view {
+        if (msg.sender != i_rebalancer) revert ParentPeer__OnlyRebalancer();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                 SETTER
+    //////////////////////////////////////////////////////////////*/
     /// @dev Revert if msg.sender is not the ParentRebalancer
-    function _revertIfMsgSenderIsNotParentRebalancer() internal view {
-        if (msg.sender != i_parentRebalancer) revert ParentPeer__OnlyParentRebalancer();
+    /// @dev Set the strategy
+    /// @param chainSelector The chain selector of the new strategy
+    /// @param protocol The protocol of the new strategy
+    function setStrategy(uint64 chainSelector, Protocol protocol) external {
+        _revertIfMsgSenderIsNotRebalancer();
+        _setStrategy(chainSelector, protocol);
     }
 
     /*//////////////////////////////////////////////////////////////

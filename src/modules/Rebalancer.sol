@@ -208,7 +208,9 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
         uint64 chainSelector = uint64(decodedSelector);
         uint8 protocolEnum = uint8(decodedEnum);
 
-        if (!s_allowedChains[chainSelector]) {
+        address parentPeer = s_parentPeer;
+
+        if (!IParentPeer(parentPeer).getAllowedChain(chainSelector)) {
             emit InvalidChainSelector(requestId, chainSelector);
             return;
         }
@@ -219,7 +221,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
 
         emit CLFRequestFulfilled(requestId, chainSelector, protocolEnum);
 
-        _setStrategy(chainSelector, Protocol(protocolEnum));
+        IParentPeer(parentPeer).setStrategy(chainSelector, IYieldPeer.Protocol(protocolEnum));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -263,32 +265,32 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     /*//////////////////////////////////////////////////////////////
                                  GETTER
     //////////////////////////////////////////////////////////////*/
-    /// @return The address of the Chainlink Functions router
+    /// @return functionsRouter The address of the Chainlink Functions router
     function getFunctionsRouter() external view returns (address functionsRouter) {
         functionsRouter = address(i_functionsRouter);
     }
 
-    /// @return The Chainlink Functions DON ID
+    /// @return donId The Chainlink Functions DON ID
     function getDonId() external view returns (bytes32 donId) {
         donId = i_donId;
     }
 
-    /// @return The Chainlink Functions subscription ID
+    /// @return clfSubId The Chainlink Functions subscription ID
     function getClfSubId() external view returns (uint64 clfSubId) {
         clfSubId = i_clfSubId;
     }
 
-    /// @return The Chainlink Automation upkeep address
+    /// @return upkeepAddress The Chainlink Automation upkeep address
     function getUpkeepAddress() external view returns (address upkeepAddress) {
         upkeepAddress = s_upkeepAddress;
     }
 
-    /// @return The Chainlink Automation forwarder
+    /// @return forwarder The Chainlink Automation forwarder
     function getForwarder() external view returns (address forwarder) {
         forwarder = s_forwarder;
     }
 
-    /// @notice Returns the ParentPeer contract address
+    /// @return parentPeer The ParentPeer contract address
     function getParentPeer() external view returns (address parentPeer) {
         parentPeer = s_parentPeer;
     }

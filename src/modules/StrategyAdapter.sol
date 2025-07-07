@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {IStrategy} from "../interfaces/IStrategy.sol";
+import {IStrategyAdapter} from "../interfaces/IStrategyAdapter.sol";
 
-/// @title YieldStrategy
+/// @title StrategyAdapter
 /// @author @contractlevel
-/// @notice Base contract for yield strategies
-abstract contract YieldStrategy is IStrategy {
+/// @notice Base contract for strategy adapters
+abstract contract StrategyAdapter is IStrategyAdapter {
     /*//////////////////////////////////////////////////////////////
-                               ERRORS
+                                 ERRORS
     //////////////////////////////////////////////////////////////*/
-    error YieldStrategy__OnlyYieldPeer();
+    error StrategyAdapter__OnlyYieldPeer();
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
@@ -21,7 +21,7 @@ abstract contract YieldStrategy is IStrategy {
                                MODIFIERS
     //////////////////////////////////////////////////////////////*/
     modifier onlyYieldPeer() {
-        if (msg.sender != i_yieldPeer) revert YieldStrategy__OnlyYieldPeer();
+        if (msg.sender != i_yieldPeer) revert StrategyAdapter__OnlyYieldPeer();
         _;
     }
 

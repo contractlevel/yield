@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {YieldStrategy} from "./YieldStrategy.sol";
+import {StrategyAdapter} from "../modules/StrategyAdapter.sol";
 import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
 import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
 import {DataTypes} from "@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol";
@@ -9,8 +9,8 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title AaveV3
 /// @author @contractlevel
-/// @notice Strategy for Aave V3
-contract AaveV3 is YieldStrategy {
+/// @notice Adapter for Aave V3
+contract AaveV3 is StrategyAdapter {
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
@@ -22,7 +22,7 @@ contract AaveV3 is YieldStrategy {
     //////////////////////////////////////////////////////////////*/
     /// @param yieldPeer The address of the yield peer
     /// @param aavePoolAddressesProvider The address of the Aave V3 pool addresses provider
-    constructor(address yieldPeer, address aavePoolAddressesProvider) YieldStrategy(yieldPeer) {
+    constructor(address yieldPeer, address aavePoolAddressesProvider) StrategyAdapter(yieldPeer) {
         i_aavePoolAddressesProvider = aavePoolAddressesProvider;
     }
 

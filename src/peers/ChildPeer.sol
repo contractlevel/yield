@@ -50,12 +50,13 @@ contract ChildPeer is YieldPeer {
     function deposit(uint256 amountToDeposit) external override {
         _initiateDeposit(amountToDeposit);
 
-        address strategyPool = _getStrategyPool();
+        address activeStrategyAdapter = _getActiveStrategyAdapter();
         DepositData memory depositData = _buildDepositData(amountToDeposit);
 
         // 1. This Child is the Strategy
-        if (strategyPool != address(0)) {
+        if (activeStrategyAdapter != address(0)) {
             /// @dev deposit USDC in strategy pool and get totalValue
+            // @review passing activeStrategyAdapter to _depositToStrategyAndGetTotalValue
             depositData.totalValue = _depositToStrategyAndGetTotalValue(amountToDeposit);
 
             /// @dev send a message to parent contract to request shareMintAmount
@@ -173,17 +174,17 @@ contract ChildPeer is YieldPeer {
     /// @param data The data to decode - decodes to Strategy (chainSelector, protocol)
     function _handleCCIPRebalanceOldStrategy(bytes memory data) internal {
         /// @dev withdraw from the old strategy
-        address oldStrategyPool = _getStrategyPool();
-        uint256 totalValue = _getTotalValueFromStrategy(oldStrategyPool);
-        if (totalValue != 0) _withdrawFromStrategy(oldStrategyPool, totalValue);
+        address oldActiveStrategyAdapter = _getActiveStrategyAdapter();
+        uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, address(i_usdc));
+        if (totalValue != 0) _withdrawFromStrategy(oldActiveStrategyAdapter, totalValue);
 
         /// @dev update strategy pool to either protocol on this chain or address(0) if on a different chain
         Strategy memory newStrategy = abi.decode(data, (Strategy));
-        address newStrategyPool = _updateStrategyPool(newStrategy.chainSelector, newStrategy.protocol);
+        address newActiveStrategyAdapter = _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocol);
 
         // if the new strategy is this chain, but different protocol, then we need to deposit to the new strategy
         if (newStrategy.chainSelector == i_thisChainSelector) {
-            _depositToStrategy(newStrategyPool, i_usdc.balanceOf(address(this)));
+            _depositToStrategy(newActiveStrategyAdapter, i_usdc.balanceOf(address(this)));
         }
         // if the new strategy is a different chain, then we need to send the usdc we just withdrew to the new strategy
         else {

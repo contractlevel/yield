@@ -12,9 +12,9 @@ import {IComet} from "../interfaces/IComet.sol";
 import {IShare} from "../interfaces/IShare.sol";
 import {IYieldPeer} from "../interfaces/IYieldPeer.sol";
 import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
-import {ProtocolOperations} from "../libraries/ProtocolOperations.sol";
 import {DataStructures} from "../libraries/DataStructures.sol";
 import {CCIPOperations} from "../libraries/CCIPOperations.sol";
+import {IStrategyAdapter} from "../interfaces/IStrategyAdapter.sol";
 
 /// @title YieldPeer
 /// @author @contractlevel
@@ -35,6 +35,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     error YieldPeer__NoZeroAmount();
     error YieldPeer__NotStrategyChain();
     error YieldPeer__InsufficientAmount();
+    error YieldPeer__InvalidStrategy();
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
@@ -68,9 +69,17 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     mapping(uint64 chainSelector => bool isAllowed) internal s_allowedChains;
     /// @dev Mapping of peers (ie other Yield contracts)
     mapping(uint64 chainSelector => address peer) internal s_peers;
+
+    // @review
     /// @notice We use this as a flag to know if this chain is the strategy
     /// @dev This is either i_aavePoolAddressesProvider, i_comet, or address(0)
     address internal s_strategyPool;
+
+    /// @dev The active strategy adapter
+    address internal s_activeStrategyAdapter;
+
+    /// @dev Mapping of strategy adapters
+    mapping(IYieldPeer.Protocol protocol => address strategyAdapter) internal s_strategyAdapters;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -81,11 +90,14 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     event AllowedPeerSet(uint64 indexed chainSelector, address indexed peer);
     /// @notice Emitted when the CCIP gas limit is set
     event CCIPGasLimitSet(uint256 indexed gasLimit);
+    /// @notice Emitted when a strategy adapter is set
+    event StrategyAdapterSet(IYieldPeer.Protocol indexed protocol, address indexed strategyAdapter);
 
     /// @notice Emitted when the strategy pool is updated
-    event StrategyPoolUpdated(address indexed strategyPool);
+    event ActiveStrategyAdapterUpdated(address indexed activeStrategyAdapter);
 
     /// @notice Emitted when USDC is deposited to the strategy
+    // @review change to strategyAdapter
     event DepositToStrategy(address indexed strategyPool, uint256 indexed amount);
     /// @notice Emitted when USDC is withdrawn from the strategy
     event WithdrawFromStrategy(address indexed strategyPool, uint256 indexed amount);
@@ -239,53 +251,54 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     function _handleCCIPRebalanceNewStrategy(bytes memory data) internal {
         /// @dev update strategy pool to protocol on this chain
         Strategy memory newStrategy = abi.decode(data, (Strategy));
-        address newStrategyPool = _updateStrategyPool(newStrategy.chainSelector, newStrategy.protocol);
+        address newActiveStrategyAdapter = _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocol);
 
         /// @dev deposit to the new strategy
         uint256 usdcBalance = i_usdc.balanceOf(address(this));
-        if (usdcBalance != 0) _depositToStrategy(newStrategyPool, usdcBalance);
+        if (usdcBalance != 0) _depositToStrategy(newActiveStrategyAdapter, usdcBalance);
     }
 
     /// @notice Internal helper to handle strategy pool updates
     /// @param chainSelector The chain selector for the strategy
     /// @param protocol The protocol for the strategy
-    /// @return strategyPool The new strategy pool address
-    function _updateStrategyPool(uint64 chainSelector, Protocol protocol) internal returns (address strategyPool) {
-        if (chainSelector == i_thisChainSelector) {
-            strategyPool = _getStrategyPoolFromProtocol(protocol);
-            s_strategyPool = strategyPool;
-        } else {
-            s_strategyPool = address(0);
-        }
-        emit StrategyPoolUpdated(strategyPool);
+    /// @return newActiveStrategyAdapter The new active strategy adapter address
+    function _updateActiveStrategyAdapter(uint64 chainSelector, Protocol protocol)
+        internal
+        returns (address newActiveStrategyAdapter)
+    {
+        if (chainSelector == i_thisChainSelector) newActiveStrategyAdapter = _getStrategyAdapterFromProtocol(protocol);
+        else newActiveStrategyAdapter = address(0);
+        emit ActiveStrategyAdapterUpdated(newActiveStrategyAdapter);
     }
 
     /// @notice Internal helper to deposit to the strategy
-    /// @param strategyPool The strategy pool to deposit to
+    /// @param strategyAdapter The strategy adapter to deposit to
     /// @param amount The amount of USDC to deposit
     /// @dev Emit DepositToStrategy event
-    function _depositToStrategy(address strategyPool, uint256 amount) internal {
-        ProtocolOperations._depositToStrategy(strategyPool, _getProtocolConfig(), amount);
-        emit DepositToStrategy(strategyPool, amount);
+    // @review passing this an address asset param instead of address(i_usdc)
+    function _depositToStrategy(address strategyAdapter, uint256 amount) internal {
+        IStrategyAdapter(strategyAdapter).deposit(address(i_usdc), amount);
+        emit DepositToStrategy(strategyAdapter, amount);
     }
 
     /// @notice Internal helper to withdraw from the strategy
-    /// @param strategyPool The strategy pool to withdraw from
+    /// @param strategyAdapter The strategy adapter to withdraw from
     /// @param amount The amount of USDC to withdraw
     /// @dev Emit WithdrawFromStrategy event
-    function _withdrawFromStrategy(address strategyPool, uint256 amount) internal {
-        ProtocolOperations._withdrawFromStrategy(strategyPool, _getProtocolConfig(), amount);
-        emit WithdrawFromStrategy(strategyPool, amount);
+    // @review passing this an address asset param instead of address(i_usdc)
+    function _withdrawFromStrategy(address strategyAdapter, uint256 amount) internal {
+        IStrategyAdapter(strategyAdapter).withdraw(address(i_usdc), amount);
+        emit WithdrawFromStrategy(strategyAdapter, amount);
     }
 
     /// @notice Deposits USDC to the strategy and returns the total value of the system
     /// @param amount The amount of USDC to deposit
     /// @return totalValue The total value of the system // _getTotalValueAndDepositToStrategy
     function _depositToStrategyAndGetTotalValue(uint256 amount) internal returns (uint256 totalValue) {
-        address strategyPool = _getStrategyPool();
-        totalValue = _getTotalValueFromStrategy(strategyPool);
-        _depositToStrategy(strategyPool, amount);
-        emit DepositToStrategyCompleted(strategyPool, amount, totalValue);
+        address activeStrategyAdapter = _getActiveStrategyAdapter();
+        totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, address(i_usdc));
+        _depositToStrategy(activeStrategyAdapter, amount);
+        emit DepositToStrategyCompleted(activeStrategyAdapter, amount, totalValue);
     }
 
     /// @notice Withdraws from the strategy and returns the USDC withdraw amount
@@ -295,11 +308,11 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         internal
         returns (uint256 usdcWithdrawAmount)
     {
-        address strategyPool = _getStrategyPool();
-        uint256 totalValue = _getTotalValueFromStrategy(strategyPool);
+        address activeStrategyAdapter = _getActiveStrategyAdapter();
+        uint256 totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, address(i_usdc));
         usdcWithdrawAmount =
             _calculateWithdrawAmount(totalValue, withdrawData.totalShares, withdrawData.shareBurnAmount);
-        if (usdcWithdrawAmount != 0) _withdrawFromStrategy(strategyPool, usdcWithdrawAmount);
+        if (usdcWithdrawAmount != 0) _withdrawFromStrategy(activeStrategyAdapter, usdcWithdrawAmount);
     }
 
     /// @notice Initiates a deposit
@@ -361,13 +374,6 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /*//////////////////////////////////////////////////////////////
                              INTERNAL VIEW
     //////////////////////////////////////////////////////////////*/
-    /// @notice Helper function to make ProtocolOperations easier
-    /// @return protocolConfig Struct containing USDC and strategy addresses
-    function _getProtocolConfig() internal view returns (ProtocolOperations.ProtocolConfig memory protocolConfig) {
-        protocolConfig =
-            ProtocolOperations._createConfig(address(i_usdc), address(i_aavePoolAddressesProvider), address(i_comet));
-    }
-
     /// @notice Builds DepositData struct, which gets used in CCIP deposit messages
     /// @param amount The amount of USDC to deposit
     /// @return depositData Struct containing depositor, amount, and chain selector
@@ -389,24 +395,32 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     }
 
     /// @notice Helper function to get the total value from the strategy
-    /// @param strategyPool The strategy pool to get the total value from
+    /// @param strategyAdapter The strategy adapter to get the total value from
+    /// @param asset The asset to get the total value from
     /// @return totalValue The total value in the Contract Level Yield system
-    function _getTotalValueFromStrategy(address strategyPool) internal view returns (uint256 totalValue) {
-        totalValue = ProtocolOperations._getTotalValueFromStrategy(strategyPool, _getProtocolConfig());
+    function _getTotalValueFromStrategy(address strategyAdapter, address asset)
+        internal
+        view
+        returns (uint256 totalValue)
+    {
+        totalValue = IStrategyAdapter(strategyAdapter).getTotalValue(asset);
     }
 
-    /// @notice Helper function to get the strategy pool from the protocol
-    /// @param protocol The protocol to get the strategy pool from
-    /// @return strategyPool The strategy pool address
-    function _getStrategyPoolFromProtocol(IYieldPeer.Protocol protocol) internal view returns (address strategyPool) {
-        strategyPool = ProtocolOperations._getStrategyPoolFromProtocol(protocol, _getProtocolConfig());
+    /// @notice Helper function to get the strategy adapter from the protocol
+    /// @param protocol The protocol to get the strategy adapter from
+    /// @return strategyAdapter The strategy adapter address
+    function _getStrategyAdapterFromProtocol(IYieldPeer.Protocol protocol)
+        internal
+        view
+        returns (address strategyAdapter)
+    {
+        strategyAdapter = s_strategyAdapters[protocol];
     }
 
-    /// @notice Helper function to get the strategy pool
-    /// @return strategyPool The strategy pool address
-    /// @notice This will return address(0) if this chain is not the strategy chain
-    function _getStrategyPool() internal view returns (address) {
-        return s_strategyPool;
+    /// @notice Helper function to get the active strategy adapter
+    /// @return activeStrategyAdapter The active strategy adapter address
+    function _getActiveStrategyAdapter() internal view returns (address activeStrategyAdapter) {
+        activeStrategyAdapter = s_activeStrategyAdapter;
     }
 
     /// @notice Helper function to calculate the USDC withdraw amount
@@ -467,9 +481,12 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @return totalValue The total value in the Contract Level Yield system
     /// @dev Revert if this chain is not the strategy chain because the totalValue will be on another chain
     function _getTotalValue() internal view returns (uint256 totalValue) {
-        address strategyPool = _getStrategyPool();
-        if (strategyPool != address(0)) totalValue = _getTotalValueFromStrategy(strategyPool);
-        else revert YieldPeer__NotStrategyChain();
+        address activeStrategyAdapter = _getActiveStrategyAdapter();
+        if (activeStrategyAdapter != address(0)) {
+            totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, address(i_usdc));
+        } else {
+            revert YieldPeer__NotStrategyChain();
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -500,6 +517,15 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     function setCCIPGasLimit(uint256 gasLimit) external onlyOwner {
         s_ccipGasLimit = gasLimit;
         emit CCIPGasLimitSet(gasLimit);
+    }
+
+    /// @notice Set the strategy adapter for a protocol
+    /// @param protocol The protocol to set the strategy adapter for
+    /// @param strategyAdapter The strategy adapter to set
+    /// @dev Access control: onlyOwner
+    function setStrategyAdapter(IYieldPeer.Protocol protocol, address strategyAdapter) external onlyOwner {
+        s_strategyAdapters[protocol] = strategyAdapter;
+        emit StrategyAdapterSet(protocol, strategyAdapter);
     }
 
     /*//////////////////////////////////////////////////////////////
