@@ -206,7 +206,7 @@ contract ParentDepositTest is BaseTest {
 }
 
 contract ParentWrapper is ParentPeer {
-    constructor() ParentPeer(address(1), address(1), 1, address(1), address(1), address(1), address(1), address(1)) {}
+    constructor() ParentPeer(address(1), address(1), 1, address(1), address(1), address(1)) {}
 
     function setTotalShares(uint256 totalShares) public {
         s_totalShares = totalShares;

@@ -52,8 +52,6 @@ contract ParentPeer is YieldPeer {
     /// @param link The address of the LINK token
     /// @param thisChainSelector The selector of the chain this contract is deployed on
     /// @param usdc The address of the USDC token
-    /// @param aavePoolAddressesProvider The address of the Aave pool addresses provider
-    /// @param comet The address of the Compound v3 cUSDCv3 contract
     /// @param share The address of the share token native to this system that is minted in exchange for USDC deposits (YieldCoin)
     /// @dev Initial Strategy is set to Aave on this chain
     constructor(
@@ -61,11 +59,9 @@ contract ParentPeer is YieldPeer {
         address link,
         uint64 thisChainSelector,
         address usdc,
-        address aavePoolAddressesProvider,
-        address comet,
         address share,
         address rebalancer
-    ) YieldPeer(ccipRouter, link, thisChainSelector, usdc, aavePoolAddressesProvider, comet, share) {
+    ) YieldPeer(ccipRouter, link, thisChainSelector, usdc, share) {
         s_strategy = Strategy({chainSelector: thisChainSelector, protocol: Protocol.Aave});
         _updateActiveStrategyAdapter(thisChainSelector, Protocol.Aave);
         // slither-disable-next-line missing-zero-check

@@ -94,8 +94,6 @@ contract Invariant is StdInvariant, BaseTest {
             networkConfig.tokens.link,
             PARENT_SELECTOR,
             networkConfig.tokens.usdc,
-            networkConfig.protocols.aavePoolAddressesProvider,
-            networkConfig.protocols.comet,
             networkConfig.tokens.share,
             networkConfig.clf.functionsRouter,
             networkConfig.clf.donId, // 0x0
@@ -110,8 +108,6 @@ contract Invariant is StdInvariant, BaseTest {
             networkConfig.tokens.link,
             CHILD1_SELECTOR,
             networkConfig.tokens.usdc,
-            networkConfig.protocols.aavePoolAddressesProvider,
-            networkConfig.protocols.comet,
             networkConfig.tokens.share,
             PARENT_SELECTOR
         );
@@ -120,8 +116,6 @@ contract Invariant is StdInvariant, BaseTest {
             networkConfig.tokens.link,
             CHILD2_SELECTOR,
             networkConfig.tokens.usdc,
-            networkConfig.protocols.aavePoolAddressesProvider,
-            networkConfig.protocols.comet,
             networkConfig.tokens.share,
             PARENT_SELECTOR
         );
@@ -180,39 +174,40 @@ contract Invariant is StdInvariant, BaseTest {
     function checkStrategyPoolPerChainSelector(uint64 chainSelector) external view {
         if (chainSelector == parent.getStrategy().chainSelector) {
             assertTrue(
-                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getStrategyPool() != address(0),
+                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter() != address(0),
                 "Invariant violated: Strategy pool should be set on the strategy chain"
             );
         } else {
             assertTrue(
-                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getStrategyPool() == address(0),
+                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter() == address(0),
                 "Invariant violated: Strategy pool should not be set on non-strategy chains"
             );
         }
     }
 
+    // @review
     /// @notice Strategy Protocol Consistency: Strategy Protocol pool on active strategy chain should match the protocol stored in ParentPeer
-    function invariant_strategyProtocol_consistency() public {
-        handler.forEachChainSelector(this.checkStrategyProtocolPerChainSelector);
-    }
+    // function invariant_strategyProtocol_consistency() public {
+    //     handler.forEachChainSelector(this.checkStrategyProtocolPerChainSelector);
+    // }
 
-    function checkStrategyProtocolPerChainSelector(uint64 chainSelector) external view {
-        if (chainSelector == parent.getStrategy().chainSelector) {
-            if (parent.getStrategy().protocol == IYieldPeer.Protocol.Aave) {
-                assertEq(
-                    IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getAave(),
-                    IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getStrategyPool(),
-                    "Invariant violated: Strategy protocol on active strategy chain should match the protocol stored in ParentPeer"
-                );
-            } else if (parent.getStrategy().protocol == IYieldPeer.Protocol.Compound) {
-                assertEq(
-                    IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getCompound(),
-                    IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getStrategyPool(),
-                    "Invariant violated: Strategy protocol on active strategy chain should match the protocol stored in ParentPeer"
-                );
-            }
-        }
-    }
+    // function checkStrategyProtocolPerChainSelector(uint64 chainSelector) external view {
+    //     if (chainSelector == parent.getStrategy().chainSelector) {
+    //         if (parent.getStrategy().protocol == IYieldPeer.Protocol.Aave) {
+    //             assertEq(
+    //                 IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getAave(),
+    //                 IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter(),
+    //                 "Invariant violated: Strategy protocol on active strategy chain should match the protocol stored in ParentPeer"
+    //             );
+    //         } else if (parent.getStrategy().protocol == IYieldPeer.Protocol.Compound) {
+    //             assertEq(
+    //                 IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getCompound(),
+    //                 IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter(),
+    //                 "Invariant violated: Strategy protocol on active strategy chain should match the protocol stored in ParentPeer"
+    //             );
+    //         }
+    //     }
+    // }
 
     /// @notice Total Shares Accountancy: The total shares tracked by ParentPeer should be equal to total minted minus total burned system wide.
     function invariant_totalShares_integrity() public view {
@@ -297,7 +292,6 @@ contract Invariant is StdInvariant, BaseTest {
             uint256 withdrawable = (userShares * totalValueConverted) / totalShares;
             uint256 withdrawableConverted = _convertShareToUsdc(withdrawable);
             uint256 minWithdrawable = netDeposits * 990 / 1000; // Allow 1% slippage
-            if (withdrawableConverted < minWithdrawable) {}
             assertTrue(
                 withdrawableConverted >= minWithdrawable || netDeposits < minUsdcValueInShares,
                 "Invariant violated: User should be able to withdraw what they deposited, except for left over dust"

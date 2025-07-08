@@ -141,7 +141,8 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
             IYieldPeer.Strategy memory newStrategy =
                 IYieldPeer.Strategy({chainSelector: chainSelector, protocol: IYieldPeer.Protocol(protocolEnum)});
             IYieldPeer.CcipTxType txType;
-            address oldStrategyPool = IYieldPeer(parentPeer).getStrategyPool();
+            // @review this is not the old strategy pool, it is the old strategy adapter
+            address oldStrategyPool = IYieldPeer(parentPeer).getStrategyAdapter(newStrategy.protocol);
             // slither-disable-next-line uninitialized-local
             uint256 totalValue;
 

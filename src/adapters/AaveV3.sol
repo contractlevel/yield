@@ -49,6 +49,9 @@ contract AaveV3 is StrategyAdapter {
         IERC20(usdc).transfer(i_yieldPeer, amount);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                                 GETTER
+    //////////////////////////////////////////////////////////////*/
     /// @notice Gets the total value of the USDC in the Aave V3 pool
     /// @param usdc The USDC token address
     /// @return totalValue The total value of the USDC in the Aave V3 pool
@@ -57,5 +60,11 @@ contract AaveV3 is StrategyAdapter {
         DataTypes.ReserveData memory reserveData = IPool(aavePool).getReserveData(usdc);
         address aTokenAddress = reserveData.aTokenAddress;
         totalValue = IERC20(aTokenAddress).balanceOf(address(this));
+    }
+
+    /// @notice Gets the pool addresses provider
+    /// @return poolAddressesProvider The pool addresses provider
+    function getPoolAddressesProvider() external view returns (address poolAddressesProvider) {
+        poolAddressesProvider = i_aavePoolAddressesProvider;
     }
 }

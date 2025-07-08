@@ -65,7 +65,7 @@ contract CheckLogTest is BaseTest {
         assertEq(uint8(newStrategy.protocol), newProtocolEnum);
         assertEq(uint8(txType), uint8(IYieldPeer.CcipTxType.RebalanceNewStrategy));
         assertEq(oldChainSelector, parentChainSelector);
-        assertEq(oldStrategyPool, address(baseParentPeer.getStrategyPool()));
+        assertEq(oldStrategyPool, address(baseParentPeer.getActiveStrategyAdapter())); // @review
         assertEq(totalValue, baseParentPeer.getTotalValue());
     }
 
@@ -93,7 +93,7 @@ contract CheckLogTest is BaseTest {
         assertEq(uint8(newStrategy.protocol), 0);
         assertEq(uint8(txType), uint8(IYieldPeer.CcipTxType.RebalanceOldStrategy));
         assertEq(decodedOldChainSelector, oldChainSelector);
-        assertEq(oldStrategyPool, address(baseParentPeer.getStrategyPool()));
+        assertEq(oldStrategyPool, address(baseParentPeer.getActiveStrategyAdapter())); // @review
         assertEq(totalValue, 0);
     }
 

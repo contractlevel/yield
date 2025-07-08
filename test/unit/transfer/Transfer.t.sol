@@ -19,8 +19,6 @@ contract TransferTest is BaseTest {
             baseNetworkConfig.tokens.link,
             baseNetworkConfig.ccip.thisChainSelector,
             address(revertToken),
-            baseNetworkConfig.protocols.aavePoolAddressesProvider,
-            baseNetworkConfig.protocols.comet,
             baseNetworkConfig.tokens.share
         );
 
@@ -56,15 +54,9 @@ contract RevertToken is ERC20 {
 
 /// @notice Example peer to test transfer reverts
 contract ExamplePeer is YieldPeer {
-    constructor(
-        address ccipRouter,
-        address link,
-        uint64 thisChainSelector,
-        address usdc,
-        address aavePoolAddressesProvider,
-        address comet,
-        address share
-    ) YieldPeer(ccipRouter, link, thisChainSelector, usdc, aavePoolAddressesProvider, comet, share) {}
+    constructor(address ccipRouter, address link, uint64 thisChainSelector, address usdc, address share)
+        YieldPeer(ccipRouter, link, thisChainSelector, usdc, share)
+    {}
 
     function transferTo(address to, uint256 amount) external {
         _transferUsdcTo(to, amount);

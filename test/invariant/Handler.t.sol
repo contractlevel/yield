@@ -291,7 +291,8 @@ contract Handler is Test {
             txType = IYieldPeer.CcipTxType.RebalanceOldStrategy;
         }
 
-        address oldStrategyPool = parent.getStrategyPool();
+        // @review
+        address oldStrategyPool = parent.getActiveStrategyAdapter();
         uint256 totalValue;
         if (oldStrategyPool != address(0)) totalValue = parent.getTotalValue();
 

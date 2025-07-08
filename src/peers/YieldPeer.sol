@@ -55,10 +55,6 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     uint64 internal immutable i_thisChainSelector;
     /// @dev USDC token
     IERC20 internal immutable i_usdc;
-    /// @dev Aave v3 pool addresses provider
-    IPoolAddressesProvider internal immutable i_aavePoolAddressesProvider;
-    /// @dev Compound v3 pool
-    IComet internal immutable i_comet;
     /// @dev Share token minted in exchange for deposits
     IShare internal immutable i_share;
 
@@ -69,11 +65,6 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     mapping(uint64 chainSelector => bool isAllowed) internal s_allowedChains;
     /// @dev Mapping of peers (ie other Yield contracts)
     mapping(uint64 chainSelector => address peer) internal s_peers;
-
-    // @review
-    /// @notice We use this as a flag to know if this chain is the strategy
-    /// @dev This is either i_aavePoolAddressesProvider, i_comet, or address(0)
-    address internal s_strategyPool;
 
     /// @dev The active strategy adapter
     address internal s_activeStrategyAdapter;
@@ -140,23 +131,14 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @param link The address of the Chainlink token
     /// @param thisChainSelector The chain selector for this chain
     /// @param usdc The address of the USDC token
-    /// @param aavePoolAddressesProvider The address of the Aave v3 pool addresses provider
-    /// @param comet The address of the Compound v3 cUSDCv3 contract
     /// @param share The address of the Share token, native to this system that is minted in return for deposits
-    constructor(
-        address ccipRouter,
-        address link,
-        uint64 thisChainSelector,
-        address usdc,
-        address aavePoolAddressesProvider,
-        address comet,
-        address share
-    ) CCIPReceiver(ccipRouter) Ownable(msg.sender) {
+    constructor(address ccipRouter, address link, uint64 thisChainSelector, address usdc, address share)
+        CCIPReceiver(ccipRouter)
+        Ownable(msg.sender)
+    {
         i_link = LinkTokenInterface(link);
         i_thisChainSelector = thisChainSelector;
         i_usdc = IERC20(usdc);
-        i_aavePoolAddressesProvider = IPoolAddressesProvider(aavePoolAddressesProvider);
-        i_comet = IComet(comet);
         i_share = IShare(share);
     }
 
@@ -330,6 +312,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @param to The address to transfer USDC to
     /// @param amount The amount of USDC to transfer
     function _transferUsdcTo(address to, uint256 amount) internal {
+        // @review do we need to change transfer to safeTransfer?
         if (!i_usdc.transfer(to, amount)) revert YieldPeer__USDCTransferFailed();
     }
 
@@ -572,7 +555,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @notice Get whether this chain is the strategy chain
     /// @return isStrategyChain Whether this chain is the strategy chain
     function getIsStrategyChain() external view returns (bool) {
-        return s_strategyPool != address(0);
+        return s_activeStrategyAdapter != address(0);
     }
 
     /// @notice Get the CCIP gas limit
@@ -581,28 +564,22 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         return s_ccipGasLimit;
     }
 
-    /// @notice Get the strategy pool address
-    /// @return strategyPool The strategy pool address
-    /// @notice This will return address(0) if this chain is not the strategy chain
-    function getStrategyPool() external view returns (address) {
-        return s_strategyPool;
-    }
-
     /// @dev Reverts if this chain is not the strategy chain
     /// @return totalValue The total value in the Contract Level Yield system
     function getTotalValue() external view returns (uint256 totalValue) {
         totalValue = _getTotalValue();
     }
 
-    /// @notice Get the Compound cUSDCv3 address
-    /// @return compound The Compound cUSDCv3 address
-    function getCompound() external view returns (address compound) {
-        compound = address(i_comet);
+    /// @notice Get the strategy adapter for a protocol
+    /// @param protocol The protocol to get the strategy adapter for
+    /// @return strategyAdapter The strategy adapter address
+    function getStrategyAdapter(IYieldPeer.Protocol protocol) external view returns (address strategyAdapter) {
+        strategyAdapter = s_strategyAdapters[protocol];
     }
 
-    /// @notice Get the Aave Pool Addresses Provider address
-    /// @return aave Aave Pool Addresses Provider address
-    function getAave() external view returns (address aave) {
-        aave = address(i_aavePoolAddressesProvider);
+    /// @notice Get the active strategy adapter
+    /// @return activeStrategyAdapter The active strategy adapter address
+    function getActiveStrategyAdapter() external view returns (address activeStrategyAdapter) {
+        activeStrategyAdapter = s_activeStrategyAdapter;
     }
 }

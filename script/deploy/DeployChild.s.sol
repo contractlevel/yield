@@ -9,12 +9,15 @@ import {SharePool} from "../../src/token/SharePool.sol";
 import {ITokenAdminRegistry} from "@chainlink/contracts/src/v0.8/ccip/interfaces/ITokenAdminRegistry.sol";
 import {RegistryModuleOwnerCustom} from
     "@chainlink/contracts/src/v0.8/ccip/tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
+import {AaveV3} from "../../src/adapters/AaveV3.sol";
+import {CompoundV3} from "../../src/adapters/CompoundV3.sol";
+import {IYieldPeer} from "../../src/interfaces/IYieldPeer.sol";
 
 contract DeployChild is Script {
     /*//////////////////////////////////////////////////////////////
                                   RUN
     //////////////////////////////////////////////////////////////*/
-    function run() public returns (Share, SharePool, ChildPeer, HelperConfig) {
+    function run() public returns (Share, SharePool, ChildPeer, HelperConfig, AaveV3, CompoundV3) {
         HelperConfig config = new HelperConfig();
         HelperConfig.NetworkConfig memory networkConfig = config.getActiveNetworkConfig();
 
@@ -30,16 +33,19 @@ contract DeployChild is Script {
             networkConfig.tokens.link,
             networkConfig.ccip.thisChainSelector,
             networkConfig.tokens.usdc,
-            networkConfig.protocols.aavePoolAddressesProvider,
-            networkConfig.protocols.comet,
             address(share),
             networkConfig.ccip.parentChainSelector
         );
         share.grantMintAndBurnRoles(address(sharePool));
         share.grantMintAndBurnRoles(address(childPeer));
 
+        AaveV3 aaveV3 = new AaveV3(address(childPeer), networkConfig.protocols.aavePoolAddressesProvider);
+        CompoundV3 compoundV3 = new CompoundV3(address(childPeer), networkConfig.protocols.comet);
+        childPeer.setStrategyAdapter(IYieldPeer.Protocol.Aave, address(aaveV3));
+        childPeer.setStrategyAdapter(IYieldPeer.Protocol.Compound, address(compoundV3));
+
         vm.stopBroadcast();
 
-        return (share, sharePool, childPeer, config);
+        return (share, sharePool, childPeer, config, aaveV3, compoundV3);
     }
 }

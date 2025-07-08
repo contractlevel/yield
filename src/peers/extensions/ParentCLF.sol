@@ -71,8 +71,6 @@ contract ParentCLF is ParentPeer, FunctionsClient {
     /// @param link The address of the LINK token
     /// @param thisChainSelector The selector of the chain this contract is deployed on
     /// @param usdc The address of the USDC token
-    /// @param aavePoolAddressesProvider The address of the Aave pool addresses provider
-    /// @param comet The address of the Compound v3 Comet USDC pool
     /// @param share The address of the SHARE token native to this system that is minted in exchange for USDC deposits
     /// @param functionsRouter The address of the Chainlink Functions router
     /// @param donId The DON ID for the Chainlink Functions request
@@ -83,17 +81,12 @@ contract ParentCLF is ParentPeer, FunctionsClient {
         address link,
         uint64 thisChainSelector,
         address usdc,
-        address aavePoolAddressesProvider,
-        address comet,
         address share,
         address functionsRouter,
         bytes32 donId,
         uint64 clfSubId,
         address parentRebalancer
-    )
-        ParentPeer(ccipRouter, link, thisChainSelector, usdc, aavePoolAddressesProvider, comet, share, parentRebalancer)
-        FunctionsClient(functionsRouter)
-    {
+    ) ParentPeer(ccipRouter, link, thisChainSelector, usdc, share, parentRebalancer) FunctionsClient(functionsRouter) {
         i_donId = donId;
         i_clfSubId = clfSubId;
         s_numberOfProtocols = 1;

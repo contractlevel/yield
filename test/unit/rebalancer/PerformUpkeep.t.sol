@@ -12,13 +12,13 @@ contract PerformUpkeepTest is BaseTest {
     }
 
     function test_yield_performUpkeep_rebalanceNewStrategy() public {
-        address aavePool = IPoolAddressesProvider(baseParentPeer.getAave()).getPool();
+        address aavePool = IPoolAddressesProvider(baseAaveV3.getPoolAddressesProvider()).getPool();
         deal(address(baseUsdc), aavePool, DEPOSIT_AMOUNT);
 
         uint64 oldChainSelector = baseParentPeer.getThisChainSelector();
         uint8 newProtocolEnum = uint8(IYieldPeer.Protocol.Aave);
         uint64 newChainSelector = optChainSelector;
-        address newStrategyPool = baseParentPeer.getStrategyPool();
+        address newStrategyPool = baseParentPeer.getActiveStrategyAdapter();
         uint256 totalValue = baseParentPeer.getTotalValue();
         bytes memory performData = _createPerformData(
             newChainSelector,
@@ -46,13 +46,13 @@ contract PerformUpkeepTest is BaseTest {
     }
 
     function test_yield_performUpkeep_rebalanceOldStrategy() public {
-        address aavePool = IPoolAddressesProvider(baseParentPeer.getAave()).getPool();
+        address aavePool = IPoolAddressesProvider(baseAaveV3.getPoolAddressesProvider()).getPool();
         deal(address(baseUsdc), aavePool, DEPOSIT_AMOUNT);
 
         uint64 oldChainSelector = ethChainSelector;
         uint64 newChainSelector = optChainSelector;
         uint8 newProtocolEnum = uint8(IYieldPeer.Protocol.Aave);
-        address newStrategyPool = baseParentPeer.getStrategyPool();
+        address newStrategyPool = baseParentPeer.getActiveStrategyAdapter();
         uint256 totalValue = baseParentPeer.getTotalValue();
         bytes memory performData = _createPerformData(
             newChainSelector,

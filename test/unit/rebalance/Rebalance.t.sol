@@ -162,7 +162,7 @@ contract RebalanceTest is BaseTest {
             uint8(0),
             IYieldPeer.CcipTxType.RebalanceNewStrategy,
             baseChainSelector,
-            baseParentPeer.getStrategyPool(),
+            baseParentPeer.getActiveStrategyAdapter(),
             baseParentPeer.getTotalValue()
         );
         _changePrank(forwarder);

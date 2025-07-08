@@ -29,6 +29,8 @@ import {LinkTokenInterface} from "@chainlink/contracts/src/v0.8/shared/interface
 import {IMessageTransmitter} from "../src/interfaces/IMessageTransmitter.sol";
 import {IYieldPeer} from "../src/interfaces/IYieldPeer.sol";
 import {IComet} from "../src/interfaces/IComet.sol";
+import {AaveV3} from "../src/adapters/AaveV3.sol";
+import {CompoundV3} from "../src/adapters/CompoundV3.sol";
 
 contract BaseTest is Test {
     /*//////////////////////////////////////////////////////////////
@@ -63,6 +65,8 @@ contract BaseTest is Test {
     ERC20 internal baseUsdc;
     USDCTokenPool internal baseUsdcTokenPool;
     IMessageTransmitter internal baseCCTPMessageTransmitter;
+    AaveV3 internal baseAaveV3;
+    CompoundV3 internal baseCompoundV3;
 
     Share internal optShare;
     SharePool internal optSharePool;
@@ -73,6 +77,8 @@ contract BaseTest is Test {
     ERC20 internal optUsdc;
     USDCTokenPool internal optUsdcTokenPool;
     IMessageTransmitter internal optCCTPMessageTransmitter;
+    AaveV3 internal optAaveV3;
+    CompoundV3 internal optCompoundV3;
 
     Share internal ethShare;
     SharePool internal ethSharePool;
@@ -83,6 +89,8 @@ contract BaseTest is Test {
     ERC20 internal ethUsdc;
     USDCTokenPool internal ethUsdcTokenPool;
     IMessageTransmitter internal ethCCTPMessageTransmitter;
+    AaveV3 internal ethAaveV3;
+    CompoundV3 internal ethCompoundV3;
 
     address internal owner = makeAddr("owner");
     address internal depositor = makeAddr("depositor");
@@ -137,7 +145,15 @@ contract BaseTest is Test {
         _bypassClfTermsOfService();
 
         DeployParent baseDeployParent = new DeployParent();
-        (baseShare, baseSharePool, baseParentPeer, baseParentRebalancer, baseConfig, clfSubId) = baseDeployParent.run();
+        DeployParent.DeploymentConfig memory baseDeploy = baseDeployParent.run();
+        baseShare = baseDeploy.share;
+        baseSharePool = baseDeploy.sharePool;
+        baseParentPeer = baseDeploy.parentPeer;
+        baseParentRebalancer = baseDeploy.parentRebalancer;
+        baseConfig = baseDeploy.config;
+        clfSubId = baseDeploy.clfSubId;
+        baseAaveV3 = baseDeploy.aaveV3;
+        baseCompoundV3 = baseDeploy.compoundV3;
         vm.makePersistent(address(baseShare));
         vm.makePersistent(address(baseSharePool));
         vm.makePersistent(address(baseParentPeer));
@@ -154,7 +170,7 @@ contract BaseTest is Test {
         assertEq(block.chainid, OPTIMISM_MAINNET_CHAIN_ID);
 
         DeployChild optDeployChild = new DeployChild();
-        (optShare, optSharePool, optChildPeer, optConfig) = optDeployChild.run();
+        (optShare, optSharePool, optChildPeer, optConfig, optAaveV3, optCompoundV3) = optDeployChild.run();
         vm.makePersistent(address(optShare));
         vm.makePersistent(address(optSharePool));
         vm.makePersistent(address(optChildPeer));
@@ -170,7 +186,7 @@ contract BaseTest is Test {
         assertEq(block.chainid, ETHEREUM_MAINNET_CHAIN_ID);
 
         DeployChild ethDeployChild = new DeployChild();
-        (ethShare, ethSharePool, ethChildPeer, ethConfig) = ethDeployChild.run();
+        (ethShare, ethSharePool, ethChildPeer, ethConfig, ethAaveV3, ethCompoundV3) = ethDeployChild.run();
         vm.makePersistent(address(ethShare));
         vm.makePersistent(address(ethSharePool));
         vm.makePersistent(address(ethChildPeer));
@@ -545,7 +561,7 @@ contract BaseTest is Test {
                 uint8(protocol),
                 IYieldPeer.CcipTxType.RebalanceNewStrategy,
                 baseChainSelector,
-                baseParentPeer.getStrategyPool(),
+                baseParentPeer.getActiveStrategyAdapter(),
                 baseParentPeer.getTotalValue()
             );
             _changePrank(forwarder);
