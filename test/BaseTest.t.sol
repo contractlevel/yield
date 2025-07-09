@@ -11,7 +11,7 @@ import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {CCIPLocalSimulatorFork, Register} from "@chainlink-local/src/ccip/CCIPLocalSimulatorFork.sol";
 import {Log} from "@chainlink/contracts/src/v0.8/automation/interfaces/ILogAutomation.sol";
 
-import {DeployParent, HelperConfig, ParentCLF, ParentRebalancer} from "../script/deploy/DeployParent.s.sol";
+import {DeployParent, HelperConfig, ParentPeer, Rebalancer} from "../script/deploy/DeployParent.s.sol";
 import {DeployChild, ChildPeer} from "../script/deploy/DeployChild.s.sol";
 import {Share} from "../src/token/Share.sol";
 import {SharePool} from "../src/token/SharePool.sol";
@@ -57,8 +57,8 @@ contract BaseTest is Test {
 
     Share internal baseShare;
     SharePool internal baseSharePool;
-    ParentCLF internal baseParentPeer;
-    ParentRebalancer internal baseParentRebalancer;
+    ParentPeer internal baseParentPeer;
+    Rebalancer internal baseRebalancer;
     HelperConfig internal baseConfig;
     HelperConfig.NetworkConfig internal baseNetworkConfig;
     uint64 internal baseChainSelector;
@@ -149,7 +149,7 @@ contract BaseTest is Test {
         baseShare = baseDeploy.share;
         baseSharePool = baseDeploy.sharePool;
         baseParentPeer = baseDeploy.parentPeer;
-        baseParentRebalancer = baseDeploy.parentRebalancer;
+        baseRebalancer = baseDeploy.rebalancer;
         baseConfig = baseDeploy.config;
         clfSubId = baseDeploy.clfSubId;
         baseAaveV3 = baseDeploy.aaveV3;
@@ -157,7 +157,7 @@ contract BaseTest is Test {
         vm.makePersistent(address(baseShare));
         vm.makePersistent(address(baseSharePool));
         vm.makePersistent(address(baseParentPeer));
-        vm.makePersistent(address(baseParentRebalancer));
+        vm.makePersistent(address(baseRebalancer));
 
         baseNetworkConfig = baseConfig.getActiveNetworkConfig();
         baseChainSelector = baseNetworkConfig.ccip.thisChainSelector;
@@ -474,12 +474,12 @@ contract BaseTest is Test {
         /// @dev set upkeepAddress
         address parentPeerOwner = baseParentPeer.owner();
         _changePrank(parentPeerOwner);
-        baseParentPeer.setUpkeepAddress(upkeepAddress);
-        baseParentPeer.setNumberOfProtocols(1); // 0 is Aave, 1 is Compound
+        baseRebalancer.setUpkeepAddress(upkeepAddress);
+        baseRebalancer.setNumberOfProtocols(1); // 0 is Aave, 1 is Compound
 
         /// @dev add ParentPeer as consumer to Chainlink Functions subscription
         address functionsRouter = baseNetworkConfig.clf.functionsRouter;
-        IFunctionsSubscriptions(functionsRouter).addConsumer(clfSubId, address(baseParentPeer));
+        IFunctionsSubscriptions(functionsRouter).addConsumer(clfSubId, address(baseRebalancer));
 
         /// @dev fund Chainlink Functions subscription
         deal(baseParentPeer.getLink(), parentPeerOwner, LINK_AMOUNT);
@@ -540,7 +540,7 @@ contract BaseTest is Test {
     /// @param err The error message to return if the request fails
     function _fulfillRequest(bytes32 requestId, bytes memory response, bytes memory err) internal {
         _changePrank(baseNetworkConfig.clf.functionsRouter);
-        FunctionsClient(address(baseParentPeer)).handleOracleFulfillment(requestId, response, err);
+        FunctionsClient(address(baseRebalancer)).handleOracleFulfillment(requestId, response, err);
         _stopPrank();
     }
 
@@ -549,6 +549,10 @@ contract BaseTest is Test {
     /// @param protocol The protocol of the strategy
     function _setStrategy(uint64 chainSelector, IYieldPeer.Protocol protocol) internal {
         _selectFork(baseFork);
+
+        address activeStrategyAdapter = baseParentPeer.getActiveStrategyAdapter();
+        console2.log("activeStrategyAdapter", activeStrategyAdapter);
+        uint256 totalValue = baseParentPeer.getTotalValue();
 
         /// @dev set the strategy on the parent chain by pranking Chainlink Functions fulfillRequest
         bytes32 requestId = bytes32("requestId");
@@ -561,11 +565,11 @@ contract BaseTest is Test {
                 uint8(protocol),
                 IYieldPeer.CcipTxType.RebalanceNewStrategy,
                 baseChainSelector,
-                baseParentPeer.getActiveStrategyAdapter(),
-                baseParentPeer.getTotalValue()
+                activeStrategyAdapter,
+                totalValue
             );
             _changePrank(forwarder);
-            baseParentRebalancer.performUpkeep(performData);
+            baseRebalancer.performUpkeep(performData);
             _stopPrank();
         }
 
@@ -619,7 +623,7 @@ contract BaseTest is Test {
         address oldStrategyPool,
         uint256 totalValue
     ) internal view returns (bytes memory) {
-        address parentPeer = address(baseParentRebalancer.getParentPeer());
+        address parentPeer = address(baseRebalancer.getParentPeer());
         IYieldPeer.Strategy memory newStrategy =
             IYieldPeer.Strategy({chainSelector: chainSelector, protocol: IYieldPeer.Protocol(protocolEnum)});
         return abi.encode(forwarder, parentPeer, newStrategy, txType, oldChainSelector, oldStrategyPool, totalValue);

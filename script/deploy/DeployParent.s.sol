@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {ParentCLF} from "../../src/peers/extensions/ParentCLF.sol";
-import {ParentRebalancer} from "../../src/modules/ParentRebalancer.sol";
+import {ParentPeer} from "../../src/peers/ParentPeer.sol";
+import {Rebalancer} from "../../src/modules/Rebalancer.sol";
 import {Script} from "forge-std/Script.sol";
 import {HelperConfig} from "../HelperConfig.s.sol";
 import {Share} from "../../src/token/Share.sol";
@@ -21,8 +21,8 @@ contract DeployParent is Script {
     struct DeploymentConfig {
         Share share;
         SharePool sharePool;
-        ParentCLF parentPeer;
-        ParentRebalancer parentRebalancer;
+        ParentPeer parentPeer;
+        Rebalancer rebalancer;
         HelperConfig config;
         uint64 clfSubId;
         AaveV3 aaveV3;
@@ -34,9 +34,10 @@ contract DeployParent is Script {
     //////////////////////////////////////////////////////////////*/
     function run() public returns (DeploymentConfig memory deploy) {
         deploy.config = new HelperConfig();
+        // @review this line was fine above the broadcast ??
+        HelperConfig.NetworkConfig memory networkConfig = deploy.config.getActiveNetworkConfig();
 
         vm.startBroadcast();
-        HelperConfig.NetworkConfig memory networkConfig = deploy.config.getActiveNetworkConfig();
         // Unit tests:
         deploy.clfSubId = IFunctionsSubscriptions(networkConfig.clf.functionsRouter).createSubscription();
         /// @notice Use this instead of the above line for premade subscription:
@@ -54,27 +55,25 @@ contract DeployParent is Script {
             address(deploy.share), address(deploy.sharePool)
         );
 
-        deploy.parentRebalancer = new ParentRebalancer();
-        deploy.parentPeer = new ParentCLF(
+        deploy.rebalancer = new Rebalancer(networkConfig.clf.functionsRouter, networkConfig.clf.donId, deploy.clfSubId);
+        deploy.parentPeer = new ParentPeer(
             networkConfig.ccip.ccipRouter,
             networkConfig.tokens.link,
             networkConfig.ccip.thisChainSelector,
             networkConfig.tokens.usdc,
             address(deploy.share),
-            networkConfig.clf.functionsRouter,
-            networkConfig.clf.donId,
-            deploy.clfSubId,
-            address(deploy.parentRebalancer)
+            address(deploy.rebalancer)
         );
 
         deploy.share.grantMintAndBurnRoles(address(deploy.sharePool));
         deploy.share.grantMintAndBurnRoles(address(deploy.parentPeer));
-        deploy.parentRebalancer.setParentPeer(address(deploy.parentPeer));
+        deploy.rebalancer.setParentPeer(address(deploy.parentPeer));
 
         deploy.aaveV3 = new AaveV3(address(deploy.parentPeer), networkConfig.protocols.aavePoolAddressesProvider);
         deploy.compoundV3 = new CompoundV3(address(deploy.parentPeer), networkConfig.protocols.comet);
         deploy.parentPeer.setStrategyAdapter(IYieldPeer.Protocol.Aave, address(deploy.aaveV3));
         deploy.parentPeer.setStrategyAdapter(IYieldPeer.Protocol.Compound, address(deploy.compoundV3));
+        deploy.parentPeer.setInitialActiveStrategy(IYieldPeer.Protocol.Aave);
 
         vm.stopBroadcast();
     }

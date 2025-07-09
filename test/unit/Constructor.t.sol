@@ -14,9 +14,9 @@ contract ConstructorTest is BaseTest {
         assertEq(uint8(baseParentPeer.getStrategy().protocol), uint8(IYieldPeer.Protocol.Aave));
         assertEq(baseParentPeer.getStrategy().chainSelector, baseNetworkConfig.ccip.thisChainSelector);
 
-        assertEq(baseParentPeer.getFunctionsRouter(), baseNetworkConfig.clf.functionsRouter);
-        assertEq(baseParentPeer.getDonId(), baseNetworkConfig.clf.donId);
-        assertEq(baseParentPeer.getClfSubId(), clfSubId);
+        assertEq(baseRebalancer.getFunctionsRouter(), baseNetworkConfig.clf.functionsRouter);
+        assertEq(baseRebalancer.getDonId(), baseNetworkConfig.clf.donId);
+        assertEq(baseRebalancer.getClfSubId(), clfSubId);
     }
 
     function test_yield_child_constructor() public view {

@@ -8,7 +8,7 @@ contract PerformUpkeepTest is BaseTest {
         bytes memory performData =
             _createPerformData(0, 0, IYieldPeer.CcipTxType.RebalanceNewStrategy, 0, address(0), 0);
         vm.expectRevert(abi.encodeWithSignature("ParentRebalancer__OnlyForwarder()"));
-        baseParentRebalancer.performUpkeep(performData);
+        baseRebalancer.performUpkeep(performData);
     }
 
     function test_yield_performUpkeep_rebalanceNewStrategy() public {
@@ -30,7 +30,7 @@ contract PerformUpkeepTest is BaseTest {
         );
         _changePrank(forwarder);
         vm.recordLogs();
-        baseParentRebalancer.performUpkeep(performData);
+        baseRebalancer.performUpkeep(performData);
 
         bytes32 ccipMessageSentEvent = keccak256("CCIPMessageSent(bytes32,uint8,uint256)");
         bool ccipMessageSentEventFound = false;
@@ -64,7 +64,7 @@ contract PerformUpkeepTest is BaseTest {
         );
         _changePrank(forwarder);
         vm.recordLogs();
-        baseParentRebalancer.performUpkeep(performData);
+        baseRebalancer.performUpkeep(performData);
 
         bytes32 ccipMessageSentEvent = keccak256("CCIPMessageSent(bytes32,uint8,uint256)");
         bool ccipMessageSentEventFound = false;

@@ -117,7 +117,7 @@ contract RebalanceTest is BaseTest {
             optChainSelector, uint8(1), IYieldPeer.CcipTxType.RebalanceOldStrategy, optChainSelector, address(0), 0
         );
         _changePrank(forwarder);
-        baseParentRebalancer.performUpkeep(performData);
+        baseRebalancer.performUpkeep(performData);
 
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
@@ -166,7 +166,7 @@ contract RebalanceTest is BaseTest {
             baseParentPeer.getTotalValue()
         );
         _changePrank(forwarder);
-        baseParentRebalancer.performUpkeep(performData);
+        baseRebalancer.performUpkeep(performData);
 
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
 
@@ -211,7 +211,7 @@ contract RebalanceTest is BaseTest {
             baseChainSelector, uint8(0), IYieldPeer.CcipTxType.RebalanceOldStrategy, optChainSelector, address(0), 0
         );
         _changePrank(forwarder);
-        baseParentRebalancer.performUpkeep(performData);
+        baseRebalancer.performUpkeep(performData);
 
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
@@ -258,7 +258,7 @@ contract RebalanceTest is BaseTest {
             ethChainSelector, uint8(0), IYieldPeer.CcipTxType.RebalanceOldStrategy, optChainSelector, address(0), 0
         );
         _changePrank(forwarder);
-        baseParentRebalancer.performUpkeep(performData);
+        baseRebalancer.performUpkeep(performData);
 
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(ethFork, attesters, attesterPks);

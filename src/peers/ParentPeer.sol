@@ -9,12 +9,12 @@ import {YieldPeer, Client, IRouterClient, CCIPOperations} from "./YieldPeer.sol"
 /// @notice This contract is deployed on only one chain
 /// @notice Users can deposit and withdraw USDC to/from the system via this contract
 /// @notice This contract tracks system wide state and acts as a system wide hub for forwarding CCIP messages to the Strategy
-/// @notice This version of ParentPeer is incomplete - ParentCLF must be used as it inherits this and implements Automation and Functions
 contract ParentPeer is YieldPeer {
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
     error ParentPeer__OnlyRebalancer();
+    error ParentPeer__InitialActiveStrategyAlreadySet();
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
@@ -28,6 +28,8 @@ contract ParentPeer is YieldPeer {
     uint256 internal s_totalShares;
     /// @dev The current strategy: chainSelector and protocol
     Strategy internal s_strategy;
+    /// @dev Whether the initial active strategy adapter has been set
+    bool internal s_initialActiveStrategySet;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -53,7 +55,6 @@ contract ParentPeer is YieldPeer {
     /// @param thisChainSelector The selector of the chain this contract is deployed on
     /// @param usdc The address of the USDC token
     /// @param share The address of the share token native to this system that is minted in exchange for USDC deposits (YieldCoin)
-    /// @dev Initial Strategy is set to Aave on this chain
     constructor(
         address ccipRouter,
         address link,
@@ -62,8 +63,6 @@ contract ParentPeer is YieldPeer {
         address share,
         address rebalancer
     ) YieldPeer(ccipRouter, link, thisChainSelector, usdc, share) {
-        s_strategy = Strategy({chainSelector: thisChainSelector, protocol: Protocol.Aave});
-        _updateActiveStrategyAdapter(thisChainSelector, Protocol.Aave);
         // slither-disable-next-line missing-zero-check
         i_rebalancer = rebalancer;
     }
@@ -426,6 +425,21 @@ contract ParentPeer is YieldPeer {
     function setStrategy(uint64 chainSelector, Protocol protocol) external {
         _revertIfMsgSenderIsNotRebalancer();
         _setStrategy(chainSelector, protocol);
+    }
+
+    /// @notice Sets the initial active strategy
+    /// @notice Can only be called once by the owner
+    /// @notice This is needed because the strategy adapters are deployed separately from the parent peer
+    /// @dev Revert if msg.sender is not the owner
+    /// @dev Revert if already called
+    /// @dev Called in deploy script, immediately after deploying initial strategy adapters, and setting them in YieldPeer::setStrategyAdapter
+    /// @param protocol The protocol of the initial active strategy
+    // @review, formally verify this can only be called once
+    function setInitialActiveStrategy(Protocol protocol) external onlyOwner {
+        if (s_initialActiveStrategySet) revert ParentPeer__InitialActiveStrategyAlreadySet();
+        s_initialActiveStrategySet = true;
+        s_strategy = Strategy({chainSelector: i_thisChainSelector, protocol: protocol});
+        _updateActiveStrategyAdapter(i_thisChainSelector, protocol);
     }
 
     /*//////////////////////////////////////////////////////////////

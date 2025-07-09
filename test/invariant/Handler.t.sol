@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {
-    Test, Vm, console2, ParentCLF, ChildPeer, IERC20, Share, IYieldPeer, ParentRebalancer
-} from "../BaseTest.t.sol";
+import {Test, Vm, console2, ParentPeer, ChildPeer, IERC20, Share, IYieldPeer, Rebalancer} from "../BaseTest.t.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice This contract is used to handle fuzzed interactions with the external functions of the system to test invariants.
@@ -22,7 +20,7 @@ contract Handler is Test {
     uint256 internal constant INITIAL_DEPOSIT_AMOUNT = 100_000_000;
     uint256 internal constant POOL_DEAL_AMOUNT = 1_000_000_000_000_000_000; // 1T USDC
 
-    ParentCLF internal parent;
+    ParentPeer internal parent;
     ChildPeer internal child1;
     ChildPeer internal child2;
     Share internal share;
@@ -33,7 +31,7 @@ contract Handler is Test {
     address internal admin = makeAddr("admin");
     address internal aavePool;
     address internal compoundPool;
-    ParentRebalancer internal rebalancer;
+    Rebalancer internal rebalancer;
     address internal forwarder = makeAddr("forwarder");
 
     uint64 internal parentChainSelector;
@@ -104,7 +102,7 @@ contract Handler is Test {
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
     constructor(
-        ParentCLF _parent,
+        ParentPeer _parent,
         ChildPeer _child1,
         ChildPeer _child2,
         Share _share,
@@ -114,7 +112,7 @@ contract Handler is Test {
         address _functionsRouter,
         address _aavePool,
         address _compoundPool,
-        ParentRebalancer _rebalancer
+        Rebalancer _rebalancer
     ) {
         parent = _parent;
         child1 = _child1;
@@ -251,7 +249,7 @@ contract Handler is Test {
         /// @dev simulate sending request to CLF don and get the request id
         vm.recordLogs();
         _changePrank(upkeep);
-        parent.sendCLFRequest();
+        rebalancer.sendCLFRequest();
         bytes memory response = abi.encode(chainSelector, protocolEnum);
         bytes32 requestId;
         Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -264,7 +262,7 @@ contract Handler is Test {
         /// @dev simulate fulfilling request from CLF don to update the strategy
         vm.recordLogs();
         _changePrank(functionsRouter);
-        parent.handleOracleFulfillment(requestId, response, "");
+        rebalancer.handleOracleFulfillment(requestId, response, "");
         /// @dev if the logs contain a StrategyUpdated event with relevant data, perform upkeep
         _handleCLFLogs();
     }

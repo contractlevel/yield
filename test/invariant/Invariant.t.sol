@@ -2,7 +2,7 @@
 pragma solidity 0.8.26;
 
 import {StdInvariant} from "forge-std/StdInvariant.sol";
-import {BaseTest, Vm, console2, ParentCLF, ChildPeer, Share, IYieldPeer, ParentRebalancer} from "../BaseTest.t.sol";
+import {BaseTest, Vm, console2, ParentPeer, ChildPeer, Share, IYieldPeer, Rebalancer} from "../BaseTest.t.sol";
 import {Handler} from "./Handler.t.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {IRouterClient} from "@chainlink/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
@@ -28,9 +28,9 @@ contract Invariant is StdInvariant, BaseTest {
     /// @dev provides address passed to contracts
     HelperConfig.NetworkConfig internal networkConfig;
     /// @dev Parent Peer contract
-    ParentCLF internal parent;
+    ParentPeer internal parent;
     /// @dev Parent Rebalancer contract
-    ParentRebalancer internal rebalancer;
+    Rebalancer internal rebalancer;
     /// @dev Child Peer contract
     ChildPeer internal child1;
     /// @dev Child Peer contract
@@ -83,24 +83,22 @@ contract Invariant is StdInvariant, BaseTest {
         networkConfig = helperConfig.getOrCreateAnvilEthConfig();
         share = Share(networkConfig.tokens.share);
         aavePool = IPoolAddressesProvider(networkConfig.protocols.aavePoolAddressesProvider).getPool();
-        rebalancer = new ParentRebalancer();
+        rebalancer =
+            new Rebalancer(networkConfig.clf.functionsRouter, networkConfig.clf.donId, networkConfig.clf.clfSubId);
 
         /// @dev since we are not forking mainnets, we will deploy contracts locally
         /// the deployed peers will interact via the ccip local simulator as if they were crosschain
         /// this is a context we need to be aware of in this test suite
         /// @dev deploy the parent contract
-        parent = new ParentCLF(
+        parent = new ParentPeer(
             networkConfig.ccip.ccipRouter,
             networkConfig.tokens.link,
             PARENT_SELECTOR,
             networkConfig.tokens.usdc,
             networkConfig.tokens.share,
-            networkConfig.clf.functionsRouter,
-            networkConfig.clf.donId, // 0x0
-            networkConfig.clf.clfSubId, // 0
             address(rebalancer)
         );
-        parent.setUpkeepAddress(upkeep);
+        rebalancer.setUpkeepAddress(upkeep);
         rebalancer.setParentPeer(address(parent));
         /// @dev deploy at least 2 child peers to cover all CCIP tx types
         child1 = new ChildPeer(

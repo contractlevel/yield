@@ -5,15 +5,15 @@ import {BaseTest, Vm} from "../../BaseTest.t.sol";
 
 contract SendCLFRequestTest is BaseTest {
     function test_yield_parentClf_sendCLFRequest_revertsWhen_notUpkeep() public {
-        vm.expectRevert(abi.encodeWithSignature("ParentCLF__OnlyUpkeep()"));
-        baseParentPeer.sendCLFRequest();
+        vm.expectRevert(abi.encodeWithSignature("Rebalancer__OnlyUpkeep()"));
+        baseRebalancer.sendCLFRequest();
     }
 
     function test_yield_parentClf_sendCLFRequest_success() public {
         vm.recordLogs();
 
         _changePrank(upkeepAddress);
-        baseParentPeer.sendCLFRequest();
+        baseRebalancer.sendCLFRequest();
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bytes32 requestId;

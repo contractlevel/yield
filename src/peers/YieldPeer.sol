@@ -36,6 +36,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     error YieldPeer__NotStrategyChain();
     error YieldPeer__InsufficientAmount();
     error YieldPeer__InvalidStrategy();
+    error YieldPeer__StrategyActive();
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
@@ -140,6 +141,8 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         i_thisChainSelector = thisChainSelector;
         i_usdc = IERC20(usdc);
         i_share = IShare(share);
+        /// @dev Set to address(1) to get past check in setStrategyAdapter for initial active strategy
+        s_activeStrategyAdapter = address(1);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -240,7 +243,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         if (usdcBalance != 0) _depositToStrategy(newActiveStrategyAdapter, usdcBalance);
     }
 
-    /// @notice Internal helper to handle strategy pool updates
+    /// @notice Internal helper to handle active strategy adapter updates
     /// @param chainSelector The chain selector for the strategy
     /// @param protocol The protocol for the strategy
     /// @return newActiveStrategyAdapter The new active strategy adapter address
@@ -248,8 +251,13 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         internal
         returns (address newActiveStrategyAdapter)
     {
-        if (chainSelector == i_thisChainSelector) newActiveStrategyAdapter = _getStrategyAdapterFromProtocol(protocol);
-        else newActiveStrategyAdapter = address(0);
+        if (chainSelector == i_thisChainSelector) {
+            newActiveStrategyAdapter = _getStrategyAdapterFromProtocol(protocol);
+            s_activeStrategyAdapter = newActiveStrategyAdapter;
+        } else {
+            s_activeStrategyAdapter = address(0);
+        }
+
         emit ActiveStrategyAdapterUpdated(newActiveStrategyAdapter);
     }
 
@@ -259,6 +267,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @dev Emit DepositToStrategy event
     // @review passing this an address asset param instead of address(i_usdc)
     function _depositToStrategy(address strategyAdapter, uint256 amount) internal {
+        _transferUsdcTo(strategyAdapter, amount);
         IStrategyAdapter(strategyAdapter).deposit(address(i_usdc), amount);
         emit DepositToStrategy(strategyAdapter, amount);
     }
@@ -507,6 +516,8 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @param strategyAdapter The strategy adapter to set
     /// @dev Access control: onlyOwner
     function setStrategyAdapter(IYieldPeer.Protocol protocol, address strategyAdapter) external onlyOwner {
+        if (_getStrategyAdapterFromProtocol(protocol) == s_activeStrategyAdapter) revert YieldPeer__StrategyActive();
+
         s_strategyAdapters[protocol] = strategyAdapter;
         emit StrategyAdapterSet(protocol, strategyAdapter);
     }

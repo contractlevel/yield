@@ -8,7 +8,7 @@ contract CheckLogTest is BaseTest {
     function test_yield_checkLog_revertsWhen_cannotExecute() public {
         Log memory log = _createStrategyUpdatedLog(address(baseParentPeer), 1, 2, 3);
         vm.expectRevert(abi.encodeWithSignature("OnlySimulatedBackend()"));
-        baseParentRebalancer.checkLog(log, "");
+        baseRebalancer.checkLog(log, "");
     }
 
     /// @notice The cannotExecute modifier will need to be commented out for this test to pass
@@ -18,7 +18,7 @@ contract CheckLogTest is BaseTest {
         topics[0] = wrongEvent;
         Log memory log = _createLog(address(baseParentPeer), topics);
         vm.expectRevert(abi.encodeWithSignature("ParentRebalancer__UpkeepNotNeeded()"));
-        baseParentRebalancer.checkLog(log, "");
+        baseRebalancer.checkLog(log, "");
     }
 
     /// @notice The cannotExecute modifier will need to be commented out for this test to pass
@@ -26,7 +26,7 @@ contract CheckLogTest is BaseTest {
         address wrongSource = makeAddr("wrongSource");
         Log memory log = _createStrategyUpdatedLog(wrongSource, 1, 2, 3);
         vm.expectRevert(abi.encodeWithSignature("ParentRebalancer__UpkeepNotNeeded()"));
-        baseParentRebalancer.checkLog(log, "");
+        baseRebalancer.checkLog(log, "");
     }
 
     /// @notice The cannotExecute modifier will need to be commented out for this test to pass
@@ -34,7 +34,7 @@ contract CheckLogTest is BaseTest {
         uint64 parentChainSelector = baseParentPeer.getThisChainSelector();
         Log memory log = _createStrategyUpdatedLog(address(baseParentPeer), parentChainSelector, 0, parentChainSelector);
         vm.expectRevert(abi.encodeWithSignature("ParentRebalancer__UpkeepNotNeeded()"));
-        baseParentRebalancer.checkLog(log, "");
+        baseRebalancer.checkLog(log, "");
     }
 
     /// @notice The cannotExecute modifier will need to be commented out for this test to pass
@@ -45,7 +45,7 @@ contract CheckLogTest is BaseTest {
 
         Log memory log =
             _createStrategyUpdatedLog(address(baseParentPeer), newChainSelector, newProtocolEnum, parentChainSelector);
-        (bool upkeepNeeded, bytes memory performData) = baseParentRebalancer.checkLog(log, "");
+        (bool upkeepNeeded, bytes memory performData) = baseRebalancer.checkLog(log, "");
         assertTrue(upkeepNeeded);
 
         (
@@ -59,8 +59,8 @@ contract CheckLogTest is BaseTest {
         ) = abi.decode(
             performData, (address, address, IYieldPeer.Strategy, IYieldPeer.CcipTxType, uint64, address, uint256)
         );
-        assertEq(forwarder, address(baseParentRebalancer.getForwarder()));
-        assertEq(parentPeer, address(baseParentRebalancer.getParentPeer()));
+        assertEq(forwarder, address(baseRebalancer.getForwarder()));
+        assertEq(parentPeer, address(baseRebalancer.getParentPeer()));
         assertEq(newStrategy.chainSelector, newChainSelector);
         assertEq(uint8(newStrategy.protocol), newProtocolEnum);
         assertEq(uint8(txType), uint8(IYieldPeer.CcipTxType.RebalanceNewStrategy));
@@ -73,7 +73,7 @@ contract CheckLogTest is BaseTest {
         uint64 newChainSelector = optChainSelector;
         uint64 oldChainSelector = ethChainSelector;
         Log memory log = _createStrategyUpdatedLog(address(baseParentPeer), newChainSelector, 0, oldChainSelector);
-        (bool upkeepNeeded, bytes memory performData) = baseParentRebalancer.checkLog(log, "");
+        (bool upkeepNeeded, bytes memory performData) = baseRebalancer.checkLog(log, "");
         assertTrue(upkeepNeeded);
 
         (
@@ -87,8 +87,8 @@ contract CheckLogTest is BaseTest {
         ) = abi.decode(
             performData, (address, address, IYieldPeer.Strategy, IYieldPeer.CcipTxType, uint64, address, uint256)
         );
-        assertEq(forwarder, address(baseParentRebalancer.getForwarder()));
-        assertEq(parentPeer, address(baseParentRebalancer.getParentPeer()));
+        assertEq(forwarder, address(baseRebalancer.getForwarder()));
+        assertEq(parentPeer, address(baseRebalancer.getParentPeer()));
         assertEq(newStrategy.chainSelector, newChainSelector);
         assertEq(uint8(newStrategy.protocol), 0);
         assertEq(uint8(txType), uint8(IYieldPeer.CcipTxType.RebalanceOldStrategy));
