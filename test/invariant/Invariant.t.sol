@@ -222,23 +222,13 @@ contract Invariant is StdInvariant, BaseTest {
 
     function checkActiveStrategyAdapterPerChainSelector(uint64 chainSelector) external view {
         if (chainSelector == parent.getStrategy().chainSelector) {
-            if (parent.getStrategy().protocol == IYieldPeer.Protocol.Aave) {
-                assertEq(
-                    IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getStrategyAdapter(
-                        IYieldPeer.Protocol.Aave
-                    ),
-                    IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter(),
-                    "Invariant violated: Active strategy adapter on active strategy chain should match the protocol stored in ParentPeer"
-                );
-            } else if (parent.getStrategy().protocol == IYieldPeer.Protocol.Compound) {
-                assertEq(
-                    IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getStrategyAdapter(
-                        IYieldPeer.Protocol.Compound
-                    ),
-                    IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter(),
-                    "Invariant violated: Active strategy adapter on active strategy chain should match the protocol stored in ParentPeer"
-                );
-            }
+            assertEq(
+                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getStrategyAdapter(
+                    parent.getStrategy().protocol
+                ),
+                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter(),
+                "Invariant violated: Active strategy adapter on active strategy chain should match the protocol stored in ParentPeer"
+            );
         } else {
             assertEq(
                 IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter(),
