@@ -215,29 +215,38 @@ contract Invariant is StdInvariant, BaseTest {
         }
     }
 
-    // @review
-    /// @notice Strategy Protocol Consistency: Strategy Protocol pool on active strategy chain should match the protocol stored in ParentPeer
-    // function invariant_strategyProtocol_consistency() public {
-    //     handler.forEachChainSelector(this.checkStrategyProtocolPerChainSelector);
-    // }
+    /// @notice Active Strategy Adapter Consistency: Active strategy adapter on active strategy chain should match the protocol stored in ParentPeer
+    function invariant_activeStrategyAdapter_consistency() public {
+        handler.forEachChainSelector(this.checkActiveStrategyAdapterPerChainSelector);
+    }
 
-    // function checkStrategyProtocolPerChainSelector(uint64 chainSelector) external view {
-    //     if (chainSelector == parent.getStrategy().chainSelector) {
-    //         if (parent.getStrategy().protocol == IYieldPeer.Protocol.Aave) {
-    //             assertEq(
-    //                 IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getAave(),
-    //                 IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter(),
-    //                 "Invariant violated: Strategy protocol on active strategy chain should match the protocol stored in ParentPeer"
-    //             );
-    //         } else if (parent.getStrategy().protocol == IYieldPeer.Protocol.Compound) {
-    //             assertEq(
-    //                 IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getCompound(),
-    //                 IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter(),
-    //                 "Invariant violated: Strategy protocol on active strategy chain should match the protocol stored in ParentPeer"
-    //             );
-    //         }
-    //     }
-    // }
+    function checkActiveStrategyAdapterPerChainSelector(uint64 chainSelector) external view {
+        if (chainSelector == parent.getStrategy().chainSelector) {
+            if (parent.getStrategy().protocol == IYieldPeer.Protocol.Aave) {
+                assertEq(
+                    IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getStrategyAdapter(
+                        IYieldPeer.Protocol.Aave
+                    ),
+                    IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter(),
+                    "Invariant violated: Active strategy adapter on active strategy chain should match the protocol stored in ParentPeer"
+                );
+            } else if (parent.getStrategy().protocol == IYieldPeer.Protocol.Compound) {
+                assertEq(
+                    IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getStrategyAdapter(
+                        IYieldPeer.Protocol.Compound
+                    ),
+                    IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter(),
+                    "Invariant violated: Active strategy adapter on active strategy chain should match the protocol stored in ParentPeer"
+                );
+            }
+        } else {
+            assertEq(
+                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter(),
+                address(0),
+                "Invariant violated: Active strategy adapter should be set to 0 on non-active strategy chains"
+            );
+        }
+    }
 
     /// @notice Total Shares Accountancy: The total shares tracked by ParentPeer should be equal to total minted minus total burned system wide.
     function invariant_totalShares_integrity() public view {
