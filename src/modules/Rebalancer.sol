@@ -176,8 +176,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
             address oldStrategyAdapter,
             uint256 totalValue
         ) = abi.decode(
-            performData,
-            (address, address, IYieldPeer.Strategy, IYieldPeer.CcipTxType, uint64, address, uint256) // @review this is not the old strategy pool, it is the old strategy adapter
+            performData, (address, address, IYieldPeer.Strategy, IYieldPeer.CcipTxType, uint64, address, uint256)
         );
 
         if (msg.sender != forwarder) revert Rebalancer__OnlyForwarder();
