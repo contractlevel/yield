@@ -7,12 +7,12 @@ contract PerformUpkeepTest is BaseTest {
     function test_yield_performUpkeep_revertsWhen_notForwarder() public {
         bytes memory performData =
             _createPerformData(0, 0, IYieldPeer.CcipTxType.RebalanceNewStrategy, 0, address(0), 0);
-        vm.expectRevert(abi.encodeWithSignature("ParentRebalancer__OnlyForwarder()"));
+        vm.expectRevert(abi.encodeWithSignature("Rebalancer__OnlyForwarder()"));
         baseRebalancer.performUpkeep(performData);
     }
 
     function test_yield_performUpkeep_rebalanceNewStrategy() public {
-        address aavePool = IPoolAddressesProvider(baseAaveV3.getPoolAddressesProvider()).getPool();
+        address aavePool = IPoolAddressesProvider(baseAaveV3Adapter.getPoolAddressesProvider()).getPool();
         deal(address(baseUsdc), aavePool, DEPOSIT_AMOUNT);
 
         uint64 oldChainSelector = baseParentPeer.getThisChainSelector();
@@ -46,7 +46,7 @@ contract PerformUpkeepTest is BaseTest {
     }
 
     function test_yield_performUpkeep_rebalanceOldStrategy() public {
-        address aavePool = IPoolAddressesProvider(baseAaveV3.getPoolAddressesProvider()).getPool();
+        address aavePool = IPoolAddressesProvider(baseAaveV3Adapter.getPoolAddressesProvider()).getPool();
         deal(address(baseUsdc), aavePool, DEPOSIT_AMOUNT);
 
         uint64 oldChainSelector = ethChainSelector;

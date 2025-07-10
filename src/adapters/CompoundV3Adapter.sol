@@ -8,7 +8,7 @@ import {IComet} from "../interfaces/IComet.sol";
 /// @title CompoundV3
 /// @author @contractlevel
 /// @notice Adapter for Compound V3
-contract CompoundV3 is StrategyAdapter {
+contract CompoundV3Adapter is StrategyAdapter {
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/

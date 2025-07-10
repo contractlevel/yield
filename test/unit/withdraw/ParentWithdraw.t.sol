@@ -25,7 +25,7 @@ contract ParentWithdrawTest is BaseTest {
     }
 
     /// @notice Scenario: Withdraw made on Parent chain, where the Strategy is, and the Strategy Protocol is Aave
-    function test_yield_parent_withdraw_strategyIsParent_aave() public {
+    function test_yield_parent_withdraw_strategyIsParent_aave_withdrawToLocalChain() public {
         /// @dev arrange
         baseParentPeer.deposit(DEPOSIT_AMOUNT);
         /// @dev sanity checks
@@ -33,7 +33,7 @@ contract ParentWithdrawTest is BaseTest {
         assertEq(baseShare.balanceOf(withdrawer), expectedShareBalance);
         address aUsdc = _getATokenAddress(baseNetworkConfig.protocols.aavePoolAddressesProvider, address(baseUsdc));
         assertApproxEqAbs(
-            IERC20(aUsdc).balanceOf(address(baseParentPeer)),
+            IERC20(aUsdc).balanceOf(address(baseAaveV3Adapter)),
             DEPOSIT_AMOUNT,
             BALANCE_TOLERANCE,
             "USDC balance should be approximately equal to deposit amount"
@@ -54,7 +54,7 @@ contract ParentWithdrawTest is BaseTest {
     }
 
     /// @notice Scenario: Withdraw made on Parent chain, where the Strategy is, and the Strategy Protocol is Compound
-    function test_yield_parent_withdraw_strategyIsParent_compound() public {
+    function test_yield_parent_withdraw_strategyIsParent_compound_withdrawToLocalChain() public {
         _setStrategy(baseChainSelector, IYieldPeer.Protocol.Compound);
         _changePrank(withdrawer);
 
@@ -64,7 +64,7 @@ contract ParentWithdrawTest is BaseTest {
         uint256 expectedShareBalance = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
         assertEq(baseShare.balanceOf(withdrawer), expectedShareBalance);
         assertApproxEqAbs(
-            IComet(baseNetworkConfig.protocols.comet).balanceOf(address(baseParentPeer)),
+            IComet(baseNetworkConfig.protocols.comet).balanceOf(address(baseCompoundV3Adapter)),
             DEPOSIT_AMOUNT,
             BALANCE_TOLERANCE,
             "Compound balance should be approximately equal to deposit amount"
@@ -164,7 +164,7 @@ contract ParentWithdrawTest is BaseTest {
         assertEq(baseShare.balanceOf(withdrawer), expectedShareBalance);
         address aUsdc = _getATokenAddress(baseNetworkConfig.protocols.aavePoolAddressesProvider, address(baseUsdc));
         assertApproxEqAbs(
-            IERC20(aUsdc).balanceOf(address(baseParentPeer)),
+            IERC20(aUsdc).balanceOf(address(baseAaveV3Adapter)),
             DEPOSIT_AMOUNT,
             BALANCE_TOLERANCE,
             "USDC balance should be approximately equal to deposit amount"

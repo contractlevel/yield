@@ -54,7 +54,7 @@ contract CheckLogTest is BaseTest {
             IYieldPeer.Strategy memory newStrategy,
             IYieldPeer.CcipTxType txType,
             uint64 oldChainSelector,
-            address oldStrategyPool,
+            address oldStrategyAdapter,
             uint256 totalValue
         ) = abi.decode(
             performData, (address, address, IYieldPeer.Strategy, IYieldPeer.CcipTxType, uint64, address, uint256)
@@ -65,7 +65,7 @@ contract CheckLogTest is BaseTest {
         assertEq(uint8(newStrategy.protocol), newProtocolEnum);
         assertEq(uint8(txType), uint8(IYieldPeer.CcipTxType.RebalanceNewStrategy));
         assertEq(oldChainSelector, parentChainSelector);
-        assertEq(oldStrategyPool, address(baseParentPeer.getActiveStrategyAdapter())); // @review
+        assertEq(oldStrategyAdapter, address(baseParentPeer.getActiveStrategyAdapter()));
         assertEq(totalValue, baseParentPeer.getTotalValue());
     }
 
@@ -82,7 +82,7 @@ contract CheckLogTest is BaseTest {
             IYieldPeer.Strategy memory newStrategy,
             IYieldPeer.CcipTxType txType,
             uint64 decodedOldChainSelector,
-            address oldStrategyPool,
+            address oldStrategyAdapter,
             uint256 totalValue
         ) = abi.decode(
             performData, (address, address, IYieldPeer.Strategy, IYieldPeer.CcipTxType, uint64, address, uint256)
@@ -93,7 +93,7 @@ contract CheckLogTest is BaseTest {
         assertEq(uint8(newStrategy.protocol), 0);
         assertEq(uint8(txType), uint8(IYieldPeer.CcipTxType.RebalanceOldStrategy));
         assertEq(decodedOldChainSelector, oldChainSelector);
-        assertEq(oldStrategyPool, address(baseParentPeer.getActiveStrategyAdapter())); // @review
+        assertEq(oldStrategyAdapter, address(baseParentPeer.getActiveStrategyAdapter()));
         assertEq(totalValue, 0);
     }
 

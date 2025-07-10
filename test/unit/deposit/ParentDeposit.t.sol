@@ -49,7 +49,7 @@ contract ParentDepositTest is BaseTest {
         /// @dev assert USDC was deposited to Aave
         address aUsdc = _getATokenAddress(baseNetworkConfig.protocols.aavePoolAddressesProvider, address(baseUsdc));
         assertApproxEqAbs(
-            IERC20(aUsdc).balanceOf(address(baseParentPeer)),
+            IERC20(aUsdc).balanceOf(address(baseAaveV3Adapter)),
             DEPOSIT_AMOUNT,
             BALANCE_TOLERANCE,
             "Aave balance should be approximately equal to deposit amount"
@@ -78,7 +78,7 @@ contract ParentDepositTest is BaseTest {
         assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
 
         /// @dev assert USDC was deposited to Compound
-        uint256 compoundBalance = IComet(baseNetworkConfig.protocols.comet).balanceOf(address(baseParentPeer));
+        uint256 compoundBalance = IComet(baseNetworkConfig.protocols.comet).balanceOf(address(baseCompoundV3Adapter));
         assertApproxEqAbs(
             compoundBalance,
             DEPOSIT_AMOUNT,
@@ -88,7 +88,7 @@ contract ParentDepositTest is BaseTest {
 
         /// @dev assert balance increases with time
         vm.warp(block.timestamp + 10 days);
-        assertGt(IComet(baseNetworkConfig.protocols.comet).balanceOf(address(baseParentPeer)), DEPOSIT_AMOUNT);
+        assertGt(IComet(baseNetworkConfig.protocols.comet).balanceOf(address(baseCompoundV3Adapter)), DEPOSIT_AMOUNT);
     }
 
     /// @notice Scenario: Deposit made on Parent chain, where the Strategy is not, and the Strategy Protocol is Aave
@@ -112,7 +112,7 @@ contract ParentDepositTest is BaseTest {
         /// @dev assert USDC was deposited to Aave on child chain
         address aUsdc = _getATokenAddress(optNetworkConfig.protocols.aavePoolAddressesProvider, address(optUsdc));
         assertApproxEqAbs(
-            IERC20(aUsdc).balanceOf(address(optChildPeer)),
+            IERC20(aUsdc).balanceOf(address(optAaveV3Adapter)),
             DEPOSIT_AMOUNT,
             BALANCE_TOLERANCE,
             "Aave balance should be approximately equal to deposit amount"
@@ -147,7 +147,7 @@ contract ParentDepositTest is BaseTest {
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
 
         /// @dev assert USDC was deposited to Compound on child chain
-        uint256 compoundBalance = IComet(optNetworkConfig.protocols.comet).balanceOf(address(optChildPeer));
+        uint256 compoundBalance = IComet(optNetworkConfig.protocols.comet).balanceOf(address(optCompoundV3Adapter));
         assertApproxEqAbs(
             compoundBalance,
             DEPOSIT_AMOUNT,

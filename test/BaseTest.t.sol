@@ -29,8 +29,8 @@ import {LinkTokenInterface} from "@chainlink/contracts/src/v0.8/shared/interface
 import {IMessageTransmitter} from "../src/interfaces/IMessageTransmitter.sol";
 import {IYieldPeer} from "../src/interfaces/IYieldPeer.sol";
 import {IComet} from "../src/interfaces/IComet.sol";
-import {AaveV3} from "../src/adapters/AaveV3.sol";
-import {CompoundV3} from "../src/adapters/CompoundV3.sol";
+import {AaveV3Adapter} from "../src/adapters/AaveV3Adapter.sol";
+import {CompoundV3Adapter} from "../src/adapters/CompoundV3Adapter.sol";
 
 contract BaseTest is Test {
     /*//////////////////////////////////////////////////////////////
@@ -65,8 +65,8 @@ contract BaseTest is Test {
     ERC20 internal baseUsdc;
     USDCTokenPool internal baseUsdcTokenPool;
     IMessageTransmitter internal baseCCTPMessageTransmitter;
-    AaveV3 internal baseAaveV3;
-    CompoundV3 internal baseCompoundV3;
+    AaveV3Adapter internal baseAaveV3Adapter;
+    CompoundV3Adapter internal baseCompoundV3Adapter;
 
     Share internal optShare;
     SharePool internal optSharePool;
@@ -77,8 +77,8 @@ contract BaseTest is Test {
     ERC20 internal optUsdc;
     USDCTokenPool internal optUsdcTokenPool;
     IMessageTransmitter internal optCCTPMessageTransmitter;
-    AaveV3 internal optAaveV3;
-    CompoundV3 internal optCompoundV3;
+    AaveV3Adapter internal optAaveV3Adapter;
+    CompoundV3Adapter internal optCompoundV3Adapter;
 
     Share internal ethShare;
     SharePool internal ethSharePool;
@@ -89,8 +89,8 @@ contract BaseTest is Test {
     ERC20 internal ethUsdc;
     USDCTokenPool internal ethUsdcTokenPool;
     IMessageTransmitter internal ethCCTPMessageTransmitter;
-    AaveV3 internal ethAaveV3;
-    CompoundV3 internal ethCompoundV3;
+    AaveV3Adapter internal ethAaveV3Adapter;
+    CompoundV3Adapter internal ethCompoundV3Adapter;
 
     address internal owner = makeAddr("owner");
     address internal depositor = makeAddr("depositor");
@@ -152,8 +152,8 @@ contract BaseTest is Test {
         baseRebalancer = baseDeploy.rebalancer;
         baseConfig = baseDeploy.config;
         clfSubId = baseDeploy.clfSubId;
-        baseAaveV3 = baseDeploy.aaveV3;
-        baseCompoundV3 = baseDeploy.compoundV3;
+        baseAaveV3Adapter = baseDeploy.aaveV3Adapter;
+        baseCompoundV3Adapter = baseDeploy.compoundV3Adapter;
         vm.makePersistent(address(baseShare));
         vm.makePersistent(address(baseSharePool));
         vm.makePersistent(address(baseParentPeer));
@@ -170,7 +170,7 @@ contract BaseTest is Test {
         assertEq(block.chainid, OPTIMISM_MAINNET_CHAIN_ID);
 
         DeployChild optDeployChild = new DeployChild();
-        (optShare, optSharePool, optChildPeer, optConfig, optAaveV3, optCompoundV3) = optDeployChild.run();
+        (optShare, optSharePool, optChildPeer, optConfig, optAaveV3Adapter, optCompoundV3Adapter) = optDeployChild.run();
         vm.makePersistent(address(optShare));
         vm.makePersistent(address(optSharePool));
         vm.makePersistent(address(optChildPeer));
@@ -186,7 +186,7 @@ contract BaseTest is Test {
         assertEq(block.chainid, ETHEREUM_MAINNET_CHAIN_ID);
 
         DeployChild ethDeployChild = new DeployChild();
-        (ethShare, ethSharePool, ethChildPeer, ethConfig, ethAaveV3, ethCompoundV3) = ethDeployChild.run();
+        (ethShare, ethSharePool, ethChildPeer, ethConfig, ethAaveV3Adapter, ethCompoundV3Adapter) = ethDeployChild.run();
         vm.makePersistent(address(ethShare));
         vm.makePersistent(address(ethSharePool));
         vm.makePersistent(address(ethChildPeer));

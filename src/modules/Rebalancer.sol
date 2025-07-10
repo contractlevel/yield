@@ -141,8 +141,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
             IYieldPeer.Strategy memory newStrategy =
                 IYieldPeer.Strategy({chainSelector: chainSelector, protocol: IYieldPeer.Protocol(protocolEnum)});
             IYieldPeer.CcipTxType txType;
-            // @review this is not the old strategy pool, it is the old strategy adapter
-            address oldStrategyPool = IYieldPeer(parentPeer).getStrategyAdapter(newStrategy.protocol);
+            address oldStrategyAdapter = IYieldPeer(parentPeer).getStrategyAdapter(newStrategy.protocol);
             // slither-disable-next-line uninitialized-local
             uint256 totalValue;
 
@@ -154,7 +153,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
             }
 
             performData =
-                abi.encode(forwarder, parentPeer, newStrategy, txType, oldChainSelector, oldStrategyPool, totalValue);
+                abi.encode(forwarder, parentPeer, newStrategy, txType, oldChainSelector, oldStrategyAdapter, totalValue);
             upkeepNeeded = true;
         } else {
             performData = "";
@@ -174,16 +173,17 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
             IYieldPeer.Strategy memory strategy,
             IYieldPeer.CcipTxType txType,
             uint64 oldChainSelector,
-            address oldStrategyPool,
+            address oldStrategyAdapter,
             uint256 totalValue
         ) = abi.decode(
-            performData, (address, address, IYieldPeer.Strategy, IYieldPeer.CcipTxType, uint64, address, uint256)
+            performData,
+            (address, address, IYieldPeer.Strategy, IYieldPeer.CcipTxType, uint64, address, uint256) // @review this is not the old strategy pool, it is the old strategy adapter
         );
 
         if (msg.sender != forwarder) revert Rebalancer__OnlyForwarder();
 
         if (txType == IYieldPeer.CcipTxType.RebalanceNewStrategy) {
-            IParentPeer(parentPeer).rebalanceNewStrategy(oldStrategyPool, totalValue, strategy);
+            IParentPeer(parentPeer).rebalanceNewStrategy(oldStrategyAdapter, totalValue, strategy);
         } else {
             IParentPeer(parentPeer).rebalanceOldStrategy(oldChainSelector, strategy);
         }

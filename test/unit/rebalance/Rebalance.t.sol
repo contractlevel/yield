@@ -20,7 +20,7 @@ contract RebalanceTest is BaseTest {
         /// @dev sanity check
         address aUsdc = _getATokenAddress(baseNetworkConfig.protocols.aavePoolAddressesProvider, address(baseUsdc));
         assertApproxEqAbs(
-            IERC20(aUsdc).balanceOf(address(baseParentPeer)),
+            IERC20(aUsdc).balanceOf(address(baseAaveV3Adapter)),
             DEPOSIT_AMOUNT,
             BALANCE_TOLERANCE,
             "Aave balance should be approximately equal to deposit amount"
@@ -48,7 +48,7 @@ contract RebalanceTest is BaseTest {
         assertEq(emittedChainSelector, baseChainSelector);
         assertEq(emittedProtocol, uint8(IYieldPeer.Protocol.Aave));
         assertApproxEqAbs(
-            IERC20(aUsdc).balanceOf(address(baseParentPeer)),
+            IERC20(aUsdc).balanceOf(address(baseAaveV3Adapter)),
             DEPOSIT_AMOUNT,
             BALANCE_TOLERANCE,
             "Aave balance should be approximately equal to deposit amount"
@@ -63,7 +63,7 @@ contract RebalanceTest is BaseTest {
         /// @dev sanity check
         address aUsdc = _getATokenAddress(baseNetworkConfig.protocols.aavePoolAddressesProvider, address(baseUsdc));
         assertApproxEqAbs(
-            IERC20(aUsdc).balanceOf(address(baseParentPeer)),
+            IERC20(aUsdc).balanceOf(address(baseAaveV3Adapter)),
             DEPOSIT_AMOUNT,
             BALANCE_TOLERANCE,
             "Aave balance should be approximately equal to deposit amount"
@@ -76,8 +76,8 @@ contract RebalanceTest is BaseTest {
         _fulfillRequest(requestId, response, "");
 
         /// @dev assert
-        assertEq(IERC20(aUsdc).balanceOf(address(baseParentPeer)), 0);
-        uint256 compoundBalance = IComet(baseNetworkConfig.protocols.comet).balanceOf(address(baseParentPeer));
+        assertEq(IERC20(aUsdc).balanceOf(address(baseAaveV3Adapter)), 0);
+        uint256 compoundBalance = IComet(baseNetworkConfig.protocols.comet).balanceOf(address(baseCompoundV3Adapter));
         assertApproxEqAbs(
             compoundBalance,
             DEPOSIT_AMOUNT,
@@ -99,7 +99,7 @@ contract RebalanceTest is BaseTest {
         /// @dev sanity check
         address aUsdc = _getATokenAddress(optNetworkConfig.protocols.aavePoolAddressesProvider, address(optUsdc));
         assertApproxEqAbs(
-            IERC20(aUsdc).balanceOf(address(optChildPeer)),
+            IERC20(aUsdc).balanceOf(address(optAaveV3Adapter)),
             DEPOSIT_AMOUNT,
             BALANCE_TOLERANCE,
             "Aave balance should be approximately equal to deposit amount"
@@ -122,8 +122,8 @@ contract RebalanceTest is BaseTest {
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
         /// @dev assert
-        assertEq(IERC20(aUsdc).balanceOf(address(optChildPeer)), 0);
-        uint256 compoundBalance = IComet(optNetworkConfig.protocols.comet).balanceOf(address(optChildPeer));
+        assertEq(IERC20(aUsdc).balanceOf(address(optAaveV3Adapter)), 0);
+        uint256 compoundBalance = IComet(optNetworkConfig.protocols.comet).balanceOf(address(optCompoundV3Adapter));
         assertApproxEqAbs(
             compoundBalance,
             DEPOSIT_AMOUNT,
@@ -144,7 +144,7 @@ contract RebalanceTest is BaseTest {
         /// @dev sanity check
         address aUsdc = _getATokenAddress(baseNetworkConfig.protocols.aavePoolAddressesProvider, address(baseUsdc));
         assertApproxEqAbs(
-            IERC20(aUsdc).balanceOf(address(baseParentPeer)),
+            IERC20(aUsdc).balanceOf(address(baseAaveV3Adapter)),
             DEPOSIT_AMOUNT,
             BALANCE_TOLERANCE,
             "Aave balance should be approximately equal to deposit amount"
@@ -173,7 +173,7 @@ contract RebalanceTest is BaseTest {
         /// @dev assert
         address optAaveUsdc = _getATokenAddress(optNetworkConfig.protocols.aavePoolAddressesProvider, address(optUsdc));
         assertApproxEqAbs(
-            IERC20(optAaveUsdc).balanceOf(address(optChildPeer)),
+            IERC20(optAaveUsdc).balanceOf(address(optAaveV3Adapter)),
             DEPOSIT_AMOUNT,
             BALANCE_TOLERANCE,
             "Aave balance should be approximately equal to deposit amount"
@@ -193,7 +193,7 @@ contract RebalanceTest is BaseTest {
         /// @dev sanity check
         address aUsdc = _getATokenAddress(optNetworkConfig.protocols.aavePoolAddressesProvider, address(optUsdc));
         assertApproxEqAbs(
-            IERC20(aUsdc).balanceOf(address(optChildPeer)),
+            IERC20(aUsdc).balanceOf(address(optAaveV3Adapter)),
             DEPOSIT_AMOUNT,
             BALANCE_TOLERANCE,
             "Aave balance should be approximately equal to deposit amount"
@@ -220,7 +220,7 @@ contract RebalanceTest is BaseTest {
         address baseAaveUsdc =
             _getATokenAddress(baseNetworkConfig.protocols.aavePoolAddressesProvider, address(baseUsdc));
         assertApproxEqAbs(
-            IERC20(baseAaveUsdc).balanceOf(address(baseParentPeer)),
+            IERC20(baseAaveUsdc).balanceOf(address(baseAaveV3Adapter)),
             DEPOSIT_AMOUNT,
             BALANCE_TOLERANCE,
             "Aave balance should be approximately equal to deposit amount"
@@ -240,7 +240,7 @@ contract RebalanceTest is BaseTest {
         /// @dev sanity check
         address aUsdc = _getATokenAddress(optNetworkConfig.protocols.aavePoolAddressesProvider, address(optUsdc));
         assertApproxEqAbs(
-            IERC20(aUsdc).balanceOf(address(optChildPeer)),
+            IERC20(aUsdc).balanceOf(address(optAaveV3Adapter)),
             DEPOSIT_AMOUNT,
             BALANCE_TOLERANCE,
             "Aave balance should be approximately equal to deposit amount"
@@ -266,7 +266,7 @@ contract RebalanceTest is BaseTest {
         /// @dev assert
         address ethAaveUsdc = _getATokenAddress(ethNetworkConfig.protocols.aavePoolAddressesProvider, address(ethUsdc));
         assertApproxEqAbs(
-            IERC20(ethAaveUsdc).balanceOf(address(ethChildPeer)),
+            IERC20(ethAaveUsdc).balanceOf(address(ethAaveV3Adapter)),
             DEPOSIT_AMOUNT,
             BALANCE_TOLERANCE,
             "Aave balance should be approximately equal to deposit amount"

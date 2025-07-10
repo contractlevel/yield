@@ -13,8 +13,8 @@ import {IFunctionsRouter} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/i
 import {ITokenAdminRegistry} from "@chainlink/contracts/src/v0.8/ccip/interfaces/ITokenAdminRegistry.sol";
 import {RegistryModuleOwnerCustom} from
     "@chainlink/contracts/src/v0.8/ccip/tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
-import {AaveV3} from "../../src/adapters/AaveV3.sol";
-import {CompoundV3} from "../../src/adapters/CompoundV3.sol";
+import {AaveV3Adapter} from "../../src/adapters/AaveV3Adapter.sol";
+import {CompoundV3Adapter} from "../../src/adapters/CompoundV3Adapter.sol";
 import {IYieldPeer} from "../../src/interfaces/IYieldPeer.sol";
 
 contract DeployParent is Script {
@@ -25,8 +25,8 @@ contract DeployParent is Script {
         Rebalancer rebalancer;
         HelperConfig config;
         uint64 clfSubId;
-        AaveV3 aaveV3;
-        CompoundV3 compoundV3;
+        AaveV3Adapter aaveV3Adapter;
+        CompoundV3Adapter compoundV3Adapter;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -69,10 +69,11 @@ contract DeployParent is Script {
         deploy.share.grantMintAndBurnRoles(address(deploy.parentPeer));
         deploy.rebalancer.setParentPeer(address(deploy.parentPeer));
 
-        deploy.aaveV3 = new AaveV3(address(deploy.parentPeer), networkConfig.protocols.aavePoolAddressesProvider);
-        deploy.compoundV3 = new CompoundV3(address(deploy.parentPeer), networkConfig.protocols.comet);
-        deploy.parentPeer.setStrategyAdapter(IYieldPeer.Protocol.Aave, address(deploy.aaveV3));
-        deploy.parentPeer.setStrategyAdapter(IYieldPeer.Protocol.Compound, address(deploy.compoundV3));
+        deploy.aaveV3Adapter =
+            new AaveV3Adapter(address(deploy.parentPeer), networkConfig.protocols.aavePoolAddressesProvider);
+        deploy.compoundV3Adapter = new CompoundV3Adapter(address(deploy.parentPeer), networkConfig.protocols.comet);
+        deploy.parentPeer.setStrategyAdapter(IYieldPeer.Protocol.Aave, address(deploy.aaveV3Adapter));
+        deploy.parentPeer.setStrategyAdapter(IYieldPeer.Protocol.Compound, address(deploy.compoundV3Adapter));
         deploy.parentPeer.setInitialActiveStrategy(IYieldPeer.Protocol.Aave);
 
         vm.stopBroadcast();

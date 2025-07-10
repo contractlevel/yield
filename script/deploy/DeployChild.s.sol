@@ -9,15 +9,15 @@ import {SharePool} from "../../src/token/SharePool.sol";
 import {ITokenAdminRegistry} from "@chainlink/contracts/src/v0.8/ccip/interfaces/ITokenAdminRegistry.sol";
 import {RegistryModuleOwnerCustom} from
     "@chainlink/contracts/src/v0.8/ccip/tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
-import {AaveV3} from "../../src/adapters/AaveV3.sol";
-import {CompoundV3} from "../../src/adapters/CompoundV3.sol";
+import {AaveV3Adapter} from "../../src/adapters/AaveV3Adapter.sol";
+import {CompoundV3Adapter} from "../../src/adapters/CompoundV3Adapter.sol";
 import {IYieldPeer} from "../../src/interfaces/IYieldPeer.sol";
 
 contract DeployChild is Script {
     /*//////////////////////////////////////////////////////////////
                                   RUN
     //////////////////////////////////////////////////////////////*/
-    function run() public returns (Share, SharePool, ChildPeer, HelperConfig, AaveV3, CompoundV3) {
+    function run() public returns (Share, SharePool, ChildPeer, HelperConfig, AaveV3Adapter, CompoundV3Adapter) {
         HelperConfig config = new HelperConfig();
         HelperConfig.NetworkConfig memory networkConfig = config.getActiveNetworkConfig();
 
@@ -39,8 +39,8 @@ contract DeployChild is Script {
         share.grantMintAndBurnRoles(address(sharePool));
         share.grantMintAndBurnRoles(address(childPeer));
 
-        AaveV3 aaveV3 = new AaveV3(address(childPeer), networkConfig.protocols.aavePoolAddressesProvider);
-        CompoundV3 compoundV3 = new CompoundV3(address(childPeer), networkConfig.protocols.comet);
+        AaveV3Adapter aaveV3 = new AaveV3Adapter(address(childPeer), networkConfig.protocols.aavePoolAddressesProvider);
+        CompoundV3Adapter compoundV3 = new CompoundV3Adapter(address(childPeer), networkConfig.protocols.comet);
         childPeer.setStrategyAdapter(IYieldPeer.Protocol.Aave, address(aaveV3));
         childPeer.setStrategyAdapter(IYieldPeer.Protocol.Compound, address(compoundV3));
 

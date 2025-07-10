@@ -9,6 +9,8 @@ import {IRouterClient} from "@chainlink/contracts/src/v0.8/ccip/interfaces/IRout
 import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
 import {IComet} from "../../src/interfaces/IComet.sol";
 import {MockCCIPRouter} from "@chainlink-local/test/mocks/MockRouter.sol";
+import {AaveV3Adapter} from "../../src/adapters/AaveV3Adapter.sol";
+import {CompoundV3Adapter} from "../../src/adapters/CompoundV3Adapter.sol";
 
 /// @notice We are making the assumption that the gasLimit set for CCIP works correctly
 contract Invariant is StdInvariant, BaseTest {
@@ -41,6 +43,19 @@ contract Invariant is StdInvariant, BaseTest {
     address internal upkeep = makeAddr("upkeep");
     /// @dev Aave Pool Address
     address internal aavePool;
+
+    /// @dev Aave Adapter contract for parent
+    AaveV3Adapter internal aaveV3AdapterParent;
+    /// @dev Compound Adapter contract for parent
+    CompoundV3Adapter internal compoundV3AdapterParent;
+    /// @dev Aave Adapter contract for child 1
+    AaveV3Adapter internal aaveV3AdapterChild1;
+    /// @dev Compound Adapter contract for child 1
+    CompoundV3Adapter internal compoundV3AdapterChild1;
+    /// @dev Aave Adapter contract for child 2
+    AaveV3Adapter internal aaveV3AdapterChild2;
+    /// @dev Compound Adapter contract for child 2
+    CompoundV3Adapter internal compoundV3AdapterChild2;
 
     /*//////////////////////////////////////////////////////////////
                                  SETUP
@@ -100,6 +115,13 @@ contract Invariant is StdInvariant, BaseTest {
         );
         rebalancer.setUpkeepAddress(upkeep);
         rebalancer.setParentPeer(address(parent));
+        /// @dev deploy parent adapters
+        aaveV3AdapterParent = new AaveV3Adapter(address(parent), networkConfig.protocols.aavePoolAddressesProvider);
+        compoundV3AdapterParent = new CompoundV3Adapter(address(parent), networkConfig.protocols.comet);
+        parent.setStrategyAdapter(IYieldPeer.Protocol.Aave, address(aaveV3AdapterParent));
+        parent.setStrategyAdapter(IYieldPeer.Protocol.Compound, address(compoundV3AdapterParent));
+        parent.setInitialActiveStrategy(IYieldPeer.Protocol.Aave);
+
         /// @dev deploy at least 2 child peers to cover all CCIP tx types
         child1 = new ChildPeer(
             networkConfig.ccip.ccipRouter,
@@ -109,6 +131,12 @@ contract Invariant is StdInvariant, BaseTest {
             networkConfig.tokens.share,
             PARENT_SELECTOR
         );
+        /// @dev child adapters
+        aaveV3AdapterChild1 = new AaveV3Adapter(address(child1), networkConfig.protocols.aavePoolAddressesProvider);
+        compoundV3AdapterChild1 = new CompoundV3Adapter(address(child1), networkConfig.protocols.comet);
+        child1.setStrategyAdapter(IYieldPeer.Protocol.Aave, address(aaveV3AdapterChild1));
+        child1.setStrategyAdapter(IYieldPeer.Protocol.Compound, address(compoundV3AdapterChild1));
+
         child2 = new ChildPeer(
             networkConfig.ccip.ccipRouter,
             networkConfig.tokens.link,
@@ -117,6 +145,10 @@ contract Invariant is StdInvariant, BaseTest {
             networkConfig.tokens.share,
             PARENT_SELECTOR
         );
+        aaveV3AdapterChild2 = new AaveV3Adapter(address(child2), networkConfig.protocols.aavePoolAddressesProvider);
+        compoundV3AdapterChild2 = new CompoundV3Adapter(address(child2), networkConfig.protocols.comet);
+        child2.setStrategyAdapter(IYieldPeer.Protocol.Aave, address(aaveV3AdapterChild2));
+        child2.setStrategyAdapter(IYieldPeer.Protocol.Compound, address(compoundV3AdapterChild2));
 
         /// @dev grant roles to the contracts
         _changePrank(share.owner());

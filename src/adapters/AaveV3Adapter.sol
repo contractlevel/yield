@@ -10,7 +10,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 /// @title AaveV3
 /// @author @contractlevel
 /// @notice Adapter for Aave V3
-contract AaveV3 is StrategyAdapter {
+contract AaveV3Adapter is StrategyAdapter {
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/

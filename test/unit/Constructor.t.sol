@@ -40,7 +40,7 @@ contract ConstructorTest is BaseTest {
     }
 
     function test_yield_getStrategyPool() public view {
-        assertEq(baseParentPeer.getActiveStrategyAdapter(), address(baseAaveV3));
+        assertEq(baseParentPeer.getActiveStrategyAdapter(), address(baseAaveV3Adapter));
         assertEq(optChildPeer.getActiveStrategyAdapter(), address(0));
         assertEq(ethChildPeer.getActiveStrategyAdapter(), address(0));
     }

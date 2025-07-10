@@ -89,15 +89,16 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     event ActiveStrategyAdapterUpdated(address indexed activeStrategyAdapter);
 
     /// @notice Emitted when USDC is deposited to the strategy
-    // @review change to strategyAdapter
-    event DepositToStrategy(address indexed strategyPool, uint256 indexed amount);
+    event DepositToStrategy(address indexed strategyAdapter, uint256 indexed amount);
     /// @notice Emitted when USDC is withdrawn from the strategy
-    event WithdrawFromStrategy(address indexed strategyPool, uint256 indexed amount);
+    event WithdrawFromStrategy(address indexed strategyAdapter, uint256 indexed amount);
 
     /// @notice Emitted when a user deposits USDC into the system
     event DepositInitiated(address indexed depositor, uint256 indexed amount, uint64 indexed thisChainSelector);
     /// @notice Emitted when a deposit to the strategy is completed
-    event DepositToStrategyCompleted(address indexed strategyPool, uint256 indexed amount, uint256 indexed totalValue);
+    event DepositToStrategyCompleted(
+        address indexed strategyAdapter, uint256 indexed amount, uint256 indexed totalValue
+    );
     /// @notice Emitted when a user initiates a withdrawal of USDC from the system
     event WithdrawInitiated(address indexed withdrawer, uint256 indexed amount, uint64 indexed thisChainSelector);
     /// @notice Emitted when a withdrawal is completed and the USDC is sent to the user
@@ -141,8 +142,8 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         i_thisChainSelector = thisChainSelector;
         i_usdc = IERC20(usdc);
         i_share = IShare(share);
-        /// @dev Set to address(1) to get past check in setStrategyAdapter for initial active strategy
-        s_activeStrategyAdapter = address(1);
+        // /// @dev Set to address(1) to get past check in setStrategyAdapter for initial active strategy
+        // s_activeStrategyAdapter = address(1);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -516,7 +517,9 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @param strategyAdapter The strategy adapter to set
     /// @dev Access control: onlyOwner
     function setStrategyAdapter(IYieldPeer.Protocol protocol, address strategyAdapter) external onlyOwner {
-        if (_getStrategyAdapterFromProtocol(protocol) == s_activeStrategyAdapter) revert YieldPeer__StrategyActive();
+        // @review without this check, if the owner changes the adapter for the active strategy, it could disrupt the system
+        // because attempts to withdraw would be made on the new adapter, but the old one would have the funds
+        // if (_getStrategyAdapterFromProtocol(protocol) == s_activeStrategyAdapter) revert YieldPeer__StrategyActive();
 
         s_strategyAdapters[protocol] = strategyAdapter;
         emit StrategyAdapterSet(protocol, strategyAdapter);

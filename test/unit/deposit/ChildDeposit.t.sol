@@ -43,7 +43,7 @@ contract ChildDepositTest is BaseTest {
         /// @dev assert USDC was deposited to Aave
         address aUsdc = _getATokenAddress(optNetworkConfig.protocols.aavePoolAddressesProvider, address(optUsdc));
         assertApproxEqAbs(
-            IERC20(aUsdc).balanceOf(address(optChildPeer)),
+            IERC20(aUsdc).balanceOf(address(optAaveV3Adapter)),
             DEPOSIT_AMOUNT,
             BALANCE_TOLERANCE,
             "Aave balance should be approximately equal to deposit amount"
@@ -78,7 +78,7 @@ contract ChildDepositTest is BaseTest {
         assertEq(usdcBalanceAfter, usdcBalanceBefore - DEPOSIT_AMOUNT);
 
         /// @dev assert USDC was deposited to Compound
-        uint256 compoundBalance = IComet(optNetworkConfig.protocols.comet).balanceOf(address(optChildPeer));
+        uint256 compoundBalance = IComet(optNetworkConfig.protocols.comet).balanceOf(address(optCompoundV3Adapter));
         assertApproxEqAbs(
             compoundBalance,
             DEPOSIT_AMOUNT,
@@ -120,7 +120,7 @@ contract ChildDepositTest is BaseTest {
         /// @dev assert USDC was deposited to Aave
         address aUsdc = _getATokenAddress(baseNetworkConfig.protocols.aavePoolAddressesProvider, address(baseUsdc));
         assertApproxEqAbs(
-            IERC20(aUsdc).balanceOf(address(baseParentPeer)),
+            IERC20(aUsdc).balanceOf(address(baseAaveV3Adapter)),
             DEPOSIT_AMOUNT,
             BALANCE_TOLERANCE,
             "Aave balance should be approximately equal to deposit amount"
@@ -157,7 +157,7 @@ contract ChildDepositTest is BaseTest {
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
 
         /// @dev assert USDC was deposited to Compound
-        uint256 compoundBalance = IComet(baseNetworkConfig.protocols.comet).balanceOf(address(baseParentPeer));
+        uint256 compoundBalance = IComet(baseNetworkConfig.protocols.comet).balanceOf(address(baseCompoundV3Adapter));
         assertApproxEqAbs(
             compoundBalance,
             DEPOSIT_AMOUNT,
@@ -204,7 +204,7 @@ contract ChildDepositTest is BaseTest {
         /// @dev assert USDC was deposited to Aave
         address aUsdc = _getATokenAddress(ethNetworkConfig.protocols.aavePoolAddressesProvider, address(ethUsdc));
         assertApproxEqAbs(
-            IERC20(aUsdc).balanceOf(address(ethChildPeer)),
+            IERC20(aUsdc).balanceOf(address(ethAaveV3Adapter)),
             DEPOSIT_AMOUNT,
             BALANCE_TOLERANCE,
             "Aave balance should be approximately equal to deposit amount"
@@ -244,7 +244,7 @@ contract ChildDepositTest is BaseTest {
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(ethFork, attesters, attesterPks);
 
         /// @dev assert USDC was deposited to Compound
-        uint256 compoundBalance = IComet(ethNetworkConfig.protocols.comet).balanceOf(address(ethChildPeer));
+        uint256 compoundBalance = IComet(ethNetworkConfig.protocols.comet).balanceOf(address(ethCompoundV3Adapter));
         assertApproxEqAbs(
             compoundBalance,
             DEPOSIT_AMOUNT,

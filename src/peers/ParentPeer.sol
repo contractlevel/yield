@@ -65,6 +65,8 @@ contract ParentPeer is YieldPeer {
     ) YieldPeer(ccipRouter, link, thisChainSelector, usdc, share) {
         // slither-disable-next-line missing-zero-check
         i_rebalancer = rebalancer;
+        // /// @dev Set to address(1) to get past check in setStrategyAdapter for initial active strategy
+        // s_activeStrategyAdapter = address(1);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -165,13 +167,15 @@ contract ParentPeer is YieldPeer {
 
     /// @dev Revert if msg.sender is not the ParentRebalancer
     /// @dev Handle moving strategy from this parent chain to a different chain
-    /// @param oldStrategyPool The address of the old strategy pool
+    /// @param oldStrategyAdapter The address of the old strategy adapter
     /// @param totalValue The total value of the system
     /// @param newStrategy The new strategy
     /// @notice This function is called by the ParentRebalancer's Log-trigger Automation performUpkeep
-    function rebalanceNewStrategy(address oldStrategyPool, uint256 totalValue, Strategy memory newStrategy) external {
+    function rebalanceNewStrategy(address oldStrategyAdapter, uint256 totalValue, Strategy memory newStrategy)
+        external
+    {
         _revertIfMsgSenderIsNotRebalancer();
-        _handleStrategyMoveToNewChain(oldStrategyPool, totalValue, newStrategy);
+        _handleStrategyMoveToNewChain(oldStrategyAdapter, totalValue, newStrategy);
     }
 
     /// @dev Revert if msg.sender is not the ParentRebalancer
@@ -435,6 +439,7 @@ contract ParentPeer is YieldPeer {
     /// @dev Called in deploy script, immediately after deploying initial strategy adapters, and setting them in YieldPeer::setStrategyAdapter
     /// @param protocol The protocol of the initial active strategy
     // @review, formally verify this can only be called once
+    // @review unit test this
     function setInitialActiveStrategy(Protocol protocol) external onlyOwner {
         if (s_initialActiveStrategySet) revert ParentPeer__InitialActiveStrategyAlreadySet();
         s_initialActiveStrategySet = true;

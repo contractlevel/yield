@@ -289,13 +289,13 @@ contract Handler is Test {
             txType = IYieldPeer.CcipTxType.RebalanceOldStrategy;
         }
 
-        // @review
-        address oldStrategyPool = parent.getActiveStrategyAdapter();
+        address oldStrategyAdapter = parent.getActiveStrategyAdapter();
         uint256 totalValue;
-        if (oldStrategyPool != address(0)) totalValue = parent.getTotalValue();
+        if (oldStrategyAdapter != address(0)) totalValue = parent.getTotalValue();
 
-        bytes memory performData =
-            abi.encode(forwarder, address(parent), newStrategy, txType, oldChainSelector, oldStrategyPool, totalValue);
+        bytes memory performData = abi.encode(
+            forwarder, address(parent), newStrategy, txType, oldChainSelector, oldStrategyAdapter, totalValue
+        );
         _changePrank(forwarder);
         rebalancer.performUpkeep(performData);
     }
