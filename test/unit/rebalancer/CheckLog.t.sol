@@ -17,7 +17,7 @@ contract CheckLogTest is BaseTest {
         bytes32[] memory topics = new bytes32[](1);
         topics[0] = wrongEvent;
         Log memory log = _createLog(address(baseParentPeer), topics);
-        vm.expectRevert(abi.encodeWithSignature("ParentRebalancer__UpkeepNotNeeded()"));
+        vm.expectRevert(abi.encodeWithSignature("Rebalancer__UpkeepNotNeeded()"));
         baseRebalancer.checkLog(log, "");
     }
 
@@ -25,7 +25,7 @@ contract CheckLogTest is BaseTest {
     function test_yield_checkLog_revertsWhen_wrongSource() public {
         address wrongSource = makeAddr("wrongSource");
         Log memory log = _createStrategyUpdatedLog(wrongSource, 1, 2, 3);
-        vm.expectRevert(abi.encodeWithSignature("ParentRebalancer__UpkeepNotNeeded()"));
+        vm.expectRevert(abi.encodeWithSignature("Rebalancer__UpkeepNotNeeded()"));
         baseRebalancer.checkLog(log, "");
     }
 
@@ -33,7 +33,7 @@ contract CheckLogTest is BaseTest {
     function test_yield_checkLog_revertsWhen_localParentRebalance() public {
         uint64 parentChainSelector = baseParentPeer.getThisChainSelector();
         Log memory log = _createStrategyUpdatedLog(address(baseParentPeer), parentChainSelector, 0, parentChainSelector);
-        vm.expectRevert(abi.encodeWithSignature("ParentRebalancer__UpkeepNotNeeded()"));
+        vm.expectRevert(abi.encodeWithSignature("Rebalancer__UpkeepNotNeeded()"));
         baseRebalancer.checkLog(log, "");
     }
 
