@@ -18,6 +18,12 @@ abstract contract StrategyAdapter is IStrategyAdapter {
     address internal immutable i_yieldPeer;
 
     /*//////////////////////////////////////////////////////////////
+                                 EVENTS
+    //////////////////////////////////////////////////////////////*/
+    event Deposit(address indexed usdc, uint256 indexed amount);
+    event Withdraw(address indexed usdc, uint256 indexed amount);
+
+    /*//////////////////////////////////////////////////////////////
                                MODIFIERS
     //////////////////////////////////////////////////////////////*/
     modifier onlyYieldPeer() {

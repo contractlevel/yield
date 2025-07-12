@@ -13,8 +13,6 @@ contract MockAavePool {
     uint256 private constant STARTING_INTEREST_RATE = 500;
     // Annual interest rate (in basis points, e.g. 500 = 5%)
     uint256 internal s_interestRate = STARTING_INTEREST_RATE;
-    // Track aToken addresses for each asset
-    mapping(address => address) private s_aTokenAddresses;
 
     address internal s_aToken;
 
@@ -27,6 +25,9 @@ contract MockAavePool {
     }
 
     function supply(address asset, uint256 amount, address onBehalfOf, uint16) external {
+        uint256 interestAccrued = _calculateInterest(onBehalfOf);
+        s_balances[onBehalfOf] += interestAccrued; // Realize interest first
+
         // Transfer asset from user
         IERC20(asset).transferFrom(msg.sender, address(this), amount);
 

@@ -5,7 +5,7 @@ import {StrategyAdapter} from "../modules/StrategyAdapter.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IComet} from "../interfaces/IComet.sol";
 
-/// @title CompoundV3
+/// @title CompoundV3Adapter
 /// @author @contractlevel
 /// @notice Adapter for Compound V3
 contract CompoundV3Adapter is StrategyAdapter {
@@ -34,6 +34,7 @@ contract CompoundV3Adapter is StrategyAdapter {
     function deposit(address usdc, uint256 amount) external onlyYieldPeer {
         IERC20(usdc).approve(i_comet, amount);
         IComet(i_comet).supply(usdc, amount);
+        emit Deposit(usdc, amount);
     }
 
     /// @notice Withdraws USDC from the Compound V3 pool
@@ -43,6 +44,7 @@ contract CompoundV3Adapter is StrategyAdapter {
     function withdraw(address usdc, uint256 amount) external onlyYieldPeer {
         IComet(i_comet).withdraw(usdc, amount);
         IERC20(usdc).transfer(i_yieldPeer, amount);
+        emit Withdraw(usdc, amount);
     }
 
     /// @notice Gets the total value of the asset in the Compound V3 pool

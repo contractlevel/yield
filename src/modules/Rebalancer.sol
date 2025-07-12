@@ -97,6 +97,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     /// @notice Called by Chainlink Automation to send a Chainlink Functions request
     /// @notice The nature of the request is to fetch the strategy with the highest yield
     /// @dev Revert if the caller is not the Chainlink Automation upkeep address
+    // @review should be pausable?
     function sendCLFRequest() external {
         if (msg.sender != s_upkeepAddress) revert Rebalancer__OnlyUpkeep();
 
