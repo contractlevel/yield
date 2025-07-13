@@ -28,8 +28,9 @@ contract MockAaveNoYield is Ownable {
 
     function withdraw(address, uint256 amount, address to) external returns (uint256) {
         if (msg.sender != s_peer) revert MockAaveNoYield__OnlyPeer();
-        require(s_balances[msg.sender] >= amount, "Insufficient balance");
-        s_balances[msg.sender] -= amount;
+        if (msg.sender != to) revert MockAaveNoYield__OnlyPeer();
+        require(s_balances[to] >= amount, "Insufficient balance");
+        s_balances[to] -= amount;
         IERC20(i_usdc).transfer(to, amount);
         return amount;
     }

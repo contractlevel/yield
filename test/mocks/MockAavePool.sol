@@ -17,36 +17,38 @@ contract MockAavePool {
     address internal s_aToken;
 
     error InvalidInterestRate();
+    error InvalidAmount();
 
-    address internal immutable i_usdc;
+    address internal immutable i_usdc; // @review unused
 
     constructor(address usdc) {
         i_usdc = usdc;
     }
 
     function supply(address asset, uint256 amount, address onBehalfOf, uint16) external {
+        // if (amount == 0) revert InvalidAmount();
         uint256 interestAccrued = _calculateInterest(onBehalfOf);
         s_balances[onBehalfOf] += interestAccrued; // Realize interest first
-
-        // Transfer asset from user
-        IERC20(asset).transferFrom(msg.sender, address(this), amount);
 
         // Update balances and timestamp
         s_balances[onBehalfOf] += amount;
         s_lastUpdateTimestamp[onBehalfOf] = block.timestamp;
+
+        // Transfer asset from user
+        IERC20(asset).transferFrom(msg.sender, address(this), amount);
     }
 
     function withdraw(address asset, uint256 amount, address to) external returns (uint256) {
         // Calculate interest accrued
-        uint256 interestAccrued = _calculateInterest(msg.sender);
-        s_balances[msg.sender] += interestAccrued;
+        uint256 interestAccrued = _calculateInterest(to);
+        s_balances[to] += interestAccrued;
 
         // Check if user has enough balance
-        require(s_balances[msg.sender] >= amount, "Insufficient balance");
+        require(s_balances[to] >= amount, "Insufficient balance");
 
         // Update balances and timestamp
-        s_balances[msg.sender] -= amount;
-        s_lastUpdateTimestamp[msg.sender] = block.timestamp;
+        s_balances[to] -= amount;
+        s_lastUpdateTimestamp[to] = block.timestamp;
 
         // Transfer asset back to user
         IERC20(asset).transfer(to, amount);

@@ -15,12 +15,11 @@ contract MockComet is IComet {
     uint256 internal s_interestRate = STARTING_INTEREST_RATE;
 
     function supply(address asset, uint256 amount) external override {
-        // Transfer USDC from user
-        IERC20(asset).transferFrom(msg.sender, address(this), amount);
-
-        // Update balances and timestamp
+        uint256 interestAccrued = _calculateInterest(msg.sender);
+        s_balances[msg.sender] += interestAccrued;
         s_balances[msg.sender] += amount;
         s_lastUpdateTimestamp[msg.sender] = block.timestamp;
+        IERC20(asset).transferFrom(msg.sender, address(this), amount);
     }
 
     function withdraw(address asset, uint256 amount) external override {

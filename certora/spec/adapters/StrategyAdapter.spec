@@ -25,6 +25,7 @@ methods {
     function bytes32ToUint256(bytes32) external returns (uint256) envfree;
     function bytes32ToAddress(bytes32) external returns (address) envfree;
     /// @notice This must be defined in the harness of the strategy adapter being verified
+    // @review could just move this to the IStrategyAdapter and actual implementations
     function getStrategyPool() external returns (address) envfree;
 }
 
@@ -85,13 +86,6 @@ hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
 }
 
 /*//////////////////////////////////////////////////////////////
-                           INVARIANTS
-//////////////////////////////////////////////////////////////*/
-/// tvl >= deposit_totalAmount_emitted - withdraw_totalAmount_emitted
-// invariant totalValue_integrity(env e, address asset)
-//     getTotalValue(e, asset) >= ghost_deposit_totalAmount_emitted[asset] - ghost_withdraw_totalAmount_emitted[asset];
-
-/*//////////////////////////////////////////////////////////////
                              RULES
 //////////////////////////////////////////////////////////////*/
 rule onlyYieldPeer_revertsWhen_notYieldPeer(method f) filtered {f -> onlyYieldPeer(f)} {
@@ -118,30 +112,6 @@ rule deposit_increases_strategy_balance() {
     assert afterBalance == beforeBalance + amount;
 }
 
-// @review this does exactly the same as deposit_increases_strategy_balance and deposit_decreases_currentContract_balance
-/// do we want less code or quicker debugging? probably quicker debugging
-/// why? well if we introduce a new adapter and we run the spec on it, and there is a fail, then we can see clearly by glancing at the prover output
-/// but if we have a single rule that checks more than one thing, then we have to read the output to see which one failed
-rule deposit_balanceIntegrity() {
-    env e;
-    uint256 amount;
-    require amount > 0, "We are assuming there won't be deposits of 0. (There wont)";
-
-    uint256 strategyBalanceBefore = usdc.balanceOf(getStrategyPool());
-    require strategyBalanceBefore + amount <= max_uint256, "should not cause overflow";
-
-    uint256 adapterBalanceBefore = usdc.balanceOf(currentContract);
-    require adapterBalanceBefore - amount >= 0, "should not cause underflow";
-
-    deposit(e, usdc, amount);
-
-    uint256 strategyBalanceAfter = usdc.balanceOf(getStrategyPool());
-    assert strategyBalanceAfter == strategyBalanceBefore + amount;
-
-    uint256 adapterBalanceAfter = usdc.balanceOf(currentContract);
-    assert adapterBalanceAfter == adapterBalanceBefore - amount;
-}
-
 rule deposit_increases_tvl() {
     env e;
     uint256 amount;
@@ -153,7 +123,7 @@ rule deposit_increases_tvl() {
     deposit(e, usdc, amount);
 
     uint256 afterTvl = getTotalValue(e, usdc);
-    assert afterTvl == beforeTvl + amount;
+    assert afterTvl >= beforeTvl + amount;
 }
 
 rule deposit_decreases_currentContract_balance() {
