@@ -10,8 +10,4 @@ contract AaveV3AdapterHarness is AaveV3Adapter, HelperHarness {
         address yieldPeer,
         address aavePoolAddressesProvider
     ) AaveV3Adapter(yieldPeer, aavePoolAddressesProvider) {}
-
-    function getStrategyPool() external returns (address) {
-        return IPoolAddressesProvider(i_aavePoolAddressesProvider).getPool();
-    }
 }

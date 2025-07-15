@@ -8,4 +8,5 @@ interface IStrategyAdapter {
     function deposit(address usdc, uint256 amount) external;
     function withdraw(address usdc, uint256 amount) external;
     function getTotalValue(address usdc) external view returns (uint256 totalValue);
+    function getStrategyPool() external returns (address);
 }

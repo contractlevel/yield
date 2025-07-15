@@ -12,6 +12,7 @@ methods {
     function deposit(address,uint256) external;
     function withdraw(address,uint256) external;
     function getTotalValue(address) external returns (uint256);
+    function getStrategyPool() external returns (address) envfree;
 
     // External methods
     function usdc.balanceOf(address) external returns (uint256) envfree;
@@ -24,9 +25,6 @@ methods {
     // Harness helper methods
     function bytes32ToUint256(bytes32) external returns (uint256) envfree;
     function bytes32ToAddress(bytes32) external returns (address) envfree;
-    /// @notice This must be defined in the harness of the strategy adapter being verified
-    // @review could just move this to the IStrategyAdapter and actual implementations
-    function getStrategyPool() external returns (address) envfree;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -48,22 +46,22 @@ definition WithdrawEvent() returns bytes32 =
 /*//////////////////////////////////////////////////////////////
                              GHOSTS
 //////////////////////////////////////////////////////////////*/
-/// @notice EventCount: track amount of Deposit event is emitted
+/// @notice Event Count: track amount of times Deposit event is emitted
 ghost mathint ghost_deposit_eventCount {
     init_state axiom ghost_deposit_eventCount == 0;
 }
 
-/// @notice EventCount: track amount of Withdraw event is emitted
+/// @notice Event Count: track amount of times Withdraw event is emitted
 ghost mathint ghost_withdraw_eventCount {
     init_state axiom ghost_withdraw_eventCount == 0;
 }
 
-/// @notice Emitted Value Count: track the total amount deposited based on param emitted by Deposit event
+/// @notice Emitted Value: track the total amount deposited based on param emitted by Deposit event
 ghost mapping(address => mathint) ghost_deposit_totalAmount_emitted {
     init_state axiom forall address a. ghost_deposit_totalAmount_emitted[a] == 0;
 }
 
-/// @notice Emitted Value Count: track the amount withdrawn based on param emitted by Withdraw event
+/// @notice Emitted Value: track the amount withdrawn based on param emitted by Withdraw event
 ghost mapping(address => mathint) ghost_withdraw_totalAmount_emitted {
     init_state axiom forall address a. ghost_withdraw_totalAmount_emitted[a] == 0;
 }

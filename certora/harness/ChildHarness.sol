@@ -11,11 +11,9 @@ contract ChildHarness is ChildPeer, HelperHarness {
         address link,
         uint64 thisChainSelector,
         address usdc,
-        address aavePoolAddressesProvider,
-        address comet,
         address share,
         uint64 parentChainSelector
-    ) ChildPeer(ccipRouter, link, thisChainSelector, usdc, aavePoolAddressesProvider, comet, share, parentChainSelector) {}
+    ) ChildPeer(ccipRouter, link, thisChainSelector, usdc, share, parentChainSelector) {}
 
     /*//////////////////////////////////////////////////////////////
                             EXPOSED INTERNAL

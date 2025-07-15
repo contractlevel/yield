@@ -52,4 +52,10 @@ contract CompoundV3Adapter is StrategyAdapter {
     function getTotalValue(address /* asset */ ) external view returns (uint256 totalValue) {
         totalValue = IComet(i_comet).balanceOf(address(this));
     }
+
+    /// @notice Gets the Compound V3 pool address
+    /// @return comet The Compound V3 pool address
+    function getStrategyPool() external returns (address comet) {
+        return i_comet;
+    }
 }

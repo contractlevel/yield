@@ -1,6 +1,5 @@
 using Share as share;
 using MockUsdc as usdc;
-using MockPoolAddressesProvider as addressesProvider;
 
 /// Verification of shared behavior between ChildPeer and ParentPeer
 /// @author @contractlevel
@@ -12,13 +11,12 @@ using MockPoolAddressesProvider as addressesProvider;
 methods {
     // Peer methods
     function getAllowedChain(uint64) external returns (bool) envfree;
-    function getCompound() external returns (address) envfree;
     function getThisChainSelector() external returns (uint64) envfree;
+    function getActiveStrategyAdapter() external returns (address) envfree;
 
     // External methods
     function share.totalSupply() external returns (uint256) envfree;
     function usdc.balanceOf(address) external returns (uint256) envfree;
-    function addressesProvider.getPool() external returns (address) envfree;
 
     // Harness helper methods
     function encodeUint64(uint64 value) external returns (bytes memory) envfree;
@@ -117,11 +115,6 @@ hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
 }
 
 /*//////////////////////////////////////////////////////////////
-                           INVARIANTS
-//////////////////////////////////////////////////////////////*/
-
-
-/*//////////////////////////////////////////////////////////////
                              RULES
 //////////////////////////////////////////////////////////////*/
 // --- deposit --- //
@@ -138,8 +131,8 @@ rule deposit_transfersUsdcFromMsgSender() {
     uint256 balanceBefore = usdc.balanceOf(e.msg.sender);
 
     require balanceBefore - amountToDeposit >= 0, "should not cause underflow";
-    require e.msg.sender != getCompound() && e.msg.sender != addressesProvider.getPool(),
-        "msg.sender should not be the compound or aave pool";
+    require e.msg.sender != getActiveStrategyAdapter();
+    require e.msg.sender != getActiveStrategyAdapter().getStrategyPool(e), "msg.sender should not be the active strategy pool";
     require e.msg.sender != currentContract, "msg.sender should not be the current contract";
 
     deposit(e, amountToDeposit);
