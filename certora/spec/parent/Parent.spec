@@ -1,6 +1,7 @@
 using Share as share;
 using MockUsdc as usdc;
-using MockPoolAddressesProvider as addressesProvider;
+using AaveV3Adapter as aaveV3Adapter;
+using CompoundV3Adapter as compoundV3Adapter;
 
 /// Verification of ParentPeer
 /// @author @contractlevel
@@ -14,16 +15,18 @@ methods {
     function getTotalShares() external returns (uint256) envfree;
     function getStrategy() external returns (IYieldPeer.Strategy) envfree;
     function getThisChainSelector() external returns (uint64) envfree;
-    function getStrategyPool() external returns (address) envfree;
-    function getCompound() external returns (address) envfree;
-    function getAave() external returns (address) envfree;
+    function getActiveStrategyAdapter() external returns (address) envfree;
 
     // External methods
     function share.totalSupply() external returns (uint256) envfree;
     function share.balanceOf(address) external returns (uint256) envfree;
     function usdc.balanceOf(address) external returns (uint256) envfree;
-    function addressesProvider.getPool() external returns (address) envfree;
-    
+
+    // Wildcard dispatcher summaries
+    function _.withdraw(address,uint256) external => DISPATCHER(true);
+    function _.deposit(address,uint256) external => DISPATCHER(true);
+    function _.getTotalValue(address) external => DISPATCHER(true);
+
     // Harness helper methods
     function bytes32ToUint256(bytes32) external returns (uint256) envfree;
     function bytes32ToUint8(bytes32) external returns (uint8) envfree;
@@ -36,6 +39,7 @@ methods {
     function calculateTotalValue(uint256) external returns (uint256);
     function createStrategy(uint64,IYieldPeer.Protocol) external returns (IYieldPeer.Strategy memory) envfree;
     function convertUsdcToShare(uint256) external returns (uint256) envfree;
+    function getStrategyAdapterFromProtocol(IYieldPeer.Protocol) external returns (address) envfree;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -251,21 +255,18 @@ rule deposit_transfersUsdcToStrategy_when_parent_is_strategy() {
     env e;
     uint256 amountToDeposit;
     require getStrategy().chainSelector == getThisChainSelector();
-    address strategyPool = getStrategyPool();
+    address strategyPool = getActiveStrategyAdapter().getStrategyPool(e);
 
     uint256 depositorBalanceBefore = usdc.balanceOf(e.msg.sender);
-    uint256 compoundBalanceBefore = usdc.balanceOf(getCompound());
-    uint256 aaveBalanceBefore = usdc.balanceOf(addressesProvider.getPool());
+    uint256 strategyPoolBalanceBefore = usdc.balanceOf(strategyPool);
 
-    require strategyPool == getCompound() => compoundBalanceBefore + amountToDeposit <= max_uint256;
-    require strategyPool == getAave() => aaveBalanceBefore + amountToDeposit <= max_uint256;
+    require strategyPoolBalanceBefore + amountToDeposit <= max_uint256;
     require usdc.balanceOf(currentContract) == 0;
-    require e.msg.sender != strategyPool && e.msg.sender != addressesProvider.getPool();
+    require e.msg.sender != strategyPool;
 
     deposit(e, amountToDeposit);
 
-    assert strategyPool == getCompound() => usdc.balanceOf(getCompound()) == compoundBalanceBefore + amountToDeposit;
-    assert strategyPool == getAave() => usdc.balanceOf(addressesProvider.getPool()) == aaveBalanceBefore + amountToDeposit;
+    assert usdc.balanceOf(strategyPool) == strategyPoolBalanceBefore + amountToDeposit;
     assert usdc.balanceOf(e.msg.sender) == depositorBalanceBefore - amountToDeposit;
 }
 
@@ -291,7 +292,7 @@ rule withdraw_edgecase() {
     require getTotalValue(e) == 100000000000000000002000001;
     require getTotalShares() == 100000000000000000001;
     require share.balanceOf(user) == 1;
-    require user != getCompound() && user != addressesProvider.getPool();
+    require user != getActiveStrategyAdapter().getStrategyPool(e);
 
     uint256 balanceBefore = usdc.balanceOf(user);
     require balanceBefore + 1000000 <= max_uint256;
@@ -388,25 +389,22 @@ rule onTokenTransfer_transfersUsdcToWithdrawer_when_parent_is_strategyChain_and_
     bytes encodedWithdrawChainSelector = encodeUint64(getThisChainSelector());
     require getStrategy().chainSelector == getThisChainSelector();
 
-    address strategyPool = getStrategyPool();
+    address strategyPool = getActiveStrategyAdapter().getStrategyPool(e);
 
     uint256 expectedWithdrawAmount = calculateWithdrawAmount(getTotalValue(e), getTotalShares(), shareBurnAmount);
     uint256 usdcBalanceBefore = usdc.balanceOf(withdrawer);
-    uint256 compoundBalanceBefore = usdc.balanceOf(getCompound());
-    uint256 aaveBalanceBefore = usdc.balanceOf(addressesProvider.getPool());
+    uint256 strategyPoolBalanceBefore = usdc.balanceOf(strategyPool);
 
-    require strategyPool == getCompound() => compoundBalanceBefore - expectedWithdrawAmount >= 0;
-    require strategyPool == getAave() => aaveBalanceBefore - expectedWithdrawAmount >= 0;
+    require strategyPoolBalanceBefore - expectedWithdrawAmount >= 0;
 
     require expectedWithdrawAmount > 0, "if the shareBurnAmount is worth less than 1 usdc wei, no usdc will be withdrawn (known issue)";
     require usdcBalanceBefore + expectedWithdrawAmount <= max_uint256;
-    require withdrawer != strategyPool && withdrawer != addressesProvider.getPool();
+    require withdrawer != strategyPool;
 
     onTokenTransfer(e, withdrawer, shareBurnAmount, encodedWithdrawChainSelector);
 
     assert usdc.balanceOf(withdrawer) == usdcBalanceBefore + expectedWithdrawAmount;
-    assert strategyPool == getCompound() => usdc.balanceOf(getCompound()) == compoundBalanceBefore - expectedWithdrawAmount;
-    assert strategyPool == getAave() => usdc.balanceOf(addressesProvider.getPool()) == aaveBalanceBefore - expectedWithdrawAmount;
+    assert usdc.balanceOf(strategyPool) == strategyPoolBalanceBefore - expectedWithdrawAmount;
 }
 
 rule onTokenTransfer_emits_CCIPMessageSent_when_strategyChain_is_differentChain() {
@@ -429,25 +427,23 @@ rule handleCCIPDepositToParent_depositsToStrategy_when_parent_is_strategy() {
     uint256 totalValue;
     uint256 shareMintAmount;
     uint64 chainSelector;
-    bytes encodedDepositData = buildEncodedDepositData(depositor, usdcDepositAmount, totalValue, shareMintAmount, chainSelector);
+    bytes encodedDepositData = 
+        buildEncodedDepositData(depositor, usdcDepositAmount, totalValue, shareMintAmount, chainSelector);
     Client.EVMTokenAmount[] tokenAmounts = prepareTokenAmounts(usdc, usdcDepositAmount);
 
     require getStrategy().chainSelector == getThisChainSelector();
     require usdcDepositAmount > 0;
 
-    address strategyPool = getStrategyPool();
-    uint256 compoundBalanceBefore = usdc.balanceOf(getCompound());
-    uint256 aaveBalanceBefore = usdc.balanceOf(addressesProvider.getPool());
+    address strategyPool = getActiveStrategyAdapter().getStrategyPool(e);
+    uint256 strategyPoolBalanceBefore = usdc.balanceOf(strategyPool);
     uint256 usdcBalanceBefore = usdc.balanceOf(currentContract);
     require usdcBalanceBefore >= usdcDepositAmount;
 
-    require strategyPool == getCompound() => compoundBalanceBefore + usdcDepositAmount <= max_uint256;
-    require strategyPool == getAave() => aaveBalanceBefore + usdcDepositAmount <= max_uint256;
+    require strategyPoolBalanceBefore + usdcDepositAmount <= max_uint256;
 
     handleCCIPDepositToParent(e, tokenAmounts, encodedDepositData);
 
-    assert strategyPool == getCompound() => usdc.balanceOf(getCompound()) == compoundBalanceBefore + usdcDepositAmount;
-    assert strategyPool == getAave() => usdc.balanceOf(addressesProvider.getPool()) == aaveBalanceBefore + usdcDepositAmount;
+    assert usdc.balanceOf(strategyPool) == strategyPoolBalanceBefore + usdcDepositAmount;
     assert usdc.balanceOf(currentContract) == usdcBalanceBefore - usdcDepositAmount;
 }
 
@@ -574,22 +570,20 @@ rule handleCCIPWithdrawToParent_withdrawsUsdc_when_parent_is_strategy() {
     uint256 usdcWithdrawAmount;
     uint64 withdrawChainSelector;
     uint64 sourceChainSelector;
-    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, withdrawChainSelector);
+    bytes encodedWithdrawData = 
+        buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, withdrawChainSelector);
     require getStrategy().chainSelector == getThisChainSelector();
 
     uint256 expectedWithdrawAmount = calculateWithdrawAmount(getTotalValue(e), getTotalShares(), shareBurnAmount);
 
-    address strategyPool = getStrategyPool();
-    uint256 compoundBalanceBefore = usdc.balanceOf(getCompound());
-    uint256 aaveBalanceBefore = usdc.balanceOf(addressesProvider.getPool());
-    require strategyPool == getCompound() => compoundBalanceBefore - expectedWithdrawAmount >= 0;
-    require strategyPool == getAave() => aaveBalanceBefore - expectedWithdrawAmount >= 0;
-    require withdrawer != strategyPool && withdrawer != addressesProvider.getPool();
+    address strategyPool = getActiveStrategyAdapter().getStrategyPool(e);
+    uint256 strategyPoolBalanceBefore = usdc.balanceOf(strategyPool);
+    require strategyPoolBalanceBefore - expectedWithdrawAmount >= 0;
+    require withdrawer != strategyPool;
 
     handleCCIPWithdrawToParent(e, encodedWithdrawData, sourceChainSelector);
 
-    assert strategyPool == getCompound() => usdc.balanceOf(getCompound()) == compoundBalanceBefore - expectedWithdrawAmount;
-    assert strategyPool == getAave() => usdc.balanceOf(addressesProvider.getPool()) == aaveBalanceBefore - expectedWithdrawAmount;
+    assert usdc.balanceOf(strategyPool) == strategyPoolBalanceBefore - expectedWithdrawAmount;
 }
 
 rule handleCCIPWithdrawToParent_transferUsdcToWithdrawer_when_parent_is_strategy_and_withdrawChain() {
@@ -600,7 +594,8 @@ rule handleCCIPWithdrawToParent_transferUsdcToWithdrawer_when_parent_is_strategy
     uint256 usdcWithdrawAmount;
     uint64 withdrawChainSelector;
     uint64 sourceChainSelector;
-    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, withdrawChainSelector);
+    bytes encodedWithdrawData = 
+        buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, withdrawChainSelector);
     require getStrategy().chainSelector == getThisChainSelector();
     require withdrawChainSelector == getThisChainSelector();
 
@@ -608,7 +603,7 @@ rule handleCCIPWithdrawToParent_transferUsdcToWithdrawer_when_parent_is_strategy
 
     uint256 usdcBalanceBefore = usdc.balanceOf(withdrawer);
     require usdcBalanceBefore + expectedWithdrawAmount <= max_uint256;
-    require withdrawer != getStrategyPool() && withdrawer != addressesProvider.getPool();
+    require withdrawer != getActiveStrategyAdapter().getStrategyPool(e);
 
     require ghost_withdrawCompleted_eventCount == 0;
     handleCCIPWithdrawToParent(e, encodedWithdrawData, sourceChainSelector);
@@ -698,31 +693,49 @@ rule setStrategy_handlesLocalStrategyChange() {
     uint64 chainSelector;
     IYieldPeer.Protocol protocol;
 
+    /// @dev require the storage mappings for active strategy adapters to be the correct contracts
+    require currentContract.s_strategyAdapters[IYieldPeer.Protocol.Aave]     == aaveV3Adapter;
+    require currentContract.s_strategyAdapters[IYieldPeer.Protocol.Compound] == compoundV3Adapter;
+
+    /// @dev require the storage for active strategy adapter to be aave or compound adapters
+    require currentContract.s_activeStrategyAdapter == aaveV3Adapter ||
+            currentContract.s_activeStrategyAdapter == compoundV3Adapter;
+    address oldActiveStrategyAdapter = getActiveStrategyAdapter();
+
+    /// @dev cache old strategy
     IYieldPeer.Strategy oldStrategy = getStrategy();
 
+    /// @dev require old strategy values to enable local strategy change
     require oldStrategy.chainSelector == chainSelector &&
             oldStrategy.chainSelector == getThisChainSelector() &&
-            oldStrategy.protocol != protocol;
+            oldStrategy.protocol      != protocol;
+    require oldActiveStrategyAdapter  != getStrategyAdapterFromProtocol(protocol);
 
-    require oldStrategy.protocol == IYieldPeer.Protocol.Aave => currentContract.s_strategyPool == getAave();
-    require oldStrategy.protocol == IYieldPeer.Protocol.Compound => currentContract.s_strategyPool == getCompound();
-
+    /// @dev cache total value and require it to be more than 0
     uint256 totalValue = getTotalValue(e);
     require totalValue > 0;
 
-    address strategyPool = getStrategyPool();
-    uint256 compoundBalanceBefore = usdc.balanceOf(getCompound());
-    uint256 aaveBalanceBefore = usdc.balanceOf(addressesProvider.getPool());
-    require strategyPool == getCompound() => compoundBalanceBefore - totalValue >= 0 && aaveBalanceBefore + totalValue <= max_uint256;
-    require strategyPool == getAave() => aaveBalanceBefore - totalValue >= 0 && compoundBalanceBefore + totalValue <= max_uint256;
-    require usdc.balanceOf(currentContract) == 0;
+    /// @dev cache old strategy pool and its balance
+    address oldStrategyPool = oldActiveStrategyAdapter.getStrategyPool(e);
+    uint256 oldStrategyPoolBalanceBefore = usdc.balanceOf(oldStrategyPool);
+    require oldStrategyPoolBalanceBefore - totalValue >= 0 && usdc.balanceOf(currentContract) == 0;
 
+    /// @dev if the old active adapter is aave, the new active adapter is compound, and vice versa
+    address newActiveStrategyAdapter;
+    require oldActiveStrategyAdapter == aaveV3Adapter => newActiveStrategyAdapter == compoundV3Adapter;
+    require oldActiveStrategyAdapter == compoundV3Adapter => newActiveStrategyAdapter == aaveV3Adapter;
+
+    /// @dev cache new strategy pool and its balance
+    address newStrategyPool = newActiveStrategyAdapter.getStrategyPool(e);
+    uint256 newStrategyPoolBalanceBefore = usdc.balanceOf(newStrategyPool);
+    require newStrategyPoolBalanceBefore + totalValue <= max_uint256;
+
+    /// @dev act
     setStrategy(e, chainSelector, protocol);
 
-    assert strategyPool == getCompound() => usdc.balanceOf(getCompound()) == 
-        compoundBalanceBefore - totalValue && usdc.balanceOf(addressesProvider.getPool()) == aaveBalanceBefore + totalValue;
-    assert strategyPool == getAave() => usdc.balanceOf(addressesProvider.getPool()) == 
-        aaveBalanceBefore - totalValue && usdc.balanceOf(getCompound()) == compoundBalanceBefore + totalValue;
+    /// @dev assert correct balance changes
+    assert usdc.balanceOf(oldStrategyPool) == oldStrategyPoolBalanceBefore - totalValue;
+    assert usdc.balanceOf(newStrategyPool) == newStrategyPoolBalanceBefore + totalValue;
 }
 
 rule setStrategy_no_localStrategyChange_when_newStrategy_is_different() {
@@ -748,7 +761,7 @@ rule rebalanceNewStrategy_revertsWhen_notParentRebalancer() {
     env e;
     calldataarg args;
 
-    require e.msg.sender != currentContract.i_parentRebalancer;
+    require e.msg.sender != currentContract.i_rebalancer;
 
     rebalanceNewStrategy@withrevert(e, args);
     assert lastReverted;
@@ -768,11 +781,9 @@ rule rebalanceNewStrategy_movesStrategyToNewChain() {
     uint256 totalValue = getTotalValue(e);
     require totalValue > 0;
 
-    address strategyPool = getStrategyPool();
-    uint256 compoundBalanceBefore = usdc.balanceOf(getCompound());
-    uint256 aaveBalanceBefore = usdc.balanceOf(addressesProvider.getPool());
-    require strategyPool == getCompound() => compoundBalanceBefore - totalValue >= 0;
-    require strategyPool == getAave() => aaveBalanceBefore - totalValue >= 0;
+    address strategyPool = getActiveStrategyAdapter().getStrategyPool(e);
+    uint256 strategyPoolBalanceBefore = usdc.balanceOf(strategyPool);
+    require strategyPoolBalanceBefore - totalValue >= 0;
     require usdc.balanceOf(currentContract) == 0;
 
     require ghost_ccipMessageSent_eventCount == 0;
@@ -781,8 +792,7 @@ rule rebalanceNewStrategy_movesStrategyToNewChain() {
     assert ghost_ccipMessageSent_txType_emitted == 8; // RebalanceNewStrategy
     assert ghost_ccipMessageSent_bridgeAmount_emitted == totalValue;
 
-    assert strategyPool == getCompound() => usdc.balanceOf(getCompound()) == compoundBalanceBefore - totalValue;
-    assert strategyPool == getAave() => usdc.balanceOf(addressesProvider.getPool()) == aaveBalanceBefore - totalValue;
+    assert usdc.balanceOf(strategyPool) == strategyPoolBalanceBefore - totalValue;
 }
 
 // --- RebalanceOldStrategy --- //
@@ -790,7 +800,7 @@ rule rebalanceOldStrategy_revertsWhen_notParentRebalancer() {
     env e;
     calldataarg args;
 
-    require e.msg.sender != currentContract.i_parentRebalancer;
+    require e.msg.sender != currentContract.i_rebalancer;
 
     rebalanceOldStrategy@withrevert(e, args);
     assert lastReverted;

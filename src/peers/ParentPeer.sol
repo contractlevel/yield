@@ -21,6 +21,7 @@ contract ParentPeer is YieldPeer {
     //////////////////////////////////////////////////////////////*/
     /// @dev This address handles automated CCIP rebalance calls with Log-trigger Automation, based on Function request callbacks
     /// @notice See ./src/modules/Rebalancer.sol
+    // @review this should definitely be configurable!
     address internal immutable i_rebalancer;
 
     /// @dev total share tokens (YieldCoin) minted across all chains

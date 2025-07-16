@@ -131,7 +131,7 @@ rule deposit_transfersUsdcFromMsgSender() {
     uint256 balanceBefore = usdc.balanceOf(e.msg.sender);
 
     require balanceBefore - amountToDeposit >= 0, "should not cause underflow";
-    require e.msg.sender != getActiveStrategyAdapter();
+    require e.msg.sender != getActiveStrategyAdapter(), "msg.sender should not be the active strategy adapter";
     require e.msg.sender != getActiveStrategyAdapter().getStrategyPool(e), "msg.sender should not be the active strategy pool";
     require e.msg.sender != currentContract, "msg.sender should not be the current contract";
 
