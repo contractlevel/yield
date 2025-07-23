@@ -439,7 +439,6 @@ contract ParentPeer is YieldPeer {
     /// @dev Revert if already called
     /// @dev Called in deploy script, immediately after deploying initial strategy adapters, and setting them in YieldPeer::setStrategyAdapter
     /// @param protocol The protocol of the initial active strategy
-    // @review, formally verify this can only be called once
     // @review unit test this
     function setInitialActiveStrategy(Protocol protocol) external onlyOwner {
         if (s_initialActiveStrategySet) revert ParentPeer__InitialActiveStrategyAlreadySet();
