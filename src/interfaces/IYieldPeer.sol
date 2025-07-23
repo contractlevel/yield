@@ -7,10 +7,20 @@ interface IYieldPeer {
         Protocol protocol;
     }
 
+    // @review this should be replaced with a StrategyRegistry contract
     enum Protocol {
         Aave,
         Compound
     }
+    // should it be:
+    // enum Protocol {
+    //     Invalid, // this would require 0 check in clf callback
+    //     AaveV3,
+    //     CompoundV3
+    // }
+    // or should it not....?
+    // how are we supposed to add new protocols?
+    // perhaps we just map to a uint8 and not have an enum at all?
 
     enum CcipTxType {
         DepositToParent, // 0 - deposit from child to parent (to get strategy chain)

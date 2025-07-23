@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {ParentRebalancer, Log, IParentPeer, IYieldPeer} from "../../src/modules/ParentRebalancer.sol";
+import {Rebalancer, Log, IParentPeer, IYieldPeer} from "../../src/modules/Rebalancer.sol";
 import {HelperHarness} from "./HelperHarness.sol";
 
-contract RebalancerHarness is ParentRebalancer, HelperHarness {
+contract RebalancerHarness is Rebalancer, HelperHarness {
+    constructor(address functionsRouter, bytes32 donId, uint64 clfSubId) Rebalancer(functionsRouter, donId, clfSubId) {}
+
     function harnessCreateLog(
         uint256 index,
         uint256 timestamp,
@@ -70,6 +72,14 @@ contract RebalancerHarness is ParentRebalancer, HelperHarness {
 
     function createEmptyBytes() public pure returns (bytes memory) {
         return "";
+    }
+
+    function createCLFResponse(uint64 chainSelector, uint8 protocolEnum) public pure returns (bytes memory) {
+        return abi.encode(chainSelector, protocolEnum);
+    }
+
+    function getStrategyFromParentPeer() public view returns (IYieldPeer.Strategy memory) {
+        return IParentPeer(s_parentPeer).getStrategy();
     }
 }
 

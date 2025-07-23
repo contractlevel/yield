@@ -447,6 +447,8 @@ The [`Yield`](https://github.com/contractlevel/yield/blob/main/certora/spec/yiel
 certoraRun ./certora/conf/Yield.conf
 ```
 
+// @review
+
 The [`ParentCLF`](https://github.com/contractlevel/yield/blob/main/certora/spec/parent/ParentCLF.spec) spec verifies logic related to Chainlink Functions and Automation.
 
 ```
@@ -458,7 +460,7 @@ The `--nondet_difficult_funcs` flag is required for `ParentCLF` to [automaticall
 The [`Rebalancer`](https://github.com/contractlevel/yield/blob/main/certora/spec/parent/Rebalancer.spec) spec verifies the `ParentRebalancer` contract.
 
 ```
-certoraRun ./certora/conf/parent/Rebalancer.conf
+certoraRun ./certora/conf/parent/Rebalancer.conf --nondet_difficult_funcs
 ```
 
 Verifying behaviour in the `checkLog()` function would result in vacuous rules with basic sanity enabled. I thought this was because of returning false when upkeep wasn't needed, and that reverting instead would improve the verification, but that resulted in vacuous rules too. For now basic sanity has been left enabled, and comments in the spec indicate the vacuous rules. Reverts instead of returning false when upkeep is not needed has been kept in place. It doesn't make any functional difference either way and is purely aesthetic, especially when both options deliver vacuous rules.
@@ -647,7 +649,7 @@ Ultimately the [additional functionality](https://github.com/contractlevel/chain
 
 Information pertaining to the “strategy” with the highest yield (ie the chain and the protocol) is fetched from the [DefiLlama API](https://yields.llama.fi/pools) which returns a HUGE response. The response was too much for Chainlink Functions, so a proxy API to filter for the relevant data was required.
 
-I made one and deployed it to AWS Lambda. The url for the API could have been abused (unlikely for a hackathon project, but a required consideration for a production ready project) so the url had to be properly encrypted with the [functions-toolkit](https://www.npmjs.com/package/@chainlink/functions-toolkit#functions-utilities](https://www.npmjs.com/package/@chainlink/functions-toolkit#encrypting-secrets) and then stored as a [constant](https://github.com/contractlevel/yield/blob/0cd489dc7a2fb2b7f2f949db890038dd33925873/src/peers/extensions/ParentCLF.sol#L33-L37) in the YieldCoin FunctionsClient contract (`ParentCLF`). This value needed to be different for different chains due to the chain-specific parameters required when executing the encrypted secrets process. Even though Chainlink Functions is used on the Parent chain only, the Parent chain changed between testnet deployments, so the chain-specific parameters for secrets encryption had to be considered.
+I made one and deployed it to AWS Lambda. The url for the API could have been abused (unlikely for a hackathon project, but a required consideration for a production ready project) so the url had to be properly encrypted with the [functions-toolkit](https://www.npmjs.com/package/@chainlink/functions-toolkit#encrypting-secrets) and then stored as a [constant](https://github.com/contractlevel/yield/blob/0cd489dc7a2fb2b7f2f949db890038dd33925873/src/peers/extensions/ParentCLF.sol#L33-L37) in the YieldCoin FunctionsClient contract (`ParentCLF`). This value needed to be different for different chains due to the chain-specific parameters required when executing the encrypted secrets process. Even though Chainlink Functions is used on the Parent chain only, the Parent chain changed between testnet deployments, so the chain-specific parameters for secrets encryption had to be considered.
 
 ### Time management/knowing what to prioritize
 

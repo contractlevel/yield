@@ -11,4 +11,5 @@ interface IParentPeer is IYieldPeer {
     function getStrategyPool() external view returns (address);
     function getTotalValue() external view returns (uint256);
     function setStrategy(uint64 chainSelector, IYieldPeer.Protocol protocol) external;
+    function getStrategy() external view returns (IYieldPeer.Strategy memory);
 }

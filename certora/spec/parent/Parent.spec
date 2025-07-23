@@ -101,6 +101,10 @@ definition DepositToStrategyEvent() returns bytes32 =
 // keccak256(abi.encodePacked("DepositToStrategy(address,uint256)"))
     to_bytes32(0x8125d05f0839eec6c1f6b1674833e01f11ab362bd9c60eb2e3b274fa3b47e4f4);
 
+definition ActiveStrategyAdapterUpdatedEvent() returns bytes32 =
+// keccak256(abi.encodePacked("ActiveStrategyAdapterUpdated(address)"))
+    to_bytes32(0xebe96b449bfdb3f1ed534cb774b9a9b0954447b489e45e828c81a03fec492cc7);
+
 /*//////////////////////////////////////////////////////////////
                              GHOSTS
 //////////////////////////////////////////////////////////////*/
@@ -194,6 +198,11 @@ ghost mathint ghost_depositToStrategy_eventCount {
     init_state axiom ghost_depositToStrategy_eventCount == 0;
 }
 
+/// @notice EventCount: track amount of ActiveStrategyAdapterUpdated event is emitted
+ghost mathint ghost_activeStrategyAdapterUpdated_eventCount {
+    init_state axiom ghost_activeStrategyAdapterUpdated_eventCount == 0;
+}
+
 /*//////////////////////////////////////////////////////////////
                              HOOKS
 //////////////////////////////////////////////////////////////*/
@@ -238,7 +247,10 @@ hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
 }
 
 hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
-    if (t0 == StrategyPoolUpdatedEvent()) ghost_strategyPoolUpdated_eventCount = ghost_strategyPoolUpdated_eventCount + 1;
+    if (t0 == StrategyPoolUpdatedEvent()) 
+        ghost_strategyPoolUpdated_eventCount = ghost_strategyPoolUpdated_eventCount + 1;
+    if (t0 == ActiveStrategyAdapterUpdatedEvent()) 
+        ghost_activeStrategyAdapterUpdated_eventCount = ghost_activeStrategyAdapterUpdated_eventCount + 1;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -839,4 +851,52 @@ rule calculateMintAmount_calculation() {
     require actualMintAmount > 1;
 
     assert actualMintAmount == assert_uint256(expectedMintAmount);
+}
+
+// --- setInitialActiveStrategy --- //
+rule setInitialActiveStrategy_revertsWhen_notOwner() {
+    env e;
+    IYieldPeer.Protocol protocol;
+
+    require e.msg.sender != currentContract._owner;
+
+    setInitialActiveStrategy@withrevert(e, protocol);
+    assert lastReverted;
+}
+
+rule setInitialActiveStrategy_revertsWhen_alreadyCalled() {
+    env e;
+    IYieldPeer.Protocol p1;
+    setInitialActiveStrategy(e, p1);
+
+    env e2;
+    IYieldPeer.Protocol p2;
+    require e2.msg.sender == e.msg.sender; // owner
+    setInitialActiveStrategy@withrevert(e2, p2);
+    assert lastReverted;
+}
+
+rule setInitialActiveStrategy_emitsEvent() {
+    env e;
+    IYieldPeer.Protocol protocol;
+
+    require ghost_activeStrategyAdapterUpdated_eventCount == 0;
+    setInitialActiveStrategy(e, protocol);
+    assert ghost_activeStrategyAdapterUpdated_eventCount == 1;
+}
+
+rule setInitialActiveStrategy_updatesStorage() {
+    env e;
+    IYieldPeer.Protocol protocol;
+
+    require currentContract.s_activeStrategyAdapter == 0;
+    require currentContract.s_strategy.chainSelector == 0;
+    // @review we need to add the invalid enum for protocol 0
+    // require currentContract.s_strategy.protocol == IYieldPeer.Protocol.Invalid;
+
+    setInitialActiveStrategy(e, protocol);
+
+    assert currentContract.s_activeStrategyAdapter == currentContract.s_strategyAdapters[protocol];
+    assert currentContract.s_strategy.chainSelector == getThisChainSelector();
+    assert currentContract.s_strategy.protocol == protocol;
 }

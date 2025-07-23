@@ -1,19 +1,21 @@
 using MockUsdc as usdc;
+using ParentPeer as parent;
 
-/// Verification of ParentRebalancer
+/// Verification of Rebalancer
 /// @author @contractlevel
-/// @notice ParentRebalancer handles the Chainlink Log-trigger Automation to execute CCIP rebalances
+/// @notice Rebalancer handles the Chainlink Automation and Functions logic
 
 /*//////////////////////////////////////////////////////////////
                             METHODS
 //////////////////////////////////////////////////////////////*/
 methods {
-    // ParentRebalancer methods
+    // Rebalancer methods
     function getForwarder() external returns (address) envfree;
     function getParentPeer() external returns (address) envfree;
 
     // External methods
     function usdc.balanceOf(address) external returns (uint256) envfree;
+    function parent.getAllowedChain(uint64) external returns (bool) envfree;
 
     // Summary methods
     function _.balanceOf(address) external => DISPATCHER(true);
@@ -27,13 +29,17 @@ methods {
     function _.withdraw(address, uint256) external => DISPATCHER(true);
     function _.withdraw(address, uint256, address) external => DISPATCHER(true);
     function _.transfer(address, uint256) external => DISPATCHER(true);
+    function _.getAllowedChain(uint64 chainSelector) external => DISPATCHER(true);
+    function _.deposit(address,uint256) external => DISPATCHER(true);
+    function _.getTotalValue(address) external => DISPATCHER(true);
 
     // Harness helper methods
     function bytes32ToAddress(bytes32) external returns (address) envfree;
     function uint64ToBytes32(uint64) external returns (bytes32) envfree;
     function uint8ToBytes32(uint8) external returns (bytes32) envfree;
     function getParentChainSelector() external returns (uint64) envfree;
-    function harnessCreateLog(uint256,uint256,bytes32,uint256,bytes32,address,bytes32[],bytes) external returns (ParentRebalancer.Log) envfree;
+    function harnessCreateLog(uint256,uint256,bytes32,uint256,bytes32,address,bytes32[],bytes) external returns 
+        (Rebalancer.Log) envfree;
     function decodePerformData(bytes) external returns (
         address,
         address,
@@ -59,11 +65,20 @@ methods {
     function createStrategy(uint64, IYieldPeer.Protocol) external returns (IYieldPeer.Strategy) envfree;
     function bytes32ToUint8(bytes32) external returns (uint8) envfree;
     function bytes32ToUint256(bytes32) external returns (uint256) envfree;
+    function createCLFResponse(uint64 chainSelector, uint8 protocolEnum) external returns (bytes memory) envfree;
+    function getStrategyFromParentPeer() external returns (IYieldPeer.Strategy memory) envfree;
 }
 
 /*//////////////////////////////////////////////////////////////
                           DEFINITIONS
 //////////////////////////////////////////////////////////////*/
+/// @notice functions that can only be called by the owner
+definition onlyOwner(method f) returns bool = 
+    f.selector == sig:setForwarder(address).selector ||
+    f.selector == sig:setParentPeer(address).selector ||
+    f.selector == sig:setUpkeepAddress(address).selector ||
+    f.selector == sig:setNumberOfProtocols(uint8).selector;
+
 definition ForwarderSetEvent() returns bytes32 =
 // keccak256(abi.encodePacked("ForwarderSet(address)"))
     to_bytes32(0x01e06e871b32b0b127105fbd5dbecd24273b7e1191a8940de24f4ea249e355d6);
@@ -80,10 +95,21 @@ definition CCIPMessageSentEvent() returns bytes32 =
 // keccak256(abi.encodePacked("CCIPMessageSent(bytes32,uint8,uint256)"))
     to_bytes32(0xf58bb6f6ec82990ff728621d18279c43cae3bc9777d052ed0d2316669e58cee6);
 
-/// @notice functions that can only be called by the owner
-definition onlyOwner(method f) returns bool = 
-    f.selector == sig:setForwarder(address).selector ||
-    f.selector == sig:setParentPeer(address).selector;
+definition CLFRequestErrorEvent() returns bytes32 =
+// keccak256(abi.encodePacked("CLFRequestError(bytes32,bytes)"))
+    to_bytes32(0x4bb259a91776ab365a90aa2b74bcc616da60d5c6a651a9e55e79c1bae9340818);
+
+definition InvalidChainSelectorEvent() returns bytes32 =
+// keccak256(abi.encodePacked("InvalidChainSelector(bytes32,uint64)"))
+    to_bytes32(0xcbb1a0175d5d5f83e120c4bcd9d3b172de3d4303caf6d5a3be87fc19472fd108);
+
+definition InvalidProtocolEnumEvent() returns bytes32 =
+// keccak256(abi.encodePacked("InvalidProtocolEnum(bytes32,uint8)"))
+    to_bytes32(0x8caa888c03854a1029a8338ba08e28156002a44eb9cd4b05cc54c3cfd06a860d);
+
+definition CLFRequestFulfilledEvent() returns bytes32 =
+// keccak256(abi.encodePacked("CLFRequestFulfilled(bytes32,uint64,uint8)"))
+    to_bytes32(0x7f47906f1ae445cc524f4c4aae1e2e8a12c0ade10b1982e852f2d6fbce7fe32f);
 
 /*//////////////////////////////////////////////////////////////
                              GHOSTS
@@ -123,6 +149,26 @@ ghost mathint ghost_ccipMessageSent_bridgeAmount_emitted {
     init_state axiom ghost_ccipMessageSent_bridgeAmount_emitted == 0;
 }
 
+/// @notice track amount of CLFRequestError event is emitted
+ghost mathint ghost_clfRequestError_eventCount {
+    init_state axiom ghost_clfRequestError_eventCount == 0;
+}
+
+/// @notice track amount of CLFRequestFulfilled event is emitted
+ghost mathint ghost_clfRequestFulfilled_eventCount {
+    init_state axiom ghost_clfRequestFulfilled_eventCount == 0;
+}
+
+/// @notice track amount of InvalidChainSelector event is emitted
+ghost mathint ghost_invalidChainSelector_eventCount {
+    init_state axiom ghost_invalidChainSelector_eventCount == 0;
+}
+
+/// @notice track amount of InvalidProtocolEnum event is emitted
+ghost mathint ghost_invalidProtocolEnum_eventCount {
+    init_state axiom ghost_invalidProtocolEnum_eventCount == 0;
+}
+
 /*//////////////////////////////////////////////////////////////
                              HOOKS
 //////////////////////////////////////////////////////////////*/
@@ -133,6 +179,13 @@ hook LOG4(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2, bytes32 
         ghost_ccipMessageSent_txType_emitted = bytes32ToUint8(t2);
         ghost_ccipMessageSent_bridgeAmount_emitted = bytes32ToUint256(t3);
     }
+    if (t0 == CLFRequestFulfilledEvent()) ghost_clfRequestFulfilled_eventCount = ghost_clfRequestFulfilled_eventCount + 1;
+}
+
+/// @notice hook onto emitted events and increment relevant ghosts
+hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
+    if (t0 == InvalidChainSelectorEvent()) ghost_invalidChainSelector_eventCount = ghost_invalidChainSelector_eventCount + 1;
+    if (t0 == InvalidProtocolEnumEvent()) ghost_invalidProtocolEnum_eventCount = ghost_invalidProtocolEnum_eventCount + 1;
 }
 
 /// @notice hook onto emitted events and update relevant ghosts
@@ -145,6 +198,7 @@ hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
         ghost_parentPeerSet_eventCount = ghost_parentPeerSet_eventCount + 1;
         ghost_parentPeerSet_emittedAddress = bytes32ToAddress(t1);
     }
+    if (t0 == CLFRequestErrorEvent()) ghost_clfRequestError_eventCount = ghost_clfRequestError_eventCount + 1;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -156,7 +210,7 @@ function createLog(
     uint64 newChainSelector, 
     uint8 protocolEnum, 
     uint64 oldChainSelector
-) returns ParentRebalancer.Log {
+) returns Rebalancer.Log {
     uint256 index;
     uint256 timestamp;
     bytes32 txHash;
@@ -234,7 +288,7 @@ rule checkLog_revertsWhen_localParentRebalance() {
     require e.msg.value == 0;
     require e.tx.origin == 0 || e.tx.origin == 0x1111111111111111111111111111111111111111;
 
-    ParentRebalancer.Log log = createLog(
+    Rebalancer.Log log = createLog(
         getParentPeer(),
         StrategyUpdatedEvent(),
         getParentChainSelector(),
@@ -261,7 +315,7 @@ rule checkLog_revertsWhen_wrongEvent() {
     bytes32 wrongEvent;
     require wrongEvent != StrategyUpdatedEvent();
 
-    ParentRebalancer.Log log = createLog(
+    Rebalancer.Log log = createLog(
         getParentPeer(),
         wrongEvent,
         newChainSelector,
@@ -287,7 +341,7 @@ rule checkLog_revertsWhen_wrongSource() {
     address wrongSource;
     require wrongSource != getParentPeer();
 
-    ParentRebalancer.Log log = createLog(
+    Rebalancer.Log log = createLog(
         wrongSource,
         StrategyUpdatedEvent(),
         newChainSelector,
@@ -311,7 +365,7 @@ rule checkLog_returnsTrueWhen_oldStrategyChild() {
     require e.tx.origin == 0 || e.tx.origin == 0x1111111111111111111111111111111111111111;
     require e.msg.value == 0;
 
-    ParentRebalancer.Log log = createLog(
+    Rebalancer.Log log = createLog(
         getParentPeer(),
         StrategyUpdatedEvent(),
         newChainSelector,
@@ -368,7 +422,7 @@ rule checkLog_returnsTrueWhen_oldStrategyParent_newStrategyChild() {
     require e.tx.origin == 0 || e.tx.origin == 0x1111111111111111111111111111111111111111;
     require e.msg.value == 0;
 
-    ParentRebalancer.Log log = createLog(
+    Rebalancer.Log log = createLog(
         getParentPeer(),
         StrategyUpdatedEvent(),
         newChainSelector,
@@ -491,4 +545,135 @@ rule performUpkeep_rebalanceOldStrategy() {
     assert ghost_ccipMessageSent_eventCount == 1;
     assert ghost_ccipMessageSent_txType_emitted == 7;
     assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;
+}
+
+/*//////////////////////////////////////////////////////////////
+                              CLF
+//////////////////////////////////////////////////////////////*/
+// --- sendCLFRequest --- //
+rule sendCLFRequest_revertsWhen_notUpkeep() {
+    env e;
+    require e.msg.sender != currentContract.s_upkeepAddress, 
+        "sendCLFRequest should always revert if the caller is not the upkeep address";
+
+    sendCLFRequest@withrevert(e);
+    assert lastReverted;
+}
+
+// --- fulfillRequest --- //
+rule fulfillRequest_returnsWhen_error() {
+    env e;
+    bytes32 requestId;
+    bytes response;
+    bytes err;
+    
+    require err.length > 0,
+        "fulfillRequest should always return if CLF returns an error";
+    
+    require ghost_clfRequestError_eventCount == 0 &&
+        ghost_clfRequestFulfilled_eventCount == 0 &&
+        ghost_invalidChainSelector_eventCount == 0 &&
+        ghost_invalidProtocolEnum_eventCount == 0,
+        "event counts should be 0 before calling fulfillRequest";
+
+    handleOracleFulfillment(e, requestId, response, err);
+
+    assert ghost_clfRequestError_eventCount == 1;
+    assert ghost_clfRequestFulfilled_eventCount == 0;
+    assert ghost_invalidChainSelector_eventCount == 0;
+    assert ghost_invalidProtocolEnum_eventCount == 0;
+}
+
+rule fulfillRequest_returnsWhen_invalidChainSelector() {
+    env e;
+    bytes32 requestId;
+    bytes response;
+    bytes err;
+    uint64 chainSelector;
+    uint8 protocolEnum;
+
+    require err.length == 0, "error should be empty when CLF returns a valid response";
+    require !parent.getAllowedChain(chainSelector), "fulfillRequest should always return if the chain selector is not allowed";
+
+    require ghost_clfRequestError_eventCount == 0 &&
+        ghost_clfRequestFulfilled_eventCount == 0 &&
+        ghost_invalidChainSelector_eventCount == 0 &&
+        ghost_invalidProtocolEnum_eventCount == 0,
+        "event counts should be 0 before calling fulfillRequest";
+
+    response = createCLFResponse(chainSelector, protocolEnum);
+    handleOracleFulfillment(e, requestId, response, err);
+
+    assert ghost_clfRequestError_eventCount == 0;
+    assert ghost_clfRequestFulfilled_eventCount == 0;
+    assert ghost_invalidChainSelector_eventCount == 1;
+    assert ghost_invalidProtocolEnum_eventCount == 0;
+}
+
+rule fulfillRequest_returnsWhen_invalidProtocolEnum() {
+    env e;
+    bytes32 requestId;
+    bytes response;
+    bytes err;
+    uint64 chainSelector;
+    uint8 protocolEnum;
+
+    require err.length == 0, "error should be empty when CLF returns a valid response";
+    require parent.getAllowedChain(chainSelector), "chain selector should be allowed";
+    require protocolEnum > currentContract.s_numberOfProtocols, 
+        "fulfillRequest should always return if the protocol enum is invalid";
+
+    require ghost_clfRequestError_eventCount == 0 &&
+        ghost_clfRequestFulfilled_eventCount == 0 &&
+        ghost_invalidChainSelector_eventCount == 0 &&
+        ghost_invalidProtocolEnum_eventCount == 0,
+        "event counts should be 0 before calling fulfillRequest";
+
+    response = createCLFResponse(chainSelector, protocolEnum);
+    handleOracleFulfillment(e, requestId, response, err);
+
+    assert ghost_clfRequestError_eventCount == 0;
+    assert ghost_clfRequestFulfilled_eventCount == 0;
+    assert ghost_invalidChainSelector_eventCount == 0;
+    assert ghost_invalidProtocolEnum_eventCount == 1;
+}
+
+rule fulfillRequest_success() {
+    env e;
+    bytes32 requestId;
+    bytes response;
+    bytes err;
+    uint64 chainSelector;
+    uint8 protocolEnum;
+
+    require err.length == 0, "error should be empty when CLF returns a valid response";
+    require parent.getAllowedChain(chainSelector), "chain selector should be allowed";
+    require protocolEnum <= currentContract.s_numberOfProtocols, "protocol enum should be less than or equal to the number of protocols";
+
+    require ghost_clfRequestError_eventCount == 0 &&
+        ghost_clfRequestFulfilled_eventCount == 0 &&
+        ghost_invalidChainSelector_eventCount == 0 &&
+        ghost_invalidProtocolEnum_eventCount == 0,
+        "event counts should be 0 before calling fulfillRequest";
+
+    response = createCLFResponse(chainSelector, protocolEnum);
+    handleOracleFulfillment(e, requestId, response, err);
+
+    assert ghost_clfRequestError_eventCount == 0;
+    assert ghost_clfRequestFulfilled_eventCount == 1;
+    assert ghost_invalidChainSelector_eventCount == 0;
+    assert ghost_invalidProtocolEnum_eventCount == 0;
+
+    assert assert_uint8(getStrategyFromParentPeer().protocol) == protocolEnum;
+    assert getStrategyFromParentPeer().chainSelector == chainSelector;
+}
+
+rule fulfillRequest_revertsWhen_notFunctionsRouter() {
+    env e;
+    calldataarg args;
+    require e.msg.sender != currentContract.i_functionsRouter, 
+        "fulfillRequest should always revert if the caller is not the functions router";
+
+    handleOracleFulfillment@withrevert(e, args);
+    assert lastReverted;
 }
