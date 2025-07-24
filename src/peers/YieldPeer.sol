@@ -323,7 +323,6 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @param to The address to transfer USDC to
     /// @param amount The amount of USDC to transfer
     function _transferUsdcTo(address to, uint256 amount) internal {
-        // @review do we need to change transfer to safeTransfer?
         if (!i_usdc.transfer(to, amount)) revert YieldPeer__USDCTransferFailed();
     }
 

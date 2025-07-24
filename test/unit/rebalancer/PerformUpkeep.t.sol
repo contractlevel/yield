@@ -4,14 +4,14 @@ pragma solidity 0.8.26;
 import {BaseTest, Vm, console2, IYieldPeer, Log, IPoolAddressesProvider} from "../../BaseTest.t.sol";
 
 contract PerformUpkeepTest is BaseTest {
-    function test_yield_performUpkeep_revertsWhen_notForwarder() public {
+    function test_yield_rebalancer_performUpkeep_revertsWhen_notForwarder() public {
         bytes memory performData =
             _createPerformData(0, 0, IYieldPeer.CcipTxType.RebalanceNewStrategy, 0, address(0), 0);
         vm.expectRevert(abi.encodeWithSignature("Rebalancer__OnlyForwarder()"));
         baseRebalancer.performUpkeep(performData);
     }
 
-    function test_yield_performUpkeep_rebalanceNewStrategy() public {
+    function test_yield_rebalancer_performUpkeep_rebalanceNewStrategy() public {
         address aavePool = IPoolAddressesProvider(baseAaveV3Adapter.getPoolAddressesProvider()).getPool();
         deal(address(baseUsdc), aavePool, DEPOSIT_AMOUNT);
 
@@ -45,7 +45,7 @@ contract PerformUpkeepTest is BaseTest {
         assertTrue(ccipMessageSentEventFound, "CCIPMessageSent log not found");
     }
 
-    function test_yield_performUpkeep_rebalanceOldStrategy() public {
+    function test_yield_rebalancer_performUpkeep_rebalanceOldStrategy() public {
         address aavePool = IPoolAddressesProvider(baseAaveV3Adapter.getPoolAddressesProvider()).getPool();
         deal(address(baseUsdc), aavePool, DEPOSIT_AMOUNT);
 

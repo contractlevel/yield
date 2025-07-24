@@ -502,7 +502,7 @@ contract HelperConfig is Script {
 
     function _deployLocalInfra() internal {
         usdc = new MockUsdc();
-        aavePool = new MockAavePool(address(usdc)); // need to set aToken address later
+        aavePool = new MockAavePool();
         aToken = new MockAToken(address(aavePool));
         poolAddressesProvider = new MockPoolAddressesProvider(address(aavePool));
         aavePool.setATokenAddress(address(aToken));

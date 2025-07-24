@@ -19,12 +19,6 @@ contract MockAavePool {
     error InvalidInterestRate();
     error InvalidAmount();
 
-    address internal immutable i_usdc; // @review unused
-
-    constructor(address usdc) {
-        i_usdc = usdc;
-    }
-
     function supply(address asset, uint256 amount, address onBehalfOf, uint16) external {
         // if (amount == 0) revert InvalidAmount();
         uint256 interestAccrued = _calculateInterest(onBehalfOf);
