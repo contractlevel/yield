@@ -450,7 +450,7 @@ certoraRun ./certora/conf/Yield.conf
 The [`Rebalancer`](https://github.com/contractlevel/yield/blob/main/certora/spec/parent/Rebalancer.spec) spec verifies the `Rebalancer` contract, which contains logic related to Chainlink Functions and Automation.
 
 ```
-certoraRun ./certora/conf/parent/Rebalancer.conf --nondet_difficult_funcs
+certoraRun ./certora/conf/modules/Rebalancer.conf --nondet_difficult_funcs
 ```
 
 The `--nondet_difficult_funcs` flag is required for `Rebalance` to [automatically summarize functions](https://docs.certora.com/en/latest/docs/prover/cli/options.html#nondet-difficult-funcs) in the `FunctionsRequest` library because otherwise the Certora Prover will timeout. The Certora Prover explores all possible paths and the `FunctionsRequest::encodeCBOR` includes an extremely high path count, making it difficult to verify.
