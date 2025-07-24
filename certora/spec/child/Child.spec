@@ -2,6 +2,7 @@ using Share as share;
 using MockUsdc as usdc;
 using AaveV3Adapter as aaveV3Adapter;
 using CompoundV3Adapter as compoundV3Adapter;
+using StrategyRegistry as strategyRegistry;
 
 /// Verification of ChildPeer
 /// @author @contractlevel
@@ -20,6 +21,7 @@ methods {
     // External methods
     function share.totalSupply() external returns (uint256) envfree;
     function usdc.balanceOf(address) external returns (uint256) envfree;
+    function strategyRegistry.getStrategyAdapter(bytes32) external returns (address) envfree;
 
     // Wildcard dispatcher summaries
     function _.withdraw(address,uint256) external => DISPATCHER(true);
@@ -27,7 +29,7 @@ methods {
     function _.getTotalValue(address) external => DISPATCHER(true);
 
     // Harness helper methods
-    function encodeStrategy(uint64,uint8) external returns (bytes memory) envfree;
+    function encodeStrategy(uint64,bytes32) external returns (bytes memory) envfree;
     function encodeUint64(uint64 value) external returns (bytes memory) envfree;
     function bytes32ToUint8(bytes32 value) external returns (uint8) envfree;
     function bytes32ToUint256(bytes32 value) external returns (uint256) envfree;
@@ -384,12 +386,14 @@ rule handleCCIPRebalanceOldStrategy_withdrawsFromOldStrategy() {
     uint256 totalValue = getTotalValue(e);
     address oldStrategyPool = getActiveStrategyAdapter().getStrategyPool(e);
     uint64 chainSelector;
-    uint8 protocolEnum;
-    bytes newStrategy = encodeStrategy(chainSelector, protocolEnum);
+    bytes32 protocolId;
+    bytes32 aaveV3ProtocolId;
+    bytes32 compoundV3ProtocolId;
+    bytes newStrategy = encodeStrategy(chainSelector, protocolId);
 
     /// @dev require the storage mappings for active strategy adapters to be the correct contracts
-    require currentContract.s_strategyAdapters[IYieldPeer.Protocol.Aave]     == aaveV3Adapter;
-    require currentContract.s_strategyAdapters[IYieldPeer.Protocol.Compound] == compoundV3Adapter;
+    require strategyRegistry.getStrategyAdapter(aaveV3ProtocolId)     == aaveV3Adapter;
+    require strategyRegistry.getStrategyAdapter(compoundV3ProtocolId) == compoundV3Adapter;
 
     /// @dev require the storage for active strategy adapter to be aave or compound adapters
     require currentContract.s_activeStrategyAdapter == aaveV3Adapter ||
@@ -398,8 +402,8 @@ rule handleCCIPRebalanceOldStrategy_withdrawsFromOldStrategy() {
     address aavePool = aaveV3Adapter.getStrategyPool(e);
     address compoundPool = compoundV3Adapter.getStrategyPool(e);
 
-    require chainSelector == getThisChainSelector() && oldStrategyPool == compoundPool => protocolEnum == 0;
-    require chainSelector == getThisChainSelector() && oldStrategyPool == aavePool => protocolEnum == 1;
+    require chainSelector == getThisChainSelector() && oldStrategyPool == compoundPool => protocolId == aaveV3ProtocolId;
+    require chainSelector == getThisChainSelector() && oldStrategyPool == aavePool => protocolId == compoundV3ProtocolId;
 
     uint256 aaveBalanceBefore = usdc.balanceOf(aavePool);
     uint256 compoundBalanceBefore = usdc.balanceOf(compoundPool);
@@ -419,12 +423,14 @@ rule handleCCIPRebalanceOldStrategy_depositsToNewStrategy_when_sameChain() {
     env e;
     uint256 totalValue = getTotalValue(e);
     address oldStrategyPool = getActiveStrategyAdapter().getStrategyPool(e);
-    uint8 protocolEnum;
-    bytes newStrategy = encodeStrategy(getThisChainSelector(), protocolEnum);
+    bytes32 protocolId;
+    bytes32 aaveV3ProtocolId;
+    bytes32 compoundV3ProtocolId;
+    bytes newStrategy = encodeStrategy(getThisChainSelector(), protocolId);
 
     /// @dev require the storage mappings for active strategy adapters to be the correct contracts
-    require currentContract.s_strategyAdapters[IYieldPeer.Protocol.Aave]     == aaveV3Adapter;
-    require currentContract.s_strategyAdapters[IYieldPeer.Protocol.Compound] == compoundV3Adapter;
+    require strategyRegistry.getStrategyAdapter(aaveV3ProtocolId)     == aaveV3Adapter;
+    require strategyRegistry.getStrategyAdapter(compoundV3ProtocolId) == compoundV3Adapter;
 
     /// @dev require the storage for active strategy adapter to be aave or compound adapters
     require currentContract.s_activeStrategyAdapter == aaveV3Adapter ||
@@ -433,8 +439,8 @@ rule handleCCIPRebalanceOldStrategy_depositsToNewStrategy_when_sameChain() {
     address aavePool = aaveV3Adapter.getStrategyPool(e);
     address compoundPool = compoundV3Adapter.getStrategyPool(e);
 
-    require oldStrategyPool == compoundPool => protocolEnum == 0;
-    require oldStrategyPool == aavePool => protocolEnum == 1;
+    require oldStrategyPool == compoundPool => protocolId == aaveV3ProtocolId;
+    require oldStrategyPool == aavePool => protocolId == compoundV3ProtocolId;
 
     uint256 compoundBalanceBefore = usdc.balanceOf(compoundPool);
     uint256 aaveBalanceBefore = usdc.balanceOf(aavePool);
@@ -461,8 +467,8 @@ rule handleCCIPRebalanceOldStrategy_emits_CCIPMessageSent_when_differentChain() 
     uint256 totalValue = getTotalValue(e);
     uint64 chainSelector;
     require chainSelector != getThisChainSelector();
-    uint8 protocolEnum;
-    bytes newStrategy = encodeStrategy(chainSelector, protocolEnum);
+    bytes32 protocolId;
+    bytes newStrategy = encodeStrategy(chainSelector, protocolId);
     require usdc.balanceOf(currentContract) == 0;
     require ghost_ccipMessageSent_eventCount == 0;
     handleCCIPRebalanceOldStrategy(e, newStrategy);

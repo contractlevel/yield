@@ -74,8 +74,8 @@ contract RebalancerHarness is Rebalancer, HelperHarness {
         return "";
     }
 
-    function createCLFResponse(uint64 chainSelector, uint8 protocolEnum) public pure returns (bytes memory) {
-        return abi.encode(chainSelector, protocolEnum);
+    function createCLFResponse(uint64 chainSelector, bytes32 protocolId) public pure returns (bytes memory) {
+        return abi.encode(chainSelector, protocolId);
     }
 
     function getStrategyFromParentPeer() public view returns (IYieldPeer.Strategy memory) {

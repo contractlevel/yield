@@ -2,6 +2,7 @@ using Share as share;
 using MockUsdc as usdc;
 using AaveV3Adapter as aaveV3Adapter;
 using CompoundV3Adapter as compoundV3Adapter;
+using StrategyRegistry as strategyRegistry;
 
 /// Verification of ParentPeer
 /// @author @contractlevel
@@ -21,6 +22,7 @@ methods {
     function share.totalSupply() external returns (uint256) envfree;
     function share.balanceOf(address) external returns (uint256) envfree;
     function usdc.balanceOf(address) external returns (uint256) envfree;
+    function strategyRegistry.getStrategyAdapter(bytes32) external returns (address) envfree;
 
     // Wildcard dispatcher summaries
     function _.withdraw(address,uint256) external => DISPATCHER(true);
@@ -37,9 +39,9 @@ methods {
     function prepareTokenAmounts(address,uint256) external returns (Client.EVMTokenAmount[] memory) envfree;
     function calculateMintAmount(uint256,uint256) external returns (uint256) envfree;
     function calculateTotalValue(uint256) external returns (uint256);
-    function createStrategy(uint64,IYieldPeer.Protocol) external returns (IYieldPeer.Strategy memory) envfree;
+    function createStrategy(uint64,bytes32) external returns (IYieldPeer.Strategy memory) envfree;
     function convertUsdcToShare(uint256) external returns (uint256) envfree;
-    function getStrategyAdapterFromProtocol(IYieldPeer.Protocol) external returns (address) envfree;
+    function getStrategyAdapterFromProtocol(bytes32) external returns (address) envfree;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -82,12 +84,12 @@ definition WithdrawForwardedToStrategyEvent() returns bytes32 =
     to_bytes32(0x62b63098828571301ff9aea97af7a6df908783e702393e063e1adf27d89605e4);
 
 definition CurrentStrategyOptimalEvent() returns bytes32 =
-// keccak256(abi.encodePacked("CurrentStrategyOptimal(uint64,uint8)"))
-    to_bytes32(0x27af4b720c71fc9b50aab1114c5dcdf5fd74cb01f03aff4c0e3f4a0dc6cf4360);
+// keccak256(abi.encodePacked("CurrentStrategyOptimal(uint64,bytes32)"))
+    to_bytes32(0x8a2bbc9188a750bed30596d0ed7ae5d7b521e02729739c43b6e7106bdfb7e89d);
 
 definition StrategyUpdatedEvent() returns bytes32 =
-// keccak256(abi.encodePacked("StrategyUpdated(uint64,uint8,uint64)"))
-    to_bytes32(0xcb31617872c52547b670aaf6e63c8f6be35dc74d4144db1b17f2e539b5475ac7);
+// keccak256(abi.encodePacked("StrategyUpdated(uint64,bytes32,uint64)"))
+    to_bytes32(0x60d0790094d9774dbd1ef0d8d0a670010be9595ac41c3215452ac9430a078aa6);
 
 definition WithdrawFromStrategyEvent() returns bytes32 =
 // keccak256(abi.encodePacked("WithdrawFromStrategy(address,uint256)"))
@@ -671,14 +673,14 @@ rule handleCCIPWithdrawToParent_forwardsToStrategy() {
 rule setStrategy_emits_CurrentStrategyOptimal_when_currentStrategy_is_optimal() {
     env e;
     uint64 chainSelector;
-    IYieldPeer.Protocol protocol;
+    bytes32 protocolId;
 
     IYieldPeer.Strategy oldStrategy = getStrategy();
 
-    require oldStrategy.chainSelector == chainSelector && oldStrategy.protocol == protocol;
+    require oldStrategy.chainSelector == chainSelector && oldStrategy.protocolId == protocolId;
 
     require ghost_currentStrategyOptimal_eventCount == 0;
-    setStrategy(e, chainSelector, protocol);
+    setStrategy(e, chainSelector, protocolId);
     assert ghost_currentStrategyOptimal_eventCount == 1;
     assert getStrategy() == oldStrategy;
 }
@@ -686,15 +688,15 @@ rule setStrategy_emits_CurrentStrategyOptimal_when_currentStrategy_is_optimal() 
 rule setStrategy_updatesStrategy_when_newStrategy_is_different() {
     env e;
     uint64 chainSelector;
-    IYieldPeer.Protocol protocol;
+    bytes32 protocolId;
 
     IYieldPeer.Strategy oldStrategy = getStrategy();
 
-    require oldStrategy.chainSelector != chainSelector || oldStrategy.protocol != protocol;
+    require oldStrategy.chainSelector != chainSelector || oldStrategy.protocolId != protocolId;
 
     require ghost_currentStrategyOptimal_eventCount == 0;
     require ghost_strategyUpdated_eventCount == 0;
-    setStrategy(e, chainSelector, protocol);
+    setStrategy(e, chainSelector, protocolId);
     assert ghost_currentStrategyOptimal_eventCount == 0;
     assert ghost_strategyUpdated_eventCount == 1;
     assert getStrategy() != oldStrategy;
@@ -703,11 +705,13 @@ rule setStrategy_updatesStrategy_when_newStrategy_is_different() {
 rule setStrategy_handlesLocalStrategyChange() {
     env e;
     uint64 chainSelector;
-    IYieldPeer.Protocol protocol;
+    bytes32 protocolId;
+    bytes32 aaveV3ProtocolId;
+    bytes32 compoundV3ProtocolId;
 
     /// @dev require the storage mappings for active strategy adapters to be the correct contracts
-    require currentContract.s_strategyAdapters[IYieldPeer.Protocol.Aave]     == aaveV3Adapter;
-    require currentContract.s_strategyAdapters[IYieldPeer.Protocol.Compound] == compoundV3Adapter;
+    require strategyRegistry.getStrategyAdapter(aaveV3ProtocolId)     == aaveV3Adapter;
+    require strategyRegistry.getStrategyAdapter(compoundV3ProtocolId) == compoundV3Adapter;
 
     /// @dev require the storage for active strategy adapter to be aave or compound adapters
     require currentContract.s_activeStrategyAdapter == aaveV3Adapter ||
@@ -720,8 +724,8 @@ rule setStrategy_handlesLocalStrategyChange() {
     /// @dev require old strategy values to enable local strategy change
     require oldStrategy.chainSelector == chainSelector &&
             oldStrategy.chainSelector == getThisChainSelector() &&
-            oldStrategy.protocol      != protocol;
-    require oldActiveStrategyAdapter  != getStrategyAdapterFromProtocol(protocol);
+            oldStrategy.protocolId    != protocolId;
+    require oldActiveStrategyAdapter  != getStrategyAdapterFromProtocol(protocolId);
 
     /// @dev cache total value and require it to be more than 0
     uint256 totalValue = getTotalValue(e);
@@ -737,13 +741,17 @@ rule setStrategy_handlesLocalStrategyChange() {
     require oldActiveStrategyAdapter == aaveV3Adapter => newActiveStrategyAdapter == compoundV3Adapter;
     require oldActiveStrategyAdapter == compoundV3Adapter => newActiveStrategyAdapter == aaveV3Adapter;
 
+    /// @dev if the old active adapter is aave, the new protocol id is compound, and vice versa
+    require oldActiveStrategyAdapter == aaveV3Adapter => protocolId == compoundV3ProtocolId;
+    require oldActiveStrategyAdapter == compoundV3Adapter => protocolId == aaveV3ProtocolId;
+
     /// @dev cache new strategy pool and its balance
     address newStrategyPool = newActiveStrategyAdapter.getStrategyPool(e);
     uint256 newStrategyPoolBalanceBefore = usdc.balanceOf(newStrategyPool);
     require newStrategyPoolBalanceBefore + totalValue <= max_uint256;
 
     /// @dev act
-    setStrategy(e, chainSelector, protocol);
+    setStrategy(e, chainSelector, protocolId);
 
     /// @dev assert correct balance changes
     assert usdc.balanceOf(oldStrategyPool) == oldStrategyPoolBalanceBefore - totalValue;
@@ -753,16 +761,16 @@ rule setStrategy_handlesLocalStrategyChange() {
 rule setStrategy_no_localStrategyChange_when_newStrategy_is_different() {
     env e;
     uint64 newChainSelector;
-    IYieldPeer.Protocol newProtocol;
+    bytes32 newProtocolId;
 
     IYieldPeer.Strategy oldStrategy = getStrategy();
 
-    require oldStrategy.chainSelector != getThisChainSelector() && oldStrategy.protocol != newProtocol;
+    require oldStrategy.chainSelector != getThisChainSelector() && oldStrategy.protocolId != newProtocolId;
 
     require ghost_withdrawFromStrategy_eventCount == 0;
     require ghost_depositToStrategy_eventCount == 0;
     require ghost_strategyPoolUpdated_eventCount == 0;
-    setStrategy(e, newChainSelector, newProtocol);
+    setStrategy(e, newChainSelector, newProtocolId);
     assert ghost_withdrawFromStrategy_eventCount == 0;
     assert ghost_depositToStrategy_eventCount == 0;
     assert ghost_strategyPoolUpdated_eventCount == 0;
@@ -782,8 +790,8 @@ rule rebalanceNewStrategy_revertsWhen_notParentRebalancer() {
 rule rebalanceNewStrategy_movesStrategyToNewChain() {
     env e;
     uint64 chainSelector;
-    IYieldPeer.Protocol protocol;
-    IYieldPeer.Strategy newStrategy = createStrategy(chainSelector, protocol);
+    bytes32 protocolId;
+    IYieldPeer.Strategy newStrategy = createStrategy(chainSelector, protocolId);
 
     IYieldPeer.Strategy oldStrategy = getStrategy();
 
@@ -821,7 +829,7 @@ rule rebalanceOldStrategy_revertsWhen_notParentRebalancer() {
 rule rebalanceOldStrategy_forwardsRebalanceToOldStrategy() {
     env e;
     uint64 chainSelector;
-    IYieldPeer.Protocol protocol;
+    bytes32 protocolId;
 
     IYieldPeer.Strategy oldStrategy = getStrategy();
 
@@ -829,7 +837,7 @@ rule rebalanceOldStrategy_forwardsRebalanceToOldStrategy() {
             oldStrategy.chainSelector != chainSelector;
 
     require ghost_ccipMessageSent_eventCount == 0;
-    rebalanceOldStrategy(e, oldStrategy.chainSelector, createStrategy(chainSelector, protocol));
+    rebalanceOldStrategy(e, oldStrategy.chainSelector, createStrategy(chainSelector, protocolId));
     assert ghost_ccipMessageSent_eventCount == 1;
     assert ghost_ccipMessageSent_txType_emitted == 7; // RebalanceOldStrategy
     assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;
@@ -856,47 +864,45 @@ rule calculateMintAmount_calculation() {
 // --- setInitialActiveStrategy --- //
 rule setInitialActiveStrategy_revertsWhen_notOwner() {
     env e;
-    IYieldPeer.Protocol protocol;
+    bytes32 protocolId;
 
     require e.msg.sender != currentContract._owner;
 
-    setInitialActiveStrategy@withrevert(e, protocol);
+    setInitialActiveStrategy@withrevert(e, protocolId);
     assert lastReverted;
 }
 
 rule setInitialActiveStrategy_revertsWhen_alreadyCalled() {
     env e;
-    IYieldPeer.Protocol p1;
-    setInitialActiveStrategy(e, p1);
+    bytes32 protocolId;
+    setInitialActiveStrategy(e, protocolId);
 
     env e2;
-    IYieldPeer.Protocol p2;
+    bytes32 protocolId2;
     require e2.msg.sender == e.msg.sender; // owner
-    setInitialActiveStrategy@withrevert(e2, p2);
+    setInitialActiveStrategy@withrevert(e2, protocolId2);
     assert lastReverted;
 }
 
 rule setInitialActiveStrategy_emitsEvent() {
     env e;
-    IYieldPeer.Protocol protocol;
+    bytes32 protocolId;
 
     require ghost_activeStrategyAdapterUpdated_eventCount == 0;
-    setInitialActiveStrategy(e, protocol);
+    setInitialActiveStrategy(e, protocolId);
     assert ghost_activeStrategyAdapterUpdated_eventCount == 1;
 }
 
 rule setInitialActiveStrategy_updatesStorage() {
     env e;
-    IYieldPeer.Protocol protocol;
+    bytes32 protocolId;
 
     require currentContract.s_activeStrategyAdapter == 0;
     require currentContract.s_strategy.chainSelector == 0;
-    // @review we need to add the invalid enum for protocol 0
-    // require currentContract.s_strategy.protocol == IYieldPeer.Protocol.Invalid;
 
-    setInitialActiveStrategy(e, protocol);
+    setInitialActiveStrategy(e, protocolId);
 
-    assert currentContract.s_activeStrategyAdapter == currentContract.s_strategyAdapters[protocol];
+    assert currentContract.s_activeStrategyAdapter == strategyRegistry.getStrategyAdapter(protocolId);
     assert currentContract.s_strategy.chainSelector == getThisChainSelector();
-    assert currentContract.s_strategy.protocol == protocol;
+    assert currentContract.s_strategy.protocolId == protocolId;
 }

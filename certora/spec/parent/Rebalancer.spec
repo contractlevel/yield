@@ -1,5 +1,6 @@
 using MockUsdc as usdc;
 using ParentPeer as parent;
+using StrategyRegistry as strategyRegistry;
 
 /// Verification of Rebalancer
 /// @author @contractlevel
@@ -16,6 +17,7 @@ methods {
     // External methods
     function usdc.balanceOf(address) external returns (uint256) envfree;
     function parent.getAllowedChain(uint64) external returns (bool) envfree;
+    function strategyRegistry.getStrategyAdapter(bytes32) external returns (address) envfree;
 
     // Summary methods
     function _.balanceOf(address) external => DISPATCHER(true);
@@ -62,10 +64,10 @@ methods {
         address,
         uint256
     ) external returns (bytes) envfree;
-    function createStrategy(uint64, IYieldPeer.Protocol) external returns (IYieldPeer.Strategy) envfree;
+    function createStrategy(uint64, bytes32) external returns (IYieldPeer.Strategy) envfree;
     function bytes32ToUint8(bytes32) external returns (uint8) envfree;
     function bytes32ToUint256(bytes32) external returns (uint256) envfree;
-    function createCLFResponse(uint64 chainSelector, uint8 protocolEnum) external returns (bytes memory) envfree;
+    function createCLFResponse(uint64 chainSelector, bytes32 protocolId) external returns (bytes memory) envfree;
     function getStrategyFromParentPeer() external returns (IYieldPeer.Strategy memory) envfree;
 }
 
@@ -76,8 +78,7 @@ methods {
 definition onlyOwner(method f) returns bool = 
     f.selector == sig:setForwarder(address).selector ||
     f.selector == sig:setParentPeer(address).selector ||
-    f.selector == sig:setUpkeepAddress(address).selector ||
-    f.selector == sig:setNumberOfProtocols(uint8).selector;
+    f.selector == sig:setUpkeepAddress(address).selector;
 
 definition ForwarderSetEvent() returns bytes32 =
 // keccak256(abi.encodePacked("ForwarderSet(address)"))
@@ -103,13 +104,13 @@ definition InvalidChainSelectorEvent() returns bytes32 =
 // keccak256(abi.encodePacked("InvalidChainSelector(bytes32,uint64)"))
     to_bytes32(0xcbb1a0175d5d5f83e120c4bcd9d3b172de3d4303caf6d5a3be87fc19472fd108);
 
-definition InvalidProtocolEnumEvent() returns bytes32 =
-// keccak256(abi.encodePacked("InvalidProtocolEnum(bytes32,uint8)"))
-    to_bytes32(0x8caa888c03854a1029a8338ba08e28156002a44eb9cd4b05cc54c3cfd06a860d);
+definition InvalidProtocolIdEvent() returns bytes32 =
+// keccak256(abi.encodePacked("InvalidProtocolId(bytes32,bytes32)"))
+    to_bytes32(0x5fbf94e7763a39475d6eeabb0e295a0f648d2e113bc1783be5aa614513cba101);
 
 definition CLFRequestFulfilledEvent() returns bytes32 =
-// keccak256(abi.encodePacked("CLFRequestFulfilled(bytes32,uint64,uint8)"))
-    to_bytes32(0x7f47906f1ae445cc524f4c4aae1e2e8a12c0ade10b1982e852f2d6fbce7fe32f);
+// keccak256(abi.encodePacked("CLFRequestFulfilled(bytes32,uint64,bytes32)"))
+    to_bytes32(0xfc2f12fbc5bcf0ba379c3c98039595e5f7793e4a1e6ad603b05c23004fd3f98b);
 
 /*//////////////////////////////////////////////////////////////
                              GHOSTS
@@ -164,9 +165,9 @@ ghost mathint ghost_invalidChainSelector_eventCount {
     init_state axiom ghost_invalidChainSelector_eventCount == 0;
 }
 
-/// @notice track amount of InvalidProtocolEnum event is emitted
-ghost mathint ghost_invalidProtocolEnum_eventCount {
-    init_state axiom ghost_invalidProtocolEnum_eventCount == 0;
+/// @notice track amount of InvalidProtocolId event is emitted
+ghost mathint ghost_invalidProtocolId_eventCount {
+    init_state axiom ghost_invalidProtocolId_eventCount == 0;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -185,7 +186,7 @@ hook LOG4(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2, bytes32 
 /// @notice hook onto emitted events and increment relevant ghosts
 hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
     if (t0 == InvalidChainSelectorEvent()) ghost_invalidChainSelector_eventCount = ghost_invalidChainSelector_eventCount + 1;
-    if (t0 == InvalidProtocolEnumEvent()) ghost_invalidProtocolEnum_eventCount = ghost_invalidProtocolEnum_eventCount + 1;
+    if (t0 == InvalidProtocolIdEvent()) ghost_invalidProtocolId_eventCount = ghost_invalidProtocolId_eventCount + 1;
 }
 
 /// @notice hook onto emitted events and update relevant ghosts
@@ -208,7 +209,7 @@ function createLog(
     address source, 
     bytes32 eventSignature,
     uint64 newChainSelector, 
-    uint8 protocolEnum, 
+    bytes32 protocolId, 
     uint64 oldChainSelector
 ) returns Rebalancer.Log {
     uint256 index;
@@ -222,7 +223,7 @@ function createLog(
     require topics.length == 4;
     require topics[0] == eventSignature;
     require topics[1] == uint64ToBytes32(newChainSelector);
-    require topics[2] == uint8ToBytes32(protocolEnum);
+    require topics[2] == protocolId;
     require topics[3] == uint64ToBytes32(oldChainSelector);
 
     return harnessCreateLog(index, timestamp, txHash, blockNumber, blockHash, source, topics, data);
@@ -284,7 +285,7 @@ rule checkLog_reverts() {
 // rule is vacuous
 rule checkLog_revertsWhen_localParentRebalance() {
     env e;
-    uint8 protocolEnum;
+    bytes32 protocolId;
     require e.msg.value == 0;
     require e.tx.origin == 0 || e.tx.origin == 0x1111111111111111111111111111111111111111;
 
@@ -292,7 +293,7 @@ rule checkLog_revertsWhen_localParentRebalance() {
         getParentPeer(),
         StrategyUpdatedEvent(),
         getParentChainSelector(),
-        protocolEnum,
+        protocolId,
         getParentChainSelector()
     );
     bytes data;
@@ -304,7 +305,7 @@ rule checkLog_revertsWhen_localParentRebalance() {
 // rule is vacuous
 rule checkLog_revertsWhen_wrongEvent() {
     env e;
-    uint8 protocolEnum;
+    bytes32 protocolId;
     uint64 newChainSelector;
     uint64 oldChainSelector;
     require e.tx.origin == 0 || e.tx.origin == 0x1111111111111111111111111111111111111111;
@@ -319,7 +320,7 @@ rule checkLog_revertsWhen_wrongEvent() {
         getParentPeer(),
         wrongEvent,
         newChainSelector,
-        protocolEnum,
+        protocolId,
         oldChainSelector
     );
     bytes data;
@@ -331,7 +332,7 @@ rule checkLog_revertsWhen_wrongEvent() {
 // rule is vacuous
 rule checkLog_revertsWhen_wrongSource() {
     env e;
-    uint8 protocolEnum;
+    bytes32 protocolId;
     uint64 newChainSelector;
     uint64 oldChainSelector;
     require newChainSelector == getParentChainSelector() => oldChainSelector != getParentChainSelector();
@@ -345,7 +346,7 @@ rule checkLog_revertsWhen_wrongSource() {
         wrongSource,
         StrategyUpdatedEvent(),
         newChainSelector,
-        protocolEnum,
+        protocolId,
         oldChainSelector
     );
     bytes data;
@@ -357,7 +358,7 @@ rule checkLog_revertsWhen_wrongSource() {
 // rule is vacuous
 rule checkLog_returnsTrueWhen_oldStrategyChild() {
     env e;
-    uint8 protocolEnum;
+    bytes32 protocolId;
     uint64 newChainSelector;
     uint64 oldChainSelector;
     require oldChainSelector != getParentChainSelector();
@@ -369,7 +370,7 @@ rule checkLog_returnsTrueWhen_oldStrategyChild() {
         getParentPeer(),
         StrategyUpdatedEvent(),
         newChainSelector,
-        protocolEnum,
+        protocolId,
         oldChainSelector
     );
     bytes data;
@@ -403,7 +404,7 @@ rule checkLog_returnsTrueWhen_oldStrategyChild() {
     assert forwarder == getForwarder();
     assert parentPeer == getParentPeer();
     assert strategy.chainSelector == newChainSelector;
-    assert assert_uint8(strategy.protocol) == protocolEnum;
+    assert strategy.protocolId == protocolId;
     assert txType == IYieldPeer.CcipTxType.RebalanceOldStrategy;
     assert decodedOldChainSelector == oldChainSelector;
     assert oldStrategyPool == 0;
@@ -413,7 +414,7 @@ rule checkLog_returnsTrueWhen_oldStrategyChild() {
 // rule is vacuous
 rule checkLog_returnsTrueWhen_oldStrategyParent_newStrategyChild() {
     env e;
-    uint8 protocolEnum;
+    bytes32 protocolId;
     uint64 newChainSelector;
     uint64 oldChainSelector;
     require oldChainSelector == getParentChainSelector();
@@ -426,7 +427,7 @@ rule checkLog_returnsTrueWhen_oldStrategyParent_newStrategyChild() {
         getParentPeer(),
         StrategyUpdatedEvent(),
         newChainSelector,
-        protocolEnum,
+        protocolId,
         oldChainSelector
     );
     bytes data;
@@ -460,7 +461,7 @@ rule checkLog_returnsTrueWhen_oldStrategyParent_newStrategyChild() {
     assert forwarder == getForwarder();
     assert parentPeer == getParentPeer();
     assert strategy.chainSelector == newChainSelector;
-    assert assert_uint8(strategy.protocol) == protocolEnum;
+    assert strategy.protocolId == protocolId;
     assert txType == IYieldPeer.CcipTxType.RebalanceNewStrategy;
     assert decodedOldChainSelector == oldChainSelector;
     assert oldStrategyPool == getStrategyPoolFromParentPeer();
@@ -471,8 +472,8 @@ rule checkLog_returnsTrueWhen_oldStrategyParent_newStrategyChild() {
 rule performUpkeep_revertsWhen_notForwarder() {
     env e;
     uint64 chainSelector;
-    IYieldPeer.Protocol protocol;
-    IYieldPeer.Strategy strategy = createStrategy(chainSelector, protocol);
+    bytes32 protocolId;
+    IYieldPeer.Strategy strategy = createStrategy(chainSelector, protocolId);
     bytes performData = createPerformData(
         getForwarder(),
         getParentPeer(),
@@ -501,8 +502,8 @@ rule performUpkeep_triggersCCIPMessageSentEvent() {
 rule performUpkeep_rebalanceNewStrategy() {
     env e;
     uint64 chainSelector;
-    IYieldPeer.Protocol protocol;
-    IYieldPeer.Strategy strategy = createStrategy(chainSelector, protocol);
+    bytes32 protocolId;
+    IYieldPeer.Strategy strategy = createStrategy(chainSelector, protocolId);
     uint256 totalValue = getTotalValueFromParentPeer();
     bytes performData = createPerformData(
         getForwarder(),
@@ -525,8 +526,8 @@ rule performUpkeep_rebalanceOldStrategy() {
     env e;
     uint64 chainSelector;
     uint64 oldChainSelector;
-    IYieldPeer.Protocol protocol;
-    IYieldPeer.Strategy strategy = createStrategy(chainSelector, protocol);
+    bytes32 protocolId;
+    IYieldPeer.Strategy strategy = createStrategy(chainSelector, protocolId);
     bytes performData = createPerformData(
         getForwarder(),
         getParentPeer(),
@@ -573,7 +574,7 @@ rule fulfillRequest_returnsWhen_error() {
     require ghost_clfRequestError_eventCount == 0 &&
         ghost_clfRequestFulfilled_eventCount == 0 &&
         ghost_invalidChainSelector_eventCount == 0 &&
-        ghost_invalidProtocolEnum_eventCount == 0,
+        ghost_invalidProtocolId_eventCount == 0,
         "event counts should be 0 before calling fulfillRequest";
 
     handleOracleFulfillment(e, requestId, response, err);
@@ -581,7 +582,7 @@ rule fulfillRequest_returnsWhen_error() {
     assert ghost_clfRequestError_eventCount == 1;
     assert ghost_clfRequestFulfilled_eventCount == 0;
     assert ghost_invalidChainSelector_eventCount == 0;
-    assert ghost_invalidProtocolEnum_eventCount == 0;
+    assert ghost_invalidProtocolId_eventCount == 0;
 }
 
 rule fulfillRequest_returnsWhen_invalidChainSelector() {
@@ -590,7 +591,7 @@ rule fulfillRequest_returnsWhen_invalidChainSelector() {
     bytes response;
     bytes err;
     uint64 chainSelector;
-    uint8 protocolEnum;
+    bytes32 protocolId;
 
     require err.length == 0, "error should be empty when CLF returns a valid response";
     require !parent.getAllowedChain(chainSelector), "fulfillRequest should always return if the chain selector is not allowed";
@@ -598,44 +599,43 @@ rule fulfillRequest_returnsWhen_invalidChainSelector() {
     require ghost_clfRequestError_eventCount == 0 &&
         ghost_clfRequestFulfilled_eventCount == 0 &&
         ghost_invalidChainSelector_eventCount == 0 &&
-        ghost_invalidProtocolEnum_eventCount == 0,
+        ghost_invalidProtocolId_eventCount == 0,
         "event counts should be 0 before calling fulfillRequest";
 
-    response = createCLFResponse(chainSelector, protocolEnum);
+    response = createCLFResponse(chainSelector, protocolId);
     handleOracleFulfillment(e, requestId, response, err);
 
     assert ghost_clfRequestError_eventCount == 0;
     assert ghost_clfRequestFulfilled_eventCount == 0;
     assert ghost_invalidChainSelector_eventCount == 1;
-    assert ghost_invalidProtocolEnum_eventCount == 0;
+    assert ghost_invalidProtocolId_eventCount == 0;
 }
 
-rule fulfillRequest_returnsWhen_invalidProtocolEnum() {
+rule fulfillRequest_returnsWhen_invalidProtocolId() {
     env e;
     bytes32 requestId;
     bytes response;
     bytes err;
     uint64 chainSelector;
-    uint8 protocolEnum;
+    bytes32 protocolId;
 
     require err.length == 0, "error should be empty when CLF returns a valid response";
     require parent.getAllowedChain(chainSelector), "chain selector should be allowed";
-    require protocolEnum > currentContract.s_numberOfProtocols, 
-        "fulfillRequest should always return if the protocol enum is invalid";
+    require strategyRegistry.getStrategyAdapter(protocolId) == 0, "fulfillRequest should always return if the protocol id is invalid";
 
     require ghost_clfRequestError_eventCount == 0 &&
         ghost_clfRequestFulfilled_eventCount == 0 &&
         ghost_invalidChainSelector_eventCount == 0 &&
-        ghost_invalidProtocolEnum_eventCount == 0,
+        ghost_invalidProtocolId_eventCount == 0,
         "event counts should be 0 before calling fulfillRequest";
 
-    response = createCLFResponse(chainSelector, protocolEnum);
+    response = createCLFResponse(chainSelector, protocolId);
     handleOracleFulfillment(e, requestId, response, err);
 
     assert ghost_clfRequestError_eventCount == 0;
     assert ghost_clfRequestFulfilled_eventCount == 0;
     assert ghost_invalidChainSelector_eventCount == 0;
-    assert ghost_invalidProtocolEnum_eventCount == 1;
+    assert ghost_invalidProtocolId_eventCount == 1;
 }
 
 rule fulfillRequest_success() {
@@ -644,27 +644,27 @@ rule fulfillRequest_success() {
     bytes response;
     bytes err;
     uint64 chainSelector;
-    uint8 protocolEnum;
+    bytes32 protocolId;
 
     require err.length == 0, "error should be empty when CLF returns a valid response";
     require parent.getAllowedChain(chainSelector), "chain selector should be allowed";
-    require protocolEnum <= currentContract.s_numberOfProtocols, "protocol enum should be less than or equal to the number of protocols";
+    require strategyRegistry.getStrategyAdapter(protocolId) != 0, "protocol id should be valid";
 
     require ghost_clfRequestError_eventCount == 0 &&
         ghost_clfRequestFulfilled_eventCount == 0 &&
         ghost_invalidChainSelector_eventCount == 0 &&
-        ghost_invalidProtocolEnum_eventCount == 0,
+        ghost_invalidProtocolId_eventCount == 0,
         "event counts should be 0 before calling fulfillRequest";
 
-    response = createCLFResponse(chainSelector, protocolEnum);
+    response = createCLFResponse(chainSelector, protocolId);
     handleOracleFulfillment(e, requestId, response, err);
 
     assert ghost_clfRequestError_eventCount == 0;
     assert ghost_clfRequestFulfilled_eventCount == 1;
     assert ghost_invalidChainSelector_eventCount == 0;
-    assert ghost_invalidProtocolEnum_eventCount == 0;
+    assert ghost_invalidProtocolId_eventCount == 0;
 
-    assert assert_uint8(getStrategyFromParentPeer().protocol) == protocolEnum;
+    assert getStrategyFromParentPeer().protocolId == protocolId;
     assert getStrategyFromParentPeer().chainSelector == chainSelector;
 }
 

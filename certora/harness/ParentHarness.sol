@@ -61,7 +61,7 @@ contract ParentHarness is ParentPeer, HelperHarness {
         return _convertUsdcToShare(amount);
     }
 
-    function getStrategyAdapterFromProtocol(IYieldPeer.Protocol protocol) public view returns (address) {
-        return _getStrategyAdapterFromProtocol(protocol);
+    function getStrategyAdapterFromProtocol(bytes32 protocolId) public view returns (address) {
+        return _getStrategyAdapterFromProtocol(protocolId);
     }
 }

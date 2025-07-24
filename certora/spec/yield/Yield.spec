@@ -3,6 +3,7 @@ using MockAToken as aUsdc;
 using MockComet as compound;
 using AaveV3Adapter as aaveV3Adapter;
 using CompoundV3Adapter as compoundV3Adapter;
+using StrategyRegistry as strategyRegistry;
 
 /// Verification of YieldPeer
 /// @author @contractlevel
@@ -21,6 +22,7 @@ methods {
     function usdc.balanceOf(address) external returns (uint256) envfree;
     function aUsdc.balanceOf(address) external returns (uint256);
     function compound.balanceOf(address) external returns (uint256);
+    function strategyRegistry.getStrategyAdapter(bytes32) external returns (address) envfree;
 
     // Wildcard dispatcher summaries
     function _.withdraw(address,uint256) external => DISPATCHER(true);
@@ -30,7 +32,7 @@ methods {
     // Harness helper methods
     function decodeAddress(bytes) external returns (address) envfree;
     function buildEncodedWithdrawData(address,uint256,uint256,uint256,uint64) external returns (bytes) envfree;
-    function encodeStrategy(uint64,uint8) external returns (bytes) envfree;
+    function encodeStrategy(uint64,bytes32) external returns (bytes) envfree;
     function encodeUint64(uint64) external returns (bytes) envfree;
 }
 
@@ -85,10 +87,10 @@ ghost mathint ghost_withdrawFromStrategy_eventCount {
     init_state axiom ghost_withdrawFromStrategy_eventCount == 0;
 }
 
-/// @notice track the storage mapping for strategy adapters
-ghost mapping(IYieldPeer.Protocol => address) ghost_storage_strategyAdapters {
-    init_state axiom forall IYieldPeer.Protocol p. ghost_storage_strategyAdapters[p] == 0;
-}
+// /// @notice track the storage mapping for strategy adapters
+// ghost mapping(IYieldPeer.Protocol => address) ghost_storage_strategyAdapters {
+//     init_state axiom forall IYieldPeer.Protocol p. ghost_storage_strategyAdapters[p] == 0;
+// }
 
 /*//////////////////////////////////////////////////////////////
                              HOOKS
@@ -109,10 +111,10 @@ hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
         ghost_activeStrategyAdapterUpdated_eventCount = ghost_activeStrategyAdapterUpdated_eventCount + 1;
 }
 
-hook Sstore s_strategyAdapters[KEY IYieldPeer.Protocol protocol] address newValue (address oldValue) {
-    if (newValue != oldValue) 
-        ghost_storage_strategyAdapters[protocol] = newValue;
-}
+// hook Sstore s_strategyAdapters[KEY IYieldPeer.Protocol protocol] address newValue (address oldValue) {
+//     if (newValue != oldValue) 
+//         ghost_storage_strategyAdapters[protocol] = newValue;
+// }
 
 /*//////////////////////////////////////////////////////////////
                            INVARIANTS
@@ -257,23 +259,25 @@ rule handleCCIPRebalanceNewStrategy_emits_ActiveStrategyAdapterUpdated() {
 
 rule handleCCIPRebalanceNewStrategy_depositsToNewStrategy() {
     env e;
-    uint8 protocolEnum;
-    bytes strategyData = encodeStrategy(getThisChainSelector(), protocolEnum);
+    bytes32 protocolId;
+    bytes32 aaveV3ProtocolId;
+    bytes32 compoundV3ProtocolId;
+    bytes strategyData = encodeStrategy(getThisChainSelector(), protocolId);
 
     /// @dev require the storage mappings for active strategy adapters to be the correct contracts
-    require currentContract.s_strategyAdapters[IYieldPeer.Protocol.Aave]     == aaveV3Adapter;
-    require currentContract.s_strategyAdapters[IYieldPeer.Protocol.Compound] == compoundV3Adapter;
+    require strategyRegistry.getStrategyAdapter(aaveV3ProtocolId)     == aaveV3Adapter;
+    require strategyRegistry.getStrategyAdapter(compoundV3ProtocolId) == compoundV3Adapter;
 
     uint256 usdcBalanceBefore = usdc.balanceOf(currentContract);
     mathint depositToStrategy_eventCountBefore = ghost_depositToStrategy_eventCount;
 
     handleCCIPRebalanceNewStrategy(e, strategyData);
 
-    assert protocolEnum == 0 => getActiveStrategyAdapter() == aaveV3Adapter;
-    assert protocolEnum == 1 => getActiveStrategyAdapter() == compoundV3Adapter;
+    assert protocolId == aaveV3ProtocolId => getActiveStrategyAdapter() == aaveV3Adapter;
+    assert protocolId == compoundV3ProtocolId => getActiveStrategyAdapter() == compoundV3Adapter;
 
-    assert usdcBalanceBefore > 0 && protocolEnum == 0 => aUsdc.balanceOf(e, getActiveStrategyAdapter()) >= usdcBalanceBefore;
-    assert usdcBalanceBefore > 0 && protocolEnum == 1 => compound.balanceOf(e, getActiveStrategyAdapter()) >= usdcBalanceBefore;
+    assert usdcBalanceBefore > 0 && protocolId == aaveV3ProtocolId => aUsdc.balanceOf(e, getActiveStrategyAdapter()) >= usdcBalanceBefore;
+    assert usdcBalanceBefore > 0 && protocolId == compoundV3ProtocolId => compound.balanceOf(e, getActiveStrategyAdapter()) >= usdcBalanceBefore;
     assert usdcBalanceBefore > 0 => ghost_depositToStrategy_eventCount == depositToStrategy_eventCountBefore + 1;
 }
 
