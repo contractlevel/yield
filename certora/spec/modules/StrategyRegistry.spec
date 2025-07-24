@@ -67,20 +67,16 @@ rule setStrategyAdapter_success(method f) {
     env e;
     bytes32 protocolId;
     address strategyAdapter;
-
-    require e.msg.sender    == currentContract._owner;
-    require e.msg.value     == 0;
-
-    require protocolId      != to_bytes32(0);
-    require strategyAdapter != 0;
-    
-    require ghost_strategyAdapterSet_eventCount        == 0;
-    require ghost_strategyAdapterSet_emittedAdapter    == 0;
+    require e.msg.sender                               == currentContract._owner;
+    require e.msg.value                                ==            0;
+    require ghost_strategyAdapterSet_eventCount        ==            0;
+    require ghost_strategyAdapterSet_emittedAdapter    ==            0;
+    require strategyAdapter                            !=            0;
+    require                                 protocolId != to_bytes32(0);
     require ghost_strategyAdapterSet_emittedProtocolId == to_bytes32(0);
-
-    setStrategyAdapter@withrevert(e, protocolId, strategyAdapter);
+    setStrategyAdapter@withrevert(e,        protocolId,   strategyAdapter);
+    assert  ghost_strategyAdapterSet_emittedAdapter    == strategyAdapter;
+    assert  ghost_strategyAdapterSet_emittedProtocolId == protocolId;
+    assert  ghost_strategyAdapterSet_eventCount        == 1;
     assert !lastReverted;
-    assert ghost_strategyAdapterSet_eventCount         == 1;
-    assert ghost_strategyAdapterSet_emittedAdapter     == strategyAdapter;
-    assert ghost_strategyAdapterSet_emittedProtocolId  == protocolId;
 }

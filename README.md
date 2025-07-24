@@ -108,6 +108,8 @@ The terms "current strategy" and "active strategy" are used interchangably.
 
 "Old Strategy" refers to the Strategy funds are being withdrawn from during the rebalance process, and "New Strategy" refers to the Strategy those funds are being deposited to during the rebalance.
 
+The string hashed for the strategy protocol ID should match what is hashed in the Chainlink Functions source code - see functions/src.js.
+
 ## Contracts/Architecture
 
 The Contract Level Yield system that powers YieldCoin consists of a crosschain network of "Peer" contracts. `YieldPeer` contracts are deployed on each compatible chain, and act as entry points to the system. Currently the only supported stablecoin is `USDC` (due partially to its availability across chains with CCIP and the time constraints of the hackathon).

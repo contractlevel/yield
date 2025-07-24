@@ -35,7 +35,11 @@ contract StrategyRegistry is IStrategyRegistry, Ownable2Step {
     //////////////////////////////////////////////////////////////*/
     /// @notice Setter for registering and deregistering a strategy adapter
     /// @dev Revert if msg.sender is not the owner
-    /// @param protocolId The protocol ID
+    /// @param protocolId The protocol ID should be generated using keccak256 with consistent formatting:
+    /// @dev Examples:
+    /// @dev bytes32 aaveV3Id = keccak256("aave-v3");
+    /// @dev bytes32 compoundV3Id = keccak256("compound-v3");
+    /// @notice The string hashed for the protocol ID should match what is hashed in the Chainlink Functions source code - see functions/src.js
     /// @param strategyAdapter The strategy adapter address
     function setStrategyAdapter(bytes32 protocolId, address strategyAdapter) external onlyOwner {
         s_strategyAdapters[protocolId] = strategyAdapter;
