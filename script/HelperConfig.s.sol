@@ -518,8 +518,8 @@ contract HelperConfig is Script {
         ccipLocalSimulator.supportNewTokenViaGetCCIPAdmin(address(share));
 
         rebalancer = new Rebalancer(address(functionsRouter), "", 0);
-        parent =
-            new ParentPeer(address(ccipRouter), address(link), 1, address(usdc), address(share), address(rebalancer));
+        parent = new ParentPeer(address(ccipRouter), address(link), 1, address(usdc), address(share));
         child = new ChildPeer(address(ccipRouter), address(link), 2, address(usdc), address(share), 1);
+        parent.setRebalancer(address(rebalancer));
     }
 }

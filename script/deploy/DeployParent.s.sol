@@ -61,13 +61,13 @@ contract DeployParent is Script {
             networkConfig.tokens.link,
             networkConfig.ccip.thisChainSelector,
             networkConfig.tokens.usdc,
-            address(deploy.share),
-            address(deploy.rebalancer)
+            address(deploy.share)
         );
 
         deploy.share.grantMintAndBurnRoles(address(deploy.sharePool));
         deploy.share.grantMintAndBurnRoles(address(deploy.parentPeer));
         deploy.rebalancer.setParentPeer(address(deploy.parentPeer));
+        deploy.parentPeer.setRebalancer(address(deploy.rebalancer));
 
         deploy.aaveV3Adapter =
             new AaveV3Adapter(address(deploy.parentPeer), networkConfig.protocols.aavePoolAddressesProvider);

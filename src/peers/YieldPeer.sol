@@ -71,6 +71,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     address internal s_activeStrategyAdapter;
 
     /// @dev Mapping of strategy adapters
+    // @review
     mapping(IYieldPeer.Protocol protocol => address strategyAdapter) internal s_strategyAdapters;
 
     /*//////////////////////////////////////////////////////////////

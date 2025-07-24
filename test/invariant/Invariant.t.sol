@@ -110,9 +110,9 @@ contract Invariant is StdInvariant, BaseTest {
             networkConfig.tokens.link,
             PARENT_SELECTOR,
             networkConfig.tokens.usdc,
-            networkConfig.tokens.share,
-            address(rebalancer)
+            networkConfig.tokens.share
         );
+        parent.setRebalancer(address(rebalancer));
         rebalancer.setUpkeepAddress(upkeep);
         rebalancer.setParentPeer(address(parent));
         /// @dev deploy parent adapters

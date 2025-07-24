@@ -9,8 +9,4 @@ contract CompoundV3AdapterHarness is CompoundV3Adapter, HelperHarness {
         address yieldPeer,
         address comet
     ) CompoundV3Adapter(yieldPeer, comet) {}
-
-    function getStrategyPool() external returns (address) {
-        return i_comet;
-    }
 }

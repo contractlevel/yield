@@ -13,9 +13,8 @@ contract ParentHarness is ParentPeer, HelperHarness {
         address link,
         uint64 thisChainSelector,
         address usdc,
-        address share,
-        address parentRebalancer    
-    ) ParentPeer(ccipRouter, link, thisChainSelector, usdc, share, parentRebalancer) {}
+        address share
+    ) ParentPeer(ccipRouter, link, thisChainSelector, usdc, share) {}
 
     function buildCCIPMessage(
         address receiver,

@@ -19,14 +19,12 @@ contract ParentPeer is YieldPeer {
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
-    /// @dev This address handles automated CCIP rebalance calls with Log-trigger Automation, based on Function request callbacks
-    /// @notice See ./src/modules/Rebalancer.sol
-    // @review this should definitely be configurable!
-    address internal immutable i_rebalancer;
-
     /// @dev total share tokens (YieldCoin) minted across all chains
     // @invariant s_totalShares == ghost_totalSharesMinted - ghost_totalSharesBurned
     uint256 internal s_totalShares;
+    /// @dev This address handles automated CCIP rebalance calls with Log-trigger Automation, based on Function request callbacks
+    /// @notice See ./src/modules/Rebalancer.sol
+    address internal s_rebalancer;
     /// @dev The current strategy: chainSelector and protocol
     Strategy internal s_strategy;
     /// @dev Whether the initial active strategy adapter has been set
@@ -47,6 +45,8 @@ contract ParentPeer is YieldPeer {
     event DepositForwardedToStrategy(uint256 indexed depositAmount, uint64 indexed strategyChainSelector);
     /// @notice Emitted when a withdraw is forwarded to the strategy
     event WithdrawForwardedToStrategy(uint256 indexed shareBurnAmount, uint64 indexed strategyChainSelector);
+    /// @notice Emitted when the rebalancer is set
+    event RebalancerSet(address indexed rebalancer);
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -56,19 +56,9 @@ contract ParentPeer is YieldPeer {
     /// @param thisChainSelector The selector of the chain this contract is deployed on
     /// @param usdc The address of the USDC token
     /// @param share The address of the share token native to this system that is minted in exchange for USDC deposits (YieldCoin)
-    constructor(
-        address ccipRouter,
-        address link,
-        uint64 thisChainSelector,
-        address usdc,
-        address share,
-        address rebalancer
-    ) YieldPeer(ccipRouter, link, thisChainSelector, usdc, share) {
-        // slither-disable-next-line missing-zero-check
-        i_rebalancer = rebalancer;
-        // /// @dev Set to address(1) to get past check in setStrategyAdapter for initial active strategy
-        // s_activeStrategyAdapter = address(1);
-    }
+    constructor(address ccipRouter, address link, uint64 thisChainSelector, address usdc, address share)
+        YieldPeer(ccipRouter, link, thisChainSelector, usdc, share)
+    {}
 
     /*//////////////////////////////////////////////////////////////
                                 EXTERNAL
@@ -417,13 +407,13 @@ contract ParentPeer is YieldPeer {
 
     /// @dev Revert if msg.sender is not the Rebalancer
     function _revertIfMsgSenderIsNotRebalancer() internal view {
-        if (msg.sender != i_rebalancer) revert ParentPeer__OnlyRebalancer();
+        if (msg.sender != s_rebalancer) revert ParentPeer__OnlyRebalancer();
     }
 
     /*//////////////////////////////////////////////////////////////
                                  SETTER
     //////////////////////////////////////////////////////////////*/
-    /// @dev Revert if msg.sender is not the ParentRebalancer
+    /// @dev Revert if msg.sender is not the Rebalancer
     /// @dev Set the strategy
     /// @param chainSelector The chain selector of the new strategy
     /// @param protocol The protocol of the new strategy
@@ -447,6 +437,14 @@ contract ParentPeer is YieldPeer {
         _updateActiveStrategyAdapter(i_thisChainSelector, protocol);
     }
 
+    /// @notice Sets the rebalancer
+    /// @dev Revert if msg.sender is not the owner
+    /// @param rebalancer The address of the rebalancer
+    function setRebalancer(address rebalancer) external onlyOwner {
+        s_rebalancer = rebalancer;
+        emit RebalancerSet(rebalancer);
+    }
+
     /*//////////////////////////////////////////////////////////////
                                  GETTER
     //////////////////////////////////////////////////////////////*/
@@ -460,5 +458,11 @@ contract ParentPeer is YieldPeer {
     /// @return totalShares The total shares minted across all chains
     function getTotalShares() external view returns (uint256) {
         return s_totalShares;
+    }
+
+    /// @notice Get the current rebalancer
+    /// @return rebalancer The current rebalancer
+    function getRebalancer() external view returns (address) {
+        return s_rebalancer;
     }
 }

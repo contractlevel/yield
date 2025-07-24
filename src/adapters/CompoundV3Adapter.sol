@@ -55,7 +55,7 @@ contract CompoundV3Adapter is StrategyAdapter {
 
     /// @notice Gets the Compound V3 pool address
     /// @return comet The Compound V3 pool address
-    function getStrategyPool() external returns (address comet) {
+    function getStrategyPool() external view returns (address comet) {
         return i_comet;
     }
 }

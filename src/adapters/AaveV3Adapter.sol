@@ -81,7 +81,7 @@ contract AaveV3Adapter is StrategyAdapter {
 
     /// @notice Gets the Aave V3 pool address
     /// @return aavePool The Aave V3 pool address
-    function getStrategyPool() external returns (address aavePool) {
+    function getStrategyPool() external view returns (address aavePool) {
         return IPoolAddressesProvider(i_aavePoolAddressesProvider).getPool();
     }
 }

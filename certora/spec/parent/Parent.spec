@@ -773,7 +773,7 @@ rule rebalanceNewStrategy_revertsWhen_notParentRebalancer() {
     env e;
     calldataarg args;
 
-    require e.msg.sender != currentContract.i_rebalancer;
+    require e.msg.sender != currentContract.s_rebalancer;
 
     rebalanceNewStrategy@withrevert(e, args);
     assert lastReverted;
@@ -812,7 +812,7 @@ rule rebalanceOldStrategy_revertsWhen_notParentRebalancer() {
     env e;
     calldataarg args;
 
-    require e.msg.sender != currentContract.i_rebalancer;
+    require e.msg.sender != currentContract.s_rebalancer;
 
     rebalanceOldStrategy@withrevert(e, args);
     assert lastReverted;
