@@ -7,6 +7,7 @@ import {FunctionsRequest} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/l
 import {ILogAutomation, Log} from "@chainlink/contracts/src/v0.8/automation/interfaces/ILogAutomation.sol";
 import {AutomationBase} from "@chainlink/contracts/src/v0.8/automation/AutomationBase.sol";
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {IStrategyRegistry} from "../interfaces/IStrategyRegistry.sol";
 
 /// @title Rebalancer
 /// @author @contractlevel
@@ -48,13 +49,12 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     /// @dev Chainlink Automation upkeep address
     /// @notice This is not "forwarder" because we are using time-based Automation
     address internal s_upkeepAddress;
-    /// @dev Number of integrated strategy protocols beginning with 0 (ie 0 = Aave, 1 = Compound)
-    /// @notice This is used to validate the protocol enum in the Chainlink Functions response
-    uint8 internal s_numberOfProtocols;
     /// @dev Chainlink Automation forwarder
     address internal s_forwarder;
     /// @dev ParentPeer contract address
     address internal s_parentPeer;
+    /// @dev Strategy registry
+    address internal s_strategyRegistry;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -62,20 +62,20 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     /// @notice Emitted when a Chainlink Functions request returns an error
     event CLFRequestError(bytes32 indexed requestId, bytes err);
     /// @notice Emitted when a Chainlink Functions request is fulfilled
-    event CLFRequestFulfilled(bytes32 indexed requestId, uint64 indexed chainSelector, uint8 indexed protocolEnum);
+    event CLFRequestFulfilled(bytes32 indexed requestId, uint64 indexed chainSelector, bytes32 indexed protocolId);
     /// @notice Emitted when a Chainlink Functions request returns an invalid chain selector
     event InvalidChainSelector(bytes32 indexed requestId, uint64 indexed chainSelector);
-    /// @notice Emitted when a Chainlink Functions request returns an invalid protocol enum
-    event InvalidProtocolEnum(bytes32 indexed requestId, uint8 indexed protocolEnum);
+    /// @notice Emitted when a Chainlink Functions request returns an invalid protocol ID
+    event InvalidProtocolId(bytes32 indexed requestId, bytes32 indexed protocolId);
 
     /// @notice Emitted when the Chainlink Automation upkeep address is set
     event UpkeepAddressSet(address indexed upkeepAddress);
-    /// @notice Emitted when the number of protocols is set
-    event NumberOfProtocolsSet(uint8 indexed numberOfProtocols);
     /// @notice Emitted when the Chainlink Automation forwarder is set
     event ForwarderSet(address indexed forwarder);
     /// @notice Emitted when the ParentPeer contract address is set
     event ParentPeerSet(address indexed parentPeer);
+    /// @notice Emitted when the strategy registry is set
+    event StrategyRegistrySet(address indexed strategyRegistry);
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -123,14 +123,14 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
         cannotExecute
         returns (bool upkeepNeeded, bytes memory performData)
     {
-        bytes32 eventSignature = keccak256("StrategyUpdated(uint64,uint8,uint64)");
+        bytes32 eventSignature = keccak256("StrategyUpdated(uint64,bytes32,uint64)");
         address parentPeer = s_parentPeer;
         uint64 thisChainSelector = IParentPeer(parentPeer).getThisChainSelector();
         address forwarder = s_forwarder;
 
         if (log.source == parentPeer && log.topics[0] == eventSignature) {
             uint64 chainSelector = uint64(uint256(log.topics[1]));
-            uint8 protocolEnum = uint8(uint256(log.topics[2]));
+            bytes32 protocolId = log.topics[2];
             uint64 oldChainSelector = uint64(uint256(log.topics[3]));
 
             if (chainSelector == thisChainSelector && oldChainSelector == thisChainSelector) {
@@ -140,9 +140,9 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
             }
 
             IYieldPeer.Strategy memory newStrategy =
-                IYieldPeer.Strategy({chainSelector: chainSelector, protocol: IYieldPeer.Protocol(protocolEnum)});
+                IYieldPeer.Strategy({chainSelector: chainSelector, protocolId: protocolId});
             IYieldPeer.CcipTxType txType;
-            address oldStrategyAdapter = IYieldPeer(parentPeer).getStrategyAdapter(newStrategy.protocol);
+            address oldStrategyAdapter = IYieldPeer(parentPeer).getStrategyAdapter(newStrategy.protocolId);
             // slither-disable-next-line uninitialized-local
             uint256 totalValue;
 
@@ -205,9 +205,8 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
             emit CLFRequestError(requestId, err);
             return;
         }
-        (uint256 decodedSelector, uint256 decodedEnum) = abi.decode(response, (uint256, uint256));
+        (uint256 decodedSelector, bytes32 protocolId) = abi.decode(response, (uint256, bytes32));
         uint64 chainSelector = uint64(decodedSelector);
-        uint8 protocolEnum = uint8(decodedEnum);
 
         address parentPeer = s_parentPeer;
 
@@ -215,14 +214,14 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
             emit InvalidChainSelector(requestId, chainSelector);
             return;
         }
-        if (protocolEnum > s_numberOfProtocols) {
-            emit InvalidProtocolEnum(requestId, protocolEnum);
+        if (IStrategyRegistry(s_strategyRegistry).getStrategyAdapter(protocolId) == address(0)) {
+            emit InvalidProtocolId(requestId, protocolId);
             return;
         }
 
-        emit CLFRequestFulfilled(requestId, chainSelector, protocolEnum);
+        emit CLFRequestFulfilled(requestId, chainSelector, protocolId);
 
-        IParentPeer(parentPeer).setStrategy(chainSelector, IYieldPeer.Protocol(protocolEnum));
+        IParentPeer(parentPeer).setStrategy(chainSelector, protocolId);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -235,14 +234,6 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     function setUpkeepAddress(address upkeepAddress) external onlyOwner {
         s_upkeepAddress = upkeepAddress;
         emit UpkeepAddressSet(upkeepAddress);
-    }
-
-    /// @notice Set the number of protocols
-    /// @param numberOfProtocols The number of protocols
-    /// @dev Revert if the caller is not the owner
-    function setNumberOfProtocols(uint8 numberOfProtocols) external onlyOwner {
-        s_numberOfProtocols = numberOfProtocols;
-        emit NumberOfProtocolsSet(numberOfProtocols);
     }
 
     /// @notice Sets the Chainlink Automation forwarder
@@ -261,6 +252,14 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     function setParentPeer(address parentPeer) external onlyOwner {
         s_parentPeer = parentPeer;
         emit ParentPeerSet(parentPeer);
+    }
+
+    /// @notice Sets the strategy registry
+    /// @param strategyRegistry The address of the strategy registry
+    /// @dev Revert if the caller is not the owner
+    function setStrategyRegistry(address strategyRegistry) external onlyOwner {
+        s_strategyRegistry = strategyRegistry;
+        emit StrategyRegistrySet(strategyRegistry);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -294,5 +293,10 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     /// @return parentPeer The ParentPeer contract address
     function getParentPeer() external view returns (address parentPeer) {
         parentPeer = s_parentPeer;
+    }
+
+    /// @return strategyRegistry The strategy registry address
+    function getStrategyRegistry() external view returns (address strategyRegistry) {
+        strategyRegistry = s_strategyRegistry;
     }
 }

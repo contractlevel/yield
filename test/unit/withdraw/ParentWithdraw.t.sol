@@ -55,7 +55,7 @@ contract ParentWithdrawTest is BaseTest {
 
     /// @notice Scenario: Withdraw made on Parent chain, where the Strategy is, and the Strategy Protocol is Compound
     function test_yield_parent_withdraw_strategyIsParent_compound_withdrawToLocalChain() public {
-        _setStrategy(baseChainSelector, IYieldPeer.Protocol.Compound);
+        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("compound-v3")));
         _changePrank(withdrawer);
 
         /// @dev arrange
@@ -86,7 +86,7 @@ contract ParentWithdrawTest is BaseTest {
 
     /// @notice Scenario: Withdraw made on Parent chain, where the Strategy is not, and the Strategy Protocol is Aave
     function test_yield_parent_withdraw_strategyIsNotParent_aave() public {
-        _setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
+        _setStrategy(optChainSelector, keccak256(abi.encodePacked("aave-v3")));
         _selectFork(baseFork);
         _changePrank(withdrawer);
 
@@ -121,7 +121,7 @@ contract ParentWithdrawTest is BaseTest {
 
     /// @notice Scenario: Withdraw made on Parent chain, where the Strategy is not, and the Strategy Protocol is Compound
     function test_yield_parent_withdraw_strategyIsNotParent_compound() public {
-        _setStrategy(optChainSelector, IYieldPeer.Protocol.Compound);
+        _setStrategy(optChainSelector, keccak256(abi.encodePacked("compound-v3")));
         _selectFork(baseFork);
         _changePrank(withdrawer);
 

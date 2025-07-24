@@ -233,14 +233,16 @@ contract Handler is Test {
     }
 
     /// @notice This function handles the fulfillment of requests to the CLF don - the purpose of which is to update the strategy
-    function fulfillRequest(uint256 chainSelectorSeed, uint256 protocolEnumSeed) public {
+    function fulfillRequest(uint256 chainSelectorSeed, uint256 protocolIdSeed) public {
         /// @dev ensure the pools have enough liquidity
         // uint256 totalValue =
         _dealPoolsUsdc();
 
         /// @dev bind the chain selector and protocol enum to the range of valid values
         uint64 chainSelector = uint64(bound(chainSelectorSeed, 1, 3));
-        uint8 protocolEnum = uint8(bound(protocolEnumSeed, 0, 1));
+        bytes32 protocolId;
+        if (protocolIdSeed % 2 == 0) protocolId = keccak256(abi.encodePacked("aave-v3"));
+        else protocolId = keccak256(abi.encodePacked("compound-v3"));
 
         /// @dev simulate the passing of time
         /// @notice we are simulating time based automation triggering once per day
@@ -250,7 +252,7 @@ contract Handler is Test {
         vm.recordLogs();
         _changePrank(upkeep);
         rebalancer.sendCLFRequest();
-        bytes memory response = abi.encode(chainSelector, protocolEnum);
+        bytes memory response = abi.encode(chainSelector, protocolId);
         bytes32 requestId;
         Vm.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i = 0; i < logs.length; i++) {
@@ -277,11 +279,11 @@ contract Handler is Test {
         _stopPrank();
     }
 
-    function _performUpkeep(uint64 newChainSelector, uint8 protocolEnum, uint64 oldChainSelector) internal {
+    function _performUpkeep(uint64 newChainSelector, bytes32 protocolId, uint64 oldChainSelector) internal {
         if (newChainSelector == parentChainSelector && oldChainSelector == parentChainSelector) return;
 
         IYieldPeer.Strategy memory newStrategy =
-            IYieldPeer.Strategy({chainSelector: newChainSelector, protocol: IYieldPeer.Protocol(protocolEnum)});
+            IYieldPeer.Strategy({chainSelector: newChainSelector, protocolId: protocolId});
         IYieldPeer.CcipTxType txType;
         if (oldChainSelector == parentChainSelector && newChainSelector != parentChainSelector) {
             txType = IYieldPeer.CcipTxType.RebalanceNewStrategy;
@@ -375,15 +377,15 @@ contract Handler is Test {
     /// @notice Handle the logs emitted during Chainlink Functions callback
     /// @dev If the logs contain a StrategyUpdated event with relevant data, perform upkeep
     function _handleCLFLogs() internal {
-        bytes32 strategyUpdatedEvent = keccak256("StrategyUpdated(uint64,uint8,uint64)");
+        bytes32 strategyUpdatedEvent = keccak256("StrategyUpdated(uint64,bytes32,uint64)");
         Vm.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i = 0; i < logs.length; i++) {
             if (logs[i].topics[0] == strategyUpdatedEvent) {
                 uint64 newChainSelector = uint64(uint256(logs[i].topics[1]));
-                uint8 protocolEnum = uint8(uint256(logs[i].topics[2]));
+                bytes32 protocolId = logs[i].topics[2];
                 uint64 oldChainSelector = uint64(uint256(logs[i].topics[3]));
 
-                _performUpkeep(newChainSelector, protocolEnum, oldChainSelector);
+                _performUpkeep(newChainSelector, protocolId, oldChainSelector);
             }
         }
     }

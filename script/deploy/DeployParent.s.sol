@@ -16,6 +16,7 @@ import {RegistryModuleOwnerCustom} from
 import {AaveV3Adapter} from "../../src/adapters/AaveV3Adapter.sol";
 import {CompoundV3Adapter} from "../../src/adapters/CompoundV3Adapter.sol";
 import {IYieldPeer} from "../../src/interfaces/IYieldPeer.sol";
+import {StrategyRegistry} from "../../src/modules/StrategyRegistry.sol";
 
 contract DeployParent is Script {
     struct DeploymentConfig {
@@ -25,6 +26,7 @@ contract DeployParent is Script {
         Rebalancer rebalancer;
         HelperConfig config;
         uint64 clfSubId;
+        StrategyRegistry strategyRegistry;
         AaveV3Adapter aaveV3Adapter;
         CompoundV3Adapter compoundV3Adapter;
     }
@@ -69,12 +71,19 @@ contract DeployParent is Script {
         deploy.rebalancer.setParentPeer(address(deploy.parentPeer));
         deploy.parentPeer.setRebalancer(address(deploy.rebalancer));
 
+        deploy.strategyRegistry = new StrategyRegistry();
         deploy.aaveV3Adapter =
             new AaveV3Adapter(address(deploy.parentPeer), networkConfig.protocols.aavePoolAddressesProvider);
         deploy.compoundV3Adapter = new CompoundV3Adapter(address(deploy.parentPeer), networkConfig.protocols.comet);
-        deploy.parentPeer.setStrategyAdapter(IYieldPeer.Protocol.Aave, address(deploy.aaveV3Adapter));
-        deploy.parentPeer.setStrategyAdapter(IYieldPeer.Protocol.Compound, address(deploy.compoundV3Adapter));
-        deploy.parentPeer.setInitialActiveStrategy(IYieldPeer.Protocol.Aave);
+        deploy.strategyRegistry.setStrategyAdapter(
+            keccak256(abi.encodePacked("aave-v3")), address(deploy.aaveV3Adapter)
+        );
+        deploy.strategyRegistry.setStrategyAdapter(
+            keccak256(abi.encodePacked("compound-v3")), address(deploy.compoundV3Adapter)
+        );
+        deploy.parentPeer.setStrategyRegistry(address(deploy.strategyRegistry));
+        deploy.rebalancer.setStrategyRegistry(address(deploy.strategyRegistry));
+        deploy.parentPeer.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")));
 
         vm.stopBroadcast();
     }

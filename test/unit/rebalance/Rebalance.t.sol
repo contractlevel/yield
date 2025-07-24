@@ -31,22 +31,22 @@ contract RebalanceTest is BaseTest {
         /// @dev act
         /// @notice the strategy chain and protocol are the same as the old strategy
         bytes32 requestId = keccak256("requestId");
-        bytes memory response = abi.encode(uint256(baseChainSelector), uint256(0)); // 0 is Aave
+        bytes memory response = abi.encode(uint256(baseChainSelector), keccak256(abi.encodePacked("aave-v3")));
         _fulfillRequest(requestId, response, "");
 
         /// @dev assert
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 eventSignature = keccak256("CurrentStrategyOptimal(uint64,uint8)");
+        bytes32 eventSignature = keccak256("CurrentStrategyOptimal(uint64,bytes32)");
         uint64 emittedChainSelector;
-        uint8 emittedProtocol;
+        bytes32 emittedProtocolId;
         for (uint256 i = 0; i < logs.length; i++) {
             if (logs[i].topics[0] == eventSignature) {
                 emittedChainSelector = uint64(uint256(logs[i].topics[1]));
-                emittedProtocol = uint8(uint256(logs[i].topics[2]));
+                emittedProtocolId = logs[i].topics[2];
             }
         }
         assertEq(emittedChainSelector, baseChainSelector);
-        assertEq(emittedProtocol, uint8(IYieldPeer.Protocol.Aave));
+        assertEq(emittedProtocolId, keccak256(abi.encodePacked("aave-v3")));
         assertApproxEqAbs(
             IERC20(aUsdc).balanceOf(address(baseAaveV3Adapter)),
             DEPOSIT_AMOUNT,
@@ -72,7 +72,7 @@ contract RebalanceTest is BaseTest {
         /// @dev act
         /// @notice here we are setting the new strategy chain to the same parent (base) whereas the protocol is Compound
         bytes32 requestId = keccak256("requestId");
-        bytes memory response = abi.encode(uint256(baseChainSelector), uint256(1)); // 1 is Compound
+        bytes memory response = abi.encode(uint256(baseChainSelector), keccak256(abi.encodePacked("compound-v3")));
         _fulfillRequest(requestId, response, "");
 
         /// @dev assert
@@ -88,7 +88,7 @@ contract RebalanceTest is BaseTest {
 
     /// @notice Scenario: Old Strategy is on child chain, New Strategy is on same child chain, but different protocol
     function test_yield_rebalance_oldChild_newChild() public {
-        _setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
+        _setStrategy(optChainSelector, keccak256(abi.encodePacked("aave-v3")));
         _selectFork(baseFork);
         _changePrank(depositor);
 
@@ -109,12 +109,17 @@ contract RebalanceTest is BaseTest {
         /// @dev act
         /// @notice here we are setting the new strategy chain to the same child (opt) whereas the protocol is Compound
         bytes32 requestId = keccak256("requestId");
-        bytes memory response = abi.encode(uint256(optChainSelector), uint256(1)); // 1 is Compound
+        bytes memory response = abi.encode(uint256(optChainSelector), keccak256(abi.encodePacked("compound-v3")));
         _fulfillRequest(requestId, response, "");
 
         /// @dev log trigger automation rebalancer happens here
         bytes memory performData = _createPerformData(
-            optChainSelector, uint8(1), IYieldPeer.CcipTxType.RebalanceOldStrategy, optChainSelector, address(0), 0
+            optChainSelector,
+            keccak256(abi.encodePacked("compound-v3")),
+            IYieldPeer.CcipTxType.RebalanceOldStrategy,
+            optChainSelector,
+            address(0),
+            0
         );
         _changePrank(forwarder);
         baseRebalancer.performUpkeep(performData);
@@ -134,7 +139,7 @@ contract RebalanceTest is BaseTest {
 
     /// @notice Scenario: Old Strategy is on Parent, New Strategy is on child chain
     function test_yield_rebalance_oldParent_newChild() public {
-        _setStrategy(baseChainSelector, IYieldPeer.Protocol.Aave);
+        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
         _selectFork(baseFork);
         _changePrank(depositor);
 
@@ -153,13 +158,13 @@ contract RebalanceTest is BaseTest {
         /// @dev act
         /// @notice here we are setting the strategy chain selector to a child (opt)
         bytes32 requestId = keccak256("requestId");
-        bytes memory response = abi.encode(uint256(optChainSelector), uint256(0)); // 0 is Aave
+        bytes memory response = abi.encode(uint256(optChainSelector), keccak256(abi.encodePacked("aave-v3")));
         _fulfillRequest(requestId, response, "");
 
         /// @dev here we need to prank the forwarder to call rebalancer.performUpkeep
         bytes memory performData = _createPerformData(
             optChainSelector,
-            uint8(0),
+            keccak256(abi.encodePacked("aave-v3")),
             IYieldPeer.CcipTxType.RebalanceNewStrategy,
             baseChainSelector,
             baseParentPeer.getActiveStrategyAdapter(),
@@ -182,7 +187,7 @@ contract RebalanceTest is BaseTest {
 
     /// @notice Scenario: Old Strategy is on child chain, New Strategy is on Parent
     function test_yield_rebalance_oldChild_newParent() public {
-        _setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
+        _setStrategy(optChainSelector, keccak256(abi.encodePacked("aave-v3")));
         _selectFork(baseFork);
         _changePrank(depositor);
 
@@ -203,12 +208,17 @@ contract RebalanceTest is BaseTest {
         /// @dev act
         /// @notice here we are setting the strategy chain selector to the parent (base)
         bytes32 requestId = keccak256("requestId");
-        bytes memory response = abi.encode(uint256(baseChainSelector), uint256(0)); // 0 is Aave
+        bytes memory response = abi.encode(uint256(baseChainSelector), keccak256(abi.encodePacked("aave-v3")));
         _fulfillRequest(requestId, response, "");
 
         /// @dev log trigger automation rebalancer happens here
         bytes memory performData = _createPerformData(
-            baseChainSelector, uint8(0), IYieldPeer.CcipTxType.RebalanceOldStrategy, optChainSelector, address(0), 0
+            baseChainSelector,
+            keccak256(abi.encodePacked("aave-v3")),
+            IYieldPeer.CcipTxType.RebalanceOldStrategy,
+            optChainSelector,
+            address(0),
+            0
         );
         _changePrank(forwarder);
         baseRebalancer.performUpkeep(performData);
@@ -229,7 +239,7 @@ contract RebalanceTest is BaseTest {
 
     /// @notice Scenario: Old Strategy is on a Child chain, New Strategy is on a different Child chain ("Chain C")
     function test_yield_rebalance_oldChild_newChainC() public {
-        _setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
+        _setStrategy(optChainSelector, keccak256(abi.encodePacked("aave-v3")));
         _selectFork(baseFork);
         _changePrank(depositor);
 
@@ -250,12 +260,17 @@ contract RebalanceTest is BaseTest {
         /// @dev act
         /// @notice here we are setting the strategy chain selector to a different child (eth)
         bytes32 requestId = keccak256("requestId");
-        bytes memory response = abi.encode(uint256(ethChainSelector), uint256(0));
+        bytes memory response = abi.encode(uint256(ethChainSelector), keccak256(abi.encodePacked("aave-v3")));
         _fulfillRequest(requestId, response, "");
 
         /// @dev log trigger automation rebalancer happens here
         bytes memory performData = _createPerformData(
-            ethChainSelector, uint8(0), IYieldPeer.CcipTxType.RebalanceOldStrategy, optChainSelector, address(0), 0
+            ethChainSelector,
+            keccak256(abi.encodePacked("aave-v3")),
+            IYieldPeer.CcipTxType.RebalanceOldStrategy,
+            optChainSelector,
+            address(0),
+            0
         );
         _changePrank(forwarder);
         baseRebalancer.performUpkeep(performData);

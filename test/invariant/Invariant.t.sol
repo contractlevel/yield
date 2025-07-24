@@ -11,6 +11,7 @@ import {IComet} from "../../src/interfaces/IComet.sol";
 import {MockCCIPRouter} from "@chainlink-local/test/mocks/MockRouter.sol";
 import {AaveV3Adapter} from "../../src/adapters/AaveV3Adapter.sol";
 import {CompoundV3Adapter} from "../../src/adapters/CompoundV3Adapter.sol";
+import {StrategyRegistry} from "../../src/modules/StrategyRegistry.sol";
 
 /// @notice We are making the assumption that the gasLimit set for CCIP works correctly
 contract Invariant is StdInvariant, BaseTest {
@@ -43,6 +44,13 @@ contract Invariant is StdInvariant, BaseTest {
     address internal upkeep = makeAddr("upkeep");
     /// @dev Aave Pool Address
     address internal aavePool;
+
+    /// @dev Strategy Registry contract for parent
+    StrategyRegistry internal strategyRegistryParent;
+    /// @dev Strategy Registry contract for child 1
+    StrategyRegistry internal strategyRegistryChild1;
+    /// @dev Strategy Registry contract for child 2
+    StrategyRegistry internal strategyRegistryChild2;
 
     /// @dev Aave Adapter contract for parent
     AaveV3Adapter internal aaveV3AdapterParent;
@@ -116,11 +124,16 @@ contract Invariant is StdInvariant, BaseTest {
         rebalancer.setUpkeepAddress(upkeep);
         rebalancer.setParentPeer(address(parent));
         /// @dev deploy parent adapters
+        strategyRegistryParent = new StrategyRegistry();
         aaveV3AdapterParent = new AaveV3Adapter(address(parent), networkConfig.protocols.aavePoolAddressesProvider);
         compoundV3AdapterParent = new CompoundV3Adapter(address(parent), networkConfig.protocols.comet);
-        parent.setStrategyAdapter(IYieldPeer.Protocol.Aave, address(aaveV3AdapterParent));
-        parent.setStrategyAdapter(IYieldPeer.Protocol.Compound, address(compoundV3AdapterParent));
-        parent.setInitialActiveStrategy(IYieldPeer.Protocol.Aave);
+        strategyRegistryParent.setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(aaveV3AdapterParent));
+        strategyRegistryParent.setStrategyAdapter(
+            keccak256(abi.encodePacked("compound-v3")), address(compoundV3AdapterParent)
+        );
+        rebalancer.setStrategyRegistry(address(strategyRegistryParent));
+        parent.setStrategyRegistry(address(strategyRegistryParent));
+        parent.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")));
 
         /// @dev deploy at least 2 child peers to cover all CCIP tx types
         child1 = new ChildPeer(
@@ -132,10 +145,14 @@ contract Invariant is StdInvariant, BaseTest {
             PARENT_SELECTOR
         );
         /// @dev child adapters
+        strategyRegistryChild1 = new StrategyRegistry();
         aaveV3AdapterChild1 = new AaveV3Adapter(address(child1), networkConfig.protocols.aavePoolAddressesProvider);
         compoundV3AdapterChild1 = new CompoundV3Adapter(address(child1), networkConfig.protocols.comet);
-        child1.setStrategyAdapter(IYieldPeer.Protocol.Aave, address(aaveV3AdapterChild1));
-        child1.setStrategyAdapter(IYieldPeer.Protocol.Compound, address(compoundV3AdapterChild1));
+        child1.setStrategyRegistry(address(strategyRegistryChild1));
+        strategyRegistryChild1.setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(aaveV3AdapterChild1));
+        strategyRegistryChild1.setStrategyAdapter(
+            keccak256(abi.encodePacked("compound-v3")), address(compoundV3AdapterChild1)
+        );
 
         child2 = new ChildPeer(
             networkConfig.ccip.ccipRouter,
@@ -145,10 +162,14 @@ contract Invariant is StdInvariant, BaseTest {
             networkConfig.tokens.share,
             PARENT_SELECTOR
         );
+        strategyRegistryChild2 = new StrategyRegistry();
         aaveV3AdapterChild2 = new AaveV3Adapter(address(child2), networkConfig.protocols.aavePoolAddressesProvider);
         compoundV3AdapterChild2 = new CompoundV3Adapter(address(child2), networkConfig.protocols.comet);
-        child2.setStrategyAdapter(IYieldPeer.Protocol.Aave, address(aaveV3AdapterChild2));
-        child2.setStrategyAdapter(IYieldPeer.Protocol.Compound, address(compoundV3AdapterChild2));
+        child2.setStrategyRegistry(address(strategyRegistryChild2));
+        strategyRegistryChild2.setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(aaveV3AdapterChild2));
+        strategyRegistryChild2.setStrategyAdapter(
+            keccak256(abi.encodePacked("compound-v3")), address(compoundV3AdapterChild2)
+        );
 
         /// @dev grant roles to the contracts
         _changePrank(share.owner());
@@ -224,7 +245,7 @@ contract Invariant is StdInvariant, BaseTest {
         if (chainSelector == parent.getStrategy().chainSelector) {
             assertEq(
                 IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getStrategyAdapter(
-                    parent.getStrategy().protocol
+                    parent.getStrategy().protocolId
                 ),
                 IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter(),
                 "Invariant violated: Active strategy adapter on active strategy chain should match the protocol stored in ParentPeer"

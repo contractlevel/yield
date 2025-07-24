@@ -3,24 +3,9 @@ pragma solidity 0.8.26;
 
 interface IYieldPeer {
     struct Strategy {
+        bytes32 protocolId;
         uint64 chainSelector;
-        Protocol protocol;
     }
-
-    // @review this should be replaced with a StrategyRegistry contract
-    enum Protocol {
-        Aave,
-        Compound
-    }
-    // should it be:
-    // enum Protocol {
-    //     Invalid, // this would require 0 check in clf callback
-    //     AaveV3,
-    //     CompoundV3
-    // }
-    // or should it not....?
-    // how are we supposed to add new protocols?
-    // perhaps we just map to a uint8 and not have an enum at all?
 
     enum CcipTxType {
         DepositToParent, // 0 - deposit from child to parent (to get strategy chain)
@@ -53,7 +38,7 @@ interface IYieldPeer {
 
     function deposit(uint256 amountToDeposit) external;
     function getTotalValue() external view returns (uint256);
-    function getStrategyAdapter(Protocol protocol) external view returns (address);
+    function getStrategyAdapter(bytes32 protocolId) external view returns (address);
     function setCCIPGasLimit(uint256 gasLimit) external;
     function setAllowedChain(uint64 chainSelector, bool allowed) external;
     function setAllowedPeer(uint64 chainSelector, address peer) external;

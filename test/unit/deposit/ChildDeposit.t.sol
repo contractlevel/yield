@@ -27,7 +27,7 @@ contract ChildDepositTest is BaseTest {
     //     - ccipReceive from parent, getting shareMintAmount
     function test_yield_child_deposit_strategyIsChild_aave() public {
         /// @dev arrange
-        _setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
+        _setStrategy(optChainSelector, keccak256(abi.encodePacked("aave-v3")));
         _selectFork(optFork);
         _changePrank(depositor);
 
@@ -64,7 +64,7 @@ contract ChildDepositTest is BaseTest {
 
     function test_yield_child_deposit_strategyIsChild_compound() public {
         /// @dev arrange
-        _setStrategy(optChainSelector, IYieldPeer.Protocol.Compound);
+        _setStrategy(optChainSelector, keccak256(abi.encodePacked("compound-v3")));
         _selectFork(optFork);
         _changePrank(depositor);
 
@@ -139,7 +139,7 @@ contract ChildDepositTest is BaseTest {
 
     function test_yield_child_deposit_strategyIsParent_compound() public {
         /// @dev arrange
-        _setStrategy(baseChainSelector, IYieldPeer.Protocol.Compound);
+        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("compound-v3")));
         _selectFork(optFork);
         _changePrank(depositor);
 
@@ -183,7 +183,7 @@ contract ChildDepositTest is BaseTest {
     //     - send `shareMintAmount` from parent to child
     function test_yield_child_deposit_strategyIsChainC_aave() public {
         /// @dev arrange
-        _setStrategy(ethChainSelector, IYieldPeer.Protocol.Aave);
+        _setStrategy(ethChainSelector, keccak256(abi.encodePacked("aave-v3")));
         _selectFork(optFork);
         _changePrank(depositor);
 
@@ -225,7 +225,7 @@ contract ChildDepositTest is BaseTest {
 
     function test_yield_child_deposit_strategyIsChainC_compound() public {
         /// @dev arrange
-        _setStrategy(ethChainSelector, IYieldPeer.Protocol.Compound);
+        _setStrategy(ethChainSelector, keccak256(abi.encodePacked("compound-v3")));
         _selectFork(optFork);
         _changePrank(depositor);
 

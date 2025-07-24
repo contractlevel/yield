@@ -11,7 +11,7 @@ contract ConstructorTest is BaseTest {
         assertEq(baseParentPeer.getUsdc(), baseNetworkConfig.tokens.usdc);
         assertEq(baseParentPeer.getShare(), address(baseShare));
 
-        assertEq(uint8(baseParentPeer.getStrategy().protocol), uint8(IYieldPeer.Protocol.Aave));
+        assertEq(baseParentPeer.getStrategy().protocolId, keccak256(abi.encodePacked("aave-v3")));
         assertEq(baseParentPeer.getStrategy().chainSelector, baseNetworkConfig.ccip.thisChainSelector);
 
         assertEq(baseRebalancer.getFunctionsRouter(), baseNetworkConfig.clf.functionsRouter);

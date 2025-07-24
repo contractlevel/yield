@@ -15,6 +15,7 @@ import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAd
 import {DataStructures} from "../libraries/DataStructures.sol";
 import {CCIPOperations} from "../libraries/CCIPOperations.sol";
 import {IStrategyAdapter} from "../interfaces/IStrategyAdapter.sol";
+import {IStrategyRegistry} from "../interfaces/IStrategyRegistry.sol";
 
 /// @title YieldPeer
 /// @author @contractlevel
@@ -67,12 +68,10 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @dev Mapping of peers (ie other Yield contracts)
     mapping(uint64 chainSelector => address peer) internal s_peers;
 
+    /// @dev The strategy registry
+    address internal s_strategyRegistry;
     /// @dev The active strategy adapter
     address internal s_activeStrategyAdapter;
-
-    /// @dev Mapping of strategy adapters
-    // @review
-    mapping(IYieldPeer.Protocol protocol => address strategyAdapter) internal s_strategyAdapters;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -83,8 +82,8 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     event AllowedPeerSet(uint64 indexed chainSelector, address indexed peer);
     /// @notice Emitted when the CCIP gas limit is set
     event CCIPGasLimitSet(uint256 indexed gasLimit);
-    /// @notice Emitted when a strategy adapter is set
-    event StrategyAdapterSet(IYieldPeer.Protocol indexed protocol, address indexed strategyAdapter);
+    /// @notice Emitted when the strategy registry is set
+    event StrategyRegistrySet(address indexed strategyRegistry);
 
     /// @notice Emitted when the strategy pool is updated
     event ActiveStrategyAdapterUpdated(address indexed activeStrategyAdapter);
@@ -234,11 +233,12 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @notice The message this function handles is sent by the old strategy when the strategy is updated
     /// @dev Updates the strategy pool to the new strategy
     /// @dev Deposits USDC totalValue of the system into the new strategy
-    /// @param data The data to decode - decodes to Strategy (chainSelector, protocol)
+    /// @param data The data to decode - decodes to Strategy (chainSelector, protocolId)
     function _handleCCIPRebalanceNewStrategy(bytes memory data) internal {
         /// @dev update strategy pool to protocol on this chain
         Strategy memory newStrategy = abi.decode(data, (Strategy));
-        address newActiveStrategyAdapter = _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocol);
+        address newActiveStrategyAdapter =
+            _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
 
         /// @dev deposit to the new strategy
         uint256 usdcBalance = i_usdc.balanceOf(address(this));
@@ -247,14 +247,14 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
 
     /// @notice Internal helper to handle active strategy adapter updates
     /// @param chainSelector The chain selector for the strategy
-    /// @param protocol The protocol for the strategy
+    /// @param protocolId The protocol ID for the strategy
     /// @return newActiveStrategyAdapter The new active strategy adapter address
-    function _updateActiveStrategyAdapter(uint64 chainSelector, Protocol protocol)
+    function _updateActiveStrategyAdapter(uint64 chainSelector, bytes32 protocolId)
         internal
         returns (address newActiveStrategyAdapter)
     {
         if (chainSelector == i_thisChainSelector) {
-            newActiveStrategyAdapter = _getStrategyAdapterFromProtocol(protocol);
+            newActiveStrategyAdapter = _getStrategyAdapterFromProtocol(protocolId);
             s_activeStrategyAdapter = newActiveStrategyAdapter;
         } else {
             s_activeStrategyAdapter = address(0);
@@ -401,14 +401,10 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     }
 
     /// @notice Helper function to get the strategy adapter from the protocol
-    /// @param protocol The protocol to get the strategy adapter from
+    /// @param protocolId The protocol ID to get the strategy adapter from
     /// @return strategyAdapter The strategy adapter address
-    function _getStrategyAdapterFromProtocol(IYieldPeer.Protocol protocol)
-        internal
-        view
-        returns (address strategyAdapter)
-    {
-        strategyAdapter = s_strategyAdapters[protocol];
+    function _getStrategyAdapterFromProtocol(bytes32 protocolId) internal view returns (address strategyAdapter) {
+        strategyAdapter = IStrategyRegistry(s_strategyRegistry).getStrategyAdapter(protocolId);
     }
 
     /// @notice Helper function to get the active strategy adapter
@@ -513,17 +509,12 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         emit CCIPGasLimitSet(gasLimit);
     }
 
-    /// @notice Set the strategy adapter for a protocol
-    /// @param protocol The protocol to set the strategy adapter for
-    /// @param strategyAdapter The strategy adapter to set
+    /// @notice Set the strategy registry
+    /// @param strategyRegistry The strategy registry to set
     /// @dev Access control: onlyOwner
-    function setStrategyAdapter(IYieldPeer.Protocol protocol, address strategyAdapter) external onlyOwner {
-        // @review without this check, if the owner changes the adapter for the active strategy, it could disrupt the system
-        // because attempts to withdraw would be made on the new adapter, but the old one would have the funds
-        // if (_getStrategyAdapterFromProtocol(protocol) == s_activeStrategyAdapter) revert YieldPeer__StrategyActive();
-
-        s_strategyAdapters[protocol] = strategyAdapter;
-        emit StrategyAdapterSet(protocol, strategyAdapter);
+    function setStrategyRegistry(address strategyRegistry) external onlyOwner {
+        s_strategyRegistry = strategyRegistry;
+        emit StrategyRegistrySet(strategyRegistry);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -586,15 +577,15 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     }
 
     /// @notice Get the strategy adapter for a protocol
-    /// @param protocol The protocol to get the strategy adapter for
+    /// @param protocolId The protocol ID to get the strategy adapter for
     /// @return strategyAdapter The strategy adapter address
-    function getStrategyAdapter(IYieldPeer.Protocol protocol) external view returns (address strategyAdapter) {
-        strategyAdapter = s_strategyAdapters[protocol];
+    function getStrategyAdapter(bytes32 protocolId) external view returns (address strategyAdapter) {
+        strategyAdapter = _getStrategyAdapterFromProtocol(protocolId);
     }
 
     /// @notice Get the active strategy adapter
     /// @return activeStrategyAdapter The active strategy adapter address
     function getActiveStrategyAdapter() external view returns (address activeStrategyAdapter) {
-        activeStrategyAdapter = s_activeStrategyAdapter;
+        activeStrategyAdapter = _getActiveStrategyAdapter();
     }
 }

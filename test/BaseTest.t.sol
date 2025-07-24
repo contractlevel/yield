@@ -31,6 +31,7 @@ import {IYieldPeer} from "../src/interfaces/IYieldPeer.sol";
 import {IComet} from "../src/interfaces/IComet.sol";
 import {AaveV3Adapter} from "../src/adapters/AaveV3Adapter.sol";
 import {CompoundV3Adapter} from "../src/adapters/CompoundV3Adapter.sol";
+import {StrategyRegistry} from "../src/modules/StrategyRegistry.sol";
 
 contract BaseTest is Test {
     /*//////////////////////////////////////////////////////////////
@@ -65,6 +66,7 @@ contract BaseTest is Test {
     ERC20 internal baseUsdc;
     USDCTokenPool internal baseUsdcTokenPool;
     IMessageTransmitter internal baseCCTPMessageTransmitter;
+    StrategyRegistry internal baseStrategyRegistry;
     AaveV3Adapter internal baseAaveV3Adapter;
     CompoundV3Adapter internal baseCompoundV3Adapter;
 
@@ -77,6 +79,7 @@ contract BaseTest is Test {
     ERC20 internal optUsdc;
     USDCTokenPool internal optUsdcTokenPool;
     IMessageTransmitter internal optCCTPMessageTransmitter;
+    StrategyRegistry internal optStrategyRegistry;
     AaveV3Adapter internal optAaveV3Adapter;
     CompoundV3Adapter internal optCompoundV3Adapter;
 
@@ -89,6 +92,7 @@ contract BaseTest is Test {
     ERC20 internal ethUsdc;
     USDCTokenPool internal ethUsdcTokenPool;
     IMessageTransmitter internal ethCCTPMessageTransmitter;
+    StrategyRegistry internal ethStrategyRegistry;
     AaveV3Adapter internal ethAaveV3Adapter;
     CompoundV3Adapter internal ethCompoundV3Adapter;
 
@@ -152,6 +156,7 @@ contract BaseTest is Test {
         baseRebalancer = baseDeploy.rebalancer;
         baseConfig = baseDeploy.config;
         clfSubId = baseDeploy.clfSubId;
+        baseStrategyRegistry = baseDeploy.strategyRegistry;
         baseAaveV3Adapter = baseDeploy.aaveV3Adapter;
         baseCompoundV3Adapter = baseDeploy.compoundV3Adapter;
         vm.makePersistent(address(baseShare));
@@ -170,7 +175,8 @@ contract BaseTest is Test {
         assertEq(block.chainid, OPTIMISM_MAINNET_CHAIN_ID);
 
         DeployChild optDeployChild = new DeployChild();
-        (optShare, optSharePool, optChildPeer, optConfig, optAaveV3Adapter, optCompoundV3Adapter) = optDeployChild.run();
+        (optShare, optSharePool, optChildPeer, optConfig, optStrategyRegistry, optAaveV3Adapter, optCompoundV3Adapter) =
+            optDeployChild.run();
         vm.makePersistent(address(optShare));
         vm.makePersistent(address(optSharePool));
         vm.makePersistent(address(optChildPeer));
@@ -186,7 +192,8 @@ contract BaseTest is Test {
         assertEq(block.chainid, ETHEREUM_MAINNET_CHAIN_ID);
 
         DeployChild ethDeployChild = new DeployChild();
-        (ethShare, ethSharePool, ethChildPeer, ethConfig, ethAaveV3Adapter, ethCompoundV3Adapter) = ethDeployChild.run();
+        (ethShare, ethSharePool, ethChildPeer, ethConfig, ethStrategyRegistry, ethAaveV3Adapter, ethCompoundV3Adapter) =
+            ethDeployChild.run();
         vm.makePersistent(address(ethShare));
         vm.makePersistent(address(ethSharePool));
         vm.makePersistent(address(ethChildPeer));
@@ -475,7 +482,6 @@ contract BaseTest is Test {
         address parentPeerOwner = baseParentPeer.owner();
         _changePrank(parentPeerOwner);
         baseRebalancer.setUpkeepAddress(upkeepAddress);
-        baseRebalancer.setNumberOfProtocols(1); // 0 is Aave, 1 is Compound
 
         /// @dev add ParentPeer as consumer to Chainlink Functions subscription
         address functionsRouter = baseNetworkConfig.clf.functionsRouter;
@@ -546,8 +552,8 @@ contract BaseTest is Test {
 
     /// @notice Helper function to set the strategy across chains
     /// @param chainSelector The chain selector of the strategy
-    /// @param protocol The protocol of the strategy
-    function _setStrategy(uint64 chainSelector, IYieldPeer.Protocol protocol) internal {
+    /// @param protocolId The protocol ID of the strategy
+    function _setStrategy(uint64 chainSelector, bytes32 protocolId) internal {
         _selectFork(baseFork);
 
         address activeStrategyAdapter = baseParentPeer.getActiveStrategyAdapter();
@@ -556,13 +562,13 @@ contract BaseTest is Test {
 
         /// @dev set the strategy on the parent chain by pranking Chainlink Functions fulfillRequest
         bytes32 requestId = bytes32("requestId");
-        bytes memory response = abi.encode(uint256(chainSelector), uint256(uint8(protocol)));
+        bytes memory response = abi.encode(uint256(chainSelector), protocolId);
         _fulfillRequest(requestId, response, "");
 
         if (chainSelector != baseChainSelector) {
             bytes memory performData = _createPerformData(
                 chainSelector,
-                uint8(protocol),
+                protocolId,
                 IYieldPeer.CcipTxType.RebalanceNewStrategy,
                 baseChainSelector,
                 activeStrategyAdapter,
@@ -611,13 +617,13 @@ contract BaseTest is Test {
 
     /// @notice Helper function to create perform data for Chainlink Automation performUpkeep
     /// @param chainSelector The chain selector of the new strategy
-    /// @param protocolEnum The protocol of the strategy
+    /// @param protocolId The protocol ID of the strategy
     /// @param txType The type of CCIP message to send
     /// @param oldChainSelector The chain selector of the old strategy
     /// @param oldStrategyPool The address of the old strategy pool
     function _createPerformData(
         uint64 chainSelector,
-        uint8 protocolEnum,
+        bytes32 protocolId,
         IYieldPeer.CcipTxType txType,
         uint64 oldChainSelector,
         address oldStrategyPool,
@@ -625,7 +631,7 @@ contract BaseTest is Test {
     ) internal view returns (bytes memory) {
         address parentPeer = address(baseRebalancer.getParentPeer());
         IYieldPeer.Strategy memory newStrategy =
-            IYieldPeer.Strategy({chainSelector: chainSelector, protocol: IYieldPeer.Protocol(protocolEnum)});
+            IYieldPeer.Strategy({chainSelector: chainSelector, protocolId: protocolId});
         return abi.encode(forwarder, parentPeer, newStrategy, txType, oldChainSelector, oldStrategyPool, totalValue);
     }
 

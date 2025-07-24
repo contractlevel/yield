@@ -7,19 +7,19 @@ contract SetStrategyAdapterTest is BaseTest {
     function test_yield_setStrategyAdapter_revertsWhen_notOwner() public {
         _changePrank(holder);
         vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", holder));
-        baseParentPeer.setStrategyAdapter(IYieldPeer.Protocol.Aave, address(baseAaveV3Adapter));
+        baseStrategyRegistry.setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(baseAaveV3Adapter));
     }
 
     function test_yield_setInitialActiveStrategy_revertsWhen_notOwner() public {
         _changePrank(holder);
         vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", holder));
-        baseParentPeer.setInitialActiveStrategy(IYieldPeer.Protocol.Aave);
+        baseParentPeer.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")));
     }
 
     function test_yield_setInitialActiveStrategy_revertsWhen_alreadySet() public {
         _changePrank(baseParentPeer.owner());
         vm.expectRevert(abi.encodeWithSignature("ParentPeer__InitialActiveStrategyAlreadySet()"));
-        baseParentPeer.setInitialActiveStrategy(IYieldPeer.Protocol.Aave);
+        baseParentPeer.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")));
     }
 
     function test_yield_strategyAdapter_onlyYieldPeer() public {

@@ -6,7 +6,8 @@ import {BaseTest, Vm, console2, IYieldPeer, Log} from "../../BaseTest.t.sol";
 contract CheckLogTest is BaseTest {
     /// @notice This test will have to be commented out along with the cannotExecute modifier in the ParentRebalancer contract, if running the entire test suite
     function test_yield_checkLog_revertsWhen_cannotExecute() public {
-        Log memory log = _createStrategyUpdatedLog(address(baseParentPeer), 1, 2, 3);
+        Log memory log =
+            _createStrategyUpdatedLog(address(baseParentPeer), 1, keccak256(abi.encodePacked("aave-v3")), 3);
         vm.expectRevert(abi.encodeWithSignature("OnlySimulatedBackend()"));
         baseRebalancer.checkLog(log, "");
     }
@@ -24,7 +25,7 @@ contract CheckLogTest is BaseTest {
     /// @notice The cannotExecute modifier will need to be commented out for this test to pass
     function test_yield_checkLog_revertsWhen_wrongSource() public {
         address wrongSource = makeAddr("wrongSource");
-        Log memory log = _createStrategyUpdatedLog(wrongSource, 1, 2, 3);
+        Log memory log = _createStrategyUpdatedLog(wrongSource, 1, keccak256(abi.encodePacked("aave-v3")), 3);
         vm.expectRevert(abi.encodeWithSignature("Rebalancer__UpkeepNotNeeded()"));
         baseRebalancer.checkLog(log, "");
     }
@@ -41,10 +42,10 @@ contract CheckLogTest is BaseTest {
     function test_yield_checkLog_rebalanceNewStrategy() public view {
         uint64 parentChainSelector = baseParentPeer.getThisChainSelector();
         uint64 newChainSelector = optChainSelector;
-        uint8 newProtocolEnum = uint8(IYieldPeer.Protocol.Aave);
+        bytes32 newProtocolId = keccak256(abi.encodePacked("aave-v3"));
 
         Log memory log =
-            _createStrategyUpdatedLog(address(baseParentPeer), newChainSelector, newProtocolEnum, parentChainSelector);
+            _createStrategyUpdatedLog(address(baseParentPeer), newChainSelector, newProtocolId, parentChainSelector);
         (bool upkeepNeeded, bytes memory performData) = baseRebalancer.checkLog(log, "");
         assertTrue(upkeepNeeded);
 
@@ -62,7 +63,7 @@ contract CheckLogTest is BaseTest {
         assertEq(forwarder, address(baseRebalancer.getForwarder()));
         assertEq(parentPeer, address(baseRebalancer.getParentPeer()));
         assertEq(newStrategy.chainSelector, newChainSelector);
-        assertEq(uint8(newStrategy.protocol), newProtocolEnum);
+        assertEq(newStrategy.protocolId, newProtocolId);
         assertEq(uint8(txType), uint8(IYieldPeer.CcipTxType.RebalanceNewStrategy));
         assertEq(oldChainSelector, parentChainSelector);
         assertEq(oldStrategyAdapter, address(baseParentPeer.getActiveStrategyAdapter()));
@@ -72,7 +73,10 @@ contract CheckLogTest is BaseTest {
     function test_yield_checkLog_rebalanceOldStrategy() public view {
         uint64 newChainSelector = optChainSelector;
         uint64 oldChainSelector = ethChainSelector;
-        Log memory log = _createStrategyUpdatedLog(address(baseParentPeer), newChainSelector, 0, oldChainSelector);
+        bytes32 newProtocolId = keccak256(abi.encodePacked("aave-v3"));
+
+        Log memory log =
+            _createStrategyUpdatedLog(address(baseParentPeer), newChainSelector, newProtocolId, oldChainSelector);
         (bool upkeepNeeded, bytes memory performData) = baseRebalancer.checkLog(log, "");
         assertTrue(upkeepNeeded);
 
@@ -90,7 +94,7 @@ contract CheckLogTest is BaseTest {
         assertEq(forwarder, address(baseRebalancer.getForwarder()));
         assertEq(parentPeer, address(baseRebalancer.getParentPeer()));
         assertEq(newStrategy.chainSelector, newChainSelector);
-        assertEq(uint8(newStrategy.protocol), 0);
+        assertEq(newStrategy.protocolId, newProtocolId);
         assertEq(uint8(txType), uint8(IYieldPeer.CcipTxType.RebalanceOldStrategy));
         assertEq(decodedOldChainSelector, oldChainSelector);
         assertEq(oldStrategyAdapter, address(baseParentPeer.getActiveStrategyAdapter()));
@@ -103,14 +107,14 @@ contract CheckLogTest is BaseTest {
     function _createStrategyUpdatedLog(
         address source,
         uint64 newChainSelector,
-        uint8 newProtocolEnum,
+        bytes32 newProtocolId,
         uint64 oldChainSelector
     ) internal view returns (Log memory) {
-        bytes32 strategyUpdatedEvent = keccak256("StrategyUpdated(uint64,uint8,uint64)");
+        bytes32 strategyUpdatedEvent = keccak256("StrategyUpdated(uint64,bytes32,uint64)");
         bytes32[] memory topics = new bytes32[](4);
         topics[0] = strategyUpdatedEvent;
         topics[1] = bytes32(uint256(newChainSelector));
-        topics[2] = bytes32(uint256(newProtocolEnum));
+        topics[2] = newProtocolId;
         topics[3] = bytes32(uint256(oldChainSelector));
         return _createLog(source, topics);
     }

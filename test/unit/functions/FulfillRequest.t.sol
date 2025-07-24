@@ -9,8 +9,8 @@ contract FulfillRequestTest is BaseTest {
     //////////////////////////////////////////////////////////////*/
     bytes32 public constant CLF_REQUEST_ERROR = keccak256("CLFRequestError(bytes32,bytes)");
     bytes32 public constant INVALID_CHAIN_SELECTOR = keccak256("InvalidChainSelector(bytes32,uint64)");
-    bytes32 public constant INVALID_PROTOCOL_ENUM = keccak256("InvalidProtocolEnum(bytes32,uint8)");
-    bytes32 public constant CLF_REQUEST_FULFILLED = keccak256("CLFRequestFulfilled(bytes32,uint64,uint8)");
+    bytes32 public constant INVALID_PROTOCOL_ID = keccak256("InvalidProtocolId(bytes32,bytes32)");
+    bytes32 public constant CLF_REQUEST_FULFILLED = keccak256("CLFRequestFulfilled(bytes32,uint64,bytes32)");
 
     /*//////////////////////////////////////////////////////////////
                                  TESTS
@@ -18,7 +18,7 @@ contract FulfillRequestTest is BaseTest {
     function test_yield_parentClf_fulfillRequest_error() public {
         /// @dev arrange
         bytes32 requestId = keccak256("requestId");
-        bytes memory response = abi.encode(uint256(0), uint256(0));
+        bytes memory response = abi.encode(uint256(0), bytes32(0));
         bytes memory err = abi.encode("error");
 
         vm.recordLogs();
@@ -45,7 +45,8 @@ contract FulfillRequestTest is BaseTest {
         /// @dev arrange
         uint64 invalidChainSelector = 1;
         bytes32 requestId = keccak256("requestId");
-        bytes memory response = abi.encode(uint256(invalidChainSelector), uint256(0));
+        bytes32 aaveProtocolId = keccak256(abi.encodePacked("aave-v3"));
+        bytes memory response = abi.encode(uint256(invalidChainSelector), aaveProtocolId);
         bytes memory err = "";
 
         vm.recordLogs();
@@ -69,9 +70,8 @@ contract FulfillRequestTest is BaseTest {
 
     function test_yield_parentClf_fulfillRequest_invalidProtocolEnum() public {
         /// @dev arrange
-        uint8 invalidProtocolEnum = 2;
         bytes32 requestId = keccak256("requestId");
-        bytes memory response = abi.encode(uint256(optChainSelector), uint256(invalidProtocolEnum));
+        bytes memory response = abi.encode(uint256(optChainSelector), bytes32(0));
         bytes memory err = "";
 
         vm.recordLogs();
@@ -84,9 +84,9 @@ contract FulfillRequestTest is BaseTest {
         bool foundInvalidProtocolEnum = false;
 
         for (uint256 i = 0; i < logs.length; i++) {
-            if (logs[i].topics[0] == INVALID_PROTOCOL_ENUM) {
+            if (logs[i].topics[0] == INVALID_PROTOCOL_ID) {
                 assertEq(logs[i].topics[1], requestId);
-                assertEq(logs[i].topics[2], bytes32(uint256(invalidProtocolEnum)));
+                assertEq(logs[i].topics[2], bytes32(0));
                 foundInvalidProtocolEnum = true;
             }
         }
@@ -101,7 +101,8 @@ contract FulfillRequestTest is BaseTest {
         baseParentPeer.deposit(DEPOSIT_AMOUNT);
 
         bytes32 requestId = keccak256("requestId");
-        bytes memory response = abi.encode(uint256(optChainSelector), uint256(0));
+        bytes32 aaveProtocolId = keccak256(abi.encodePacked("aave-v3"));
+        bytes memory response = abi.encode(uint256(optChainSelector), aaveProtocolId);
         bytes memory err = "";
 
         vm.recordLogs();
@@ -113,7 +114,7 @@ contract FulfillRequestTest is BaseTest {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bool foundError = false;
         bool foundInvalidChainSelector = false;
-        bool foundInvalidProtocolEnum = false;
+        bool foundInvalidProtocolId = false;
         bool foundCLFRequestFulfilled = false;
 
         for (uint256 i = 0; i < logs.length; i++) {
@@ -123,26 +124,27 @@ contract FulfillRequestTest is BaseTest {
             if (logs[i].topics[0] == INVALID_CHAIN_SELECTOR) {
                 foundInvalidChainSelector = true;
             }
-            if (logs[i].topics[0] == INVALID_PROTOCOL_ENUM) {
-                foundInvalidProtocolEnum = true;
+            if (logs[i].topics[0] == INVALID_PROTOCOL_ID) {
+                foundInvalidProtocolId = true;
             }
             if (logs[i].topics[0] == CLF_REQUEST_FULFILLED) {
                 assertEq(logs[i].topics[1], requestId);
                 assertEq(logs[i].topics[2], bytes32(uint256(optChainSelector)));
-                assertEq(logs[i].topics[3], bytes32(uint256(0)));
+                assertEq(logs[i].topics[3], aaveProtocolId);
                 foundCLFRequestFulfilled = true;
             }
         }
         assertFalse(foundError);
         assertFalse(foundInvalidChainSelector);
-        assertFalse(foundInvalidProtocolEnum);
+        assertFalse(foundInvalidProtocolId);
         assertTrue(foundCLFRequestFulfilled);
     }
 
     function test_yield_parentClf_fulfillRequest_success_noShares() public {
         /// @dev arrange
         bytes32 requestId = keccak256("requestId");
-        bytes memory response = abi.encode(uint256(optChainSelector), uint256(0));
+        bytes32 aaveProtocolId = keccak256(abi.encodePacked("aave-v3"));
+        bytes memory response = abi.encode(uint256(optChainSelector), aaveProtocolId);
         bytes memory err = "";
 
         vm.recordLogs();
@@ -154,7 +156,7 @@ contract FulfillRequestTest is BaseTest {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bool foundError = false;
         bool foundInvalidChainSelector = false;
-        bool foundInvalidProtocolEnum = false;
+        bool foundInvalidProtocolId = false;
         bool foundCLFRequestFulfilled = false;
 
         for (uint256 i = 0; i < logs.length; i++) {
@@ -164,19 +166,19 @@ contract FulfillRequestTest is BaseTest {
             if (logs[i].topics[0] == INVALID_CHAIN_SELECTOR) {
                 foundInvalidChainSelector = true;
             }
-            if (logs[i].topics[0] == INVALID_PROTOCOL_ENUM) {
-                foundInvalidProtocolEnum = true;
+            if (logs[i].topics[0] == INVALID_PROTOCOL_ID) {
+                foundInvalidProtocolId = true;
             }
             if (logs[i].topics[0] == CLF_REQUEST_FULFILLED) {
                 assertEq(logs[i].topics[1], requestId);
                 assertEq(logs[i].topics[2], bytes32(uint256(optChainSelector)));
-                assertEq(logs[i].topics[3], bytes32(uint256(0)));
+                assertEq(logs[i].topics[3], aaveProtocolId);
                 foundCLFRequestFulfilled = true;
             }
         }
         assertFalse(foundError);
         assertFalse(foundInvalidChainSelector);
-        assertFalse(foundInvalidProtocolEnum);
+        assertFalse(foundInvalidProtocolId);
         assertTrue(foundCLFRequestFulfilled);
     }
 }

@@ -12,12 +12,16 @@ import {RegistryModuleOwnerCustom} from
 import {AaveV3Adapter} from "../../src/adapters/AaveV3Adapter.sol";
 import {CompoundV3Adapter} from "../../src/adapters/CompoundV3Adapter.sol";
 import {IYieldPeer} from "../../src/interfaces/IYieldPeer.sol";
+import {StrategyRegistry} from "../../src/modules/StrategyRegistry.sol";
 
 contract DeployChild is Script {
     /*//////////////////////////////////////////////////////////////
                                   RUN
     //////////////////////////////////////////////////////////////*/
-    function run() public returns (Share, SharePool, ChildPeer, HelperConfig, AaveV3Adapter, CompoundV3Adapter) {
+    function run()
+        public
+        returns (Share, SharePool, ChildPeer, HelperConfig, StrategyRegistry, AaveV3Adapter, CompoundV3Adapter)
+    {
         HelperConfig config = new HelperConfig();
         HelperConfig.NetworkConfig memory networkConfig = config.getActiveNetworkConfig();
 
@@ -39,13 +43,16 @@ contract DeployChild is Script {
         share.grantMintAndBurnRoles(address(sharePool));
         share.grantMintAndBurnRoles(address(childPeer));
 
-        AaveV3Adapter aaveV3 = new AaveV3Adapter(address(childPeer), networkConfig.protocols.aavePoolAddressesProvider);
-        CompoundV3Adapter compoundV3 = new CompoundV3Adapter(address(childPeer), networkConfig.protocols.comet);
-        childPeer.setStrategyAdapter(IYieldPeer.Protocol.Aave, address(aaveV3));
-        childPeer.setStrategyAdapter(IYieldPeer.Protocol.Compound, address(compoundV3));
+        StrategyRegistry strategyRegistry = new StrategyRegistry();
+        AaveV3Adapter aaveV3Adapter =
+            new AaveV3Adapter(address(childPeer), networkConfig.protocols.aavePoolAddressesProvider);
+        CompoundV3Adapter compoundV3Adapter = new CompoundV3Adapter(address(childPeer), networkConfig.protocols.comet);
+        strategyRegistry.setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(aaveV3Adapter));
+        strategyRegistry.setStrategyAdapter(keccak256(abi.encodePacked("compound-v3")), address(compoundV3Adapter));
+        childPeer.setStrategyRegistry(address(strategyRegistry));
 
         vm.stopBroadcast();
 
-        return (share, sharePool, childPeer, config, aaveV3, compoundV3);
+        return (share, sharePool, childPeer, config, strategyRegistry, aaveV3Adapter, compoundV3Adapter);
     }
 }

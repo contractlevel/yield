@@ -2,12 +2,6 @@ if (!secrets.api) {
   throw Error('Proxy API URL not provided');
 }
 
-// const chainSelectorMap = {
-//   Arbitrum: '4949039107694359620',
-//   Ethereum: '16015286601757825753', // 5009297550715157269
-//   Base: '10344971235874465080', // 15971525489660198786
-//   Optimism: '3734403246176062136',
-// };
 const chainSelectorMap = {
   Avalanche: '14767482510784806043', // Fuji
   Ethereum: '16015286601757825753', // Sepolia
@@ -63,23 +57,36 @@ try {
   ) {
     console.log('Invalid Pool Data:', pool);
     const selectorBytes = Functions.encodeUint256(BigInt(0));
-    const enumBytes = Functions.encodeUint256(0);
+    const protocolId = new Uint8Array(32); // Zero bytes for invalid case
     const result = new Uint8Array(64);
     result.set(selectorBytes, 0);
-    result.set(enumBytes, 32);
+    result.set(protocolId, 32);
     return result;
   }
 
-  const protocolEnum = pool.project === 'aave-v3' ? 0 : 1;
   const chainSelector = chainSelectorMap[pool.chain] || '0';
-
   const selectorBytes = Functions.encodeUint256(BigInt(chainSelector));
-  const enumBytes = Functions.encodeUint256(protocolEnum);
+
+  let protocolId;
+  try {
+    const ethers = await import('npm:ethers@5.7.2');
+    const projectBytes = ethers.utils.toUtf8Bytes(pool.project); // Convert string to UTF-8 bytes
+    const protocolIdBytes = ethers.utils.arrayify(
+      ethers.utils.keccak256(projectBytes)
+    ); // Hash to bytes32
+    protocolId = new Uint8Array(32);
+    protocolId.set(protocolIdBytes, 0);
+  } catch (e) {
+    console.log('Ethers import failed:', e.message);
+  }
+
   const result = new Uint8Array(64);
   result.set(selectorBytes, 0);
-  result.set(enumBytes, 32);
+  result.set(protocolId, 32);
   return result;
 } catch (error) {
   console.log('General Error:', error.message);
   return Functions.encodeString(error.message);
 }
+
+// @review - this would need to be minimized into an updated src.min.js before deployment

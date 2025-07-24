@@ -58,7 +58,7 @@ contract ParentDepositTest is BaseTest {
 
     /// @notice Scenario: Deposit made on Parent chain, where the Strategy is, and the Strategy Protocol is Compound
     function test_yield_parent_deposit_strategyIsParent_compound() public {
-        _setStrategy(baseChainSelector, IYieldPeer.Protocol.Compound);
+        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("compound-v3")));
         _selectFork(baseFork);
         _changePrank(depositor);
 
@@ -93,7 +93,7 @@ contract ParentDepositTest is BaseTest {
 
     /// @notice Scenario: Deposit made on Parent chain, where the Strategy is not, and the Strategy Protocol is Aave
     function test_yield_parent_deposit_strategyIsChild_aave() public {
-        _setStrategy(optChainSelector, IYieldPeer.Protocol.Aave);
+        _setStrategy(optChainSelector, keccak256(abi.encodePacked("aave-v3")));
         _selectFork(baseFork);
         _changePrank(depositor);
 
@@ -130,7 +130,7 @@ contract ParentDepositTest is BaseTest {
 
     /// @notice Scenario: Deposit made on Parent chain, where the Strategy is not, and the Strategy Protocol is Compound
     function test_yield_parent_deposit_strategyIsChild_compound() public {
-        _setStrategy(optChainSelector, IYieldPeer.Protocol.Compound);
+        _setStrategy(optChainSelector, keccak256(abi.encodePacked("compound-v3")));
         _selectFork(baseFork);
         _changePrank(depositor);
 

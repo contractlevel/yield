@@ -34,9 +34,9 @@ contract ParentPeer is YieldPeer {
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
     /// @notice Emitted when the current strategy is optimal
-    event CurrentStrategyOptimal(uint64 indexed chainSelector, Protocol indexed protocol);
+    event CurrentStrategyOptimal(uint64 indexed chainSelector, bytes32 indexed protocolId);
     /// @notice Emitted when the strategy is updated
-    event StrategyUpdated(uint64 indexed chainSelector, Protocol indexed protocol, uint64 indexed oldChainSelector);
+    event StrategyUpdated(uint64 indexed chainSelector, bytes32 indexed protocolId, uint64 indexed oldChainSelector);
     /// @notice Emitted when the amount of shares minted is updated
     event ShareMintUpdate(uint256 indexed shareMintAmount, uint64 indexed chainSelector, uint256 indexed totalShares);
     /// @notice Emitted when the amount of shares burned is updated
@@ -176,7 +176,8 @@ contract ParentPeer is YieldPeer {
     /// @notice This function is called by the ParentRebalancer's Log-trigger Automation performUpkeep
     function rebalanceOldStrategy(uint64 oldChainSelector, Strategy memory newStrategy) external {
         _revertIfMsgSenderIsNotRebalancer();
-        Strategy memory oldStrategy = Strategy({chainSelector: oldChainSelector, protocol: Protocol.Aave});
+        // @review - I don't think we need the old protocol ID. Double check this.
+        Strategy memory oldStrategy = Strategy({chainSelector: oldChainSelector, protocolId: bytes32(0)});
         _handleRebalanceFromDifferentChain(oldStrategy, newStrategy);
     }
 
@@ -319,12 +320,12 @@ contract ParentPeer is YieldPeer {
     /// @notice Rebalances funds from the old strategy to the new strategy if both are on this chain
     /// @notice Handles the case where both the old and new strategy are on this chain
     /// @param chainSelector The chain selector of the new strategy
-    /// @param protocol The protocol of the new strategy
+    /// @param protocolId The protocol ID of the new strategy
     /// @dev StrategyUpdated event emitted in _updateStrategy will trigger ParentRebalancer::performUpkeep ccip rebalances
     /// @notice performUpkeep handles the case where the old or new strategies are on different chains with ccipSend
-    function _setStrategy(uint64 chainSelector, Protocol protocol) internal {
+    function _setStrategy(uint64 chainSelector, bytes32 protocolId) internal {
         Strategy memory oldStrategy = s_strategy;
-        Strategy memory newStrategy = Strategy({chainSelector: chainSelector, protocol: protocol});
+        Strategy memory newStrategy = Strategy({chainSelector: chainSelector, protocolId: protocolId});
 
         // Early return if strategy hasn't changed
         if (!_updateStrategy(newStrategy, oldStrategy)) {
@@ -341,12 +342,13 @@ contract ParentPeer is YieldPeer {
     /// @param oldStrategy The current strategy
     /// @return bool Whether the strategy was actually changed
     function _updateStrategy(Strategy memory newStrategy, Strategy memory oldStrategy) internal returns (bool) {
-        if (oldStrategy.chainSelector == newStrategy.chainSelector && oldStrategy.protocol == newStrategy.protocol) {
-            emit CurrentStrategyOptimal(newStrategy.chainSelector, newStrategy.protocol);
+        if (oldStrategy.chainSelector == newStrategy.chainSelector && oldStrategy.protocolId == newStrategy.protocolId)
+        {
+            emit CurrentStrategyOptimal(newStrategy.chainSelector, newStrategy.protocolId);
             return false;
         }
         s_strategy = newStrategy;
-        emit StrategyUpdated(newStrategy.chainSelector, newStrategy.protocol, oldStrategy.chainSelector);
+        emit StrategyUpdated(newStrategy.chainSelector, newStrategy.protocolId, oldStrategy.chainSelector);
         return true;
     }
 
@@ -356,7 +358,8 @@ contract ParentPeer is YieldPeer {
         address oldActiveStrategyAdapter = _getActiveStrategyAdapter();
         uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, address(i_usdc));
         if (totalValue != 0) _withdrawFromStrategy(oldActiveStrategyAdapter, totalValue);
-        address newActiveStrategyAdapter = _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocol);
+        address newActiveStrategyAdapter =
+            _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
         _depositToStrategy(newActiveStrategyAdapter, i_usdc.balanceOf(address(this)));
     }
 
@@ -368,7 +371,7 @@ contract ParentPeer is YieldPeer {
         internal
     {
         if (totalValue != 0) _withdrawFromStrategy(oldStrategyPool, totalValue);
-        _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocol);
+        _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
         _ccipSend(
             newStrategy.chainSelector,
             CcipTxType.RebalanceNewStrategy,
@@ -416,10 +419,10 @@ contract ParentPeer is YieldPeer {
     /// @dev Revert if msg.sender is not the Rebalancer
     /// @dev Set the strategy
     /// @param chainSelector The chain selector of the new strategy
-    /// @param protocol The protocol of the new strategy
-    function setStrategy(uint64 chainSelector, Protocol protocol) external {
+    /// @param protocolId The protocol ID of the new strategy
+    function setStrategy(uint64 chainSelector, bytes32 protocolId) external {
         _revertIfMsgSenderIsNotRebalancer();
-        _setStrategy(chainSelector, protocol);
+        _setStrategy(chainSelector, protocolId);
     }
 
     /// @notice Sets the initial active strategy
@@ -428,13 +431,13 @@ contract ParentPeer is YieldPeer {
     /// @dev Revert if msg.sender is not the owner
     /// @dev Revert if already called
     /// @dev Called in deploy script, immediately after deploying initial strategy adapters, and setting them in YieldPeer::setStrategyAdapter
-    /// @param protocol The protocol of the initial active strategy
+    /// @param protocolId The protocol ID of the initial active strategy
     // @review unit test this
-    function setInitialActiveStrategy(Protocol protocol) external onlyOwner {
+    function setInitialActiveStrategy(bytes32 protocolId) external onlyOwner {
         if (s_initialActiveStrategySet) revert ParentPeer__InitialActiveStrategyAlreadySet();
         s_initialActiveStrategySet = true;
-        s_strategy = Strategy({chainSelector: i_thisChainSelector, protocol: protocol});
-        _updateActiveStrategyAdapter(i_thisChainSelector, protocol);
+        s_strategy = Strategy({chainSelector: i_thisChainSelector, protocolId: protocolId});
+        _updateActiveStrategyAdapter(i_thisChainSelector, protocolId);
     }
 
     /// @notice Sets the rebalancer
