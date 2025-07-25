@@ -76,7 +76,7 @@ contract ParentPeer is YieldPeer {
 
         // 1. This Parent is the Strategy. Therefore the deposit is handled here and shares can be minted here.
         if (strategy.chainSelector == i_thisChainSelector) {
-            uint256 totalValue = _depositToStrategyAndGetTotalValue(amountToDeposit);
+            uint256 totalValue = _depositToStrategyAndGetTotalValue(_getActiveStrategyAdapter(), amountToDeposit);
 
             uint256 shareMintAmount = _calculateMintAmount(totalValue, amountToDeposit);
             s_totalShares += shareMintAmount;
@@ -162,6 +162,7 @@ contract ParentPeer is YieldPeer {
     /// @param totalValue The total value of the system
     /// @param newStrategy The new strategy
     /// @notice This function is called by the ParentRebalancer's Log-trigger Automation performUpkeep
+    /// @notice This is called when the strategy is on this chain and is being moved to a different chain
     function rebalanceNewStrategy(address oldStrategyAdapter, uint256 totalValue, Strategy memory newStrategy)
         external
     {
@@ -174,11 +175,10 @@ contract ParentPeer is YieldPeer {
     /// @param oldChainSelector The chain selector of the old strategy
     /// @param newStrategy The new strategy
     /// @notice This function is called by the ParentRebalancer's Log-trigger Automation performUpkeep
+    /// @notice This is called when the old strategy is on a different chain to this chain, a remote child
     function rebalanceOldStrategy(uint64 oldChainSelector, Strategy memory newStrategy) external {
         _revertIfMsgSenderIsNotRebalancer();
-        // @review - I don't think we need the old protocol ID. Double check this.
-        Strategy memory oldStrategy = Strategy({chainSelector: oldChainSelector, protocolId: bytes32(0)});
-        _handleRebalanceFromDifferentChain(oldStrategy, newStrategy);
+        _handleRebalanceFromDifferentChain(oldChainSelector, newStrategy);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -224,7 +224,7 @@ contract ParentPeer is YieldPeer {
 
         /// @dev If Strategy is on this Parent, deposit into strategy and get totalValue
         if (strategy.chainSelector == i_thisChainSelector) {
-            depositData.totalValue = _depositToStrategyAndGetTotalValue(depositData.amount);
+            depositData.totalValue = _depositToStrategyAndGetTotalValue(_getActiveStrategyAdapter(), depositData.amount);
             depositData.shareMintAmount = _calculateMintAmount(depositData.totalValue, depositData.amount);
             s_totalShares += depositData.shareMintAmount;
             emit ShareMintUpdate(depositData.shareMintAmount, depositData.chainSelector, s_totalShares);
@@ -381,12 +381,11 @@ contract ParentPeer is YieldPeer {
     }
 
     /// @notice Handles rebalancing when strategy is on a different chain
-    /// @param oldStrategy The current strategy
+    /// @param oldChainSelector The chain selector of the old strategy
     /// @param newStrategy The new strategy
-    function _handleRebalanceFromDifferentChain(Strategy memory oldStrategy, Strategy memory newStrategy) internal {
-        _ccipSend(
-            oldStrategy.chainSelector, CcipTxType.RebalanceOldStrategy, abi.encode(newStrategy), ZERO_BRIDGE_AMOUNT
-        );
+    /// @notice This function is sending a crosschain message to the old strategy to rebalance funds to the new strategy
+    function _handleRebalanceFromDifferentChain(uint64 oldChainSelector, Strategy memory newStrategy) internal {
+        _ccipSend(oldChainSelector, CcipTxType.RebalanceOldStrategy, abi.encode(newStrategy), ZERO_BRIDGE_AMOUNT);
     }
 
     /*//////////////////////////////////////////////////////////////

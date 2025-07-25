@@ -36,10 +36,10 @@ contract DeployParent is Script {
     //////////////////////////////////////////////////////////////*/
     function run() public returns (DeploymentConfig memory deploy) {
         deploy.config = new HelperConfig();
-        // @review this line was fine above the broadcast ??
-        HelperConfig.NetworkConfig memory networkConfig = deploy.config.getActiveNetworkConfig();
 
         vm.startBroadcast();
+        HelperConfig.NetworkConfig memory networkConfig = deploy.config.getActiveNetworkConfig();
+
         // Unit tests:
         deploy.clfSubId = IFunctionsSubscriptions(networkConfig.clf.functionsRouter).createSubscription();
         /// @notice Use this instead of the above line for premade subscription:

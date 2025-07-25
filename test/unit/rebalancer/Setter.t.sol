@@ -61,19 +61,4 @@ contract SetterTest is BaseTest {
         baseRebalancer.setStrategyRegistry(newStrategyRegistry);
         assertEq(baseRebalancer.getStrategyRegistry(), newStrategyRegistry);
     }
-
-    // @review - these should be moved
-    function test_yield_rebalanceNewStrategy_revertsWhen_notParentRebalancer() public {
-        vm.expectRevert(abi.encodeWithSignature("ParentPeer__OnlyRebalancer()"));
-        baseParentPeer.rebalanceNewStrategy(
-            address(0), 0, IYieldPeer.Strategy({chainSelector: 0, protocolId: keccak256(abi.encodePacked("aave-v3"))})
-        );
-    }
-
-    function test_yield_rebalanceOldStrategy_revertsWhen_notParentRebalancer() public {
-        vm.expectRevert(abi.encodeWithSignature("ParentPeer__OnlyRebalancer()"));
-        baseParentPeer.rebalanceOldStrategy(
-            0, IYieldPeer.Strategy({chainSelector: 0, protocolId: keccak256(abi.encodePacked("aave-v3"))})
-        );
-    }
 }

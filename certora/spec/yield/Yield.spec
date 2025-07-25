@@ -282,8 +282,7 @@ rule handleCCIPRebalanceNewStrategy_depositsToNewStrategy() {
 }
 
 // --- depositToStrategy --- //
-// @review, probably delete
-rule depositToStrategy_revertsWhen_invalidStrategyPool() {
+rule depositToStrategy_revertsWhen_invalidStrategyAdapter() {
     env e;
     address invalidStrategyAdapter;
     uint256 amount;
@@ -314,18 +313,6 @@ rule depositToStrategy_depositsToStrategy() {
 }
 
 // --- withdrawFromStrategy --- //
-// @review, this could be deleted but we will probably need something like this if introducing the invalid protocol enum
-// rule withdrawFromStrategy_revertsWhen_invalidStrategyAdapter() {
-//     env e;
-//     address invalidStrategyAdapter;
-//     uint256 amount;
-
-//     require invalidStrategyAdapter != aaveV3Adapter && invalidStrategyAdapter != compoundV3Adapter;
-
-//     withdrawFromStrategy@withrevert(e, invalidStrategyAdapter, amount);
-//     assert lastReverted;
-// }
-
 rule withdrawFromStrategy_emit_WithdrawFromStrategy() {
     env e;
     calldataarg args;

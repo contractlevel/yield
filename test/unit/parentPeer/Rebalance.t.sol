@@ -287,4 +287,18 @@ contract RebalanceTest is BaseTest {
             "Aave balance should be approximately equal to deposit amount"
         );
     }
+
+    function test_yield_rebalanceNewStrategy_revertsWhen_notRebalancer() public {
+        vm.expectRevert(abi.encodeWithSignature("ParentPeer__OnlyRebalancer()"));
+        baseParentPeer.rebalanceNewStrategy(
+            address(0), 0, IYieldPeer.Strategy({chainSelector: 0, protocolId: keccak256(abi.encodePacked("aave-v3"))})
+        );
+    }
+
+    function test_yield_rebalanceOldStrategy_revertsWhen_notRebalancer() public {
+        vm.expectRevert(abi.encodeWithSignature("ParentPeer__OnlyRebalancer()"));
+        baseParentPeer.rebalanceOldStrategy(
+            0, IYieldPeer.Strategy({chainSelector: 0, protocolId: keccak256(abi.encodePacked("aave-v3"))})
+        );
+    }
 }

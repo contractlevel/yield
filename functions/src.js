@@ -88,5 +88,3 @@ try {
   console.log('General Error:', error.message);
   return Functions.encodeString(error.message);
 }
-
-// @review - this would need to be minimized into an updated src.min.js before deployment

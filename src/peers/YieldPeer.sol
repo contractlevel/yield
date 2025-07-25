@@ -8,10 +8,8 @@ import {IERC677Receiver} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IComet} from "../interfaces/IComet.sol";
 import {IShare} from "../interfaces/IShare.sol";
 import {IYieldPeer} from "../interfaces/IYieldPeer.sol";
-import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
 import {DataStructures} from "../libraries/DataStructures.sol";
 import {CCIPOperations} from "../libraries/CCIPOperations.sol";
 import {IStrategyAdapter} from "../interfaces/IStrategyAdapter.sol";
@@ -29,15 +27,12 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
-    error YieldPeer__USDCTransferFailed();
     error YieldPeer__OnlyShare();
     error YieldPeer__ChainNotAllowed(uint64 chainSelector);
     error YieldPeer__PeerNotAllowed(address peer);
     error YieldPeer__NoZeroAmount();
     error YieldPeer__NotStrategyChain();
     error YieldPeer__InsufficientAmount();
-    error YieldPeer__InvalidStrategy();
-    error YieldPeer__StrategyActive();
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
@@ -285,10 +280,13 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     }
 
     /// @notice Deposits USDC to the strategy and returns the total value of the system
+    /// @param activeStrategyAdapter The active strategy adapter
     /// @param amount The amount of USDC to deposit
     /// @return totalValue The total value of the system // _getTotalValueAndDepositToStrategy
-    function _depositToStrategyAndGetTotalValue(uint256 amount) internal returns (uint256 totalValue) {
-        address activeStrategyAdapter = _getActiveStrategyAdapter();
+    function _depositToStrategyAndGetTotalValue(address activeStrategyAdapter, uint256 amount)
+        internal
+        returns (uint256 totalValue)
+    {
         totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, address(i_usdc));
         _depositToStrategy(activeStrategyAdapter, amount);
         emit DepositToStrategyCompleted(activeStrategyAdapter, amount, totalValue);
@@ -323,7 +321,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @param to The address to transfer USDC to
     /// @param amount The amount of USDC to transfer
     function _transferUsdcTo(address to, uint256 amount) internal {
-        if (!i_usdc.transfer(to, amount)) revert YieldPeer__USDCTransferFailed();
+        i_usdc.safeTransfer(to, amount);
     }
 
     /// @notice Transfer USDC from an address
@@ -331,7 +329,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @param to The address to transfer USDC to
     /// @param amount The amount of USDC to transfer
     function _transferUsdcFrom(address from, address to, uint256 amount) internal {
-        if (!i_usdc.transferFrom(from, to, amount)) revert YieldPeer__USDCTransferFailed();
+        i_usdc.safeTransferFrom(from, to, amount);
     }
 
     /// @notice Mints shares

@@ -35,7 +35,7 @@ contract AaveV3Adapter is StrategyAdapter {
     /// @dev Deposits the USDC to the Aave V3 pool
     function deposit(address usdc, uint256 amount) external onlyYieldPeer {
         address aavePool = _getAavePool();
-        IERC20(usdc).approve(aavePool, amount);
+        _approveToken(usdc, aavePool, amount);
         IPool(aavePool).supply(usdc, amount, address(this), 0);
         emit Deposit(usdc, amount);
     }
@@ -47,7 +47,7 @@ contract AaveV3Adapter is StrategyAdapter {
     function withdraw(address usdc, uint256 amount) external onlyYieldPeer {
         address aavePool = _getAavePool();
         IPool(aavePool).withdraw(usdc, amount, address(this));
-        IERC20(usdc).transfer(i_yieldPeer, amount);
+        _transferTokenTo(usdc, i_yieldPeer, amount);
         emit Withdraw(usdc, amount);
     }
 
