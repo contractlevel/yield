@@ -71,10 +71,13 @@ rule setStrategyAdapter_success(method f) {
     require e.msg.value                                ==            0;
     require ghost_strategyAdapterSet_eventCount        ==            0;
     require ghost_strategyAdapterSet_emittedAdapter    ==            0;
-    require strategyAdapter                            !=            0;
+
+    require       strategyAdapter                      !=            0;
     require                                 protocolId != to_bytes32(0);
     require ghost_strategyAdapterSet_emittedProtocolId == to_bytes32(0);
+
     setStrategyAdapter@withrevert(e,        protocolId,   strategyAdapter);
+
     assert  ghost_strategyAdapterSet_emittedAdapter    == strategyAdapter;
     assert  ghost_strategyAdapterSet_emittedProtocolId == protocolId;
     assert  ghost_strategyAdapterSet_eventCount        == 1;
