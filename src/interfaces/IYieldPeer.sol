@@ -3,13 +3,8 @@ pragma solidity 0.8.26;
 
 interface IYieldPeer {
     struct Strategy {
+        bytes32 protocolId;
         uint64 chainSelector;
-        Protocol protocol;
-    }
-
-    enum Protocol {
-        Aave,
-        Compound
     }
 
     enum CcipTxType {
@@ -42,13 +37,12 @@ interface IYieldPeer {
     }
 
     function deposit(uint256 amountToDeposit) external;
-    function getStrategyPool() external view returns (address);
     function getTotalValue() external view returns (uint256);
-    function getCompound() external view returns (address);
-    function getAave() external view returns (address);
+    function getStrategyAdapter(bytes32 protocolId) external view returns (address);
     function setCCIPGasLimit(uint256 gasLimit) external;
     function setAllowedChain(uint64 chainSelector, bool allowed) external;
     function setAllowedPeer(uint64 chainSelector, address peer) external;
     function getAllowedChain(uint64 chainSelector) external view returns (bool);
     function getAllowedPeer(uint64 chainSelector) external view returns (address);
+    function getActiveStrategyAdapter() external view returns (address);
 }

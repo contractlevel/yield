@@ -4,9 +4,15 @@ pragma solidity 0.8.26;
 import {Client, IRouterClient} from "@chainlink/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
 import {LinkTokenInterface} from "@chainlink/contracts/src/v0.8/shared/interfaces/LinkTokenInterface.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IYieldPeer} from "../interfaces/IYieldPeer.sol";
 
 library CCIPOperations {
+    /*//////////////////////////////////////////////////////////////
+                           TYPE DECLARATIONS
+    //////////////////////////////////////////////////////////////*/
+    using SafeERC20 for IERC20;
+
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
@@ -72,7 +78,7 @@ library CCIPOperations {
         if (bridgeAmount > 0) {
             tokenAmounts = new Client.EVMTokenAmount[](1);
             tokenAmounts[0] = Client.EVMTokenAmount({token: address(usdc), amount: bridgeAmount});
-            usdc.approve(ccipRouter, bridgeAmount);
+            usdc.safeIncreaseAllowance(ccipRouter, bridgeAmount);
         } else {
             tokenAmounts = new Client.EVMTokenAmount[](0);
         }

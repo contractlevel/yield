@@ -52,8 +52,8 @@ contract HelperHarness {
         }
     }
 
-    function encodeStrategy(uint64 chainSelector, uint8 protocolEnum) public pure returns (bytes memory) {
-        return abi.encode(IYieldPeer.Strategy({chainSelector: chainSelector, protocol: IYieldPeer.Protocol(protocolEnum)}));
+    function encodeStrategy(uint64 chainSelector, bytes32 protocolId) public pure returns (bytes memory) {
+        return abi.encode(IYieldPeer.Strategy({chainSelector: chainSelector, protocolId: protocolId}));
     }
 
     function encodeUint64(uint64 value) public pure returns (bytes memory) {
@@ -88,7 +88,7 @@ contract HelperHarness {
         return (shareBurnAmount * totalValue) / totalShares;
     }
 
-    function createStrategy(uint64 chainSelector, IYieldPeer.Protocol protocol) public pure returns (IYieldPeer.Strategy memory) {
-        return IYieldPeer.Strategy({chainSelector: chainSelector, protocol: protocol});
+    function createStrategy(uint64 chainSelector, bytes32 protocolId) public pure returns (IYieldPeer.Strategy memory) {
+        return IYieldPeer.Strategy({chainSelector: chainSelector, protocolId: protocolId});
     }
 }

@@ -13,7 +13,7 @@ contract MockAavePoolTest is Test {
 
     function setUp() public {
         mockUsdc = new MockUsdc();
-        mockAavePool = new MockAavePool(address(mockUsdc));
+        mockAavePool = new MockAavePool();
         mockAToken = new MockAToken(address(mockAavePool));
         mockAavePool.setATokenAddress(address(mockAToken));
     }

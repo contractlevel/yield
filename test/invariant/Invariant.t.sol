@@ -2,13 +2,16 @@
 pragma solidity 0.8.26;
 
 import {StdInvariant} from "forge-std/StdInvariant.sol";
-import {BaseTest, Vm, console2, ParentCLF, ChildPeer, Share, IYieldPeer, ParentRebalancer} from "../BaseTest.t.sol";
+import {BaseTest, Vm, console2, ParentPeer, ChildPeer, Share, IYieldPeer, Rebalancer} from "../BaseTest.t.sol";
 import {Handler} from "./Handler.t.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {IRouterClient} from "@chainlink/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
 import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
 import {IComet} from "../../src/interfaces/IComet.sol";
 import {MockCCIPRouter} from "@chainlink-local/test/mocks/MockRouter.sol";
+import {AaveV3Adapter} from "../../src/adapters/AaveV3Adapter.sol";
+import {CompoundV3Adapter} from "../../src/adapters/CompoundV3Adapter.sol";
+import {StrategyRegistry} from "../../src/modules/StrategyRegistry.sol";
 
 /// @notice We are making the assumption that the gasLimit set for CCIP works correctly
 contract Invariant is StdInvariant, BaseTest {
@@ -28,9 +31,9 @@ contract Invariant is StdInvariant, BaseTest {
     /// @dev provides address passed to contracts
     HelperConfig.NetworkConfig internal networkConfig;
     /// @dev Parent Peer contract
-    ParentCLF internal parent;
+    ParentPeer internal parent;
     /// @dev Parent Rebalancer contract
-    ParentRebalancer internal rebalancer;
+    Rebalancer internal rebalancer;
     /// @dev Child Peer contract
     ChildPeer internal child1;
     /// @dev Child Peer contract
@@ -41,6 +44,26 @@ contract Invariant is StdInvariant, BaseTest {
     address internal upkeep = makeAddr("upkeep");
     /// @dev Aave Pool Address
     address internal aavePool;
+
+    /// @dev Strategy Registry contract for parent
+    StrategyRegistry internal strategyRegistryParent;
+    /// @dev Strategy Registry contract for child 1
+    StrategyRegistry internal strategyRegistryChild1;
+    /// @dev Strategy Registry contract for child 2
+    StrategyRegistry internal strategyRegistryChild2;
+
+    /// @dev Aave Adapter contract for parent
+    AaveV3Adapter internal aaveV3AdapterParent;
+    /// @dev Compound Adapter contract for parent
+    CompoundV3Adapter internal compoundV3AdapterParent;
+    /// @dev Aave Adapter contract for child 1
+    AaveV3Adapter internal aaveV3AdapterChild1;
+    /// @dev Compound Adapter contract for child 1
+    CompoundV3Adapter internal compoundV3AdapterChild1;
+    /// @dev Aave Adapter contract for child 2
+    AaveV3Adapter internal aaveV3AdapterChild2;
+    /// @dev Compound Adapter contract for child 2
+    CompoundV3Adapter internal compoundV3AdapterChild2;
 
     /*//////////////////////////////////////////////////////////////
                                  SETUP
@@ -83,47 +106,69 @@ contract Invariant is StdInvariant, BaseTest {
         networkConfig = helperConfig.getOrCreateAnvilEthConfig();
         share = Share(networkConfig.tokens.share);
         aavePool = IPoolAddressesProvider(networkConfig.protocols.aavePoolAddressesProvider).getPool();
-        rebalancer = new ParentRebalancer();
+        rebalancer =
+            new Rebalancer(networkConfig.clf.functionsRouter, networkConfig.clf.donId, networkConfig.clf.clfSubId);
 
         /// @dev since we are not forking mainnets, we will deploy contracts locally
         /// the deployed peers will interact via the ccip local simulator as if they were crosschain
         /// this is a context we need to be aware of in this test suite
         /// @dev deploy the parent contract
-        parent = new ParentCLF(
+        parent = new ParentPeer(
             networkConfig.ccip.ccipRouter,
             networkConfig.tokens.link,
             PARENT_SELECTOR,
             networkConfig.tokens.usdc,
-            networkConfig.protocols.aavePoolAddressesProvider,
-            networkConfig.protocols.comet,
-            networkConfig.tokens.share,
-            networkConfig.clf.functionsRouter,
-            networkConfig.clf.donId, // 0x0
-            networkConfig.clf.clfSubId, // 0
-            address(rebalancer)
+            networkConfig.tokens.share
         );
-        parent.setUpkeepAddress(upkeep);
+        parent.setRebalancer(address(rebalancer));
+        rebalancer.setUpkeepAddress(upkeep);
         rebalancer.setParentPeer(address(parent));
+        /// @dev deploy parent adapters
+        strategyRegistryParent = new StrategyRegistry();
+        aaveV3AdapterParent = new AaveV3Adapter(address(parent), networkConfig.protocols.aavePoolAddressesProvider);
+        compoundV3AdapterParent = new CompoundV3Adapter(address(parent), networkConfig.protocols.comet);
+        strategyRegistryParent.setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(aaveV3AdapterParent));
+        strategyRegistryParent.setStrategyAdapter(
+            keccak256(abi.encodePacked("compound-v3")), address(compoundV3AdapterParent)
+        );
+        rebalancer.setStrategyRegistry(address(strategyRegistryParent));
+        parent.setStrategyRegistry(address(strategyRegistryParent));
+        parent.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")));
+
         /// @dev deploy at least 2 child peers to cover all CCIP tx types
         child1 = new ChildPeer(
             networkConfig.ccip.ccipRouter,
             networkConfig.tokens.link,
             CHILD1_SELECTOR,
             networkConfig.tokens.usdc,
-            networkConfig.protocols.aavePoolAddressesProvider,
-            networkConfig.protocols.comet,
             networkConfig.tokens.share,
             PARENT_SELECTOR
         );
+        /// @dev child adapters
+        strategyRegistryChild1 = new StrategyRegistry();
+        aaveV3AdapterChild1 = new AaveV3Adapter(address(child1), networkConfig.protocols.aavePoolAddressesProvider);
+        compoundV3AdapterChild1 = new CompoundV3Adapter(address(child1), networkConfig.protocols.comet);
+        child1.setStrategyRegistry(address(strategyRegistryChild1));
+        strategyRegistryChild1.setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(aaveV3AdapterChild1));
+        strategyRegistryChild1.setStrategyAdapter(
+            keccak256(abi.encodePacked("compound-v3")), address(compoundV3AdapterChild1)
+        );
+
         child2 = new ChildPeer(
             networkConfig.ccip.ccipRouter,
             networkConfig.tokens.link,
             CHILD2_SELECTOR,
             networkConfig.tokens.usdc,
-            networkConfig.protocols.aavePoolAddressesProvider,
-            networkConfig.protocols.comet,
             networkConfig.tokens.share,
             PARENT_SELECTOR
+        );
+        strategyRegistryChild2 = new StrategyRegistry();
+        aaveV3AdapterChild2 = new AaveV3Adapter(address(child2), networkConfig.protocols.aavePoolAddressesProvider);
+        compoundV3AdapterChild2 = new CompoundV3Adapter(address(child2), networkConfig.protocols.comet);
+        child2.setStrategyRegistry(address(strategyRegistryChild2));
+        strategyRegistryChild2.setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(aaveV3AdapterChild2));
+        strategyRegistryChild2.setStrategyAdapter(
+            keccak256(abi.encodePacked("compound-v3")), address(compoundV3AdapterChild2)
         );
 
         /// @dev grant roles to the contracts
@@ -180,37 +225,37 @@ contract Invariant is StdInvariant, BaseTest {
     function checkStrategyPoolPerChainSelector(uint64 chainSelector) external view {
         if (chainSelector == parent.getStrategy().chainSelector) {
             assertTrue(
-                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getStrategyPool() != address(0),
+                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter() != address(0),
                 "Invariant violated: Strategy pool should be set on the strategy chain"
             );
         } else {
             assertTrue(
-                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getStrategyPool() == address(0),
+                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter() == address(0),
                 "Invariant violated: Strategy pool should not be set on non-strategy chains"
             );
         }
     }
 
-    /// @notice Strategy Protocol Consistency: Strategy Protocol pool on active strategy chain should match the protocol stored in ParentPeer
-    function invariant_strategyProtocol_consistency() public {
-        handler.forEachChainSelector(this.checkStrategyProtocolPerChainSelector);
+    /// @notice Active Strategy Adapter Consistency: Active strategy adapter on active strategy chain should match the protocol stored in ParentPeer
+    function invariant_activeStrategyAdapter_consistency() public {
+        handler.forEachChainSelector(this.checkActiveStrategyAdapterPerChainSelector);
     }
 
-    function checkStrategyProtocolPerChainSelector(uint64 chainSelector) external view {
+    function checkActiveStrategyAdapterPerChainSelector(uint64 chainSelector) external view {
         if (chainSelector == parent.getStrategy().chainSelector) {
-            if (parent.getStrategy().protocol == IYieldPeer.Protocol.Aave) {
-                assertEq(
-                    IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getAave(),
-                    IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getStrategyPool(),
-                    "Invariant violated: Strategy protocol on active strategy chain should match the protocol stored in ParentPeer"
-                );
-            } else if (parent.getStrategy().protocol == IYieldPeer.Protocol.Compound) {
-                assertEq(
-                    IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getCompound(),
-                    IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getStrategyPool(),
-                    "Invariant violated: Strategy protocol on active strategy chain should match the protocol stored in ParentPeer"
-                );
-            }
+            assertEq(
+                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getStrategyAdapter(
+                    parent.getStrategy().protocolId
+                ),
+                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter(),
+                "Invariant violated: Active strategy adapter on active strategy chain should match the protocol stored in ParentPeer"
+            );
+        } else {
+            assertEq(
+                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter(),
+                address(0),
+                "Invariant violated: Active strategy adapter should be set to 0 on non-active strategy chains"
+            );
         }
     }
 
@@ -297,7 +342,6 @@ contract Invariant is StdInvariant, BaseTest {
             uint256 withdrawable = (userShares * totalValueConverted) / totalShares;
             uint256 withdrawableConverted = _convertShareToUsdc(withdrawable);
             uint256 minWithdrawable = netDeposits * 990 / 1000; // Allow 1% slippage
-            if (withdrawableConverted < minWithdrawable) {}
             assertTrue(
                 withdrawableConverted >= minWithdrawable || netDeposits < minUsdcValueInShares,
                 "Invariant violated: User should be able to withdraw what they deposited, except for left over dust"

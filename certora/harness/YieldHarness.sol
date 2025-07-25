@@ -12,10 +12,8 @@ contract YieldHarness is YieldPeer, HelperHarness {
         address link,
         uint64 thisChainSelector,
         address usdc,
-        address aavePoolAddressesProvider,
-        address comet,
         address share
-    ) YieldPeer(ccipRouter, link, thisChainSelector, usdc, aavePoolAddressesProvider, comet, share) {}
+    ) YieldPeer(ccipRouter, link, thisChainSelector, usdc, share) {}
 
     /*//////////////////////////////////////////////////////////////
                                 OVERRIDE
@@ -42,12 +40,12 @@ contract YieldHarness is YieldPeer, HelperHarness {
         _handleCCIPRebalanceNewStrategy(data);
     }
 
-    function depositToStrategy(address strategyPool, uint256 amount) public {
-        _depositToStrategy(strategyPool, amount);
+    function depositToStrategy(address strategyAdapter, uint256 amount) public {
+        _depositToStrategy(strategyAdapter, amount);
     }
 
-    function withdrawFromStrategy(address strategyPool, uint256 amount) public {
-        _withdrawFromStrategy(strategyPool, amount);
+    function withdrawFromStrategy(address strategyAdapter, uint256 amount) public {
+        _withdrawFromStrategy(strategyAdapter, amount);
     }
     
     function decodeWithdrawChainSelector(bytes calldata data) public view returns (uint64) {

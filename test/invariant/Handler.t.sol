@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {
-    Test, Vm, console2, ParentCLF, ChildPeer, IERC20, Share, IYieldPeer, ParentRebalancer
-} from "../BaseTest.t.sol";
+import {Test, Vm, console2, ParentPeer, ChildPeer, IERC20, Share, IYieldPeer, Rebalancer} from "../BaseTest.t.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice This contract is used to handle fuzzed interactions with the external functions of the system to test invariants.
@@ -22,7 +20,7 @@ contract Handler is Test {
     uint256 internal constant INITIAL_DEPOSIT_AMOUNT = 100_000_000;
     uint256 internal constant POOL_DEAL_AMOUNT = 1_000_000_000_000_000_000; // 1T USDC
 
-    ParentCLF internal parent;
+    ParentPeer internal parent;
     ChildPeer internal child1;
     ChildPeer internal child2;
     Share internal share;
@@ -33,7 +31,7 @@ contract Handler is Test {
     address internal admin = makeAddr("admin");
     address internal aavePool;
     address internal compoundPool;
-    ParentRebalancer internal rebalancer;
+    Rebalancer internal rebalancer;
     address internal forwarder = makeAddr("forwarder");
 
     uint64 internal parentChainSelector;
@@ -104,7 +102,7 @@ contract Handler is Test {
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
     constructor(
-        ParentCLF _parent,
+        ParentPeer _parent,
         ChildPeer _child1,
         ChildPeer _child2,
         Share _share,
@@ -114,7 +112,7 @@ contract Handler is Test {
         address _functionsRouter,
         address _aavePool,
         address _compoundPool,
-        ParentRebalancer _rebalancer
+        Rebalancer _rebalancer
     ) {
         parent = _parent;
         child1 = _child1;
@@ -235,14 +233,16 @@ contract Handler is Test {
     }
 
     /// @notice This function handles the fulfillment of requests to the CLF don - the purpose of which is to update the strategy
-    function fulfillRequest(uint256 chainSelectorSeed, uint256 protocolEnumSeed) public {
+    function fulfillRequest(uint256 chainSelectorSeed, uint256 protocolIdSeed) public {
         /// @dev ensure the pools have enough liquidity
         // uint256 totalValue =
         _dealPoolsUsdc();
 
         /// @dev bind the chain selector and protocol enum to the range of valid values
         uint64 chainSelector = uint64(bound(chainSelectorSeed, 1, 3));
-        uint8 protocolEnum = uint8(bound(protocolEnumSeed, 0, 1));
+        bytes32 protocolId;
+        if (protocolIdSeed % 2 == 0) protocolId = keccak256(abi.encodePacked("aave-v3"));
+        else protocolId = keccak256(abi.encodePacked("compound-v3"));
 
         /// @dev simulate the passing of time
         /// @notice we are simulating time based automation triggering once per day
@@ -251,8 +251,8 @@ contract Handler is Test {
         /// @dev simulate sending request to CLF don and get the request id
         vm.recordLogs();
         _changePrank(upkeep);
-        parent.sendCLFRequest();
-        bytes memory response = abi.encode(chainSelector, protocolEnum);
+        rebalancer.sendCLFRequest();
+        bytes memory response = abi.encode(chainSelector, protocolId);
         bytes32 requestId;
         Vm.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i = 0; i < logs.length; i++) {
@@ -264,7 +264,7 @@ contract Handler is Test {
         /// @dev simulate fulfilling request from CLF don to update the strategy
         vm.recordLogs();
         _changePrank(functionsRouter);
-        parent.handleOracleFulfillment(requestId, response, "");
+        rebalancer.handleOracleFulfillment(requestId, response, "");
         /// @dev if the logs contain a StrategyUpdated event with relevant data, perform upkeep
         _handleCLFLogs();
     }
@@ -279,11 +279,11 @@ contract Handler is Test {
         _stopPrank();
     }
 
-    function _performUpkeep(uint64 newChainSelector, uint8 protocolEnum, uint64 oldChainSelector) internal {
+    function _performUpkeep(uint64 newChainSelector, bytes32 protocolId, uint64 oldChainSelector) internal {
         if (newChainSelector == parentChainSelector && oldChainSelector == parentChainSelector) return;
 
         IYieldPeer.Strategy memory newStrategy =
-            IYieldPeer.Strategy({chainSelector: newChainSelector, protocol: IYieldPeer.Protocol(protocolEnum)});
+            IYieldPeer.Strategy({chainSelector: newChainSelector, protocolId: protocolId});
         IYieldPeer.CcipTxType txType;
         if (oldChainSelector == parentChainSelector && newChainSelector != parentChainSelector) {
             txType = IYieldPeer.CcipTxType.RebalanceNewStrategy;
@@ -291,12 +291,13 @@ contract Handler is Test {
             txType = IYieldPeer.CcipTxType.RebalanceOldStrategy;
         }
 
-        address oldStrategyPool = parent.getStrategyPool();
+        address oldStrategyAdapter = parent.getActiveStrategyAdapter();
         uint256 totalValue;
-        if (oldStrategyPool != address(0)) totalValue = parent.getTotalValue();
+        if (oldStrategyAdapter != address(0)) totalValue = parent.getTotalValue();
 
-        bytes memory performData =
-            abi.encode(forwarder, address(parent), newStrategy, txType, oldChainSelector, oldStrategyPool, totalValue);
+        bytes memory performData = abi.encode(
+            forwarder, address(parent), newStrategy, txType, oldChainSelector, oldStrategyAdapter, totalValue
+        );
         _changePrank(forwarder);
         rebalancer.performUpkeep(performData);
     }
@@ -376,15 +377,15 @@ contract Handler is Test {
     /// @notice Handle the logs emitted during Chainlink Functions callback
     /// @dev If the logs contain a StrategyUpdated event with relevant data, perform upkeep
     function _handleCLFLogs() internal {
-        bytes32 strategyUpdatedEvent = keccak256("StrategyUpdated(uint64,uint8,uint64)");
+        bytes32 strategyUpdatedEvent = keccak256("StrategyUpdated(uint64,bytes32,uint64)");
         Vm.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i = 0; i < logs.length; i++) {
             if (logs[i].topics[0] == strategyUpdatedEvent) {
                 uint64 newChainSelector = uint64(uint256(logs[i].topics[1]));
-                uint8 protocolEnum = uint8(uint256(logs[i].topics[2]));
+                bytes32 protocolId = logs[i].topics[2];
                 uint64 oldChainSelector = uint64(uint256(logs[i].topics[3]));
 
-                _performUpkeep(newChainSelector, protocolEnum, oldChainSelector);
+                _performUpkeep(newChainSelector, protocolId, oldChainSelector);
             }
         }
     }

@@ -108,6 +108,8 @@ The terms "current strategy" and "active strategy" are used interchangably.
 
 "Old Strategy" refers to the Strategy funds are being withdrawn from during the rebalance process, and "New Strategy" refers to the Strategy those funds are being deposited to during the rebalance.
 
+The string hashed for the strategy protocol ID should match what is hashed in the Chainlink Functions source code - see functions/src.js.
+
 ## Contracts/Architecture
 
 The Contract Level Yield system that powers YieldCoin consists of a crosschain network of "Peer" contracts. `YieldPeer` contracts are deployed on each compatible chain, and act as entry points to the system. Currently the only supported stablecoin is `USDC` (due partially to its availability across chains with CCIP and the time constraints of the hackathon).
@@ -447,21 +449,28 @@ The [`Yield`](https://github.com/contractlevel/yield/blob/main/certora/spec/yiel
 certoraRun ./certora/conf/Yield.conf
 ```
 
-The [`ParentCLF`](https://github.com/contractlevel/yield/blob/main/certora/spec/parent/ParentCLF.spec) spec verifies logic related to Chainlink Functions and Automation.
+The [`Rebalancer`](https://github.com/contractlevel/yield/blob/main/certora/spec/parent/Rebalancer.spec) spec verifies the `Rebalancer` contract, which contains logic related to Chainlink Functions and Automation.
 
 ```
-certoraRun ./certora/conf/parent/ParentCLF.conf --nondet_difficult_funcs
+certoraRun ./certora/conf/modules/Rebalancer.conf --nondet_difficult_funcs
 ```
 
-The `--nondet_difficult_funcs` flag is required for `ParentCLF` to [automatically summarize functions](https://docs.certora.com/en/latest/docs/prover/cli/options.html#nondet-difficult-funcs) in the `FunctionsRequest` library because otherwise the Certora Prover will timeout. The Certora Prover explores all possible paths and the `FunctionsRequest::encodeCBOR` includes an extremely high path count, making it difficult to verify.
-
-The [`Rebalancer`](https://github.com/contractlevel/yield/blob/main/certora/spec/parent/Rebalancer.spec) spec verifies the `ParentRebalancer` contract.
-
-```
-certoraRun ./certora/conf/parent/Rebalancer.conf
-```
+The `--nondet_difficult_funcs` flag is required for `Rebalance` to [automatically summarize functions](https://docs.certora.com/en/latest/docs/prover/cli/options.html#nondet-difficult-funcs) in the `FunctionsRequest` library because otherwise the Certora Prover will timeout. The Certora Prover explores all possible paths and the `FunctionsRequest::encodeCBOR` includes an extremely high path count, making it difficult to verify.
 
 Verifying behaviour in the `checkLog()` function would result in vacuous rules with basic sanity enabled. I thought this was because of returning false when upkeep wasn't needed, and that reverting instead would improve the verification, but that resulted in vacuous rules too. For now basic sanity has been left enabled, and comments in the spec indicate the vacuous rules. Reverts instead of returning false when upkeep is not needed has been kept in place. It doesn't make any functional difference either way and is purely aesthetic, especially when both options deliver vacuous rules.
+
+To verify strategy adapters:
+
+```
+certoraRun ./certora/conf/adapters/AaveV3Adapter.conf
+certoraRun ./certora/conf/adapters/CompoundV3Adapter.conf
+```
+
+To verify the strategy registry:
+
+```
+certoraRun ./certora/conf/modules/StrategyRegistry.conf
+```
 
 ## Known Issues
 
@@ -640,7 +649,7 @@ Ultimately the [additional functionality](https://github.com/contractlevel/chain
 
 Information pertaining to the “strategy” with the highest yield (ie the chain and the protocol) is fetched from the [DefiLlama API](https://yields.llama.fi/pools) which returns a HUGE response. The response was too much for Chainlink Functions, so a proxy API to filter for the relevant data was required.
 
-I made one and deployed it to AWS Lambda. The url for the API could have been abused (unlikely for a hackathon project, but a required consideration for a production ready project) so the url had to be properly encrypted with the [functions-toolkit](https://www.npmjs.com/package/@chainlink/functions-toolkit#functions-utilities](https://www.npmjs.com/package/@chainlink/functions-toolkit#encrypting-secrets) and then stored as a [constant](https://github.com/contractlevel/yield/blob/0cd489dc7a2fb2b7f2f949db890038dd33925873/src/peers/extensions/ParentCLF.sol#L33-L37) in the YieldCoin FunctionsClient contract (`ParentCLF`). This value needed to be different for different chains due to the chain-specific parameters required when executing the encrypted secrets process. Even though Chainlink Functions is used on the Parent chain only, the Parent chain changed between testnet deployments, so the chain-specific parameters for secrets encryption had to be considered.
+I made one and deployed it to AWS Lambda. The url for the API could have been abused (unlikely for a hackathon project, but a required consideration for a production ready project) so the url had to be properly encrypted with the [functions-toolkit](https://www.npmjs.com/package/@chainlink/functions-toolkit#encrypting-secrets) and then stored as a [constant](https://github.com/contractlevel/yield/blob/0cd489dc7a2fb2b7f2f949db890038dd33925873/src/peers/extensions/ParentCLF.sol#L33-L37) in the YieldCoin FunctionsClient contract (`ParentCLF`). This value needed to be different for different chains due to the chain-specific parameters required when executing the encrypted secrets process. Even though Chainlink Functions is used on the Parent chain only, the Parent chain changed between testnet deployments, so the chain-specific parameters for secrets encryption had to be considered.
 
 ### Time management/knowing what to prioritize
 

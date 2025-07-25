@@ -13,11 +13,8 @@ contract ParentHarness is ParentPeer, HelperHarness {
         address link,
         uint64 thisChainSelector,
         address usdc,
-        address aavePoolAddressesProvider,
-        address comet,
-        address share,
-        address parentRebalancer    
-    ) ParentPeer(ccipRouter, link, thisChainSelector, usdc, aavePoolAddressesProvider, comet, share, parentRebalancer) {}
+        address share
+    ) ParentPeer(ccipRouter, link, thisChainSelector, usdc, share) {}
 
     function buildCCIPMessage(
         address receiver,
@@ -56,15 +53,15 @@ contract ParentHarness is ParentPeer, HelperHarness {
         _handleCCIPWithdrawToParent(data, sourceChainSelector);
     }
 
-    function setStrategy(uint64 chainSelector, Protocol protocol) public {
-        _setStrategy(chainSelector, protocol);
-    }
-
     function calculateMintAmount(uint256 totalValue, uint256 amount) public view returns (uint256) {
         return _calculateMintAmount(totalValue, amount);
     }
 
     function convertUsdcToShare(uint256 amount) public pure returns (uint256) {
         return _convertUsdcToShare(amount);
+    }
+
+    function getStrategyAdapterFromProtocol(bytes32 protocolId) public view returns (address) {
+        return _getStrategyAdapterFromProtocol(protocolId);
     }
 }

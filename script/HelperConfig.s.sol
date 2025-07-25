@@ -13,7 +13,7 @@ import {CCIPLocalSimulator, LinkToken, IRouterClient} from "@chainlink-local/src
 import {Share} from "../src/token/Share.sol";
 import {ParentPeer} from "../src/peers/ParentPeer.sol";
 import {ChildPeer} from "../src/peers/ChildPeer.sol";
-import {ParentRebalancer} from "../src/modules/ParentRebalancer.sol";
+import {Rebalancer} from "../src/modules/Rebalancer.sol";
 import {SharePool} from "../src/token/SharePool.sol";
 
 contract HelperConfig is Script {
@@ -494,7 +494,7 @@ contract HelperConfig is Script {
     CCIPLocalSimulator internal ccipLocalSimulator;
     Share internal share;
     SharePool internal sharePool;
-    ParentRebalancer internal rebalancer;
+    Rebalancer internal rebalancer;
     ParentPeer internal parent;
     ChildPeer internal child;
     IRouterClient internal ccipRouter;
@@ -502,7 +502,7 @@ contract HelperConfig is Script {
 
     function _deployLocalInfra() internal {
         usdc = new MockUsdc();
-        aavePool = new MockAavePool(address(usdc)); // need to set aToken address later
+        aavePool = new MockAavePool();
         aToken = new MockAToken(address(aavePool));
         poolAddressesProvider = new MockPoolAddressesProvider(address(aavePool));
         aavePool.setATokenAddress(address(aToken));
@@ -517,26 +517,9 @@ contract HelperConfig is Script {
         ccipLocalSimulator.supportNewTokenViaOwner(address(usdc));
         ccipLocalSimulator.supportNewTokenViaGetCCIPAdmin(address(share));
 
-        rebalancer = new ParentRebalancer();
-        parent = new ParentPeer(
-            address(ccipRouter),
-            address(link),
-            1,
-            address(usdc),
-            address(poolAddressesProvider),
-            address(comet),
-            address(share),
-            address(rebalancer)
-        );
-        child = new ChildPeer(
-            address(ccipRouter),
-            address(link),
-            2,
-            address(usdc),
-            address(poolAddressesProvider),
-            address(comet),
-            address(share),
-            1
-        );
+        rebalancer = new Rebalancer(address(functionsRouter), "", 0);
+        parent = new ParentPeer(address(ccipRouter), address(link), 1, address(usdc), address(share));
+        child = new ChildPeer(address(ccipRouter), address(link), 2, address(usdc), address(share), 1);
+        parent.setRebalancer(address(rebalancer));
     }
 }

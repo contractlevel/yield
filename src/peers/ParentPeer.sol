@@ -9,33 +9,34 @@ import {YieldPeer, Client, IRouterClient, CCIPOperations} from "./YieldPeer.sol"
 /// @notice This contract is deployed on only one chain
 /// @notice Users can deposit and withdraw USDC to/from the system via this contract
 /// @notice This contract tracks system wide state and acts as a system wide hub for forwarding CCIP messages to the Strategy
-/// @notice This version of ParentPeer is incomplete - ParentCLF must be used as it inherits this and implements Automation and Functions
 contract ParentPeer is YieldPeer {
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
-    error ParentPeer__OnlyParentRebalancer();
+    error ParentPeer__OnlyRebalancer();
+    error ParentPeer__InitialActiveStrategyAlreadySet();
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
-    /// @dev This address handles automated CCIP rebalance calls with Log-trigger Automation, based on Function request callbacks
-    /// @notice See ./src/modules/ParentRebalancer.sol
-    address internal immutable i_parentRebalancer;
-
     /// @dev total share tokens (YieldCoin) minted across all chains
     // @invariant s_totalShares == ghost_totalSharesMinted - ghost_totalSharesBurned
     uint256 internal s_totalShares;
+    /// @dev This address handles automated CCIP rebalance calls with Log-trigger Automation, based on Function request callbacks
+    /// @notice See ./src/modules/Rebalancer.sol
+    address internal s_rebalancer;
     /// @dev The current strategy: chainSelector and protocol
     Strategy internal s_strategy;
+    /// @dev Whether the initial active strategy adapter has been set
+    bool internal s_initialActiveStrategySet;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
     /// @notice Emitted when the current strategy is optimal
-    event CurrentStrategyOptimal(uint64 indexed chainSelector, Protocol indexed protocol);
+    event CurrentStrategyOptimal(uint64 indexed chainSelector, bytes32 indexed protocolId);
     /// @notice Emitted when the strategy is updated
-    event StrategyUpdated(uint64 indexed chainSelector, Protocol indexed protocol, uint64 indexed oldChainSelector);
+    event StrategyUpdated(uint64 indexed chainSelector, bytes32 indexed protocolId, uint64 indexed oldChainSelector);
     /// @notice Emitted when the amount of shares minted is updated
     event ShareMintUpdate(uint256 indexed shareMintAmount, uint64 indexed chainSelector, uint256 indexed totalShares);
     /// @notice Emitted when the amount of shares burned is updated
@@ -44,6 +45,8 @@ contract ParentPeer is YieldPeer {
     event DepositForwardedToStrategy(uint256 indexed depositAmount, uint64 indexed strategyChainSelector);
     /// @notice Emitted when a withdraw is forwarded to the strategy
     event WithdrawForwardedToStrategy(uint256 indexed shareBurnAmount, uint64 indexed strategyChainSelector);
+    /// @notice Emitted when the rebalancer is set
+    event RebalancerSet(address indexed rebalancer);
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -52,25 +55,10 @@ contract ParentPeer is YieldPeer {
     /// @param link The address of the LINK token
     /// @param thisChainSelector The selector of the chain this contract is deployed on
     /// @param usdc The address of the USDC token
-    /// @param aavePoolAddressesProvider The address of the Aave pool addresses provider
-    /// @param comet The address of the Compound v3 cUSDCv3 contract
     /// @param share The address of the share token native to this system that is minted in exchange for USDC deposits (YieldCoin)
-    /// @dev Initial Strategy is set to Aave on this chain
-    constructor(
-        address ccipRouter,
-        address link,
-        uint64 thisChainSelector,
-        address usdc,
-        address aavePoolAddressesProvider,
-        address comet,
-        address share,
-        address parentRebalancer
-    ) YieldPeer(ccipRouter, link, thisChainSelector, usdc, aavePoolAddressesProvider, comet, share) {
-        s_strategy = Strategy({chainSelector: thisChainSelector, protocol: Protocol.Aave});
-        _updateStrategyPool(thisChainSelector, Protocol.Aave);
-        // slither-disable-next-line missing-zero-check
-        i_parentRebalancer = parentRebalancer;
-    }
+    constructor(address ccipRouter, address link, uint64 thisChainSelector, address usdc, address share)
+        YieldPeer(ccipRouter, link, thisChainSelector, usdc, share)
+    {}
 
     /*//////////////////////////////////////////////////////////////
                                 EXTERNAL
@@ -88,7 +76,7 @@ contract ParentPeer is YieldPeer {
 
         // 1. This Parent is the Strategy. Therefore the deposit is handled here and shares can be minted here.
         if (strategy.chainSelector == i_thisChainSelector) {
-            uint256 totalValue = _depositToStrategyAndGetTotalValue(amountToDeposit);
+            uint256 totalValue = _depositToStrategyAndGetTotalValue(_getActiveStrategyAdapter(), amountToDeposit);
 
             uint256 shareMintAmount = _calculateMintAmount(totalValue, amountToDeposit);
             s_totalShares += shareMintAmount;
@@ -139,12 +127,12 @@ contract ParentPeer is YieldPeer {
 
         // 1. This Parent is the Strategy. Therefore the usdcWithdrawAmount is calculated and withdrawal is handled here.
         if (strategy.chainSelector == i_thisChainSelector) {
-            address strategyPool = _getStrategyPool();
-            uint256 totalValue = _getTotalValueFromStrategy(strategyPool);
+            address activeStrategyAdapter = _getActiveStrategyAdapter();
+            uint256 totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, address(i_usdc));
 
             uint256 usdcWithdrawAmount = _calculateWithdrawAmount(totalValue, totalShares, shareBurnAmount);
 
-            if (usdcWithdrawAmount != 0) _withdrawFromStrategy(strategyPool, usdcWithdrawAmount);
+            if (usdcWithdrawAmount != 0) _withdrawFromStrategy(activeStrategyAdapter, usdcWithdrawAmount);
 
             if (withdrawChainSelector == i_thisChainSelector) {
                 if (usdcWithdrawAmount != 0) _transferUsdcTo(withdrawer, usdcWithdrawAmount);
@@ -170,13 +158,16 @@ contract ParentPeer is YieldPeer {
 
     /// @dev Revert if msg.sender is not the ParentRebalancer
     /// @dev Handle moving strategy from this parent chain to a different chain
-    /// @param oldStrategyPool The address of the old strategy pool
+    /// @param oldStrategyAdapter The address of the old strategy adapter
     /// @param totalValue The total value of the system
     /// @param newStrategy The new strategy
     /// @notice This function is called by the ParentRebalancer's Log-trigger Automation performUpkeep
-    function rebalanceNewStrategy(address oldStrategyPool, uint256 totalValue, Strategy memory newStrategy) external {
-        _revertIfMsgSenderIsNotParentRebalancer();
-        _handleStrategyMoveToNewChain(oldStrategyPool, totalValue, newStrategy);
+    /// @notice This is called when the strategy is on this chain and is being moved to a different chain
+    function rebalanceNewStrategy(address oldStrategyAdapter, uint256 totalValue, Strategy memory newStrategy)
+        external
+    {
+        _revertIfMsgSenderIsNotRebalancer();
+        _handleStrategyMoveToNewChain(oldStrategyAdapter, totalValue, newStrategy);
     }
 
     /// @dev Revert if msg.sender is not the ParentRebalancer
@@ -184,10 +175,10 @@ contract ParentPeer is YieldPeer {
     /// @param oldChainSelector The chain selector of the old strategy
     /// @param newStrategy The new strategy
     /// @notice This function is called by the ParentRebalancer's Log-trigger Automation performUpkeep
+    /// @notice This is called when the old strategy is on a different chain to this chain, a remote child
     function rebalanceOldStrategy(uint64 oldChainSelector, Strategy memory newStrategy) external {
-        _revertIfMsgSenderIsNotParentRebalancer();
-        Strategy memory oldStrategy = Strategy({chainSelector: oldChainSelector, protocol: Protocol.Aave});
-        _handleRebalanceFromDifferentChain(oldStrategy, newStrategy);
+        _revertIfMsgSenderIsNotRebalancer();
+        _handleRebalanceFromDifferentChain(oldChainSelector, newStrategy);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -198,8 +189,8 @@ contract ParentPeer is YieldPeer {
     /// The CCIP message received
     /// - CcipTxType DepositToParent: A tx from child to parent to deposit USDC in strategy
     /// - CcipTxType DepositCallbackParent: A tx from the strategy to parent to calculate shareMintAmount and mint shares to the depositor on this chain or another child chain
-    /// - CcipTxType WithdrawCallback: A tx from the strategy chain to send USDC to the withdrawer
     /// - CcipTxType WithdrawToParent: A tx from the withdraw chain to forward to the strategy chain
+    /// - CcipTxType WithdrawCallback: A tx from the strategy chain to send USDC to the withdrawer
     /// - CcipTxType RebalanceNewStrategy: A tx from the old strategy, sending rebalanced funds to the new strategy
     /// @param tokenAmounts The token amounts received in the CCIP message
     /// @param data The data received in the CCIP message
@@ -233,7 +224,7 @@ contract ParentPeer is YieldPeer {
 
         /// @dev If Strategy is on this Parent, deposit into strategy and get totalValue
         if (strategy.chainSelector == i_thisChainSelector) {
-            depositData.totalValue = _depositToStrategyAndGetTotalValue(depositData.amount);
+            depositData.totalValue = _depositToStrategyAndGetTotalValue(_getActiveStrategyAdapter(), depositData.amount);
             depositData.shareMintAmount = _calculateMintAmount(depositData.totalValue, depositData.amount);
             s_totalShares += depositData.shareMintAmount;
             emit ShareMintUpdate(depositData.shareMintAmount, depositData.chainSelector, s_totalShares);
@@ -329,12 +320,12 @@ contract ParentPeer is YieldPeer {
     /// @notice Rebalances funds from the old strategy to the new strategy if both are on this chain
     /// @notice Handles the case where both the old and new strategy are on this chain
     /// @param chainSelector The chain selector of the new strategy
-    /// @param protocol The protocol of the new strategy
+    /// @param protocolId The protocol ID of the new strategy
     /// @dev StrategyUpdated event emitted in _updateStrategy will trigger ParentRebalancer::performUpkeep ccip rebalances
     /// @notice performUpkeep handles the case where the old or new strategies are on different chains with ccipSend
-    function _setStrategy(uint64 chainSelector, Protocol protocol) internal {
+    function _setStrategy(uint64 chainSelector, bytes32 protocolId) internal {
         Strategy memory oldStrategy = s_strategy;
-        Strategy memory newStrategy = Strategy({chainSelector: chainSelector, protocol: protocol});
+        Strategy memory newStrategy = Strategy({chainSelector: chainSelector, protocolId: protocolId});
 
         // Early return if strategy hasn't changed
         if (!_updateStrategy(newStrategy, oldStrategy)) {
@@ -351,23 +342,25 @@ contract ParentPeer is YieldPeer {
     /// @param oldStrategy The current strategy
     /// @return bool Whether the strategy was actually changed
     function _updateStrategy(Strategy memory newStrategy, Strategy memory oldStrategy) internal returns (bool) {
-        if (oldStrategy.chainSelector == newStrategy.chainSelector && oldStrategy.protocol == newStrategy.protocol) {
-            emit CurrentStrategyOptimal(newStrategy.chainSelector, newStrategy.protocol);
+        if (oldStrategy.chainSelector == newStrategy.chainSelector && oldStrategy.protocolId == newStrategy.protocolId)
+        {
+            emit CurrentStrategyOptimal(newStrategy.chainSelector, newStrategy.protocolId);
             return false;
         }
         s_strategy = newStrategy;
-        emit StrategyUpdated(newStrategy.chainSelector, newStrategy.protocol, oldStrategy.chainSelector);
+        emit StrategyUpdated(newStrategy.chainSelector, newStrategy.protocolId, oldStrategy.chainSelector);
         return true;
     }
 
     /// @notice Handles strategy change when both old and new strategies are on this chain
     /// @param newStrategy The new strategy
     function _handleLocalStrategyChange(Strategy memory newStrategy) internal {
-        address oldStrategyPool = _getStrategyPool();
-        uint256 totalValue = _getTotalValueFromStrategy(oldStrategyPool);
-        if (totalValue != 0) _withdrawFromStrategy(oldStrategyPool, totalValue);
-        address newStrategyPool = _updateStrategyPool(newStrategy.chainSelector, newStrategy.protocol);
-        _depositToStrategy(newStrategyPool, i_usdc.balanceOf(address(this)));
+        address oldActiveStrategyAdapter = _getActiveStrategyAdapter();
+        uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, address(i_usdc));
+        if (totalValue != 0) _withdrawFromStrategy(oldActiveStrategyAdapter, totalValue);
+        address newActiveStrategyAdapter =
+            _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
+        _depositToStrategy(newActiveStrategyAdapter, i_usdc.balanceOf(address(this)));
     }
 
     /// @notice Handles moving strategy to a different chain
@@ -378,7 +371,7 @@ contract ParentPeer is YieldPeer {
         internal
     {
         if (totalValue != 0) _withdrawFromStrategy(oldStrategyPool, totalValue);
-        _updateStrategyPool(newStrategy.chainSelector, newStrategy.protocol);
+        _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
         _ccipSend(
             newStrategy.chainSelector,
             CcipTxType.RebalanceNewStrategy,
@@ -388,12 +381,11 @@ contract ParentPeer is YieldPeer {
     }
 
     /// @notice Handles rebalancing when strategy is on a different chain
-    /// @param oldStrategy The current strategy
+    /// @param oldChainSelector The chain selector of the old strategy
     /// @param newStrategy The new strategy
-    function _handleRebalanceFromDifferentChain(Strategy memory oldStrategy, Strategy memory newStrategy) internal {
-        _ccipSend(
-            oldStrategy.chainSelector, CcipTxType.RebalanceOldStrategy, abi.encode(newStrategy), ZERO_BRIDGE_AMOUNT
-        );
+    /// @notice This function is sending a crosschain message to the old strategy to rebalance funds to the new strategy
+    function _handleRebalanceFromDifferentChain(uint64 oldChainSelector, Strategy memory newStrategy) internal {
+        _ccipSend(oldChainSelector, CcipTxType.RebalanceOldStrategy, abi.encode(newStrategy), ZERO_BRIDGE_AMOUNT);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -415,9 +407,43 @@ contract ParentPeer is YieldPeer {
         if (shareMintAmount == 0) shareMintAmount = 1;
     }
 
-    /// @dev Revert if msg.sender is not the ParentRebalancer
-    function _revertIfMsgSenderIsNotParentRebalancer() internal view {
-        if (msg.sender != i_parentRebalancer) revert ParentPeer__OnlyParentRebalancer();
+    /// @dev Revert if msg.sender is not the Rebalancer
+    function _revertIfMsgSenderIsNotRebalancer() internal view {
+        if (msg.sender != s_rebalancer) revert ParentPeer__OnlyRebalancer();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                 SETTER
+    //////////////////////////////////////////////////////////////*/
+    /// @dev Revert if msg.sender is not the Rebalancer
+    /// @dev Set the strategy
+    /// @param chainSelector The chain selector of the new strategy
+    /// @param protocolId The protocol ID of the new strategy
+    function setStrategy(uint64 chainSelector, bytes32 protocolId) external {
+        _revertIfMsgSenderIsNotRebalancer();
+        _setStrategy(chainSelector, protocolId);
+    }
+
+    /// @notice Sets the initial active strategy
+    /// @notice Can only be called once by the owner
+    /// @notice This is needed because the strategy adapters are deployed separately from the parent peer
+    /// @dev Revert if msg.sender is not the owner
+    /// @dev Revert if already called
+    /// @dev Called in deploy script, immediately after deploying initial strategy adapters, and setting them in YieldPeer::setStrategyAdapter
+    /// @param protocolId The protocol ID of the initial active strategy
+    function setInitialActiveStrategy(bytes32 protocolId) external onlyOwner {
+        if (s_initialActiveStrategySet) revert ParentPeer__InitialActiveStrategyAlreadySet();
+        s_initialActiveStrategySet = true;
+        s_strategy = Strategy({chainSelector: i_thisChainSelector, protocolId: protocolId});
+        _updateActiveStrategyAdapter(i_thisChainSelector, protocolId);
+    }
+
+    /// @notice Sets the rebalancer
+    /// @dev Revert if msg.sender is not the owner
+    /// @param rebalancer The address of the rebalancer
+    function setRebalancer(address rebalancer) external onlyOwner {
+        s_rebalancer = rebalancer;
+        emit RebalancerSet(rebalancer);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -433,5 +459,11 @@ contract ParentPeer is YieldPeer {
     /// @return totalShares The total shares minted across all chains
     function getTotalShares() external view returns (uint256) {
         return s_totalShares;
+    }
+
+    /// @notice Get the current rebalancer
+    /// @return rebalancer The current rebalancer
+    function getRebalancer() external view returns (address) {
+        return s_rebalancer;
     }
 }

@@ -22,19 +22,15 @@ contract ChildPeer is YieldPeer {
     /// @param link The address of the LINK token
     /// @param thisChainSelector The CCIP selector of the chain this peer is deployed on
     /// @param usdc The address of the USDC token
-    /// @param aavePoolAddressesProvider The address of the Aave pool addresses provider
-    /// @param comet The address of the Compound v3 cUSDCv3 contract
     /// @param share The address of the Share token, native to this system that is minted in return for deposits
     constructor(
         address ccipRouter,
         address link,
         uint64 thisChainSelector,
         address usdc,
-        address aavePoolAddressesProvider,
-        address comet,
         address share,
         uint64 parentChainSelector
-    ) YieldPeer(ccipRouter, link, thisChainSelector, usdc, aavePoolAddressesProvider, comet, share) {
+    ) YieldPeer(ccipRouter, link, thisChainSelector, usdc, share) {
         i_parentChainSelector = parentChainSelector;
     }
 
@@ -50,13 +46,13 @@ contract ChildPeer is YieldPeer {
     function deposit(uint256 amountToDeposit) external override {
         _initiateDeposit(amountToDeposit);
 
-        address strategyPool = _getStrategyPool();
+        address activeStrategyAdapter = _getActiveStrategyAdapter();
         DepositData memory depositData = _buildDepositData(amountToDeposit);
 
         // 1. This Child is the Strategy
-        if (strategyPool != address(0)) {
+        if (activeStrategyAdapter != address(0)) {
             /// @dev deposit USDC in strategy pool and get totalValue
-            depositData.totalValue = _depositToStrategyAndGetTotalValue(amountToDeposit);
+            depositData.totalValue = _depositToStrategyAndGetTotalValue(activeStrategyAdapter, amountToDeposit);
 
             /// @dev send a message to parent contract to request shareMintAmount
             _ccipSend(
@@ -129,7 +125,7 @@ contract ChildPeer is YieldPeer {
         DepositData memory depositData = _decodeDepositData(data);
         CCIPOperations._validateTokenAmounts(tokenAmounts, address(i_usdc), depositData.amount);
 
-        depositData.totalValue = _depositToStrategyAndGetTotalValue(depositData.amount);
+        depositData.totalValue = _depositToStrategyAndGetTotalValue(_getActiveStrategyAdapter(), depositData.amount);
 
         /// @dev send a message to parent with totalValue to calculate shareMintAmount
         _ccipSend(i_parentChainSelector, CcipTxType.DepositCallbackParent, abi.encode(depositData), ZERO_BRIDGE_AMOUNT);
@@ -170,20 +166,21 @@ contract ChildPeer is YieldPeer {
     /// @notice The message this function handles is sent by the Parent when the Strategy is updated
     /// @notice This function should only be executed when this chain is the (old) strategy
     /// @dev Rebalances funds from the old strategy to the new strategy
-    /// @param data The data to decode - decodes to Strategy (chainSelector, protocol)
+    /// @param data The data to decode - decodes to Strategy (chainSelector, protocolId)
     function _handleCCIPRebalanceOldStrategy(bytes memory data) internal {
         /// @dev withdraw from the old strategy
-        address oldStrategyPool = _getStrategyPool();
-        uint256 totalValue = _getTotalValueFromStrategy(oldStrategyPool);
-        if (totalValue != 0) _withdrawFromStrategy(oldStrategyPool, totalValue);
+        address oldActiveStrategyAdapter = _getActiveStrategyAdapter();
+        uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, address(i_usdc));
+        if (totalValue != 0) _withdrawFromStrategy(oldActiveStrategyAdapter, totalValue);
 
         /// @dev update strategy pool to either protocol on this chain or address(0) if on a different chain
         Strategy memory newStrategy = abi.decode(data, (Strategy));
-        address newStrategyPool = _updateStrategyPool(newStrategy.chainSelector, newStrategy.protocol);
+        address newActiveStrategyAdapter =
+            _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
 
         // if the new strategy is this chain, but different protocol, then we need to deposit to the new strategy
         if (newStrategy.chainSelector == i_thisChainSelector) {
-            _depositToStrategy(newStrategyPool, i_usdc.balanceOf(address(this)));
+            _depositToStrategy(newActiveStrategyAdapter, i_usdc.balanceOf(address(this)));
         }
         // if the new strategy is a different chain, then we need to send the usdc we just withdrew to the new strategy
         else {
