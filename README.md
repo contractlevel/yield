@@ -466,6 +466,12 @@ certoraRun ./certora/conf/adapters/AaveV3Adapter.conf
 certoraRun ./certora/conf/adapters/CompoundV3Adapter.conf
 ```
 
+To verify the strategy registry:
+
+```
+certoraRun ./certora/conf/modules/StrategyRegistry.conf
+```
+
 ## Known Issues
 
 ### Burning small amounts of shares can result in 0 usdc withdrawn
