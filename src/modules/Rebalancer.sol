@@ -180,6 +180,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
             performData, (address, address, IYieldPeer.Strategy, IYieldPeer.CcipTxType, uint64, address, uint256)
         );
 
+        // @review, we should be reading this from storage. this looks vulnerable
         if (msg.sender != forwarder) revert Rebalancer__OnlyForwarder();
 
         if (txType == IYieldPeer.CcipTxType.RebalanceNewStrategy) {
