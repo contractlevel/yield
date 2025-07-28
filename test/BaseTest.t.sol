@@ -478,6 +478,10 @@ contract BaseTest is Test {
     function _setUpAutomationAndFunctions() internal {
         _selectFork(baseFork);
 
+        /// @dev set forwarder
+        _changePrank(baseParentPeer.owner());
+        baseRebalancer.setForwarder(forwarder);
+
         /// @dev set upkeepAddress
         address parentPeerOwner = baseParentPeer.owner();
         _changePrank(parentPeerOwner);
@@ -632,7 +636,7 @@ contract BaseTest is Test {
         address parentPeer = address(baseRebalancer.getParentPeer());
         IYieldPeer.Strategy memory newStrategy =
             IYieldPeer.Strategy({chainSelector: chainSelector, protocolId: protocolId});
-        return abi.encode(forwarder, parentPeer, newStrategy, txType, oldChainSelector, oldStrategyPool, totalValue);
+        return abi.encode(parentPeer, newStrategy, txType, oldChainSelector, oldStrategyPool, totalValue);
     }
 
     /// @notice Helper function to convert USDC to Share

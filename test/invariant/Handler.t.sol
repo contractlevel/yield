@@ -295,9 +295,8 @@ contract Handler is Test {
         uint256 totalValue;
         if (oldStrategyAdapter != address(0)) totalValue = parent.getTotalValue();
 
-        bytes memory performData = abi.encode(
-            forwarder, address(parent), newStrategy, txType, oldChainSelector, oldStrategyAdapter, totalValue
-        );
+        bytes memory performData =
+            abi.encode(address(parent), newStrategy, txType, oldChainSelector, oldStrategyAdapter, totalValue);
         _changePrank(forwarder);
         rebalancer.performUpkeep(performData);
     }

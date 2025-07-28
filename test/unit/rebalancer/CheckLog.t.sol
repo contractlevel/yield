@@ -50,17 +50,13 @@ contract CheckLogTest is BaseTest {
         assertTrue(upkeepNeeded);
 
         (
-            address forwarder,
             address parentPeer,
             IYieldPeer.Strategy memory newStrategy,
             IYieldPeer.CcipTxType txType,
             uint64 oldChainSelector,
             address oldStrategyAdapter,
             uint256 totalValue
-        ) = abi.decode(
-            performData, (address, address, IYieldPeer.Strategy, IYieldPeer.CcipTxType, uint64, address, uint256)
-        );
-        assertEq(forwarder, address(baseRebalancer.getForwarder()));
+        ) = abi.decode(performData, (address, IYieldPeer.Strategy, IYieldPeer.CcipTxType, uint64, address, uint256));
         assertEq(parentPeer, address(baseRebalancer.getParentPeer()));
         assertEq(newStrategy.chainSelector, newChainSelector);
         assertEq(newStrategy.protocolId, newProtocolId);
@@ -81,17 +77,13 @@ contract CheckLogTest is BaseTest {
         assertTrue(upkeepNeeded);
 
         (
-            address forwarder,
             address parentPeer,
             IYieldPeer.Strategy memory newStrategy,
             IYieldPeer.CcipTxType txType,
             uint64 decodedOldChainSelector,
             address oldStrategyAdapter,
             uint256 totalValue
-        ) = abi.decode(
-            performData, (address, address, IYieldPeer.Strategy, IYieldPeer.CcipTxType, uint64, address, uint256)
-        );
-        assertEq(forwarder, address(baseRebalancer.getForwarder()));
+        ) = abi.decode(performData, (address, IYieldPeer.Strategy, IYieldPeer.CcipTxType, uint64, address, uint256));
         assertEq(parentPeer, address(baseRebalancer.getParentPeer()));
         assertEq(newStrategy.chainSelector, newChainSelector);
         assertEq(newStrategy.protocolId, newProtocolId);

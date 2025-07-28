@@ -126,7 +126,6 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
         bytes32 eventSignature = keccak256("StrategyUpdated(uint64,bytes32,uint64)");
         address parentPeer = s_parentPeer;
         uint64 thisChainSelector = IParentPeer(parentPeer).getThisChainSelector();
-        address forwarder = s_forwarder;
 
         if (log.source == parentPeer && log.topics[0] == eventSignature) {
             uint64 chainSelector = uint64(uint256(log.topics[1]));
@@ -153,8 +152,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
                 txType = IYieldPeer.CcipTxType.RebalanceOldStrategy;
             }
 
-            performData =
-                abi.encode(forwarder, parentPeer, newStrategy, txType, oldChainSelector, oldStrategyAdapter, totalValue);
+            performData = abi.encode(parentPeer, newStrategy, txType, oldChainSelector, oldStrategyAdapter, totalValue);
             upkeepNeeded = true;
         } else {
             performData = "";
@@ -168,20 +166,15 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     /// @dev Revert if caller is not the Chainlink Automation forwarder
     /// @param performData The performData returned by the checkLog function
     function performUpkeep(bytes calldata performData) external {
+        if (msg.sender != s_forwarder) revert Rebalancer__OnlyForwarder();
         (
-            address forwarder,
             address parentPeer,
             IYieldPeer.Strategy memory strategy,
             IYieldPeer.CcipTxType txType,
             uint64 oldChainSelector,
             address oldStrategyAdapter,
             uint256 totalValue
-        ) = abi.decode(
-            performData, (address, address, IYieldPeer.Strategy, IYieldPeer.CcipTxType, uint64, address, uint256)
-        );
-
-        // @review, we should be reading this from storage. this looks vulnerable
-        if (msg.sender != forwarder) revert Rebalancer__OnlyForwarder();
+        ) = abi.decode(performData, (address, IYieldPeer.Strategy, IYieldPeer.CcipTxType, uint64, address, uint256));
 
         if (txType == IYieldPeer.CcipTxType.RebalanceNewStrategy) {
             IParentPeer(parentPeer).rebalanceNewStrategy(oldStrategyAdapter, totalValue, strategy);
