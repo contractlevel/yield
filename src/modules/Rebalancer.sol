@@ -87,6 +87,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
         Ownable(msg.sender)
         FunctionsClient(functionsRouter)
     {
+        // @review - should these be configurable?
         i_donId = donId;
         i_clfSubId = clfSubId;
     }
@@ -98,6 +99,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     /// @notice The nature of the request is to fetch the strategy with the highest yield
     /// @dev Revert if the caller is not the Chainlink Automation upkeep address
     // @review should be pausable?
+    // a: yes, but we will want to review using time-based automation vs incentivized public keepers
     function sendCLFRequest() external {
         if (msg.sender != s_upkeepAddress) revert Rebalancer__OnlyUpkeep();
 

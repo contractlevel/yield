@@ -76,10 +76,9 @@ contract ParentPeer is YieldPeer {
 
         // 1. This Parent is the Strategy. Therefore the deposit is handled here and shares can be minted here.
         if (strategy.chainSelector == i_thisChainSelector) {
-            // @review take fee somewhere in here?
-
             uint256 totalValue = _depositToStrategyAndGetTotalValue(_getActiveStrategyAdapter(), amountToDeposit);
 
+            // @review take fee somewhere here?
             uint256 shareMintAmount = _calculateMintAmount(totalValue, amountToDeposit);
             s_totalShares += shareMintAmount;
 
@@ -253,6 +252,8 @@ contract ParentPeer is YieldPeer {
     function _handleCCIPDepositCallbackParent(bytes memory data) internal {
         /// @dev decode the deposit data and total value in the system
         DepositData memory depositData = _decodeDepositData(data);
+
+        // @review take fee somewhere here?
 
         /// @dev calculate shareMintAmount based on depositData.totalValue and depositData.amount
         depositData.shareMintAmount = _calculateMintAmount(depositData.totalValue, depositData.amount);
