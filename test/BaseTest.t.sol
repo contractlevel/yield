@@ -652,4 +652,12 @@ contract BaseTest is Test {
     function _convertShareToUsdc(uint256 amountInShare) internal pure returns (uint256 amountInUsdc) {
         amountInUsdc = amountInShare / INITIAL_SHARE_PRECISION;
     }
+
+    /// @notice Helper function to set the fee rate
+    /// @param feeRate The fee rate to set
+    function _setFeeRate(uint256 feeRate) internal {
+        _selectFork(baseFork);
+        _changePrank(baseParentPeer.owner());
+        baseParentPeer.setFeeRate(feeRate);
+    }
 }

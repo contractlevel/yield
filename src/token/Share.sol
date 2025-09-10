@@ -30,7 +30,7 @@ contract Share is BurnMintERC677, IGetCCIPAdmin {
                                  SETTER
     //////////////////////////////////////////////////////////////*/
     /// @notice Transfers the CCIPAdmin role to a new address
-    /// @dev only the owner can call this function, NOT the current ccipAdmin, and 1-step ownership transfer is used.
+    /// @dev only the owner can call this function, NOT the current ccipAdmin, and 2-step ownership transfer is used.
     /// @param newAdmin The address to transfer the CCIPAdmin role to. Setting to address(0) is a valid way to revoke
     /// the role
     //slither-disable-next-line missing-zero-check

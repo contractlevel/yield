@@ -15,10 +15,18 @@ contract ParentPeer is YieldPeer {
     //////////////////////////////////////////////////////////////*/
     error ParentPeer__OnlyRebalancer();
     error ParentPeer__InitialActiveStrategyAlreadySet();
+    error ParentPeer__FeeRateTooHigh();
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
+    /// @dev The divisor used to calculate the fee rate in basis points
+    uint256 internal constant FEE_RATE_DIVISOR = 100_000_000; // 1e8
+    /// @dev The maximum fee rate: 1% = 1_000_000 / 1e8
+    uint256 internal constant MAX_FEE_RATE = 1_000_000;
+
+    /// @dev The fee rate
+    uint256 internal s_feeRate;
     /// @dev total share tokens (YieldCoin) minted across all chains
     // @invariant s_totalShares == ghost_totalSharesMinted - ghost_totalSharesBurned
     uint256 internal s_totalShares;
@@ -47,6 +55,12 @@ contract ParentPeer is YieldPeer {
     event WithdrawForwardedToStrategy(uint256 indexed shareBurnAmount, uint64 indexed strategyChainSelector);
     /// @notice Emitted when the rebalancer is set
     event RebalancerSet(address indexed rebalancer);
+    /// @notice Emitted when the fee rate is set
+    event FeeRateSet(uint256 indexed feeRate);
+    /// @notice Emitted when a fee is taken during a deposit
+    event FeeTaken(uint256 indexed fee);
+    /// @notice Emitted when fees are withdrawn
+    event FeesWithdrawn(uint256 indexed fees);
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -58,7 +72,9 @@ contract ParentPeer is YieldPeer {
     /// @param share The address of the share token native to this system that is minted in exchange for USDC deposits (YieldCoin)
     constructor(address ccipRouter, address link, uint64 thisChainSelector, address usdc, address share)
         YieldPeer(ccipRouter, link, thisChainSelector, usdc, share)
-    {}
+    {
+        // @review set initial fee rate?
+    }
 
     /*//////////////////////////////////////////////////////////////
                                 EXTERNAL
@@ -78,12 +94,13 @@ contract ParentPeer is YieldPeer {
         if (strategy.chainSelector == i_thisChainSelector) {
             uint256 totalValue = _depositToStrategyAndGetTotalValue(_getActiveStrategyAdapter(), amountToDeposit);
 
-            // @review take fee somewhere here?
             uint256 shareMintAmount = _calculateMintAmount(totalValue, amountToDeposit);
             s_totalShares += shareMintAmount;
 
+            uint256 shareMintAmountMinusFee = _takeFee(shareMintAmount);
+
             /// @dev mint share tokens (YieldCoin) to msg.sender based on amount deposited and total value of the system
-            _mintShares(msg.sender, shareMintAmount);
+            _mintShares(msg.sender, shareMintAmountMinusFee);
             emit ShareMintUpdate(shareMintAmount, i_thisChainSelector, s_totalShares);
         }
         // 2. This Parent is not the Strategy. Therefore the deposit must be sent to the strategy and get totalValue.
@@ -182,6 +199,15 @@ contract ParentPeer is YieldPeer {
         _handleRebalanceFromDifferentChain(oldChainSelector, newStrategy);
     }
 
+    // @review test
+    /// @notice Withdraws the fees
+    /// @dev Revert if msg.sender is not the owner
+    function withdrawFees() external onlyOwner {
+        uint256 fees = i_share.balanceOf(address(this));
+        i_share.transfer(msg.sender, fees);
+        emit FeesWithdrawn(fees);
+    }
+
     /*//////////////////////////////////////////////////////////////
                                 INTERNAL
     //////////////////////////////////////////////////////////////*/
@@ -253,12 +279,13 @@ contract ParentPeer is YieldPeer {
         /// @dev decode the deposit data and total value in the system
         DepositData memory depositData = _decodeDepositData(data);
 
-        // @review take fee somewhere here?
-
         /// @dev calculate shareMintAmount based on depositData.totalValue and depositData.amount
         depositData.shareMintAmount = _calculateMintAmount(depositData.totalValue, depositData.amount);
         /// @dev update s_totalShares += shareMintAmount
         s_totalShares += depositData.shareMintAmount;
+
+        /// @dev take fee from shareMintAmount and update depositData.shareMintAmount so it doesn't include the fee
+        depositData.shareMintAmount = _takeFee(depositData.shareMintAmount);
 
         /// @dev handle the case where the deposit was made on this parent chain
         if (depositData.chainSelector == i_thisChainSelector) {
@@ -391,6 +418,18 @@ contract ParentPeer is YieldPeer {
         _ccipSend(oldChainSelector, CcipTxType.RebalanceOldStrategy, abi.encode(newStrategy), ZERO_BRIDGE_AMOUNT);
     }
 
+    // @review test
+    /// @notice Takes a fee for a deposit from the shareMintAmount
+    /// @param shareMintAmount The amount of shares (yieldcoin tokens) being minted
+    /// @return shareMintAmountMinusFee The amount of shares (yieldcoin tokens) being minted minus the fee
+    /// @notice The fee is paid to the YieldCoin infrastructure to cover development and Chainlink costs
+    function _takeFee(uint256 shareMintAmount) internal returns (uint256 shareMintAmountMinusFee) {
+        uint256 fee = _calculateFee(shareMintAmount);
+        shareMintAmountMinusFee = shareMintAmount - fee;
+        emit FeeTaken(fee);
+        _mintShares(address(this), fee);
+    }
+
     /*//////////////////////////////////////////////////////////////
                              INTERNAL VIEW
     //////////////////////////////////////////////////////////////*/
@@ -413,6 +452,15 @@ contract ParentPeer is YieldPeer {
     /// @dev Revert if msg.sender is not the Rebalancer
     function _revertIfMsgSenderIsNotRebalancer() internal view {
         if (msg.sender != s_rebalancer) revert ParentPeer__OnlyRebalancer();
+    }
+
+    // @review test
+    /// @notice Calculates the fee for a deposit
+    /// @param shareMintAmount The amount of shares (yieldcoin tokens) being minted
+    /// @return fee The fee for the deposit
+    /// @notice The fee is paid to the YieldCoin infrastructure to cover development and Chainlink costs
+    function _calculateFee(uint256 shareMintAmount) internal view returns (uint256 fee) {
+        fee = (shareMintAmount * s_feeRate) / FEE_RATE_DIVISOR;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -449,6 +497,16 @@ contract ParentPeer is YieldPeer {
         emit RebalancerSet(rebalancer);
     }
 
+    // @review test
+    /// @notice Sets the fee rate
+    /// @dev Revert if msg.sender is not the owner
+    /// @param newFeeRate The new fee rate
+    function setFeeRate(uint256 newFeeRate) external onlyOwner {
+        if (newFeeRate > MAX_FEE_RATE) revert ParentPeer__FeeRateTooHigh();
+        s_feeRate = newFeeRate;
+        emit FeeRateSet(newFeeRate);
+    }
+
     /*//////////////////////////////////////////////////////////////
                                  GETTER
     //////////////////////////////////////////////////////////////*/
@@ -468,5 +526,17 @@ contract ParentPeer is YieldPeer {
     /// @return rebalancer The current rebalancer
     function getRebalancer() external view returns (address) {
         return s_rebalancer;
+    }
+
+    /// @notice Get the current fee rate
+    /// @return feeRate The current fee rate
+    function getFeeRate() external view returns (uint256) {
+        return s_feeRate;
+    }
+
+    /// @notice Get the current fee rate divisor
+    /// @return feeRateDivisor The current fee rate divisor
+    function getFeeRateDivisor() external pure returns (uint256) {
+        return FEE_RATE_DIVISOR;
     }
 }

@@ -34,4 +34,23 @@ contract SetterTest is BaseTest {
     function test_yield_parentPeer_setInitialActiveStrategy_success() public view {
         assertEq(baseParentPeer.getStrategy().protocolId, keccak256(abi.encodePacked("aave-v3")));
     }
+
+    // --- setFeeRate --- //
+    function test_yield_parentPeer_setFeeRate_revertsWhen_notOwner() public {
+        _changePrank(holder);
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", holder));
+        baseParentPeer.setFeeRate(1);
+    }
+
+    function test_yield_parentPeer_setFeeRate_revertsWhen_tooHigh() public {
+        _changePrank(baseParentPeer.owner());
+        vm.expectRevert(abi.encodeWithSignature("ParentPeer__FeeRateTooHigh()"));
+        baseParentPeer.setFeeRate(1_000_001);
+    }
+
+    function test_yield_parentPeer_setFeeRate_success() public {
+        _changePrank(baseParentPeer.owner());
+        baseParentPeer.setFeeRate(1);
+        assertEq(baseParentPeer.getFeeRate(), 1);
+    }
 }

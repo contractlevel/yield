@@ -18,6 +18,10 @@ contract ParentDepositTest is BaseTest {
         /// @dev baseFork is the parent chain
         _selectFork(baseFork);
         deal(address(baseUsdc), depositor, DEPOSIT_AMOUNT);
+
+        uint256 feeRate = 1_000_000; // 1%
+        _setFeeRate(feeRate);
+
         _changePrank(depositor);
         baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
     }
@@ -43,8 +47,12 @@ contract ParentDepositTest is BaseTest {
         /// @dev assert correct amount of shares minted
         uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
         assertEq(baseShare.totalSupply(), expectedShareMintAmount);
-        assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount);
         assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
+
+        /// @dev assert fee is taken from shareMintAmount
+        uint256 fee = (expectedShareMintAmount * baseParentPeer.getFeeRate()) / baseParentPeer.getFeeRateDivisor();
+        assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
+        assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount - fee);
 
         /// @dev assert USDC was deposited to Aave
         address aUsdc = _getATokenAddress(baseNetworkConfig.protocols.aavePoolAddressesProvider, address(baseUsdc));
@@ -73,8 +81,10 @@ contract ParentDepositTest is BaseTest {
 
         /// @dev assert correct amount of shares minted
         uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
+        uint256 fee = (expectedShareMintAmount * baseParentPeer.getFeeRate()) / baseParentPeer.getFeeRateDivisor();
+        assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
         assertEq(baseShare.totalSupply(), expectedShareMintAmount);
-        assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount);
+        assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount - fee);
         assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
 
         /// @dev assert USDC was deposited to Compound
@@ -123,8 +133,10 @@ contract ParentDepositTest is BaseTest {
 
         /// @dev assert correct amount of shares minted
         uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
+        uint256 fee = (expectedShareMintAmount * baseParentPeer.getFeeRate()) / baseParentPeer.getFeeRateDivisor();
+        assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
         assertEq(baseShare.totalSupply(), expectedShareMintAmount);
-        assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount);
+        assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount - fee);
         assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
     }
 
@@ -160,8 +172,10 @@ contract ParentDepositTest is BaseTest {
 
         /// @dev assert correct amount of shares minted
         uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
+        uint256 fee = (expectedShareMintAmount * baseParentPeer.getFeeRate()) / baseParentPeer.getFeeRateDivisor();
+        assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
         assertEq(baseShare.totalSupply(), expectedShareMintAmount);
-        assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount);
+        assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount - fee);
         assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
     }
 
@@ -176,8 +190,10 @@ contract ParentDepositTest is BaseTest {
         baseParentPeer.deposit(DEPOSIT_AMOUNT);
         /// @dev assert correct amount of shares minted
         uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
+        uint256 fee = (expectedShareMintAmount * baseParentPeer.getFeeRate()) / baseParentPeer.getFeeRateDivisor();
+        assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
         assertEq(baseShare.totalSupply(), expectedShareMintAmount);
-        assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount);
+        assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount - fee);
 
         /// @dev act
         _changePrank(depositor2);
@@ -187,11 +203,14 @@ contract ParentDepositTest is BaseTest {
         uint256 totalValue = baseParentPeer.getTotalValue();
         uint256 expectedSecondShareMintAmount =
             (_convertUsdcToShare(DEPOSIT_AMOUNT) * baseShare.totalSupply()) / _convertUsdcToShare(totalValue);
-        uint256 yieldDifference = 6e11;
+        uint256 secondFee =
+            (expectedSecondShareMintAmount * baseParentPeer.getFeeRate()) / baseParentPeer.getFeeRateDivisor();
+        assertEq(baseShare.balanceOf(address(baseParentPeer)), fee + secondFee);
+        uint256 yieldDifference = 6e12;
         assertApproxEqAbs(
             baseShare.totalSupply(), expectedShareMintAmount + expectedSecondShareMintAmount, yieldDifference
         );
-        assertApproxEqAbs(baseShare.balanceOf(depositor2), expectedSecondShareMintAmount, yieldDifference);
+        assertApproxEqAbs(baseShare.balanceOf(depositor2), expectedSecondShareMintAmount - secondFee, yieldDifference);
     }
 
     function test_yield_calculateMintAmount_edgeCase() public {
