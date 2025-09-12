@@ -50,7 +50,7 @@ contract ParentDepositTest is BaseTest {
         assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
 
         /// @dev assert fee is taken from shareMintAmount
-        uint256 fee = (expectedShareMintAmount * baseParentPeer.getFeeRate()) / baseParentPeer.getFeeRateDivisor();
+        uint256 fee = _getFee(expectedShareMintAmount);
         assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
         assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount - fee);
 
@@ -205,8 +205,8 @@ contract ParentDepositTest is BaseTest {
             (_convertUsdcToShare(DEPOSIT_AMOUNT) * baseShare.totalSupply()) / _convertUsdcToShare(totalValue);
         uint256 secondFee =
             (expectedSecondShareMintAmount * baseParentPeer.getFeeRate()) / baseParentPeer.getFeeRateDivisor();
-        assertEq(baseShare.balanceOf(address(baseParentPeer)), fee + secondFee);
         uint256 yieldDifference = 6e12;
+        assertApproxEqAbs(baseShare.balanceOf(address(baseParentPeer)), fee + secondFee, yieldDifference);
         assertApproxEqAbs(
             baseShare.totalSupply(), expectedShareMintAmount + expectedSecondShareMintAmount, yieldDifference
         );

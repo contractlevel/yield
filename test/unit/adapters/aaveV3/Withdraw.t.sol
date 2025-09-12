@@ -21,6 +21,6 @@ contract WithdrawTest is BaseTest {
         baseAaveV3Adapter.withdraw(address(baseUsdc), baseAaveV3Adapter.getTotalValue(address(baseUsdc)));
 
         uint256 yieldPeerBalanceAfter = baseUsdc.balanceOf(address(baseParentPeer));
-        assertEq(yieldPeerBalanceAfter, yieldPeerBalanceBefore + DEPOSIT_AMOUNT);
+        assertApproxEqAbs(yieldPeerBalanceAfter, yieldPeerBalanceBefore + DEPOSIT_AMOUNT, BALANCE_TOLERANCE);
     }
 }

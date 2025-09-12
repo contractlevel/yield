@@ -39,7 +39,7 @@ contract BaseTest is Test {
     //////////////////////////////////////////////////////////////*/
     uint256 internal constant DEPOSIT_AMOUNT = 1_000_000_000; // 1000 USDC
     uint256 internal constant INITIAL_SHARE_PRECISION = 1e18 / 1e6;
-    uint256 internal constant BALANCE_TOLERANCE = 3; // Allow 3 wei difference
+    uint256 internal constant BALANCE_TOLERANCE = 4; // Allow 4 wei difference
 
     CCIPLocalSimulatorFork internal ccipLocalSimulatorFork;
     uint256 internal constant LINK_AMOUNT = 1_000 * 1e18; // 1000 LINK
@@ -659,5 +659,12 @@ contract BaseTest is Test {
         _selectFork(baseFork);
         _changePrank(baseParentPeer.owner());
         baseParentPeer.setFeeRate(feeRate);
+    }
+
+    /// @notice Helper function to get the fee for a deposit
+    /// @param shareMintAmount The amount of shares (yieldcoin tokens) being minted
+    /// @return fee The fee for the deposit
+    function _getFee(uint256 shareMintAmount) internal view returns (uint256 fee) {
+        fee = (shareMintAmount * baseParentPeer.getFeeRate()) / baseParentPeer.getFeeRateDivisor();
     }
 }

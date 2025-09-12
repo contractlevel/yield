@@ -9,6 +9,10 @@ import {console2} from "forge-std/console2.sol";
 contract ChildDepositTest is BaseTest {
     function setUp() public override {
         super.setUp();
+        /// @dev set the fee rate on the parent chain
+        _selectFork(baseFork);
+        uint256 feeRate = 1_000_000; // 1%
+        _setFeeRate(feeRate);
         /// @dev optFork is a child chain
         _selectFork(optFork);
         deal(address(optUsdc), depositor, DEPOSIT_AMOUNT);
@@ -57,9 +61,12 @@ contract ChildDepositTest is BaseTest {
         /// @dev switch back to child chain and route ccip message with shareMintAmount to mint shares
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
-        /// @dev assert correct amount of shares minted
-        assertEq(optShare.totalSupply(), expectedShareMintAmount);
-        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount);
+        /// @dev assert correct amount of shares minted and fees are taken
+        uint256 fee = _getFee(expectedShareMintAmount);
+        assertEq(optShare.totalSupply(), expectedShareMintAmount - fee);
+        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount - fee);
+        assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
+        assertEq(baseShare.totalSupply(), fee);
     }
 
     function test_yield_child_deposit_strategyIsChild_compound() public {
@@ -95,8 +102,12 @@ contract ChildDepositTest is BaseTest {
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
         /// @dev assert correct amount of shares minted
-        assertEq(optShare.totalSupply(), expectedShareMintAmount);
-        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount);
+        uint256 fee = _getFee(expectedShareMintAmount);
+        assertEq(optShare.totalSupply(), expectedShareMintAmount - fee);
+        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount - fee);
+        assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
+        assertEq(baseShare.totalSupply(), fee);
+        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount - fee);
     }
 
     // - parent is strategy
@@ -218,9 +229,13 @@ contract ChildDepositTest is BaseTest {
         /// @dev switch back to deposit child chain and route ccip message with shareMintAmount to mint shares
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
-        /// @dev assert correct amount of shares minted
-        assertEq(optShare.totalSupply(), expectedShareMintAmount);
-        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount);
+        /// @dev assert correct amount of shares minted and fees are taken
+        uint256 fee = _getFee(expectedShareMintAmount);
+        assertEq(optShare.totalSupply(), expectedShareMintAmount - fee);
+        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount - fee);
+        assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
+        assertEq(baseShare.totalSupply(), fee);
+        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount - fee);
     }
 
     function test_yield_child_deposit_strategyIsChainC_compound() public {
@@ -261,8 +276,12 @@ contract ChildDepositTest is BaseTest {
         /// @dev switch back to deposit child chain and route ccip message with shareMintAmount to mint shares
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
-        /// @dev assert correct amount of shares minted
-        assertEq(optShare.totalSupply(), expectedShareMintAmount);
-        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount);
+        /// @dev assert correct amount of shares minted and fees are taken
+        uint256 fee = _getFee(expectedShareMintAmount);
+        assertEq(optShare.totalSupply(), expectedShareMintAmount - fee);
+        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount - fee);
+        assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
+        assertEq(baseShare.totalSupply(), fee);
+        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount - fee);
     }
 }

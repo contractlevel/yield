@@ -199,7 +199,6 @@ contract ParentPeer is YieldPeer {
         _handleRebalanceFromDifferentChain(oldChainSelector, newStrategy);
     }
 
-    // @review test
     /// @notice Withdraws the fees
     /// @dev Revert if msg.sender is not the owner
     function withdrawFees() external onlyOwner {
@@ -418,7 +417,6 @@ contract ParentPeer is YieldPeer {
         _ccipSend(oldChainSelector, CcipTxType.RebalanceOldStrategy, abi.encode(newStrategy), ZERO_BRIDGE_AMOUNT);
     }
 
-    // @review test
     /// @notice Takes a fee for a deposit from the shareMintAmount
     /// @param shareMintAmount The amount of shares (yieldcoin tokens) being minted
     /// @return shareMintAmountMinusFee The amount of shares (yieldcoin tokens) being minted minus the fee
@@ -454,18 +452,21 @@ contract ParentPeer is YieldPeer {
         if (msg.sender != s_rebalancer) revert ParentPeer__OnlyRebalancer();
     }
 
-    // @review test
     /// @notice Calculates the fee for a deposit
     /// @param shareMintAmount The amount of shares (yieldcoin tokens) being minted
     /// @return fee The fee for the deposit
     /// @notice The fee is paid to the YieldCoin infrastructure to cover development and Chainlink costs
     function _calculateFee(uint256 shareMintAmount) internal view returns (uint256 fee) {
-        fee = (shareMintAmount * s_feeRate) / FEE_RATE_DIVISOR;
+        // @review how much more optimal in terms of gas would it be to just assign this to fee? readability would decrease
+        uint256 feeRate = s_feeRate;
+        // @review should we be using solady fixedpointmath?
+        if (feeRate != 0) fee = (shareMintAmount * feeRate) / FEE_RATE_DIVISOR;
     }
 
     /*//////////////////////////////////////////////////////////////
                                  SETTER
     //////////////////////////////////////////////////////////////*/
+    // @review I dont see the rebalancer using this. it's using the rebalanceNew and rebalanceOld
     /// @dev Revert if msg.sender is not the Rebalancer
     /// @dev Set the strategy
     /// @param chainSelector The chain selector of the new strategy
@@ -497,7 +498,6 @@ contract ParentPeer is YieldPeer {
         emit RebalancerSet(rebalancer);
     }
 
-    // @review test
     /// @notice Sets the fee rate
     /// @dev Revert if msg.sender is not the owner
     /// @param newFeeRate The new fee rate
