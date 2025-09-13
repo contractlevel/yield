@@ -3,7 +3,7 @@ pragma solidity 0.8.26;
 
 import {YieldPeer, Client, IRouterClient, CCIPOperations} from "./YieldPeer.sol";
 
-/// @title CLY ParentPeer
+/// @title YieldCoin ParentPeer
 /// @author @contractlevel
 /// @notice This contract is the ParentPeer of the Contract Level Yield system
 /// @notice This contract is deployed on only one chain
@@ -16,6 +16,8 @@ contract ParentPeer is YieldPeer {
     error ParentPeer__OnlyRebalancer();
     error ParentPeer__InitialActiveStrategyAlreadySet();
     error ParentPeer__FeeRateTooHigh();
+    error ParentPeer__NoFeesToWithdraw();
+    error ParentPeer__FeeWithdrawalFailed();
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
@@ -203,8 +205,12 @@ contract ParentPeer is YieldPeer {
     /// @dev Revert if msg.sender is not the owner
     function withdrawFees() external onlyOwner {
         uint256 fees = i_share.balanceOf(address(this));
-        i_share.transfer(msg.sender, fees);
-        emit FeesWithdrawn(fees);
+        if (fees != 0) {
+            if (!i_share.transfer(msg.sender, fees)) revert ParentPeer__FeeWithdrawalFailed();
+            emit FeesWithdrawn(fees);
+        } else {
+            revert ParentPeer__NoFeesToWithdraw();
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -385,10 +391,13 @@ contract ParentPeer is YieldPeer {
     /// @param newStrategy The new strategy
     function _handleLocalStrategyChange(Strategy memory newStrategy) internal {
         address oldActiveStrategyAdapter = _getActiveStrategyAdapter();
-        uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, address(i_usdc));
-        if (totalValue != 0) _withdrawFromStrategy(oldActiveStrategyAdapter, totalValue);
+
         address newActiveStrategyAdapter =
             _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
+
+        uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, address(i_usdc));
+        if (totalValue != 0) _withdrawFromStrategy(oldActiveStrategyAdapter, totalValue);
+
         _depositToStrategy(newActiveStrategyAdapter, i_usdc.balanceOf(address(this)));
     }
 
@@ -493,6 +502,7 @@ contract ParentPeer is YieldPeer {
     /// @notice Sets the rebalancer
     /// @dev Revert if msg.sender is not the owner
     /// @param rebalancer The address of the rebalancer
+    //slither-disable-next-line missing-zero-check
     function setRebalancer(address rebalancer) external onlyOwner {
         s_rebalancer = rebalancer;
         emit RebalancerSet(rebalancer);

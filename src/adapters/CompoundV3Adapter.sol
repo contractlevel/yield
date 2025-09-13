@@ -20,6 +20,7 @@ contract CompoundV3Adapter is StrategyAdapter {
     //////////////////////////////////////////////////////////////*/
     /// @param yieldPeer The address of the yield peer
     /// @param comet The address of the Compound V3 pool
+    //slither-disable-next-line missing-zero-check
     constructor(address yieldPeer, address comet) StrategyAdapter(yieldPeer) {
         i_comet = comet;
     }

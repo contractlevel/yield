@@ -23,6 +23,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
                            TYPE DECLARATIONS
     //////////////////////////////////////////////////////////////*/
     using SafeERC20 for IERC20;
+    using SafeERC20 for IShare;
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -129,6 +130,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @param thisChainSelector The chain selector for this chain
     /// @param usdc The address of the USDC token
     /// @param share The address of the Share token, native to this system that is minted in return for deposits
+    //slither-disable-next-line missing-zero-check
     constructor(address ccipRouter, address link, uint64 thisChainSelector, address usdc, address share)
         CCIPReceiver(ccipRouter)
         Ownable(msg.sender)
@@ -137,6 +139,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         i_thisChainSelector = thisChainSelector;
         i_usdc = IERC20(usdc);
         i_share = IShare(share);
+        // @review these comments
         // /// @dev Set to address(1) to get past check in setStrategyAdapter for initial active strategy
         // s_activeStrategyAdapter = address(1);
     }
@@ -509,6 +512,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @notice Set the strategy registry
     /// @param strategyRegistry The strategy registry to set
     /// @dev Access control: onlyOwner
+    //slither-disable-next-line missing-zero-check
     function setStrategyRegistry(address strategyRegistry) external onlyOwner {
         s_strategyRegistry = strategyRegistry;
         emit StrategyRegistrySet(strategyRegistry);

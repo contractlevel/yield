@@ -122,8 +122,11 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     function checkLog(Log calldata log, bytes memory)
         external
         view
-        cannotExecute
-        returns (bool upkeepNeeded, bytes memory performData)
+        returns (
+            // cannotExecute // @review uncomment
+            bool upkeepNeeded,
+            bytes memory performData
+        )
     {
         bytes32 eventSignature = keccak256("StrategyUpdated(uint64,bytes32,uint64)");
         address parentPeer = s_parentPeer;
@@ -253,6 +256,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     /// @notice Sets the strategy registry
     /// @param strategyRegistry The address of the strategy registry
     /// @dev Revert if the caller is not the owner
+    // slither-disable-next-line missing-zero-check
     function setStrategyRegistry(address strategyRegistry) external onlyOwner {
         s_strategyRegistry = strategyRegistry;
         emit StrategyRegistrySet(strategyRegistry);

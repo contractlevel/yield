@@ -168,15 +168,17 @@ contract ChildPeer is YieldPeer {
     /// @dev Rebalances funds from the old strategy to the new strategy
     /// @param data The data to decode - decodes to Strategy (chainSelector, protocolId)
     function _handleCCIPRebalanceOldStrategy(bytes memory data) internal {
-        /// @dev withdraw from the old strategy
+        /// @dev cache the old active strategy adapter
         address oldActiveStrategyAdapter = _getActiveStrategyAdapter();
-        uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, address(i_usdc));
-        if (totalValue != 0) _withdrawFromStrategy(oldActiveStrategyAdapter, totalValue);
 
         /// @dev update strategy pool to either protocol on this chain or address(0) if on a different chain
         Strategy memory newStrategy = abi.decode(data, (Strategy));
         address newActiveStrategyAdapter =
             _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
+
+        /// @dev withdraw from the old strategy
+        uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, address(i_usdc));
+        if (totalValue != 0) _withdrawFromStrategy(oldActiveStrategyAdapter, totalValue);
 
         // if the new strategy is this chain, but different protocol, then we need to deposit to the new strategy
         if (newStrategy.chainSelector == i_thisChainSelector) {

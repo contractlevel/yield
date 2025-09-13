@@ -2,6 +2,11 @@
 pragma solidity 0.8.26;
 
 import {BaseTest, Vm, console2, IYieldPeer, Log} from "../../BaseTest.t.sol";
+import {Share} from "../../../src/token/Share.sol";
+import {
+    ERC20,
+    IERC20
+} from "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/ERC20.sol";
 
 contract WithdrawFeesTest is BaseTest {
     function setUp() public override {
@@ -31,4 +36,32 @@ contract WithdrawFeesTest is BaseTest {
 
         assertEq(baseShare.balanceOf(baseParentPeer.owner()), _getFee(expectedShareMintAmount));
     }
+
+    function test_yield_parent_withdrawFees_revertsWhen_noFeesToWithdraw() public {
+        _changePrank(baseParentPeer.owner());
+        vm.expectRevert(abi.encodeWithSignature("ParentPeer__NoFeesToWithdraw()"));
+        baseParentPeer.withdrawFees();
+    }
+
+    function test_yield_parent_withdrawFees_revertsWhen_tokenTransfer_returnsFalse() public {
+        _changePrank(depositor);
+        baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+
+        FalseTransferToken falseTransferToken = new FalseTransferToken();
+        vm.etch(address(baseShare), address(falseTransferToken).code);
+
+        _changePrank(baseParentPeer.owner());
+        vm.expectRevert(abi.encodeWithSignature("ParentPeer__FeeWithdrawalFailed()"));
+        baseParentPeer.withdrawFees();
+    }
+}
+
+contract FalseTransferToken is Share {
+    function transfer(address to, uint256 amount) public override(ERC20, IERC20) returns (bool) {
+        return false;
+    }
+
+    /// @dev ignore in coverage report
+    function test_empty() public {}
 }
