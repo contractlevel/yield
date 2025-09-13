@@ -256,10 +256,18 @@ contract ParentPeer is YieldPeer {
 
         /// @dev If Strategy is on this Parent, deposit into strategy and get totalValue
         if (strategy.chainSelector == i_thisChainSelector) {
-            depositData.totalValue = _depositToStrategyAndGetTotalValue(_getActiveStrategyAdapter(), depositData.amount);
+            /// @dev cache active strategy adapter
+            address activeStrategyAdapter = _getActiveStrategyAdapter();
+            /// @dev get total value from strategy and calculate share mint amount
+            depositData.totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, address(i_usdc));
             depositData.shareMintAmount = _calculateMintAmount(depositData.totalValue, depositData.amount);
+            /// @dev update s_totalShares
             s_totalShares += depositData.shareMintAmount;
             emit ShareMintUpdate(depositData.shareMintAmount, depositData.chainSelector, s_totalShares);
+            /// @dev deposit to strategy
+            _depositToStrategy(activeStrategyAdapter, depositData.amount);
+
+            // @review do we need to take a fee here?
 
             _ccipSend(
                 depositData.chainSelector, CcipTxType.DepositCallbackChild, abi.encode(depositData), ZERO_BRIDGE_AMOUNT
@@ -408,8 +416,8 @@ contract ParentPeer is YieldPeer {
     function _handleStrategyMoveToNewChain(address oldStrategyPool, uint256 totalValue, Strategy memory newStrategy)
         internal
     {
-        if (totalValue != 0) _withdrawFromStrategy(oldStrategyPool, totalValue);
         _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
+        if (totalValue != 0) _withdrawFromStrategy(oldStrategyPool, totalValue);
         _ccipSend(
             newStrategy.chainSelector,
             CcipTxType.RebalanceNewStrategy,
