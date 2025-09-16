@@ -103,15 +103,7 @@ contract BaseTest is Test {
     address internal upkeepAddress = makeAddr("upkeepAddress");
     address internal forwarder = makeAddr("forwarder");
     address[] internal attesters = new address[](4);
-    address internal cctpAttester1;
-    address internal cctpAttester2;
-    address internal cctpAttester3;
-    address internal cctpAttester4;
     uint256[] internal attesterPks = new uint256[](4);
-    uint256 internal cctpAttesterPk1;
-    uint256 internal cctpAttesterPk2;
-    uint256 internal cctpAttesterPk3;
-    uint256 internal cctpAttesterPk4;
 
     /*//////////////////////////////////////////////////////////////
                                  SETUP
