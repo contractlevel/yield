@@ -33,9 +33,10 @@ contract CompoundV3Adapter is StrategyAdapter {
     /// @param amount The amount of USDC to deposit
     /// @dev Deposits the USDC to the Compound V3 pool
     function deposit(address usdc, uint256 amount) external onlyYieldPeer {
+        emit Deposit(usdc, amount);
+
         _approveToken(usdc, i_comet, amount);
         IComet(i_comet).supply(usdc, amount);
-        emit Deposit(usdc, amount);
     }
 
     /// @notice Withdraws USDC from the Compound V3 pool
@@ -43,9 +44,10 @@ contract CompoundV3Adapter is StrategyAdapter {
     /// @param amount The amount of USDC to withdraw
     /// @dev Transfers the USDC to the yield peer
     function withdraw(address usdc, uint256 amount) external onlyYieldPeer {
+        emit Withdraw(usdc, amount);
+
         IComet(i_comet).withdraw(usdc, amount);
         _transferTokenTo(usdc, i_yieldPeer, amount);
-        emit Withdraw(usdc, amount);
     }
 
     /// @notice Gets the total value of the asset in the Compound V3 pool

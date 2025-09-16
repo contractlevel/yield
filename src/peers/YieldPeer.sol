@@ -211,6 +211,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
 
         bytes32 ccipMessageId = IRouterClient(i_ccipRouter).ccipSend(destChainSelector, evm2AnyMessage);
 
+        //slither-disable-next-line reentrancy-events
         emit CCIPMessageSent(ccipMessageId, txType, bridgeAmount);
     }
 
@@ -265,11 +266,11 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @param strategyAdapter The strategy adapter to deposit to
     /// @param amount The amount of USDC to deposit
     /// @dev Emit DepositToStrategy event
-    // @review passing this an address asset param instead of address(i_usdc)
+    // @review passing this an address asset param instead of address(i_usdc) - this will be part of the additional stablecoins task
     function _depositToStrategy(address strategyAdapter, uint256 amount) internal {
+        emit DepositToStrategy(strategyAdapter, amount);
         _transferUsdcTo(strategyAdapter, amount);
         IStrategyAdapter(strategyAdapter).deposit(address(i_usdc), amount);
-        emit DepositToStrategy(strategyAdapter, amount);
     }
 
     /// @notice Internal helper to withdraw from the strategy
@@ -278,8 +279,8 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @dev Emit WithdrawFromStrategy event
     // @review passing this an address asset param instead of address(i_usdc)
     function _withdrawFromStrategy(address strategyAdapter, uint256 amount) internal {
-        IStrategyAdapter(strategyAdapter).withdraw(address(i_usdc), amount);
         emit WithdrawFromStrategy(strategyAdapter, amount);
+        IStrategyAdapter(strategyAdapter).withdraw(address(i_usdc), amount);
     }
 
     /// @notice Deposits USDC to the strategy and returns the total value of the system
@@ -291,8 +292,8 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         returns (uint256 totalValue)
     {
         totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, address(i_usdc));
-        _depositToStrategy(activeStrategyAdapter, amount);
         emit DepositToStrategyCompleted(activeStrategyAdapter, amount, totalValue);
+        _depositToStrategy(activeStrategyAdapter, amount);
     }
 
     /// @notice Withdraws from the strategy and returns the USDC withdraw amount

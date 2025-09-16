@@ -94,16 +94,26 @@ contract ParentPeer is YieldPeer {
 
         // 1. This Parent is the Strategy. Therefore the deposit is handled here and shares can be minted here.
         if (strategy.chainSelector == i_thisChainSelector) {
-            uint256 totalValue = _depositToStrategyAndGetTotalValue(_getActiveStrategyAdapter(), amountToDeposit);
+            /// @dev cache active strategy adapter
+            address activeStrategyAdapter = _getActiveStrategyAdapter();
 
+            /// @dev get total value from strategy
+            uint256 totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, address(i_usdc));
+
+            /// @dev calculate share mint amount
             uint256 shareMintAmount = _calculateMintAmount(totalValue, amountToDeposit);
             s_totalShares += shareMintAmount;
+            emit ShareMintUpdate(shareMintAmount, i_thisChainSelector, s_totalShares);
 
+            /// @dev take fee from share mint amount
             uint256 shareMintAmountMinusFee = _takeFee(shareMintAmount);
+
+            /// @dev deposit to strategy
+            //slither-disable-next-line reentrancy-events
+            _depositToStrategy(activeStrategyAdapter, amountToDeposit);
 
             /// @dev mint share tokens (YieldCoin) to msg.sender based on amount deposited and total value of the system
             _mintShares(msg.sender, shareMintAmountMinusFee);
-            emit ShareMintUpdate(shareMintAmount, i_thisChainSelector, s_totalShares);
         }
         // 2. This Parent is not the Strategy. Therefore the deposit must be sent to the strategy and get totalValue.
         else {
@@ -139,9 +149,9 @@ contract ParentPeer is YieldPeer {
 
         /// @dev update s_totalShares and burn shares from msg.sender
         s_totalShares -= shareBurnAmount;
-        _burnShares(withdrawer, shareBurnAmount);
         emit ShareBurnUpdate(shareBurnAmount, i_thisChainSelector, totalShares - shareBurnAmount);
         emit WithdrawInitiated(withdrawer, shareBurnAmount, i_thisChainSelector);
+        _burnShares(withdrawer, shareBurnAmount);
 
         Strategy memory strategy = s_strategy;
 
@@ -152,11 +162,13 @@ contract ParentPeer is YieldPeer {
 
             uint256 usdcWithdrawAmount = _calculateWithdrawAmount(totalValue, totalShares, shareBurnAmount);
 
+            //slither-disable-next-line reentrancy-events
             if (usdcWithdrawAmount != 0) _withdrawFromStrategy(activeStrategyAdapter, usdcWithdrawAmount);
 
             if (withdrawChainSelector == i_thisChainSelector) {
-                if (usdcWithdrawAmount != 0) _transferUsdcTo(withdrawer, usdcWithdrawAmount);
+                // @review do we want to emit this event outside of these brackets? need to check if it is also emitted in the ccipSend's receive
                 emit WithdrawCompleted(withdrawer, usdcWithdrawAmount);
+                if (usdcWithdrawAmount != 0) _transferUsdcTo(withdrawer, usdcWithdrawAmount);
             } else {
                 WithdrawData memory withdrawData =
                     _buildWithdrawData(withdrawer, shareBurnAmount, withdrawChainSelector);
@@ -206,8 +218,8 @@ contract ParentPeer is YieldPeer {
     function withdrawFees() external onlyOwner {
         uint256 fees = i_share.balanceOf(address(this));
         if (fees != 0) {
-            if (!i_share.transfer(msg.sender, fees)) revert ParentPeer__FeeWithdrawalFailed();
             emit FeesWithdrawn(fees);
+            if (!i_share.transfer(msg.sender, fees)) revert ParentPeer__FeeWithdrawalFailed();
         } else {
             revert ParentPeer__NoFeesToWithdraw();
         }
@@ -297,13 +309,17 @@ contract ParentPeer is YieldPeer {
         /// @dev update s_totalShares += shareMintAmount
         s_totalShares += depositData.shareMintAmount;
 
+        /// @dev emit ShareMintUpdate to help track system wide mints for formal verification later
+        /// @dev emitted regardless of if the mint happens on this parent or a child
+        emit ShareMintUpdate(depositData.shareMintAmount, depositData.chainSelector, s_totalShares);
+
         /// @dev take fee from shareMintAmount and update depositData.shareMintAmount so it doesn't include the fee
         depositData.shareMintAmount = _takeFee(depositData.shareMintAmount);
 
         /// @dev handle the case where the deposit was made on this parent chain
         if (depositData.chainSelector == i_thisChainSelector) {
+            //slither-disable-next-line reentrancy-events
             _mintShares(depositData.depositor, depositData.shareMintAmount);
-            emit ShareMintUpdate(depositData.shareMintAmount, i_thisChainSelector, s_totalShares);
         }
         /// @dev handle the case where the deposit was made on a child chain
         else {
@@ -311,7 +327,6 @@ contract ParentPeer is YieldPeer {
             _ccipSend(
                 depositData.chainSelector, CcipTxType.DepositCallbackChild, abi.encode(depositData), ZERO_BRIDGE_AMOUNT
             );
-            emit ShareMintUpdate(depositData.shareMintAmount, depositData.chainSelector, s_totalShares);
         }
     }
 
@@ -322,6 +337,7 @@ contract ParentPeer is YieldPeer {
     /// @dev Updates s_totalShares and emits ShareBurnUpdate
     /// @param data The encoded WithdrawData
     /// @param sourceChainSelector The chain selector of the chain where the withdraw originated from and shares were burned
+    // @review this has similar functionality to ChildPeer::_handleCCIPWithdrawToStrategy - check for DRY/modular optimizations
     function _handleCCIPWithdrawToParent(bytes memory data, uint64 sourceChainSelector) internal {
         WithdrawData memory withdrawData = _decodeWithdrawData(data);
         withdrawData.totalShares = s_totalShares;
@@ -338,8 +354,10 @@ contract ParentPeer is YieldPeer {
             withdrawData.usdcWithdrawAmount = _withdrawFromStrategyAndGetUsdcWithdrawAmount(withdrawData);
 
             if (withdrawData.chainSelector == i_thisChainSelector) {
-                _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
+                // @review would it be better to emit an event outside of these brackets, for both conditions?
+                //slither-disable-next-line reentrancy-events
                 emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
+                _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
             } else {
                 _ccipSend(
                     withdrawData.chainSelector,
@@ -406,6 +424,7 @@ contract ParentPeer is YieldPeer {
         uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, address(i_usdc));
         if (totalValue != 0) _withdrawFromStrategy(oldActiveStrategyAdapter, totalValue);
 
+        //slither-disable-next-line reentrancy-events
         _depositToStrategy(newActiveStrategyAdapter, i_usdc.balanceOf(address(this)));
     }
 

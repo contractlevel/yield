@@ -145,13 +145,16 @@ contract ChildPeer is YieldPeer {
     /// withdraw -> parent -> strategy (HERE) -> callback to withdraw chain
     /// @notice If this strategy chain is the same as the withdraw chain, we transfer the USDC to the withdrawer, concluding the withdrawal process.
     /// @param data The encoded WithdrawData
+    // @review this has similar functionality to ParentPeer::_handleCCIPWithdrawToParent - check for DRY/modular optimizations
     function _handleCCIPWithdrawToStrategy(bytes memory data) internal {
         WithdrawData memory withdrawData = _decodeWithdrawData(data);
         withdrawData.usdcWithdrawAmount = _withdrawFromStrategyAndGetUsdcWithdrawAmount(withdrawData);
 
         if (i_thisChainSelector == withdrawData.chainSelector) {
-            _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
+            // @review would it be better to emit an event outside of these brackets, for both conditions?
+            //slither-disable-next-line reentrancy-events
             emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
+            _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
         } else {
             _ccipSend(
                 withdrawData.chainSelector,
@@ -182,6 +185,7 @@ contract ChildPeer is YieldPeer {
 
         // if the new strategy is this chain, but different protocol, then we need to deposit to the new strategy
         if (newStrategy.chainSelector == i_thisChainSelector) {
+            //slither-disable-next-line reentrancy-events
             _depositToStrategy(newActiveStrategyAdapter, i_usdc.balanceOf(address(this)));
         }
         // if the new strategy is a different chain, then we need to send the usdc we just withdrew to the new strategy
