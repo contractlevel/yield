@@ -2,7 +2,6 @@
 pragma solidity 0.8.26;
 
 import {StrategyAdapter} from "../modules/StrategyAdapter.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IComet} from "../interfaces/IComet.sol";
 
 /// @title CompoundV3Adapter

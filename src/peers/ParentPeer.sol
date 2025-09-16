@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {YieldPeer, Client, IRouterClient, CCIPOperations} from "./YieldPeer.sol";
+import {YieldPeer, Client, IRouterClient, CCIPOperations, IERC20, SafeERC20} from "./YieldPeer.sol";
 
 /// @title YieldCoin ParentPeer
 /// @author @contractlevel
@@ -11,13 +11,17 @@ import {YieldPeer, Client, IRouterClient, CCIPOperations} from "./YieldPeer.sol"
 /// @notice This contract tracks system wide state and acts as a system wide hub for forwarding CCIP messages to the Strategy
 contract ParentPeer is YieldPeer {
     /*//////////////////////////////////////////////////////////////
+                           TYPE DECLARATIONS
+    //////////////////////////////////////////////////////////////*/
+    using SafeERC20 for IERC20;
+
+    /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
     error ParentPeer__OnlyRebalancer();
     error ParentPeer__InitialActiveStrategyAlreadySet();
     error ParentPeer__FeeRateTooHigh();
     error ParentPeer__NoFeesToWithdraw();
-    error ParentPeer__FeeWithdrawalFailed();
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
@@ -219,7 +223,7 @@ contract ParentPeer is YieldPeer {
         uint256 fees = i_share.balanceOf(address(this));
         if (fees != 0) {
             emit FeesWithdrawn(fees);
-            if (!i_share.transfer(msg.sender, fees)) revert ParentPeer__FeeWithdrawalFailed();
+            IERC20(address(i_share)).safeTransfer(msg.sender, fees);
         } else {
             revert ParentPeer__NoFeesToWithdraw();
         }

@@ -42,26 +42,4 @@ contract WithdrawFeesTest is BaseTest {
         vm.expectRevert(abi.encodeWithSignature("ParentPeer__NoFeesToWithdraw()"));
         baseParentPeer.withdrawFees();
     }
-
-    function test_yield_parent_withdrawFees_revertsWhen_tokenTransfer_returnsFalse() public {
-        _changePrank(depositor);
-        baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
-
-        FalseTransferToken falseTransferToken = new FalseTransferToken();
-        vm.etch(address(baseShare), address(falseTransferToken).code);
-
-        _changePrank(baseParentPeer.owner());
-        vm.expectRevert(abi.encodeWithSignature("ParentPeer__FeeWithdrawalFailed()"));
-        baseParentPeer.withdrawFees();
-    }
-}
-
-contract FalseTransferToken is Share {
-    function transfer(address to, uint256 amount) public override(ERC20, IERC20) returns (bool) {
-        return false;
-    }
-
-    /// @dev ignore in coverage report
-    function test_empty() public {}
 }
