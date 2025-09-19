@@ -362,6 +362,97 @@ contract Invariant is StdInvariant, BaseTest {
         }
     }
 
+    /// @notice Fees Consistency: The total withdrawable fees taken should be equal to the total fees taken minus total fees withdrawn
+    function invariant_fees_consistency() public view {
+        assertEq(
+            handler.ghost_event_totalFeesTakenInShares() - handler.ghost_state_totalFeesWithdrawnInShares(),
+            share.balanceOf(address(parent)),
+            "Invariant violated: The total withdrawable fees taken should be equal to the total fees taken minus total fees withdrawn"
+        );
+    }
+
+    /// @notice Fee Rate Consistency: If the fee rate is set, we should always take a fee
+    /// @dev This invariant is also tested in Handler._handleDepositLogs assertions
+    function invariant_feeRate_consistency() public view {
+        if (parent.getFeeRate() > 0) {
+            // every deposit should have a fee taken event and share.balanceOf(parent) should increase
+            // @review finish this
+        }
+    }
+
+    /// @notice Fee Conversion Consistency: Total fees taken should be convertable to underlying stablecoins
+    function invariant_fee_conversion_consistency() public view {
+        uint256 totalFeesTakenInShares = handler.ghost_event_totalFeesTakenInShares();
+        uint256 totalFeesTakenInStablecoins = handler.ghost_event_totalFeesTakenInStablecoin();
+
+        uint256 totalValue =
+            IYieldPeer(handler.chainSelectorsToPeers(parent.getStrategy().chainSelector)).getTotalValue();
+        uint256 totalValueConverted = _convertUsdcToShare(totalValue);
+        uint256 minUsdcValueInShares = _convertUsdcToShare(1);
+        uint256 totalShares = parent.getTotalShares();
+
+        if (totalFeesTakenInShares > 0) {
+            // calculate the amount of stablecoins that should be withdrawn
+            uint256 withdrawable = (totalFeesTakenInShares * totalValueConverted) / totalShares;
+            uint256 withdrawableConverted = _convertShareToUsdc(withdrawable);
+            uint256 minWithdrawable = totalFeesTakenInStablecoins * 990 / 1000; // Allow 1% slippage
+
+            assertTrue(
+                withdrawableConverted >= minWithdrawable || totalFeesTakenInStablecoins < minUsdcValueInShares,
+                "Invariant violated: Total fees taken should be convertable to underlying stablecoins"
+            );
+        } else {
+            assertTrue(
+                totalFeesTakenInStablecoins == 0,
+                "Invariant violated: Total fees taken should be 0 if no fees have been taken"
+            );
+        }
+    }
+
+    /// @notice Comprehensive Redemption Integrity: Total system value should be sufficient to cover all user redemptions AND protocol fee redemptions
+    /// @dev This invariant ensures that both users and the protocol can fully redeem their shares without anyone losing out
+    function invariant_comprehensive_stablecoin_redemption_integrity() public view {
+        uint256 totalValue =
+            IYieldPeer(handler.chainSelectorsToPeers(parent.getStrategy().chainSelector)).getTotalValue();
+        uint256 totalShares = parent.getTotalShares();
+
+        if (totalShares > 0) {
+            /// @dev calculate total user deposits minus fees (what users should be able to redeem)
+            uint256 totalUserDeposits = handler.ghost_state_totalUsdcDeposited();
+            uint256 totalUserWithdrawals = handler.ghost_event_totalUsdcWithdrawn();
+            uint256 netUserDeposits =
+                totalUserDeposits > totalUserWithdrawals ? totalUserDeposits - totalUserWithdrawals : 0;
+
+            uint256 userFeesPaid = handler.ghost_event_totalFeesTakenInStablecoin();
+            uint256 userRedeemableAmount = netUserDeposits > userFeesPaid ? netUserDeposits - userFeesPaid : 0;
+
+            /// @dev convert fees taken in shares to usdc equivalent because actual value could be higher than ghost_event_totalFeesTakenInStablecoin
+            uint256 totalFeesTakenInShares = handler.ghost_event_totalFeesTakenInShares();
+            uint256 totalValueConverted = _convertUsdcToShare(totalValue);
+            uint256 remainingFeesInUsdc = totalFeesTakenInShares > 0
+                ? _convertShareToUsdc((totalFeesTakenInShares * totalValueConverted) / totalShares)
+                : 0;
+
+            /// @dev total redemptions needed: user redemptions + protocol fee redemptions
+            uint256 totalRedemptionsNeeded = userRedeemableAmount + remainingFeesInUsdc;
+
+            /// @dev allow 0.5% slippage for small wei differences from strategy deposits, rounding and conversion errors
+            uint256 slippageTolerance = totalRedemptionsNeeded * 5 / 1000; // 0.5% slippage
+            uint256 minUsdcValueInShares = _convertUsdcToShare(1);
+
+            assertTrue(
+                totalValue >= totalRedemptionsNeeded - slippageTolerance
+                    || totalRedemptionsNeeded < minUsdcValueInShares,
+                "Invariant violated: Total system value should be sufficient to cover all user redemptions AND protocol fee redemptions"
+            );
+        } else {
+            assertTrue(
+                handler.ghost_state_totalUsdcDeposited() == 0 && handler.ghost_event_totalFeesTakenInShares() == 0,
+                "Invariant violated: No shares should exist if no deposits or fees have been taken"
+            );
+        }
+    }
+
     /*//////////////////////////////////////////////////////////////
                                 UTILITY
     //////////////////////////////////////////////////////////////*/

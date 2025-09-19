@@ -101,7 +101,7 @@ contract Handler is Test {
     // /// @dev tracks the total fees taken, in Yieldcoin token shares
     // uint256 public ghost_state_totalFeesTaken;
     /// @dev tracks the total fees withdrawn, in Yieldcoin token shares
-    uint256 public ghost_state_totalFeesWithdrawn;
+    uint256 public ghost_state_totalFeesWithdrawnInShares;
 
     /// @dev tracks the total fees taken - based on FeeTaken events
     uint256 public ghost_event_totalFeesTakenInShares;
@@ -114,8 +114,10 @@ contract Handler is Test {
     /// @dev tracks the number of FeeWithdrawn events
     uint256 public ghost_event_feeWithdrawn_emissions;
 
-    /// @dev tracks the total fees taken per user - based on FeeTaken events
+    /// @dev tracks the total fees taken in stablecoins per user - based on FeeTaken events
     mapping(address user => uint256 totalFeesTaken) public ghost_event_totalFeesTakenInStablecoinPerUser;
+    /// @dev tracks the total fees taken in stablecoins - based on FeeTaken events
+    uint256 public ghost_event_totalFeesTakenInStablecoin;
 
     /// @dev tracks the current fee rate
     uint256 public ghost_state_feeRate;
@@ -296,7 +298,7 @@ contract Handler is Test {
         uint256 availableFees = share.balanceOf(address(parent));
         if (availableFees == 0) return; // @review wasted run
         /// @dev update the ghost state
-        ghost_state_totalFeesWithdrawn += availableFees;
+        ghost_state_totalFeesWithdrawnInShares += availableFees;
 
         /// @dev withdraw the fees
         _changePrank(parent.owner());
@@ -401,7 +403,8 @@ contract Handler is Test {
                 uint256 feeInShares = uint256(logs[i].topics[2]);
                 ghost_event_totalFeesTakenInShares += feeInShares;
                 uint256 feeInStablecoin = uint256(logs[i].topics[1]);
-                ghost_event_totalFeesTakenInStablecoinPerUser[depositor] += feeInStablecoin;
+                ghost_event_totalFeesTakenInStablecoinPerUser[depositor] += feeInStablecoin; // @review unused in invariants
+                ghost_event_totalFeesTakenInStablecoin += feeInStablecoin;
             }
         }
         assertTrue(depositInitiatedEventFound, "DepositInitiated log not found");
