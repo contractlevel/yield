@@ -27,15 +27,16 @@ contract ParentPeer is YieldPeer {
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
     /// @dev The divisor used to calculate the fee rate in basis points
-    uint256 internal constant FEE_RATE_DIVISOR = 100_000_000; // 1e8
-    /// @dev The maximum fee rate: 1% = 1_000_000 / 1e8
-    uint256 internal constant MAX_FEE_RATE = 1_000_000;
+    uint256 internal constant FEE_RATE_DIVISOR = 1_000_000; // 1e6 (same as USDC decimals)
+    /// @dev The maximum fee rate: 1% = 10_000 / 1e6
+    uint256 internal constant MAX_FEE_RATE = 10_000;
 
     /// @dev The fee rate
     uint256 internal s_feeRate;
     /// @dev total share tokens (YieldCoin) minted across all chains
     // @invariant s_totalShares == ghost_totalSharesMinted - ghost_totalSharesBurned
     uint256 internal s_totalShares;
+    // @review optimal storage layout of the next 3 variables
     /// @dev This address handles automated CCIP rebalance calls with Log-trigger Automation, based on Function request callbacks
     /// @notice See ./src/modules/Rebalancer.sol
     address internal s_rebalancer;
@@ -64,7 +65,7 @@ contract ParentPeer is YieldPeer {
     /// @notice Emitted when the fee rate is set
     event FeeRateSet(uint256 indexed feeRate);
     /// @notice Emitted when a fee is taken during a deposit
-    event FeeTaken(uint256 indexed fee);
+    event FeeTaken(uint256 indexed feeAmountInStablecoin, uint256 indexed feeAmountInShares);
     /// @notice Emitted when fees are withdrawn
     event FeesWithdrawn(uint256 indexed fees);
 
@@ -104,20 +105,21 @@ contract ParentPeer is YieldPeer {
             /// @dev get total value from strategy
             uint256 totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, address(i_usdc));
 
-            /// @dev calculate share mint amount
-            uint256 shareMintAmount = _calculateMintAmount(totalValue, amountToDeposit);
-            s_totalShares += shareMintAmount;
-            emit ShareMintUpdate(shareMintAmount, i_thisChainSelector, s_totalShares);
+            /// @dev calculate share mint amount for total deposit (includes storage read of s_totalShares)
+            uint256 totalShareMintAmount = _calculateMintAmount(totalValue, amountToDeposit);
 
-            /// @dev take fee from share mint amount
-            uint256 shareMintAmountMinusFee = _takeFee(shareMintAmount);
+            /// @dev update total shares (only once)
+            s_totalShares += totalShareMintAmount;
+            emit ShareMintUpdate(totalShareMintAmount, i_thisChainSelector, s_totalShares);
 
             /// @dev deposit to strategy
             //slither-disable-next-line reentrancy-events
             _depositToStrategy(activeStrategyAdapter, amountToDeposit);
 
+            uint256 userShareMintAmount = _handleFeeAndGetUserShareMintAmount(totalShareMintAmount, amountToDeposit);
+
             /// @dev mint share tokens (YieldCoin) to msg.sender based on amount deposited and total value of the system
-            _mintShares(msg.sender, shareMintAmountMinusFee);
+            _mintShares(msg.sender, userShareMintAmount);
         }
         // 2. This Parent is not the Strategy. Therefore the deposit must be sent to the strategy and get totalValue.
         else {
@@ -283,7 +285,9 @@ contract ParentPeer is YieldPeer {
             /// @dev deposit to strategy
             _depositToStrategy(activeStrategyAdapter, depositData.amount);
 
-            // @review do we need to take a fee here?
+            /// @dev take fee from shareMintAmount and update depositData.shareMintAmount so it doesn't include the fee
+            depositData.shareMintAmount =
+                _handleFeeAndGetUserShareMintAmount(depositData.shareMintAmount, depositData.amount);
 
             _ccipSend(
                 depositData.chainSelector, CcipTxType.DepositCallbackChild, abi.encode(depositData), ZERO_BRIDGE_AMOUNT
@@ -318,7 +322,8 @@ contract ParentPeer is YieldPeer {
         emit ShareMintUpdate(depositData.shareMintAmount, depositData.chainSelector, s_totalShares);
 
         /// @dev take fee from shareMintAmount and update depositData.shareMintAmount so it doesn't include the fee
-        depositData.shareMintAmount = _takeFee(depositData.shareMintAmount);
+        depositData.shareMintAmount =
+            _handleFeeAndGetUserShareMintAmount(depositData.shareMintAmount, depositData.amount);
 
         /// @dev handle the case where the deposit was made on this parent chain
         if (depositData.chainSelector == i_thisChainSelector) {
@@ -457,15 +462,25 @@ contract ParentPeer is YieldPeer {
         _ccipSend(oldChainSelector, CcipTxType.RebalanceOldStrategy, abi.encode(newStrategy), ZERO_BRIDGE_AMOUNT);
     }
 
-    /// @notice Takes a fee for a deposit from the shareMintAmount
-    /// @param shareMintAmount The amount of shares (yieldcoin tokens) being minted
-    /// @return shareMintAmountMinusFee The amount of shares (yieldcoin tokens) being minted minus the fee
-    /// @notice The fee is paid to the YieldCoin infrastructure to cover development and Chainlink costs
-    function _takeFee(uint256 shareMintAmount) internal returns (uint256 shareMintAmountMinusFee) {
-        uint256 fee = _calculateFee(shareMintAmount);
-        shareMintAmountMinusFee = shareMintAmount - fee;
-        emit FeeTaken(fee);
-        _mintShares(address(this), fee);
+    /// @notice Handles the fee for a deposit and returns the user share mint amount
+    /// @param totalShareMintAmount The total amount of shares (yieldcoin tokens) being minted
+    /// @param stablecoinDepositAmount The amount of stablecoin being deposited
+    /// @return userShareMintAmount The amount of shares (yieldcoin tokens) being minted for the user
+    function _handleFeeAndGetUserShareMintAmount(uint256 totalShareMintAmount, uint256 stablecoinDepositAmount)
+        internal
+        returns (uint256 userShareMintAmount)
+    {
+        /// @dev calculate fee in stablecoin and shares
+        uint256 feeAmountInStablecoin = _calculateFee(stablecoinDepositAmount);
+        // @review this calculation - should we be doing decimal conversions here?
+        uint256 feeShareMintAmount = (totalShareMintAmount * feeAmountInStablecoin) / stablecoinDepositAmount;
+        userShareMintAmount = totalShareMintAmount - feeShareMintAmount;
+
+        /// @dev take fee from share mint amount
+        if (feeShareMintAmount > 0) {
+            emit FeeTaken(feeAmountInStablecoin, feeShareMintAmount);
+            _mintShares(address(this), feeShareMintAmount);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -493,14 +508,14 @@ contract ParentPeer is YieldPeer {
     }
 
     /// @notice Calculates the fee for a deposit
-    /// @param shareMintAmount The amount of shares (yieldcoin tokens) being minted
+    /// @param stablecoinDepositAmount The amount of stablecoins being deposited
     /// @return fee The fee for the deposit
     /// @notice The fee is paid to the YieldCoin infrastructure to cover development and Chainlink costs
-    function _calculateFee(uint256 shareMintAmount) internal view returns (uint256 fee) {
+    function _calculateFee(uint256 stablecoinDepositAmount) internal view returns (uint256 fee) {
         // @review how much more optimal in terms of gas would it be to just assign this to fee? readability would decrease
         uint256 feeRate = s_feeRate;
         // @review should we be using solady fixedpointmath?
-        if (feeRate != 0) fee = (shareMintAmount * feeRate) / FEE_RATE_DIVISOR;
+        if (feeRate != 0) fee = (stablecoinDepositAmount * feeRate) / FEE_RATE_DIVISOR;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -579,5 +594,11 @@ contract ParentPeer is YieldPeer {
     /// @return feeRateDivisor The current fee rate divisor
     function getFeeRateDivisor() external pure returns (uint256) {
         return FEE_RATE_DIVISOR;
+    }
+
+    /// @notice Get the maximum fee rate
+    /// @return maxFeeRate The maximum fee rate
+    function getMaxFeeRate() external pure returns (uint256) {
+        return MAX_FEE_RATE;
     }
 }

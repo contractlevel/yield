@@ -51,7 +51,7 @@ contract Handler is Test {
     /*//////////////////////////////////////////////////////////////
                                  GHOSTS
     //////////////////////////////////////////////////////////////*/
-    // 1
+    // 1 // @review these ghosts - are they needed?
     uint256 public ghost_state_totalSharesMinted;
     /// @dev track the total shares burned by incrementing by shareBurnAmount everytime share.transferAndCall is used to withdraw USDC
     uint256 public ghost_state_totalSharesBurned;
@@ -97,6 +97,28 @@ contract Handler is Test {
     mapping(address user => uint256 totalSharesMinted) public ghost_event_totalSharesMintedPerUser;
     /// @dev track total shares burnt per user - based on value passed to share.transferAndCall
     mapping(address user => uint256 shareBurnAmount) public ghost_state_totalSharesBurnedPerUser;
+
+    // /// @dev tracks the total fees taken, in Yieldcoin token shares
+    // uint256 public ghost_state_totalFeesTaken;
+    /// @dev tracks the total fees withdrawn, in Yieldcoin token shares
+    uint256 public ghost_state_totalFeesWithdrawn;
+
+    /// @dev tracks the total fees taken - based on FeeTaken events
+    uint256 public ghost_event_totalFeesTakenInShares;
+    /// @dev tracks the total fees withdrawn - based on FeesWithdrawn events
+    // 1
+    uint256 public ghost_event_totalFeesWithdrawn;
+
+    /// @dev tracks the number of FeeTaken events
+    uint256 public ghost_event_feeTaken_emissions;
+    /// @dev tracks the number of FeeWithdrawn events
+    uint256 public ghost_event_feeWithdrawn_emissions;
+
+    /// @dev tracks the total fees taken per user - based on FeeTaken events
+    mapping(address user => uint256 totalFeesTaken) public ghost_event_totalFeesTakenInStablecoinPerUser;
+
+    /// @dev tracks the current fee rate
+    uint256 public ghost_state_feeRate;
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -269,6 +291,30 @@ contract Handler is Test {
         _handleCLFLogs();
     }
 
+    /// @notice This function handles withdrawing fees
+    function withdrawFees() public {
+        uint256 availableFees = share.balanceOf(address(parent));
+        if (availableFees == 0) return; // @review wasted run
+        /// @dev update the ghost state
+        ghost_state_totalFeesWithdrawn += availableFees;
+
+        /// @dev withdraw the fees
+        _changePrank(parent.owner());
+        parent.withdrawFees();
+    }
+
+    /// @notice This function handles setting the fee rate
+    /// @param feeRate the fee rate to set
+    function setFeeRate(uint256 feeRate) public {
+        /// @dev bind the fee rate to the range of valid values
+        feeRate = bound(feeRate, 0, parent.getMaxFeeRate());
+        /// @dev update the ghost state
+        ghost_state_feeRate = feeRate;
+        /// @dev update the fee rate
+        _changePrank(parent.owner());
+        parent.setFeeRate(feeRate);
+    }
+
     /*//////////////////////////////////////////////////////////////
                                 INTERNAL
     //////////////////////////////////////////////////////////////*/
@@ -301,6 +347,13 @@ contract Handler is Test {
         rebalancer.performUpkeep(performData);
     }
 
+    // @review, maybe we need this calculation in invariants
+    // function _calculateFee(uint256 stablecoinDepositAmount) internal view returns (uint256 fee) {
+    //     uint256 shareMintAmount = parent.calculateMintAmount(stablecoinDepositAmount);
+
+    //     fee = (shareMintAmount * parent.getFeeRate()) / parent.getFeeRateDivisor();
+    // }
+
     /*//////////////////////////////////////////////////////////////
                              UPDATE GHOSTS
     //////////////////////////////////////////////////////////////*/
@@ -321,8 +374,10 @@ contract Handler is Test {
     function _handleDepositLogs() internal {
         bytes32 depositInitiatedEvent = keccak256("DepositInitiated(address,uint256,uint64)");
         bytes32 shareMintUpdateEvent = keccak256("ShareMintUpdate(uint256,uint64,uint256)");
+        bytes32 feeTakenEvent = keccak256("FeeTaken(uint256,uint256)");
         bool depositInitiatedEventFound = false;
         bool shareMintUpdateEventFound = false;
+        bool feeTakenEventFound = false;
         address depositor;
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -340,9 +395,19 @@ contract Handler is Test {
                 ghost_event_totalSharesMintedPerUser[depositor] += shareMintAmount;
                 console2.log("shareMintAmount:", shareMintAmount);
             }
+            if (logs[i].topics[0] == feeTakenEvent) {
+                feeTakenEventFound = true;
+                ghost_event_feeTaken_emissions++;
+                uint256 feeInShares = uint256(logs[i].topics[2]);
+                ghost_event_totalFeesTakenInShares += feeInShares;
+                uint256 feeInStablecoin = uint256(logs[i].topics[1]);
+                ghost_event_totalFeesTakenInStablecoinPerUser[depositor] += feeInStablecoin;
+            }
         }
         assertTrue(depositInitiatedEventFound, "DepositInitiated log not found");
         assertTrue(shareMintUpdateEventFound, "ShareMintUpdate log not found");
+        console2.log("ghost_state_feeRate:", ghost_state_feeRate);
+        if (ghost_state_feeRate > 0) assertTrue(feeTakenEventFound, "FeeTaken log not found");
     }
 
     function _handleWithdrawLogs() internal {
@@ -398,6 +463,8 @@ contract Handler is Test {
         seedAddress = address(boundInt);
         if (seedAddress == admin) seedAddress = _seedToAddress(addressSeed + 1);
         if (seedAddress == address(share)) seedAddress = _seedToAddress(addressSeed + 2);
+        if (seedAddress == address(parent)) seedAddress = _seedToAddress(addressSeed + 3);
+        if (seedAddress == parent.owner()) seedAddress = _seedToAddress(addressSeed + 4); // excluding the owner introduces the assumption that the owner will not be interacting with the protocol as a user
         users.add(seedAddress);
     }
 

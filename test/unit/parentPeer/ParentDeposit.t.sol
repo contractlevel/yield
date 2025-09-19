@@ -19,8 +19,7 @@ contract ParentDepositTest is BaseTest {
         _selectFork(baseFork);
         deal(address(baseUsdc), depositor, DEPOSIT_AMOUNT);
 
-        uint256 feeRate = 1_000_000; // 1%
-        _setFeeRate(feeRate);
+        _setFeeRate(INITIAL_FEE_RATE);
 
         _changePrank(depositor);
         baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
@@ -50,7 +49,7 @@ contract ParentDepositTest is BaseTest {
         assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
 
         /// @dev assert fee is taken from shareMintAmount
-        uint256 fee = _getFee(expectedShareMintAmount);
+        uint256 fee = _getFeeShareMintAmount(expectedShareMintAmount, DEPOSIT_AMOUNT);
         assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
         assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount - fee);
 
@@ -81,7 +80,7 @@ contract ParentDepositTest is BaseTest {
 
         /// @dev assert correct amount of shares minted
         uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
-        uint256 fee = (expectedShareMintAmount * baseParentPeer.getFeeRate()) / baseParentPeer.getFeeRateDivisor();
+        uint256 fee = _getFeeShareMintAmount(expectedShareMintAmount, DEPOSIT_AMOUNT);
         assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
         assertEq(baseShare.totalSupply(), expectedShareMintAmount);
         assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount - fee);
@@ -133,7 +132,7 @@ contract ParentDepositTest is BaseTest {
 
         /// @dev assert correct amount of shares minted
         uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
-        uint256 fee = (expectedShareMintAmount * baseParentPeer.getFeeRate()) / baseParentPeer.getFeeRateDivisor();
+        uint256 fee = _getFeeShareMintAmount(expectedShareMintAmount, DEPOSIT_AMOUNT);
         assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
         assertEq(baseShare.totalSupply(), expectedShareMintAmount);
         assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount - fee);
@@ -172,7 +171,7 @@ contract ParentDepositTest is BaseTest {
 
         /// @dev assert correct amount of shares minted
         uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
-        uint256 fee = (expectedShareMintAmount * baseParentPeer.getFeeRate()) / baseParentPeer.getFeeRateDivisor();
+        uint256 fee = _getFeeShareMintAmount(expectedShareMintAmount, DEPOSIT_AMOUNT);
         assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
         assertEq(baseShare.totalSupply(), expectedShareMintAmount);
         assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount - fee);
@@ -190,7 +189,7 @@ contract ParentDepositTest is BaseTest {
         baseParentPeer.deposit(DEPOSIT_AMOUNT);
         /// @dev assert correct amount of shares minted
         uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
-        uint256 fee = (expectedShareMintAmount * baseParentPeer.getFeeRate()) / baseParentPeer.getFeeRateDivisor();
+        uint256 fee = _getFeeShareMintAmount(expectedShareMintAmount, DEPOSIT_AMOUNT);
         assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
         assertEq(baseShare.totalSupply(), expectedShareMintAmount);
         assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount - fee);
@@ -203,8 +202,7 @@ contract ParentDepositTest is BaseTest {
         uint256 totalValue = baseParentPeer.getTotalValue();
         uint256 expectedSecondShareMintAmount =
             (_convertUsdcToShare(DEPOSIT_AMOUNT) * baseShare.totalSupply()) / _convertUsdcToShare(totalValue);
-        uint256 secondFee =
-            (expectedSecondShareMintAmount * baseParentPeer.getFeeRate()) / baseParentPeer.getFeeRateDivisor();
+        uint256 secondFee = _getFeeShareMintAmount(expectedSecondShareMintAmount, DEPOSIT_AMOUNT);
         uint256 yieldDifference = 6e12;
         assertApproxEqAbs(baseShare.balanceOf(address(baseParentPeer)), fee + secondFee, yieldDifference);
         assertApproxEqAbs(

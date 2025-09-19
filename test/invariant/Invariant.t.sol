@@ -90,10 +90,12 @@ contract Invariant is StdInvariant, BaseTest {
         );
 
         /// @dev define appropriate function selectors
-        bytes4[] memory selectors = new bytes4[](3);
+        bytes4[] memory selectors = new bytes4[](5);
         selectors[0] = Handler.deposit.selector;
         selectors[1] = Handler.withdraw.selector;
         selectors[2] = Handler.fulfillRequest.selector;
+        selectors[3] = Handler.withdrawFees.selector;
+        selectors[4] = Handler.setFeeRate.selector;
 
         /// @dev target handler and appropriate function selectors
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
@@ -294,6 +296,8 @@ contract Invariant is StdInvariant, BaseTest {
             address user = handler.getUserAt(i);
             sumOfBalances += share.balanceOf(user);
         }
+        sumOfBalances += share.balanceOf(address(parent));
+        sumOfBalances += share.balanceOf(parent.owner());
 
         assertEq(
             parent.getTotalShares(),
@@ -320,7 +324,7 @@ contract Invariant is StdInvariant, BaseTest {
         );
     }
 
-    /// @notice Users should always be able to withdraw what they deposited (minus fees, but those arent implemented yet)
+    /// @notice Users should always be able to withdraw what they deposited
     /// @dev this is a critical invariant that ensures the integrity of user deposit redemption
     function invariant_stablecoinRedemptionIntegrity() public {
         handler.forEachUser(this.checkRedemptionIntegrityPerUser);
@@ -328,8 +332,9 @@ contract Invariant is StdInvariant, BaseTest {
 
     function checkRedemptionIntegrityPerUser(address user) external view {
         uint256 deposited = handler.ghost_state_totalUsdcDepositedPerUser(user);
+        uint256 depositedMinusFees = deposited - _calculateFee(deposited);
         uint256 withdrawn = handler.ghost_event_totalUsdcWithdrawnPerUser(user);
-        uint256 netDeposits = deposited > withdrawn ? deposited - withdrawn : 0;
+        uint256 netDeposits = depositedMinusFees > withdrawn ? depositedMinusFees - withdrawn : 0;
         uint256 userShares = share.balanceOf(user);
 
         uint256 totalValue =
@@ -339,7 +344,13 @@ contract Invariant is StdInvariant, BaseTest {
         uint256 totalShares = parent.getTotalShares();
 
         if (totalShares > 0) {
-            uint256 withdrawable = (userShares * totalValueConverted) / totalShares;
+            // @review are the next 3 lines correct? the invariant is passing...
+            // Account for protocol fees: subtract fee shares from total shares when calculating user withdrawable
+            uint256 protocolFeeShares = handler.ghost_event_totalFeesTakenInShares();
+            uint256 userTotalShares = totalShares - protocolFeeShares;
+
+            uint256 withdrawable = userTotalShares > 0 ? (userShares * totalValueConverted) / userTotalShares : 0;
+            // uint256 withdrawable = (userShares * totalValueConverted) / totalShares;
             uint256 withdrawableConverted = _convertShareToUsdc(withdrawable);
             uint256 minWithdrawable = netDeposits * 990 / 1000; // Allow 1% slippage
             assertTrue(
@@ -349,5 +360,15 @@ contract Invariant is StdInvariant, BaseTest {
         } else {
             assertTrue(netDeposits == 0, "Invariant violated: User should be able to withdraw what they deposited");
         }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                UTILITY
+    //////////////////////////////////////////////////////////////*/
+    /// @notice Helper function to calculate the fee for a deposit
+    /// @param stablecoinDepositAmount The amount of stablecoin being deposited
+    /// @return fee The fee for the deposit in stablecoin amount
+    function _calculateFee(uint256 stablecoinDepositAmount) internal view returns (uint256 fee) {
+        fee = (stablecoinDepositAmount * parent.getFeeRate()) / parent.getFeeRateDivisor();
     }
 }

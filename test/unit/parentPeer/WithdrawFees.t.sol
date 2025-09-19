@@ -14,8 +14,7 @@ contract WithdrawFeesTest is BaseTest {
         _selectFork(baseFork);
         deal(address(baseUsdc), depositor, DEPOSIT_AMOUNT);
 
-        uint256 feeRate = 1_000_000; // 1%
-        _setFeeRate(feeRate);
+        _setFeeRate(INITIAL_FEE_RATE);
     }
 
     function test_yield_parent_withdrawFees_revertsWhen_notOwner() public {
@@ -34,7 +33,9 @@ contract WithdrawFeesTest is BaseTest {
         _changePrank(baseParentPeer.owner());
         baseParentPeer.withdrawFees();
 
-        assertEq(baseShare.balanceOf(baseParentPeer.owner()), _getFee(expectedShareMintAmount));
+        assertEq(
+            baseShare.balanceOf(baseParentPeer.owner()), _getFeeShareMintAmount(expectedShareMintAmount, DEPOSIT_AMOUNT)
+        );
     }
 
     function test_yield_parent_withdrawFees_revertsWhen_noFeesToWithdraw() public {

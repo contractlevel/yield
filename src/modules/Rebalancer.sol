@@ -181,6 +181,8 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
             uint256 totalValue
         ) = abi.decode(performData, (address, IYieldPeer.Strategy, IYieldPeer.CcipTxType, uint64, address, uint256));
 
+        // @review if we read the natspec for both of these in ParentPeer, we can see they facilitate moving tvl from Parent -> new chain, or remote child -> new chain. HOW ARE WE DOING PARENT -> PARENT??!?!?!?!
+        // wait, is the parent -> new chain also doing parent -> parent?
         if (txType == IYieldPeer.CcipTxType.RebalanceNewStrategy) {
             IParentPeer(parentPeer).rebalanceNewStrategy(oldStrategyAdapter, totalValue, strategy);
         } else {

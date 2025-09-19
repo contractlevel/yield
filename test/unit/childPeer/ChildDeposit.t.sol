@@ -11,8 +11,7 @@ contract ChildDepositTest is BaseTest {
         super.setUp();
         /// @dev set the fee rate on the parent chain
         _selectFork(baseFork);
-        uint256 feeRate = 1_000_000; // 1%
-        _setFeeRate(feeRate);
+        _setFeeRate(INITIAL_FEE_RATE);
         /// @dev optFork is a child chain
         _selectFork(optFork);
         deal(address(optUsdc), depositor, DEPOSIT_AMOUNT);
@@ -62,7 +61,7 @@ contract ChildDepositTest is BaseTest {
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
         /// @dev assert correct amount of shares minted and fees are taken
-        uint256 fee = _getFee(expectedShareMintAmount);
+        uint256 fee = _getFeeShareMintAmount(expectedShareMintAmount, DEPOSIT_AMOUNT);
         assertEq(optShare.totalSupply(), expectedShareMintAmount - fee);
         assertEq(optShare.balanceOf(depositor), expectedShareMintAmount - fee);
         assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
@@ -102,7 +101,7 @@ contract ChildDepositTest is BaseTest {
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
         /// @dev assert correct amount of shares minted
-        uint256 fee = _getFee(expectedShareMintAmount);
+        uint256 fee = _getFeeShareMintAmount(expectedShareMintAmount, DEPOSIT_AMOUNT);
         assertEq(optShare.totalSupply(), expectedShareMintAmount - fee);
         assertEq(optShare.balanceOf(depositor), expectedShareMintAmount - fee);
         assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
@@ -139,13 +138,15 @@ contract ChildDepositTest is BaseTest {
 
         uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
         assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
+        uint256 feeShareMintAmount = _getFeeShareMintAmount(expectedShareMintAmount, DEPOSIT_AMOUNT);
+        assertEq(baseShare.balanceOf(address(baseParentPeer)), feeShareMintAmount);
 
         /// @dev switch back to child chain and route ccip message with shareMintAmount to mint shares
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
         /// @dev assert correct amount of shares minted
-        assertEq(optShare.totalSupply(), expectedShareMintAmount);
-        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount);
+        assertEq(optShare.totalSupply(), expectedShareMintAmount - feeShareMintAmount);
+        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount - feeShareMintAmount);
     }
 
     function test_yield_child_deposit_strategyIsParent_compound() public {
@@ -178,13 +179,15 @@ contract ChildDepositTest is BaseTest {
 
         uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
         assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
+        uint256 feeShareMintAmount = _getFeeShareMintAmount(expectedShareMintAmount, DEPOSIT_AMOUNT);
+        assertEq(baseShare.balanceOf(address(baseParentPeer)), feeShareMintAmount);
 
         /// @dev switch back to child chain and route ccip message with shareMintAmount to mint shares
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
         /// @dev assert correct amount of shares minted
-        assertEq(optShare.totalSupply(), expectedShareMintAmount);
-        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount);
+        assertEq(optShare.totalSupply(), expectedShareMintAmount - feeShareMintAmount);
+        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount - feeShareMintAmount);
     }
 
     // - chain c is strategy
@@ -230,7 +233,7 @@ contract ChildDepositTest is BaseTest {
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
         /// @dev assert correct amount of shares minted and fees are taken
-        uint256 fee = _getFee(expectedShareMintAmount);
+        uint256 fee = _getFeeShareMintAmount(expectedShareMintAmount, DEPOSIT_AMOUNT);
         assertEq(optShare.totalSupply(), expectedShareMintAmount - fee);
         assertEq(optShare.balanceOf(depositor), expectedShareMintAmount - fee);
         assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
@@ -277,7 +280,7 @@ contract ChildDepositTest is BaseTest {
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
         /// @dev assert correct amount of shares minted and fees are taken
-        uint256 fee = _getFee(expectedShareMintAmount);
+        uint256 fee = _getFeeShareMintAmount(expectedShareMintAmount, DEPOSIT_AMOUNT);
         assertEq(optShare.totalSupply(), expectedShareMintAmount - fee);
         assertEq(optShare.balanceOf(depositor), expectedShareMintAmount - fee);
         assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);

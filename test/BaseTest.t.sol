@@ -40,6 +40,7 @@ contract BaseTest is Test {
     uint256 internal constant DEPOSIT_AMOUNT = 1_000_000_000; // 1000 USDC
     uint256 internal constant INITIAL_SHARE_PRECISION = 1e18 / 1e6;
     uint256 internal constant BALANCE_TOLERANCE = 4; // Allow 4 wei difference
+    uint256 internal constant INITIAL_FEE_RATE = 10_000; // 1%
 
     CCIPLocalSimulatorFork internal ccipLocalSimulatorFork;
     uint256 internal constant LINK_AMOUNT = 1_000 * 1e18; // 1000 LINK
@@ -654,9 +655,16 @@ contract BaseTest is Test {
     }
 
     /// @notice Helper function to get the fee for a deposit
-    /// @param shareMintAmount The amount of shares (yieldcoin tokens) being minted
-    /// @return fee The fee for the deposit
-    function _getFee(uint256 shareMintAmount) internal view returns (uint256 fee) {
-        fee = (shareMintAmount * baseParentPeer.getFeeRate()) / baseParentPeer.getFeeRateDivisor();
+    /// @param totalShareMintAmount The amount of shares (yieldcoin tokens) being minted
+    /// @param stablecoinDepositAmount The amount of stablecoin being deposited
+    /// @return feeShareMintAmount The fee for the deposit in shares (yieldcoin tokens)
+    function _getFeeShareMintAmount(uint256 totalShareMintAmount, uint256 stablecoinDepositAmount)
+        internal
+        view
+        returns (uint256 feeShareMintAmount)
+    {
+        uint256 feeAmountInStablecoin =
+            (stablecoinDepositAmount * baseParentPeer.getFeeRate()) / baseParentPeer.getFeeRateDivisor();
+        feeShareMintAmount = (totalShareMintAmount * feeAmountInStablecoin) / stablecoinDepositAmount;
     }
 }

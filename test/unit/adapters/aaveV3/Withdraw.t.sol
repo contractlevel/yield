@@ -35,7 +35,7 @@ contract WithdrawTest is BaseTest {
 }
 
 contract IncorrectWithdrawAmountPool {
-    function withdraw(address, uint256 amount, address) external returns (uint256) {
+    function withdraw(address, uint256 amount, address) external pure returns (uint256) {
         return amount - 1;
     }
 }
