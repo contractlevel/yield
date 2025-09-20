@@ -470,6 +470,7 @@ contract Invariant is StdInvariant, BaseTest {
     /// @notice Total fees taken should equal sum of all individual deposit fees
     function invariant_totalFeesFromDepositRecords() public view {
         uint256 totalFeesFromEvents = handler.ghost_event_totalFeesTakenInStablecoin();
+        // @review would it be cleaner to do these calculations in invariant or handler?
         uint256 totalFeesFromDepositRecords = handler.calculateTotalExpectedFeesFromDepositRecords();
 
         assertEq(
