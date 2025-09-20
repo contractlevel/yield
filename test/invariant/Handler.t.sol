@@ -122,6 +122,24 @@ contract Handler is Test {
     /// @dev tracks the current fee rate
     uint256 public ghost_state_feeRate;
 
+    /// @dev tracks if the non-owner withdrew fees
+    bool public ghost_nonOwner_withdrewFees;
+
+    /*//////////////////////////////////////////////////////////////
+                            DEPOSIT TRACKING
+    //////////////////////////////////////////////////////////////*/
+    /// @dev struct to track individual deposits with their fee rates
+    struct DepositRecord {
+        address user;
+        uint256 amount;
+        uint256 feeRate;
+        uint256 timestamp;
+        uint256 fee;
+    }
+
+    /// @dev mapping from user to array of their deposits
+    mapping(address => DepositRecord[]) public ghost_userDeposits;
+
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
@@ -294,11 +312,20 @@ contract Handler is Test {
     }
 
     /// @notice This function handles withdrawing fees
-    function withdrawFees() public {
+    function withdrawFees(address nonOwner) public {
         uint256 availableFees = share.balanceOf(address(parent));
         if (availableFees == 0) return; // @review wasted run
         /// @dev update the ghost state
         ghost_state_totalFeesWithdrawnInShares += availableFees;
+
+        /// @dev try call from non-owner to assert it never succeeds
+        vm.assume(nonOwner != parent.owner());
+        _changePrank(nonOwner);
+        try parent.withdrawFees() {
+            ghost_nonOwner_withdrewFees = true;
+        } catch {
+            console2.log("nonOwner withdrawFees failed");
+        }
 
         /// @dev withdraw the fees
         _changePrank(parent.owner());
@@ -349,12 +376,26 @@ contract Handler is Test {
         rebalancer.performUpkeep(performData);
     }
 
-    // @review, maybe we need this calculation in invariants
-    // function _calculateFee(uint256 stablecoinDepositAmount) internal view returns (uint256 fee) {
-    //     uint256 shareMintAmount = parent.calculateMintAmount(stablecoinDepositAmount);
+    /// @dev calculate the fee for a deposit
+    function _calculateFee(uint256 depositAmount) internal view returns (uint256) {
+        return (depositAmount * parent.getFeeRate()) / parent.getFeeRateDivisor();
+    }
 
-    //     fee = (shareMintAmount * parent.getFeeRate()) / parent.getFeeRateDivisor();
-    // }
+    /*//////////////////////////////////////////////////////////////
+                            DEPOSIT TRACKING
+    //////////////////////////////////////////////////////////////*/
+    /// @dev record a deposit with its fee rate and timestamp
+    function _recordDeposit(address user, uint256 amount) internal {
+        DepositRecord memory depositRecord = DepositRecord({
+            user: user,
+            amount: amount,
+            feeRate: parent.getFeeRate(),
+            timestamp: block.timestamp,
+            fee: _calculateFee(amount)
+        });
+
+        ghost_userDeposits[user].push(depositRecord);
+    }
 
     /*//////////////////////////////////////////////////////////////
                              UPDATE GHOSTS
@@ -363,6 +404,9 @@ contract Handler is Test {
         ghost_state_totalUsdcDeposited += depositAmount;
         ghost_state_totalUsdcDepositedPerUser[depositor] += depositAmount;
         console2.log("total deposited:", ghost_state_totalUsdcDeposited);
+
+        /// @dev record the deposit with current fee rate
+        _recordDeposit(depositor, depositAmount);
     }
 
     function _updateWithdrawGhosts(address withdrawer, uint256 shareBurnAmount) internal {
@@ -403,7 +447,7 @@ contract Handler is Test {
                 uint256 feeInShares = uint256(logs[i].topics[2]);
                 ghost_event_totalFeesTakenInShares += feeInShares;
                 uint256 feeInStablecoin = uint256(logs[i].topics[1]);
-                ghost_event_totalFeesTakenInStablecoinPerUser[depositor] += feeInStablecoin; // @review unused in invariants
+                ghost_event_totalFeesTakenInStablecoinPerUser[depositor] += feeInStablecoin;
                 ghost_event_totalFeesTakenInStablecoin += feeInStablecoin;
             }
         }
@@ -539,6 +583,45 @@ contract Handler is Test {
     /// @dev getter for the admin's share balance
     function getAdminShareBalance() external view returns (uint256) {
         return share.balanceOf(admin);
+    }
+
+    /// @dev calculate expected fees for a user based on their historical deposits
+    function calculateExpectedFeesForUser(address user) external view returns (uint256 totalExpectedFees) {
+        DepositRecord[] memory deposits = ghost_userDeposits[user];
+        for (uint256 i = 0; i < deposits.length; i++) {
+            totalExpectedFees += _calculateFeeWithRate(deposits[i].amount, deposits[i].feeRate);
+        }
+    }
+
+    /// @dev calculate expected fees for a user by summing up the fees from deposit records
+    function calculateExpectedFeesFromDepositRecords(address user) external view returns (uint256 totalExpectedFees) {
+        DepositRecord[] memory deposits = ghost_userDeposits[user];
+        for (uint256 i = 0; i < deposits.length; i++) {
+            totalExpectedFees += deposits[i].fee;
+        }
+    }
+
+    /// @dev calculate total expected fees across all users by summing deposit record fees
+    function calculateTotalExpectedFeesFromDepositRecords() external view returns (uint256 totalExpectedFees) {
+        for (uint256 i = 0; i < users.length(); i++) {
+            address user = users.at(i);
+            totalExpectedFees += this.calculateExpectedFeesFromDepositRecords(user);
+        }
+    }
+
+    /// @dev calculate fee for a specific deposit amount with a specific fee rate
+    function _calculateFeeWithRate(uint256 depositAmount, uint256 feeRate) internal view returns (uint256) {
+        return (depositAmount * feeRate) / parent.getFeeRateDivisor();
+    }
+
+    /// @dev get the number of deposits for a user
+    function getUserDepositCount(address user) external view returns (uint256) {
+        return ghost_userDeposits[user].length;
+    }
+
+    /// @dev get a specific deposit record for a user
+    function getUserDeposit(address user, uint256 index) external view returns (DepositRecord memory) {
+        return ghost_userDeposits[user][index];
     }
 
     /// @dev empty test to ignore in coverage report

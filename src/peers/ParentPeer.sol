@@ -521,7 +521,8 @@ contract ParentPeer is YieldPeer {
     /*//////////////////////////////////////////////////////////////
                                  SETTER
     //////////////////////////////////////////////////////////////*/
-    // @review I dont see the rebalancer using this. it's using the rebalanceNew and rebalanceOld
+    /// @notice This is called by Rebalancer::_fulfillRequest during a CLF callback
+    /// @notice _setStrategy will emit StrategyUpdated() event which CLA Log trigger uses in Rebalancer
     /// @dev Revert if msg.sender is not the Rebalancer
     /// @dev Set the strategy
     /// @param chainSelector The chain selector of the new strategy

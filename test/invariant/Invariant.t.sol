@@ -371,15 +371,6 @@ contract Invariant is StdInvariant, BaseTest {
         );
     }
 
-    /// @notice Fee Rate Consistency: If the fee rate is set, we should always take a fee
-    /// @dev This invariant is also tested in Handler._handleDepositLogs assertions
-    function invariant_feeRate_consistency() public view {
-        if (parent.getFeeRate() > 0) {
-            // every deposit should have a fee taken event and share.balanceOf(parent) should increase
-            // @review finish this
-        }
-    }
-
     /// @notice Fee Conversion Consistency: Total fees taken should be convertable to underlying stablecoins
     function invariant_fee_conversion_consistency() public view {
         uint256 totalFeesTakenInShares = handler.ghost_event_totalFeesTakenInShares();
@@ -451,6 +442,48 @@ contract Invariant is StdInvariant, BaseTest {
                 "Invariant violated: No shares should exist if no deposits or fees have been taken"
             );
         }
+    }
+
+    /// @notice Fee rate should always be within valid bounds
+    function invariant_feeRate_bounds() public view {
+        assertTrue(
+            parent.getFeeRate() <= parent.getMaxFeeRate(),
+            "Invariant violated: Fee rate should not exceed maximum allowed fee rate"
+        );
+    }
+
+    /// @notice Fee amount integrity: Total fees per user should equal sum of individual deposit fees
+    function invariant_fee_integrity_perUser() public {
+        handler.forEachUser(this.checkFeeIntegrityPerUser);
+    }
+
+    function checkFeeIntegrityPerUser(address user) external view {
+        if (handler.ghost_state_totalUsdcDepositedPerUser(user) > 0) {
+            assertTrue(
+                handler.ghost_event_totalFeesTakenInStablecoinPerUser(user)
+                    == handler.calculateExpectedFeesFromDepositRecords(user),
+                "Invariant violated: Total fees per user should equal sum of individual deposit fees"
+            );
+        }
+    }
+
+    /// @notice Total fees taken should equal sum of all individual deposit fees
+    function invariant_totalFeesFromDepositRecords() public view {
+        uint256 totalFeesFromEvents = handler.ghost_event_totalFeesTakenInStablecoin();
+        uint256 totalFeesFromDepositRecords = handler.calculateTotalExpectedFeesFromDepositRecords();
+
+        assertEq(
+            totalFeesFromEvents,
+            totalFeesFromDepositRecords,
+            "Invariant violated: Total fees taken should equal sum of all individual deposit fees"
+        );
+    }
+
+    /// @notice Fee withdrawal integrity: Non-owner should not be able to withdraw fees
+    function invariant_feeWithdrawal_onlyOwner() public view {
+        assertFalse(
+            handler.ghost_nonOwner_withdrewFees(), "Invariant violated: Fees should only be withdrawable by owner"
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
