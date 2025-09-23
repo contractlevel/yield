@@ -17,6 +17,7 @@ contract StrategyRegistry is IStrategyRegistry, Ownable2Step {
     /// @dev bytes32 aaveV3Id = keccak256("aave-v3");
     /// @dev bytes32 compoundV3Id = keccak256("compound-v3");
     /// @notice The string hashed for the protocol ID should match what is hashed in the Chainlink Functions source code - see functions/src.js
+    /// The string hashed is the "project" from the DefiLlama yields pools API
     mapping(bytes32 protocolId => address strategyAdapter) internal s_strategyAdapters;
 
     /*//////////////////////////////////////////////////////////////

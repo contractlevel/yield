@@ -344,8 +344,8 @@ contract Invariant is StdInvariant, BaseTest {
         uint256 totalShares = parent.getTotalShares();
 
         if (totalShares > 0) {
-            // @review are the next 3 lines correct? the invariant is passing...
             // Account for protocol fees: subtract fee shares from total shares when calculating user withdrawable
+            // @review are the next 3 lines of code correct? the invariant is passing...
             uint256 protocolFeeShares = handler.ghost_event_totalFeesTakenInShares();
             uint256 userTotalShares = totalShares - protocolFeeShares;
 
@@ -485,6 +485,14 @@ contract Invariant is StdInvariant, BaseTest {
         assertFalse(
             handler.ghost_nonOwner_withdrewFees(), "Invariant violated: Fees should only be withdrawable by owner"
         );
+    }
+
+    /// @notice Strategy Registry: Active protocol must be registered in StrategyRegistry
+    // @review is this verified with certora?
+    function invariant_activeProtocol_registered() public view {
+        bytes32 protocolId = parent.getStrategy().protocolId;
+        address adapter = strategyRegistryParent.getStrategyAdapter(protocolId);
+        assertTrue(adapter != address(0), "Invariant violated: Active protocol must be registered in StrategyRegistry");
     }
 
     /*//////////////////////////////////////////////////////////////
