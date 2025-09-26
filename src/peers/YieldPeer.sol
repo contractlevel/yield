@@ -139,9 +139,6 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         i_thisChainSelector = thisChainSelector;
         i_usdc = IERC20(usdc);
         i_share = IShare(share);
-        // @review these comments
-        // /// @dev Set to address(1) to get past check in setStrategyAdapter for initial active strategy
-        // s_activeStrategyAdapter = address(1);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -277,7 +274,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @param strategyAdapter The strategy adapter to withdraw from
     /// @param amount The amount of USDC to withdraw
     /// @dev Emit WithdrawFromStrategy event
-    // @review passing this an address asset param instead of address(i_usdc)
+    // @review passing this an address asset param instead of address(i_usdc) - additional/modular stablecoins task
     function _withdrawFromStrategy(address strategyAdapter, uint256 amount) internal {
         emit WithdrawFromStrategy(strategyAdapter, amount);
         IStrategyAdapter(strategyAdapter).withdraw(address(i_usdc), amount);
@@ -589,5 +586,11 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @return activeStrategyAdapter The active strategy adapter address
     function getActiveStrategyAdapter() external view returns (address activeStrategyAdapter) {
         activeStrategyAdapter = _getActiveStrategyAdapter();
+    }
+
+    /// @notice Get the strategy registry
+    /// @return strategyRegistry The strategy registry address
+    function getStrategyRegistry() external view returns (address strategyRegistry) {
+        strategyRegistry = s_strategyRegistry;
     }
 }

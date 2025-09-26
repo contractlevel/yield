@@ -495,6 +495,18 @@ contract Invariant is StdInvariant, BaseTest {
         assertTrue(adapter != address(0), "Invariant violated: Active protocol must be registered in StrategyRegistry");
     }
 
+    /// @notice Strategy Registry: Active adapter must match registered adapter for strategyprotocolId stored in ParentPeer
+    // @review is this verified with certora?
+    function invariant_adapterMatchesRegistryOnActiveChain() public view {
+        bytes32 protocolId = parent.getStrategy().protocolId;
+        address activePeer = handler.chainSelectorsToPeers(parent.getStrategy().chainSelector);
+        assertEq(
+            IYieldPeer(activePeer).getActiveStrategyAdapter(),
+            StrategyRegistry(IYieldPeer(activePeer).getStrategyRegistry()).getStrategyAdapter(protocolId),
+            "Invariant violated: Active adapter must match registered adapter for protocolId stored in ParentPeer"
+        );
+    }
+
     /*//////////////////////////////////////////////////////////////
                                 UTILITY
     //////////////////////////////////////////////////////////////*/

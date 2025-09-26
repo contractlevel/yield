@@ -218,7 +218,7 @@ contract ParentDepositTest is BaseTest {
         uint256 totalShares = 100000000000000000001;
         uint256 amount = 1e6;
         parentWrapper.setTotalShares(totalShares);
-        assertEq(parentWrapper.calculateMintAmount(totalValue, amount), 1);
+        assertEq(parentWrapper.calculateMintAmount_(totalValue, amount), 1);
     }
 }
 
@@ -229,7 +229,7 @@ contract ParentWrapper is ParentPeer {
         s_totalShares = totalShares;
     }
 
-    function calculateMintAmount(uint256 totalValue, uint256 amount) public view returns (uint256) {
+    function calculateMintAmount_(uint256 totalValue, uint256 amount) public view returns (uint256) {
         return _calculateMintAmount(totalValue, amount);
     }
 }

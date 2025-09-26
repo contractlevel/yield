@@ -88,6 +88,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
         FunctionsClient(functionsRouter)
     {
         // @review - should these be configurable?
+        // a: no because the Rebalancer itself is configurable in parent
         i_donId = donId;
         i_clfSubId = clfSubId;
     }

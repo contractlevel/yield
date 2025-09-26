@@ -36,7 +36,7 @@ contract ParentPeer is YieldPeer {
     /// @dev total share tokens (YieldCoin) minted across all chains
     // @invariant s_totalShares == ghost_totalSharesMinted - ghost_totalSharesBurned
     uint256 internal s_totalShares;
-    // @review optimal storage layout of the next 3 variables
+    // @review optimal storage layout of the next 3 variables - s_strategy is subject to change during modular stablecoin task
     /// @dev This address handles automated CCIP rebalance calls with Log-trigger Automation, based on Function request callbacks
     /// @notice See ./src/modules/Rebalancer.sol
     address internal s_rebalancer;
@@ -53,6 +53,7 @@ contract ParentPeer is YieldPeer {
     /// @notice Emitted when the strategy is updated
     event StrategyUpdated(uint64 indexed chainSelector, bytes32 indexed protocolId, uint64 indexed oldChainSelector);
     /// @notice Emitted when the amount of shares minted is updated
+    // @review including the chainSelector here might get confusing because we are also minting shares for fees on this chain
     event ShareMintUpdate(uint256 indexed shareMintAmount, uint64 indexed chainSelector, uint256 indexed totalShares);
     /// @notice Emitted when the amount of shares burned is updated
     event ShareBurnUpdate(uint256 indexed shareBurnAmount, uint64 indexed chainSelector, uint256 indexed totalShares);
@@ -105,6 +106,8 @@ contract ParentPeer is YieldPeer {
             /// @dev get total value from strategy
             uint256 totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, address(i_usdc));
 
+            // if we calculate the mint amount for (amountToDeposit - feeInStablecoin) and feeInStablecoin, will that always be the same as if we just calculated the mintAmount for the amountToDeposit
+
             /// @dev calculate share mint amount for total deposit (includes storage read of s_totalShares)
             uint256 totalShareMintAmount = _calculateMintAmount(totalValue, amountToDeposit);
 
@@ -115,6 +118,8 @@ contract ParentPeer is YieldPeer {
             /// @dev deposit to strategy
             //slither-disable-next-line reentrancy-events
             _depositToStrategy(activeStrategyAdapter, amountToDeposit);
+
+            // @review TAKE FEE!
 
             uint256 userShareMintAmount = _handleFeeAndGetUserShareMintAmount(totalShareMintAmount, amountToDeposit);
 
@@ -285,6 +290,8 @@ contract ParentPeer is YieldPeer {
             /// @dev deposit to strategy
             _depositToStrategy(activeStrategyAdapter, depositData.amount);
 
+            // @review TAKE FEE!
+
             /// @dev take fee from shareMintAmount and update depositData.shareMintAmount so it doesn't include the fee
             depositData.shareMintAmount =
                 _handleFeeAndGetUserShareMintAmount(depositData.shareMintAmount, depositData.amount);
@@ -321,6 +328,7 @@ contract ParentPeer is YieldPeer {
         /// @dev emitted regardless of if the mint happens on this parent or a child
         emit ShareMintUpdate(depositData.shareMintAmount, depositData.chainSelector, s_totalShares);
 
+        // @review TAKE FEE!
         /// @dev take fee from shareMintAmount and update depositData.shareMintAmount so it doesn't include the fee
         depositData.shareMintAmount =
             _handleFeeAndGetUserShareMintAmount(depositData.shareMintAmount, depositData.amount);
@@ -470,6 +478,7 @@ contract ParentPeer is YieldPeer {
         internal
         returns (uint256 userShareMintAmount)
     {
+        // @review still not entirely sure about this calculation. needs consideration.
         /// @dev calculate fee in stablecoin and shares
         uint256 feeAmountInStablecoin = _calculateFee(stablecoinDepositAmount);
         // @review this calculation - should we be doing decimal conversions here?
@@ -601,5 +610,14 @@ contract ParentPeer is YieldPeer {
     /// @return maxFeeRate The maximum fee rate
     function getMaxFeeRate() external pure returns (uint256) {
         return MAX_FEE_RATE;
+    }
+
+    // @review delete these
+    function calculateMintAmount(uint256 totalValue, uint256 amount) external view returns (uint256) {
+        return _calculateMintAmount(totalValue, amount);
+    }
+
+    function calculateFee(uint256 stablecoinDepositAmount) external view returns (uint256) {
+        return _calculateFee(stablecoinDepositAmount);
     }
 }

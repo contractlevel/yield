@@ -45,4 +45,5 @@ interface IYieldPeer {
     function getAllowedChain(uint64 chainSelector) external view returns (bool);
     function getAllowedPeer(uint64 chainSelector) external view returns (address);
     function getActiveStrategyAdapter() external view returns (address);
+    function getStrategyRegistry() external view returns (address);
 }

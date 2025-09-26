@@ -51,7 +51,7 @@ contract Handler is Test {
     /*//////////////////////////////////////////////////////////////
                                  GHOSTS
     //////////////////////////////////////////////////////////////*/
-    // 1 // @review these ghosts - are they needed?
+    // 1 // @review these ghosts - are they needed? - context: every ghost with // 1 comment is indicating it is appearing once, and therefore not used
     uint256 public ghost_state_totalSharesMinted;
     /// @dev track the total shares burned by incrementing by shareBurnAmount everytime share.transferAndCall is used to withdraw USDC
     uint256 public ghost_state_totalSharesBurned;

@@ -54,6 +54,8 @@ contract ChildPeer is YieldPeer {
             /// @dev deposit USDC in strategy pool and get totalValue
             depositData.totalValue = _depositToStrategyAndGetTotalValue(activeStrategyAdapter, amountToDeposit);
 
+            // @review if there is a fee set, and we are taking it in stablecoin on parent... how will that work here?
+
             /// @dev send a message to parent contract to request shareMintAmount
             _ccipSend(
                 i_parentChainSelector, CcipTxType.DepositCallbackParent, abi.encode(depositData), ZERO_BRIDGE_AMOUNT
