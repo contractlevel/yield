@@ -15,11 +15,12 @@ import {ParentPeer} from "../../../src/peers/ParentPeer.sol";
 contract ParentDepositTest is BaseTest {
     function setUp() public override {
         super.setUp();
+        /// @dev set the fee rate
+        _setFeeRate(INITIAL_FEE_RATE);
+
         /// @dev baseFork is the parent chain
         _selectFork(baseFork);
         deal(address(baseUsdc), depositor, DEPOSIT_AMOUNT);
-
-        _setFeeRate(INITIAL_FEE_RATE);
 
         _changePrank(depositor);
         baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
@@ -35,6 +36,9 @@ contract ParentDepositTest is BaseTest {
         assertEq(baseShare.totalSupply(), 0);
 
         uint256 usdcBalanceBefore = baseUsdc.balanceOf(depositor);
+        uint256 fee = _getFee(DEPOSIT_AMOUNT);
+        uint256 userPrincipal = DEPOSIT_AMOUNT - fee;
+        uint256 baseParentUsdcBalanceBefore = baseUsdc.balanceOf(address(baseParentPeer));
 
         /// @dev act
         baseParentPeer.deposit(DEPOSIT_AMOUNT);
@@ -44,32 +48,33 @@ contract ParentDepositTest is BaseTest {
         assertEq(usdcBalanceAfter, usdcBalanceBefore - DEPOSIT_AMOUNT);
 
         /// @dev assert correct amount of shares minted
-        uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
+        uint256 expectedShareMintAmount = userPrincipal * INITIAL_SHARE_PRECISION;
         assertEq(baseShare.totalSupply(), expectedShareMintAmount);
         assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
-
-        /// @dev assert fee is taken from shareMintAmount
-        uint256 fee = _getFeeShareMintAmount(expectedShareMintAmount, DEPOSIT_AMOUNT);
-        assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
-        assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount - fee);
+        assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount);
+        /// @dev assert fee is taken from stablecoin deposit
+        assertEq(baseUsdc.balanceOf(address(baseParentPeer)), baseParentUsdcBalanceBefore + fee);
 
         /// @dev assert USDC was deposited to Aave
         address aUsdc = _getATokenAddress(baseNetworkConfig.protocols.aavePoolAddressesProvider, address(baseUsdc));
         assertApproxEqAbs(
             IERC20(aUsdc).balanceOf(address(baseAaveV3Adapter)),
-            DEPOSIT_AMOUNT,
+            userPrincipal,
             BALANCE_TOLERANCE,
-            "Aave balance should be approximately equal to deposit amount"
+            "Aave balance should be approximately equal to user principal (deposit amount - fee)"
         );
     }
 
     /// @notice Scenario: Deposit made on Parent chain, where the Strategy is, and the Strategy Protocol is Compound
     function test_yield_parent_deposit_strategyIsParent_compound() public {
-        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("compound-v3")));
+        _setStrategy(baseChainSelector, keccak256("compound-v3"));
         _selectFork(baseFork);
         _changePrank(depositor);
 
         uint256 usdcBalanceBefore = baseUsdc.balanceOf(depositor);
+        uint256 fee = _getFee(DEPOSIT_AMOUNT);
+        uint256 userPrincipal = DEPOSIT_AMOUNT - fee;
+        uint256 baseParentUsdcBalanceBefore = baseUsdc.balanceOf(address(baseParentPeer));
 
         /// @dev act
         baseParentPeer.deposit(DEPOSIT_AMOUNT);
@@ -79,34 +84,37 @@ contract ParentDepositTest is BaseTest {
         assertEq(usdcBalanceAfter, usdcBalanceBefore - DEPOSIT_AMOUNT);
 
         /// @dev assert correct amount of shares minted
-        uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
-        uint256 fee = _getFeeShareMintAmount(expectedShareMintAmount, DEPOSIT_AMOUNT);
-        assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
+        uint256 expectedShareMintAmount = userPrincipal * INITIAL_SHARE_PRECISION;
         assertEq(baseShare.totalSupply(), expectedShareMintAmount);
-        assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount - fee);
+        assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount);
         assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
+        /// @dev assert fee is taken from stablecoin deposit
+        assertEq(baseUsdc.balanceOf(address(baseParentPeer)), baseParentUsdcBalanceBefore + fee);
 
         /// @dev assert USDC was deposited to Compound
         uint256 compoundBalance = IComet(baseNetworkConfig.protocols.comet).balanceOf(address(baseCompoundV3Adapter));
         assertApproxEqAbs(
             compoundBalance,
-            DEPOSIT_AMOUNT,
+            userPrincipal,
             BALANCE_TOLERANCE,
-            "Compound balance should be approximately equal to deposit amount"
+            "Compound balance should be approximately equal to user principal (deposit amount - fee)"
         );
 
         /// @dev assert balance increases with time
         vm.warp(block.timestamp + 10 days);
-        assertGt(IComet(baseNetworkConfig.protocols.comet).balanceOf(address(baseCompoundV3Adapter)), DEPOSIT_AMOUNT);
+        assertGt(IComet(baseNetworkConfig.protocols.comet).balanceOf(address(baseCompoundV3Adapter)), userPrincipal);
     }
 
     /// @notice Scenario: Deposit made on Parent chain, where the Strategy is not, and the Strategy Protocol is Aave
     function test_yield_parent_deposit_strategyIsChild_aave() public {
-        _setStrategy(optChainSelector, keccak256(abi.encodePacked("aave-v3")));
+        _setStrategy(optChainSelector, keccak256("aave-v3"));
         _selectFork(baseFork);
         _changePrank(depositor);
 
         uint256 usdcBalanceBefore = baseUsdc.balanceOf(depositor);
+        uint256 fee = _getFee(DEPOSIT_AMOUNT);
+        uint256 userPrincipal = DEPOSIT_AMOUNT - fee;
+        uint256 baseParentUsdcBalanceBefore = baseUsdc.balanceOf(address(baseParentPeer));
 
         /// @dev act
         baseParentPeer.deposit(DEPOSIT_AMOUNT);
@@ -122,30 +130,33 @@ contract ParentDepositTest is BaseTest {
         address aUsdc = _getATokenAddress(optNetworkConfig.protocols.aavePoolAddressesProvider, address(optUsdc));
         assertApproxEqAbs(
             IERC20(aUsdc).balanceOf(address(optAaveV3Adapter)),
-            DEPOSIT_AMOUNT,
+            userPrincipal,
             BALANCE_TOLERANCE,
-            "Aave balance should be approximately equal to deposit amount"
+            "Aave balance should be approximately equal to user principal (deposit amount - fee)"
         );
 
         /// @dev switch back to parent chain and route ccip message with totalValue to calculate shareMintAmount
         ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
 
         /// @dev assert correct amount of shares minted
-        uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
-        uint256 fee = _getFeeShareMintAmount(expectedShareMintAmount, DEPOSIT_AMOUNT);
-        assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
+        uint256 expectedShareMintAmount = userPrincipal * INITIAL_SHARE_PRECISION;
         assertEq(baseShare.totalSupply(), expectedShareMintAmount);
-        assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount - fee);
+        assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount);
         assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
+        /// @dev assert fee is taken from stablecoin deposit
+        assertEq(baseUsdc.balanceOf(address(baseParentPeer)), baseParentUsdcBalanceBefore + fee);
     }
 
     /// @notice Scenario: Deposit made on Parent chain, where the Strategy is not, and the Strategy Protocol is Compound
     function test_yield_parent_deposit_strategyIsChild_compound() public {
-        _setStrategy(optChainSelector, keccak256(abi.encodePacked("compound-v3")));
+        _setStrategy(optChainSelector, keccak256("compound-v3"));
         _selectFork(baseFork);
         _changePrank(depositor);
 
         uint256 usdcBalanceBefore = baseUsdc.balanceOf(depositor);
+        uint256 fee = _getFee(DEPOSIT_AMOUNT);
+        uint256 userPrincipal = DEPOSIT_AMOUNT - fee;
+        uint256 baseParentUsdcBalanceBefore = baseUsdc.balanceOf(address(baseParentPeer));
 
         /// @dev act
         baseParentPeer.deposit(DEPOSIT_AMOUNT);
@@ -161,20 +172,20 @@ contract ParentDepositTest is BaseTest {
         uint256 compoundBalance = IComet(optNetworkConfig.protocols.comet).balanceOf(address(optCompoundV3Adapter));
         assertApproxEqAbs(
             compoundBalance,
-            DEPOSIT_AMOUNT,
+            userPrincipal,
             BALANCE_TOLERANCE,
-            "Compound balance should be approximately equal to deposit amount"
+            "Compound balance should be approximately equal to user principal (deposit amount - fee)"
         );
 
         /// @dev switch back to parent chain and route ccip message with totalValue to calculate shareMintAmount
         ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
 
         /// @dev assert correct amount of shares minted
-        uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
-        uint256 fee = _getFeeShareMintAmount(expectedShareMintAmount, DEPOSIT_AMOUNT);
-        assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
+        uint256 expectedShareMintAmount = userPrincipal * INITIAL_SHARE_PRECISION;
         assertEq(baseShare.totalSupply(), expectedShareMintAmount);
-        assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount - fee);
+        assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount);
+        /// @dev assert fee is taken from stablecoin deposit
+        assertEq(baseUsdc.balanceOf(address(baseParentPeer)), baseParentUsdcBalanceBefore + fee);
         assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
     }
 
@@ -185,14 +196,17 @@ contract ParentDepositTest is BaseTest {
         _changePrank(depositor2);
         baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
 
+        uint256 fee = _getFee(DEPOSIT_AMOUNT);
+        uint256 userPrincipal = DEPOSIT_AMOUNT - fee;
+        uint256 baseParentUsdcBalanceBefore = baseUsdc.balanceOf(address(baseParentPeer));
+
         _changePrank(depositor);
         baseParentPeer.deposit(DEPOSIT_AMOUNT);
         /// @dev assert correct amount of shares minted
-        uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
-        uint256 fee = _getFeeShareMintAmount(expectedShareMintAmount, DEPOSIT_AMOUNT);
-        assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
+        uint256 expectedShareMintAmount = userPrincipal * INITIAL_SHARE_PRECISION;
         assertEq(baseShare.totalSupply(), expectedShareMintAmount);
-        assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount - fee);
+        assertEq(baseShare.balanceOf(depositor), expectedShareMintAmount);
+        assertEq(baseUsdc.balanceOf(address(baseParentPeer)), baseParentUsdcBalanceBefore + fee);
 
         /// @dev act
         _changePrank(depositor2);
@@ -201,14 +215,14 @@ contract ParentDepositTest is BaseTest {
         /// @dev assert correct amount of shares minted for second deposit
         uint256 totalValue = baseParentPeer.getTotalValue();
         uint256 expectedSecondShareMintAmount =
-            (_convertUsdcToShare(DEPOSIT_AMOUNT) * baseShare.totalSupply()) / _convertUsdcToShare(totalValue);
-        uint256 secondFee = _getFeeShareMintAmount(expectedSecondShareMintAmount, DEPOSIT_AMOUNT);
+            (_convertUsdcToShare(userPrincipal) * baseShare.totalSupply()) / _convertUsdcToShare(totalValue);
         uint256 yieldDifference = 6e12;
-        assertApproxEqAbs(baseShare.balanceOf(address(baseParentPeer)), fee + secondFee, yieldDifference);
+        assertApproxEqAbs(baseShare.balanceOf(address(baseParentPeer)), fee * 2, yieldDifference);
         assertApproxEqAbs(
             baseShare.totalSupply(), expectedShareMintAmount + expectedSecondShareMintAmount, yieldDifference
         );
-        assertApproxEqAbs(baseShare.balanceOf(depositor2), expectedSecondShareMintAmount - secondFee, yieldDifference);
+        assertApproxEqAbs(baseShare.balanceOf(depositor2), expectedSecondShareMintAmount - fee, yieldDifference);
+        assertEq(baseUsdc.balanceOf(address(baseParentPeer)), baseParentUsdcBalanceBefore + (fee * 2));
     }
 
     function test_yield_calculateMintAmount_edgeCase() public {

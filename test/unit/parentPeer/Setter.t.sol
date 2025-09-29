@@ -44,7 +44,7 @@ contract SetterTest is BaseTest {
 
     function test_yield_parentPeer_setFeeRate_revertsWhen_tooHigh() public {
         _changePrank(baseParentPeer.owner());
-        vm.expectRevert(abi.encodeWithSignature("ParentPeer__FeeRateTooHigh()"));
+        vm.expectRevert(abi.encodeWithSignature("YieldFees__FeeRateTooHigh()"));
         baseParentPeer.setFeeRate(1_000_001);
     }
 

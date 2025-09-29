@@ -554,7 +554,6 @@ contract BaseTest is Test {
         _selectFork(baseFork);
 
         address activeStrategyAdapter = baseParentPeer.getActiveStrategyAdapter();
-        console2.log("activeStrategyAdapter", activeStrategyAdapter);
         uint256 totalValue = baseParentPeer.getTotalValue();
 
         /// @dev set the strategy on the parent chain by pranking Chainlink Functions fulfillRequest
@@ -646,14 +645,22 @@ contract BaseTest is Test {
         amountInUsdc = amountInShare / INITIAL_SHARE_PRECISION;
     }
 
-    /// @notice Helper function to set the fee rate
+    /// @notice Helper function to set the fee rate across chains
     /// @param feeRate The fee rate to set
     function _setFeeRate(uint256 feeRate) internal {
         _selectFork(baseFork);
         _changePrank(baseParentPeer.owner());
         baseParentPeer.setFeeRate(feeRate);
+        _selectFork(optFork);
+        _changePrank(optChildPeer.owner());
+        optChildPeer.setFeeRate(feeRate);
+        _selectFork(ethFork);
+        _changePrank(ethChildPeer.owner());
+        ethChildPeer.setFeeRate(feeRate);
+        _stopPrank();
     }
 
+    // @review delete
     /// @notice Helper function to get the fee for a deposit
     /// @param totalShareMintAmount The amount of shares (yieldcoin tokens) being minted
     /// @param stablecoinDepositAmount The amount of stablecoin being deposited
@@ -666,5 +673,21 @@ contract BaseTest is Test {
         uint256 feeAmountInStablecoin =
             (stablecoinDepositAmount * baseParentPeer.getFeeRate()) / baseParentPeer.getFeeRateDivisor();
         feeShareMintAmount = (totalShareMintAmount * feeAmountInStablecoin) / stablecoinDepositAmount;
+    }
+
+    /// @notice Helper function to get the fee for a deposit
+    /// @param stablecoinDepositAmount The amount of stablecoin being deposited
+    /// @return fee The fee for the deposit
+    function _getFee(uint256 stablecoinDepositAmount) internal view returns (uint256 fee) {
+        // Get the fee rate from the current chain's peer
+        uint256 feeRate;
+        if (block.chainid == BASE_MAINNET_CHAIN_ID) {
+            feeRate = baseParentPeer.getFeeRate();
+        } else if (block.chainid == OPTIMISM_MAINNET_CHAIN_ID) {
+            feeRate = optChildPeer.getFeeRate();
+        } else if (block.chainid == ETHEREUM_MAINNET_CHAIN_ID) {
+            feeRate = ethChildPeer.getFeeRate();
+        }
+        fee = (stablecoinDepositAmount * feeRate) / baseParentPeer.getFeeRateDivisor();
     }
 }

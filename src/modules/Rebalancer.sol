@@ -101,6 +101,8 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     /// @dev Revert if the caller is not the Chainlink Automation upkeep address
     // @review should be pausable?
     // a: yes, but we will want to review using time-based automation vs incentivized public keepers
+    // @review - pausable and time-based abstraction are 2 different tasks
+    // although this may not necessarily need to be pausable because the rebalancer is configurable in parent
     function sendCLFRequest() external {
         if (msg.sender != s_upkeepAddress) revert Rebalancer__OnlyUpkeep();
 
@@ -123,8 +125,11 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     function checkLog(Log calldata log, bytes memory)
         external
         view
-        cannotExecute
-        returns (bool upkeepNeeded, bytes memory performData)
+        returns (
+            // cannotExecute // @review uncomment
+            bool upkeepNeeded,
+            bytes memory performData
+        )
     {
         bytes32 eventSignature = keccak256("StrategyUpdated(uint64,bytes32,uint64)");
         address parentPeer = s_parentPeer;
@@ -256,6 +261,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     /// @param strategyRegistry The address of the strategy registry
     /// @dev Revert if the caller is not the owner
     // slither-disable-next-line missing-zero-check
+    // @review we set this in every yield peer. so maybe we should read this from the parent and remove strategy registry logic from rebalancer
     function setStrategyRegistry(address strategyRegistry) external onlyOwner {
         s_strategyRegistry = strategyRegistry;
         emit StrategyRegistrySet(strategyRegistry);

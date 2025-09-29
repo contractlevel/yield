@@ -43,8 +43,10 @@ contract ChildPeer is YieldPeer {
     /// 2. This Child is not the Strategy
     /// @param amountToDeposit The amount of USDC to deposit into the system
     /// @dev Revert if amountToDeposit is less than 1e6 (1 USDC)
+    /// @notice User must approve this contract to spend their stablecoin
     function deposit(uint256 amountToDeposit) external override {
-        _initiateDeposit(amountToDeposit);
+        /// @dev takes a fee
+        amountToDeposit = _initiateDeposit(amountToDeposit);
 
         address activeStrategyAdapter = _getActiveStrategyAdapter();
         DepositData memory depositData = _buildDepositData(amountToDeposit);
@@ -53,8 +55,6 @@ contract ChildPeer is YieldPeer {
         if (activeStrategyAdapter != address(0)) {
             /// @dev deposit USDC in strategy pool and get totalValue
             depositData.totalValue = _depositToStrategyAndGetTotalValue(activeStrategyAdapter, amountToDeposit);
-
-            // @review if there is a fee set, and we are taking it in stablecoin on parent... how will that work here?
 
             /// @dev send a message to parent contract to request shareMintAmount
             _ccipSend(
@@ -115,7 +115,7 @@ contract ChildPeer is YieldPeer {
         if (txType == CcipTxType.WithdrawToStrategy) _handleCCIPWithdrawToStrategy(data);
         if (txType == CcipTxType.WithdrawCallback) _handleCCIPWithdrawCallback(tokenAmounts, data);
         if (txType == CcipTxType.RebalanceOldStrategy) _handleCCIPRebalanceOldStrategy(data);
-        if (txType == CcipTxType.RebalanceNewStrategy) _handleCCIPRebalanceNewStrategy(data);
+        if (txType == CcipTxType.RebalanceNewStrategy) _handleCCIPRebalanceNewStrategy(tokenAmounts, data);
     }
 
     /// @notice This function handles a deposit sent from Parent to this Strategy-Child
@@ -188,11 +188,11 @@ contract ChildPeer is YieldPeer {
         // if the new strategy is this chain, but different protocol, then we need to deposit to the new strategy
         if (newStrategy.chainSelector == i_thisChainSelector) {
             //slither-disable-next-line reentrancy-events
-            _depositToStrategy(newActiveStrategyAdapter, i_usdc.balanceOf(address(this)));
+            _depositToStrategy(newActiveStrategyAdapter, totalValue);
         }
         // if the new strategy is a different chain, then we need to send the usdc we just withdrew to the new strategy
         else {
-            _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, data, i_usdc.balanceOf(address(this)));
+            _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, data, totalValue);
         }
     }
 

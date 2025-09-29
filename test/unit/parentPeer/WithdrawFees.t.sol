@@ -11,36 +11,41 @@ import {
 contract WithdrawFeesTest is BaseTest {
     function setUp() public override {
         super.setUp();
+        /// @dev set the fee rate
+        _setFeeRate(INITIAL_FEE_RATE);
+
+        /// @dev baseFork is the parent chain
         _selectFork(baseFork);
         deal(address(baseUsdc), depositor, DEPOSIT_AMOUNT);
-
-        _setFeeRate(INITIAL_FEE_RATE);
     }
 
     function test_yield_parent_withdrawFees_revertsWhen_notOwner() public {
         _changePrank(holder);
         vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", holder));
-        baseParentPeer.withdrawFees();
+        baseParentPeer.withdrawFees(address(baseUsdc));
     }
 
     function test_yield_parent_withdrawFees_success() public {
+        /// @dev arrange
         _changePrank(depositor);
         baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
         baseParentPeer.deposit(DEPOSIT_AMOUNT);
 
-        uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
+        uint256 ownerBalanceBefore = baseUsdc.balanceOf(baseParentPeer.owner());
 
+        /// @dev act
         _changePrank(baseParentPeer.owner());
-        baseParentPeer.withdrawFees();
+        baseParentPeer.withdrawFees(address(baseUsdc));
 
-        assertEq(
-            baseShare.balanceOf(baseParentPeer.owner()), _getFeeShareMintAmount(expectedShareMintAmount, DEPOSIT_AMOUNT)
-        );
+        uint256 ownerBalanceAfter = baseUsdc.balanceOf(baseParentPeer.owner());
+
+        /// @dev assert
+        assertEq(ownerBalanceAfter - ownerBalanceBefore, _getFee(DEPOSIT_AMOUNT));
     }
 
     function test_yield_parent_withdrawFees_revertsWhen_noFeesToWithdraw() public {
         _changePrank(baseParentPeer.owner());
-        vm.expectRevert(abi.encodeWithSignature("ParentPeer__NoFeesToWithdraw()"));
-        baseParentPeer.withdrawFees();
+        vm.expectRevert(abi.encodeWithSignature("YieldFees__NoFeesToWithdraw()"));
+        baseParentPeer.withdrawFees(address(baseUsdc));
     }
 }

@@ -14,11 +14,12 @@ import {DataStructures} from "../libraries/DataStructures.sol";
 import {CCIPOperations} from "../libraries/CCIPOperations.sol";
 import {IStrategyAdapter} from "../interfaces/IStrategyAdapter.sol";
 import {IStrategyRegistry} from "../interfaces/IStrategyRegistry.sol";
+import {YieldFees} from "../modules/YieldFees.sol";
 
 /// @title YieldPeer
 /// @author @contractlevel
 /// @notice YieldPeer is the base contract for the Parent and Child Peers in the Contract Level Yield system
-abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYieldPeer {
+abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYieldPeer, YieldFees {
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS
     //////////////////////////////////////////////////////////////*/
@@ -129,7 +130,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @param link The address of the Chainlink token
     /// @param thisChainSelector The chain selector for this chain
     /// @param usdc The address of the USDC token
-    /// @param share The address of the Share token, native to this system that is minted in return for deposits
+    /// @param share The address of the YieldCoin Share token, native to this system that is minted in return for deposits
     //slither-disable-next-line missing-zero-check
     constructor(address ccipRouter, address link, uint64 thisChainSelector, address usdc, address share)
         CCIPReceiver(ccipRouter)
@@ -229,16 +230,20 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @notice The message this function handles is sent by the old strategy when the strategy is updated
     /// @dev Updates the strategy pool to the new strategy
     /// @dev Deposits USDC totalValue of the system into the new strategy
+    /// @param tokenAmounts The token amounts received in the CCIP message
     /// @param data The data to decode - decodes to Strategy (chainSelector, protocolId)
-    function _handleCCIPRebalanceNewStrategy(bytes memory data) internal {
+    function _handleCCIPRebalanceNewStrategy(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data) internal {
         /// @dev update strategy pool to protocol on this chain
         Strategy memory newStrategy = abi.decode(data, (Strategy));
         address newActiveStrategyAdapter =
             _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
 
+        /// @dev compare 0 amounts for the scenario a strategy rebalance occurs when there have been no deposits
+        uint256 totalValue;
+        if (tokenAmounts.length > 0) totalValue = tokenAmounts[0].amount;
+
         /// @dev deposit to the new strategy
-        uint256 usdcBalance = i_usdc.balanceOf(address(this));
-        if (usdcBalance != 0) _depositToStrategy(newActiveStrategyAdapter, usdcBalance);
+        if (totalValue != 0) _depositToStrategy(newActiveStrategyAdapter, totalValue);
     }
 
     /// @notice Internal helper to handle active strategy adapter updates
@@ -312,12 +317,22 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @dev Revert if amountToDeposit is less than 1e6 (1 USDC)
     /// @dev Transfer USDC from msg.sender to this contract
     /// @dev Emit DepositInitiated event
-    function _initiateDeposit(uint256 amountToDeposit) internal {
+    /// @dev Takes a fee and emits FeeTaken event (if fee rate is not 0)
+    /// @return amountToDepositMinusFee The amount of USDC deposited by the user minus the fee
+    function _initiateDeposit(uint256 amountToDeposit) internal returns (uint256 amountToDepositMinusFee) {
         if (amountToDeposit < USDC_DECIMALS) revert YieldPeer__InsufficientAmount();
         _transferUsdcFrom(msg.sender, address(this), amountToDeposit);
-        emit DepositInitiated(msg.sender, amountToDeposit, i_thisChainSelector);
+
+        /// @dev take fee
+        uint256 fee = _calculateFee(amountToDeposit);
+        amountToDepositMinusFee = amountToDeposit - fee;
+        if (fee > 0) emit FeeTaken(fee);
+
+        // @review certora and invariants: amountToDepositMinusFee used to be amountToDeposit
+        emit DepositInitiated(msg.sender, amountToDepositMinusFee, i_thisChainSelector);
     }
 
+    // @review we will update 2 helpers these in the additional/modular stablecoins task
     /// @notice Transfer USDC to an address
     /// @param to The address to transfer USDC to
     /// @param amount The amount of USDC to transfer

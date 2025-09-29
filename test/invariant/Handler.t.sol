@@ -66,13 +66,16 @@ contract Handler is Test {
     // 1
     uint256 public ghost_state_totalUsdcWithdrawn;
 
+    /// @dev track the total USDC deposited as user principal (initial deposit amount minus fees)
+    uint256 public ghost_state_totalUsdcDeposited_userPrincipal;
+
     // 1
     uint256 public ghost_event_totalUsdcDeposited;
     /// @dev track the total USDC withdrawn amount according to WithdrawCompleted events emitted by Peers
     uint256 public ghost_event_totalUsdcWithdrawn;
 
-    /// @dev track total USDC deposited per user
-    mapping(address user => uint256 usdcDepositAmount) public ghost_state_totalUsdcDepositedPerUser;
+    /// @dev track total USDC deposited per user in user principal (initial deposit amount minus fees)
+    mapping(address user => uint256 usdcDepositAmount) public ghost_state_totalUsdcDepositedPerUser_userPrincipal;
     /// @dev track total USDC withdrawn per user
     // 1
     mapping(address user => uint256 usdcWithdrawAmount) public ghost_state_totalUsdcWithdrawnPerUser;
@@ -98,13 +101,11 @@ contract Handler is Test {
     /// @dev track total shares burnt per user - based on value passed to share.transferAndCall
     mapping(address user => uint256 shareBurnAmount) public ghost_state_totalSharesBurnedPerUser;
 
-    // /// @dev tracks the total fees taken, in Yieldcoin token shares
+    // /// @dev tracks the total fees taken, in Yieldcoin token stablecoin
     // uint256 public ghost_state_totalFeesTaken;
-    /// @dev tracks the total fees withdrawn, in Yieldcoin token shares
-    uint256 public ghost_state_totalFeesWithdrawnInShares;
+    /// @dev tracks the total fees withdrawn, in Yieldcoin token stablecoin
+    uint256 public ghost_state_totalFeesWithdrawnInStablecoin;
 
-    /// @dev tracks the total fees taken - based on FeeTaken events
-    uint256 public ghost_event_totalFeesTakenInShares;
     /// @dev tracks the total fees withdrawn - based on FeesWithdrawn events
     // 1
     uint256 public ghost_event_totalFeesWithdrawn;
@@ -313,15 +314,18 @@ contract Handler is Test {
 
     /// @notice This function handles withdrawing fees
     function withdrawFees(address nonOwner) public {
-        uint256 availableFees = share.balanceOf(address(parent));
+        uint256 parentFees = usdc.balanceOf(address(parent));
+        uint256 child1Fees = usdc.balanceOf(address(child1));
+        uint256 child2Fees = usdc.balanceOf(address(child2));
+        uint256 availableFees = parentFees + child1Fees + child2Fees;
         if (availableFees == 0) return; // @review wasted run
         /// @dev update the ghost state
-        ghost_state_totalFeesWithdrawnInShares += availableFees;
+        ghost_state_totalFeesWithdrawnInStablecoin += availableFees;
 
         /// @dev try call from non-owner to assert it never succeeds
         vm.assume(nonOwner != parent.owner());
         _changePrank(nonOwner);
-        try parent.withdrawFees() {
+        try parent.withdrawFees(address(usdc)) {
             ghost_nonOwner_withdrewFees = true;
         } catch {
             console2.log("nonOwner withdrawFees failed");
@@ -329,7 +333,9 @@ contract Handler is Test {
 
         /// @dev withdraw the fees
         _changePrank(parent.owner());
-        parent.withdrawFees();
+        if (parentFees > 0) parent.withdrawFees(address(usdc));
+        if (child1Fees > 0) child1.withdrawFees(address(usdc));
+        if (child2Fees > 0) child2.withdrawFees(address(usdc));
     }
 
     /// @notice This function handles setting the fee rate
@@ -342,6 +348,8 @@ contract Handler is Test {
         /// @dev update the fee rate
         _changePrank(parent.owner());
         parent.setFeeRate(feeRate);
+        child1.setFeeRate(feeRate);
+        child2.setFeeRate(feeRate);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -388,7 +396,7 @@ contract Handler is Test {
     function _recordDeposit(address user, uint256 amount) internal {
         DepositRecord memory depositRecord = DepositRecord({
             user: user,
-            amount: amount,
+            amount: amount, // @notice this is the total deposit amount, including the fee - NOT the user principal
             feeRate: parent.getFeeRate(),
             timestamp: block.timestamp,
             fee: _calculateFee(amount)
@@ -401,8 +409,10 @@ contract Handler is Test {
                              UPDATE GHOSTS
     //////////////////////////////////////////////////////////////*/
     function _updateDepositGhosts(address depositor, uint256 depositAmount) internal {
-        ghost_state_totalUsdcDeposited += depositAmount;
-        ghost_state_totalUsdcDepositedPerUser[depositor] += depositAmount;
+        uint256 userPrincipal = depositAmount - _calculateFee(depositAmount);
+        ghost_state_totalUsdcDeposited_userPrincipal += userPrincipal;
+        // ghost_state_totalUsdcDeposited += depositAmount;
+        ghost_state_totalUsdcDepositedPerUser_userPrincipal[depositor] += userPrincipal;
         console2.log("total deposited:", ghost_state_totalUsdcDeposited);
 
         /// @dev record the deposit with current fee rate
@@ -420,19 +430,26 @@ contract Handler is Test {
     function _handleDepositLogs() internal {
         bytes32 depositInitiatedEvent = keccak256("DepositInitiated(address,uint256,uint64)");
         bytes32 shareMintUpdateEvent = keccak256("ShareMintUpdate(uint256,uint64,uint256)");
-        bytes32 feeTakenEvent = keccak256("FeeTaken(uint256,uint256)");
+        bytes32 feeTakenEvent = keccak256("FeeTaken(uint256)");
         bool depositInitiatedEventFound = false;
         bool shareMintUpdateEventFound = false;
         bool feeTakenEventFound = false;
         address depositor;
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        // First pass: find the depositor from DepositInitiated event
         for (uint256 i = 0; i < logs.length; i++) {
             if (logs[i].topics[0] == depositInitiatedEvent) {
                 depositInitiatedEventFound = true;
                 ghost_event_depositInitiated_emissions++;
                 depositor = address(uint160(uint256(logs[i].topics[1])));
+                break; // Found the depositor, break out of loop
             }
+        }
+
+        // Second pass: process all events with the correct depositor
+        for (uint256 i = 0; i < logs.length; i++) {
             if (logs[i].topics[0] == shareMintUpdateEvent) {
                 shareMintUpdateEventFound = true;
                 ghost_event_shareMintUpdate_emissions++;
@@ -444,9 +461,9 @@ contract Handler is Test {
             if (logs[i].topics[0] == feeTakenEvent) {
                 feeTakenEventFound = true;
                 ghost_event_feeTaken_emissions++;
-                uint256 feeInShares = uint256(logs[i].topics[2]);
-                ghost_event_totalFeesTakenInShares += feeInShares;
                 uint256 feeInStablecoin = uint256(logs[i].topics[1]);
+                console2.log("FeeTaken event found for depositor:", depositor);
+                console2.log("Fee amount:", feeInStablecoin);
                 ghost_event_totalFeesTakenInStablecoinPerUser[depositor] += feeInStablecoin;
                 ghost_event_totalFeesTakenInStablecoin += feeInStablecoin;
             }
@@ -585,7 +602,7 @@ contract Handler is Test {
         return share.balanceOf(admin);
     }
 
-    /// @dev calculate expected fees for a user based on their historical deposits
+    /// @dev calculate expected fees taken for a user based on their historical deposits
     function calculateExpectedFeesForUser(address user) external view returns (uint256 totalExpectedFees) {
         DepositRecord[] memory deposits = ghost_userDeposits[user];
         for (uint256 i = 0; i < deposits.length; i++) {

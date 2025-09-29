@@ -9,8 +9,7 @@ import {console2} from "forge-std/console2.sol";
 contract ChildDepositTest is BaseTest {
     function setUp() public override {
         super.setUp();
-        /// @dev set the fee rate on the parent chain
-        _selectFork(baseFork);
+        /// @dev set the fee rate
         _setFeeRate(INITIAL_FEE_RATE);
         /// @dev optFork is a child chain
         _selectFork(optFork);
@@ -35,6 +34,9 @@ contract ChildDepositTest is BaseTest {
         _changePrank(depositor);
 
         uint256 usdcBalanceBefore = optUsdc.balanceOf(depositor);
+        uint256 fee = _getFee(DEPOSIT_AMOUNT);
+        uint256 userPrincipal = DEPOSIT_AMOUNT - fee;
+        uint256 optChildUsdcBalanceBefore = optUsdc.balanceOf(address(optChildPeer));
 
         /// @dev act
         optChildPeer.deposit(DEPOSIT_AMOUNT);
@@ -47,25 +49,23 @@ contract ChildDepositTest is BaseTest {
         address aUsdc = _getATokenAddress(optNetworkConfig.protocols.aavePoolAddressesProvider, address(optUsdc));
         assertApproxEqAbs(
             IERC20(aUsdc).balanceOf(address(optAaveV3Adapter)),
-            DEPOSIT_AMOUNT,
+            userPrincipal,
             BALANCE_TOLERANCE,
             "Aave balance should be approximately equal to deposit amount"
         );
 
         /// @dev switch to parent chain and route ccip message with totalValue and amount deposited to calculate shareMintAmount
         ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
-        uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
+        uint256 expectedShareMintAmount = userPrincipal * INITIAL_SHARE_PRECISION;
         assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
 
         /// @dev switch back to child chain and route ccip message with shareMintAmount to mint shares
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
         /// @dev assert correct amount of shares minted and fees are taken
-        uint256 fee = _getFeeShareMintAmount(expectedShareMintAmount, DEPOSIT_AMOUNT);
-        assertEq(optShare.totalSupply(), expectedShareMintAmount - fee);
-        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount - fee);
-        assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
-        assertEq(baseShare.totalSupply(), fee);
+        assertEq(optShare.totalSupply(), expectedShareMintAmount);
+        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount);
+        assertEq(optUsdc.balanceOf(address(optChildPeer)), optChildUsdcBalanceBefore + fee);
     }
 
     function test_yield_child_deposit_strategyIsChild_compound() public {
@@ -75,6 +75,9 @@ contract ChildDepositTest is BaseTest {
         _changePrank(depositor);
 
         uint256 usdcBalanceBefore = optUsdc.balanceOf(depositor);
+        uint256 fee = _getFee(DEPOSIT_AMOUNT);
+        uint256 userPrincipal = DEPOSIT_AMOUNT - fee;
+        uint256 optChildUsdcBalanceBefore = optUsdc.balanceOf(address(optChildPeer));
 
         /// @dev act
         optChildPeer.deposit(DEPOSIT_AMOUNT);
@@ -87,26 +90,23 @@ contract ChildDepositTest is BaseTest {
         uint256 compoundBalance = IComet(optNetworkConfig.protocols.comet).balanceOf(address(optCompoundV3Adapter));
         assertApproxEqAbs(
             compoundBalance,
-            DEPOSIT_AMOUNT,
+            userPrincipal,
             BALANCE_TOLERANCE,
             "Compound balance should be approximately equal to deposit amount"
         );
 
         /// @dev switch to parent chain and route ccip message with totalValue and amount deposited to calculate shareMintAmount
         ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
-        uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
+        uint256 expectedShareMintAmount = userPrincipal * INITIAL_SHARE_PRECISION;
         assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
 
         /// @dev switch back to child chain and route ccip message with shareMintAmount to mint shares
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
         /// @dev assert correct amount of shares minted
-        uint256 fee = _getFeeShareMintAmount(expectedShareMintAmount, DEPOSIT_AMOUNT);
-        assertEq(optShare.totalSupply(), expectedShareMintAmount - fee);
-        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount - fee);
-        assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
-        assertEq(baseShare.totalSupply(), fee);
-        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount - fee);
+        assertEq(optShare.totalSupply(), expectedShareMintAmount);
+        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount);
+        assertEq(optUsdc.balanceOf(address(optChildPeer)), optChildUsdcBalanceBefore + fee);
     }
 
     // - parent is strategy
@@ -115,6 +115,9 @@ contract ChildDepositTest is BaseTest {
     //     - calculate and send `shareMintAmount` from parent-strategy to child
     function test_yield_child_deposit_strategyIsParent_aave() public {
         uint256 usdcBalanceBefore = optUsdc.balanceOf(depositor);
+        uint256 fee = _getFee(DEPOSIT_AMOUNT);
+        uint256 userPrincipal = DEPOSIT_AMOUNT - fee;
+        uint256 optChildUsdcBalanceBefore = optUsdc.balanceOf(address(optChildPeer));
 
         /// @dev act
         optChildPeer.deposit(DEPOSIT_AMOUNT);
@@ -131,22 +134,21 @@ contract ChildDepositTest is BaseTest {
         address aUsdc = _getATokenAddress(baseNetworkConfig.protocols.aavePoolAddressesProvider, address(baseUsdc));
         assertApproxEqAbs(
             IERC20(aUsdc).balanceOf(address(baseAaveV3Adapter)),
-            DEPOSIT_AMOUNT,
+            userPrincipal,
             BALANCE_TOLERANCE,
             "Aave balance should be approximately equal to deposit amount"
         );
 
-        uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
+        uint256 expectedShareMintAmount = userPrincipal * INITIAL_SHARE_PRECISION;
         assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
-        uint256 feeShareMintAmount = _getFeeShareMintAmount(expectedShareMintAmount, DEPOSIT_AMOUNT);
-        assertEq(baseShare.balanceOf(address(baseParentPeer)), feeShareMintAmount);
 
         /// @dev switch back to child chain and route ccip message with shareMintAmount to mint shares
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
         /// @dev assert correct amount of shares minted
-        assertEq(optShare.totalSupply(), expectedShareMintAmount - feeShareMintAmount);
-        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount - feeShareMintAmount);
+        assertEq(optShare.totalSupply(), expectedShareMintAmount);
+        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount);
+        assertEq(optUsdc.balanceOf(address(optChildPeer)), optChildUsdcBalanceBefore + fee);
     }
 
     function test_yield_child_deposit_strategyIsParent_compound() public {
@@ -156,6 +158,9 @@ contract ChildDepositTest is BaseTest {
         _changePrank(depositor);
 
         uint256 usdcBalanceBefore = optUsdc.balanceOf(depositor);
+        uint256 fee = _getFee(DEPOSIT_AMOUNT);
+        uint256 userPrincipal = DEPOSIT_AMOUNT - fee;
+        uint256 optChildUsdcBalanceBefore = optUsdc.balanceOf(address(optChildPeer));
 
         /// @dev act
         optChildPeer.deposit(DEPOSIT_AMOUNT);
@@ -172,22 +177,21 @@ contract ChildDepositTest is BaseTest {
         uint256 compoundBalance = IComet(baseNetworkConfig.protocols.comet).balanceOf(address(baseCompoundV3Adapter));
         assertApproxEqAbs(
             compoundBalance,
-            DEPOSIT_AMOUNT,
+            userPrincipal,
             BALANCE_TOLERANCE,
             "Compound balance should be approximately equal to deposit amount"
         );
 
-        uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
+        uint256 expectedShareMintAmount = userPrincipal * INITIAL_SHARE_PRECISION;
         assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
-        uint256 feeShareMintAmount = _getFeeShareMintAmount(expectedShareMintAmount, DEPOSIT_AMOUNT);
-        assertEq(baseShare.balanceOf(address(baseParentPeer)), feeShareMintAmount);
 
         /// @dev switch back to child chain and route ccip message with shareMintAmount to mint shares
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
         /// @dev assert correct amount of shares minted
-        assertEq(optShare.totalSupply(), expectedShareMintAmount - feeShareMintAmount);
-        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount - feeShareMintAmount);
+        assertEq(optShare.totalSupply(), expectedShareMintAmount);
+        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount);
+        assertEq(optUsdc.balanceOf(address(optChildPeer)), optChildUsdcBalanceBefore + fee);
     }
 
     // - chain c is strategy
@@ -202,6 +206,10 @@ contract ChildDepositTest is BaseTest {
         _changePrank(depositor);
 
         uint256 usdcBalanceBefore = optUsdc.balanceOf(depositor);
+        uint256 fee = _getFee(DEPOSIT_AMOUNT);
+        uint256 userPrincipal = DEPOSIT_AMOUNT - fee;
+
+        uint256 optChildUsdcBalanceBefore = optUsdc.balanceOf(address(optChildPeer));
 
         /// @dev act
         optChildPeer.deposit(DEPOSIT_AMOUNT);
@@ -219,26 +227,23 @@ contract ChildDepositTest is BaseTest {
         address aUsdc = _getATokenAddress(ethNetworkConfig.protocols.aavePoolAddressesProvider, address(ethUsdc));
         assertApproxEqAbs(
             IERC20(aUsdc).balanceOf(address(ethAaveV3Adapter)),
-            DEPOSIT_AMOUNT,
+            userPrincipal,
             BALANCE_TOLERANCE,
             "Aave balance should be approximately equal to deposit amount"
         );
 
         /// @dev switch to parent chain and route ccip message with totalValue and amount deposited to calculate shareMintAmount
         ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
-        uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
+        uint256 expectedShareMintAmount = userPrincipal * INITIAL_SHARE_PRECISION;
         assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
 
         /// @dev switch back to deposit child chain and route ccip message with shareMintAmount to mint shares
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
-        /// @dev assert correct amount of shares minted and fees are taken
-        uint256 fee = _getFeeShareMintAmount(expectedShareMintAmount, DEPOSIT_AMOUNT);
-        assertEq(optShare.totalSupply(), expectedShareMintAmount - fee);
-        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount - fee);
-        assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
-        assertEq(baseShare.totalSupply(), fee);
-        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount - fee);
+        /// @dev assert correct amount of shares minted
+        assertEq(optShare.totalSupply(), expectedShareMintAmount);
+        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount);
+        assertEq(optUsdc.balanceOf(address(optChildPeer)), optChildUsdcBalanceBefore + fee);
     }
 
     function test_yield_child_deposit_strategyIsChainC_compound() public {
@@ -248,6 +253,9 @@ contract ChildDepositTest is BaseTest {
         _changePrank(depositor);
 
         uint256 usdcBalanceBefore = optUsdc.balanceOf(depositor);
+        uint256 fee = _getFee(DEPOSIT_AMOUNT);
+        uint256 userPrincipal = DEPOSIT_AMOUNT - fee;
+        uint256 optChildUsdcBalanceBefore = optUsdc.balanceOf(address(optChildPeer));
 
         /// @dev act
         optChildPeer.deposit(DEPOSIT_AMOUNT);
@@ -265,7 +273,7 @@ contract ChildDepositTest is BaseTest {
         uint256 compoundBalance = IComet(ethNetworkConfig.protocols.comet).balanceOf(address(ethCompoundV3Adapter));
         assertApproxEqAbs(
             compoundBalance,
-            DEPOSIT_AMOUNT,
+            userPrincipal,
             BALANCE_TOLERANCE,
             "Compound balance should be approximately equal to deposit amount"
         );
@@ -273,18 +281,15 @@ contract ChildDepositTest is BaseTest {
         /// @dev switch to parent chain and route ccip message with totalValue and amount deposited to calculate shareMintAmount
         ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
         /// @dev assert total shares is the expected amount
-        uint256 expectedShareMintAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
+        uint256 expectedShareMintAmount = userPrincipal * INITIAL_SHARE_PRECISION;
         assertEq(baseParentPeer.getTotalShares(), expectedShareMintAmount);
 
         /// @dev switch back to deposit child chain and route ccip message with shareMintAmount to mint shares
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
         /// @dev assert correct amount of shares minted and fees are taken
-        uint256 fee = _getFeeShareMintAmount(expectedShareMintAmount, DEPOSIT_AMOUNT);
-        assertEq(optShare.totalSupply(), expectedShareMintAmount - fee);
-        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount - fee);
-        assertEq(baseShare.balanceOf(address(baseParentPeer)), fee);
-        assertEq(baseShare.totalSupply(), fee);
-        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount - fee);
+        assertEq(optShare.totalSupply(), expectedShareMintAmount);
+        assertEq(optShare.balanceOf(depositor), expectedShareMintAmount);
+        assertEq(optUsdc.balanceOf(address(optChildPeer)), optChildUsdcBalanceBefore + fee);
     }
 }
