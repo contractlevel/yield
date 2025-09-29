@@ -35,7 +35,7 @@ interface IYieldPeer is IYieldFees {
         uint256 shareBurnAmount; // amount of shares burned
         uint256 totalShares; // total shares in the system (updated on the parent chain)
         uint256 usdcWithdrawAmount; // amount of USDC to withdraw
-        uint64 chainSelector; // chain selector of the chain the withdrawal originated from
+        uint64 chainSelector; // chain selector of the chain the withdrawn stablecoins are sent to
     }
 
     function deposit(uint256 amountToDeposit) external;
