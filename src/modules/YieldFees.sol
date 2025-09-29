@@ -4,6 +4,7 @@ pragma solidity 0.8.26;
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IYieldFees} from "../interfaces/IYieldFees.sol";
 
 /// @title YieldFees
 /// @author @contractlevel
@@ -11,7 +12,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol
 /// @notice This contract is abstract because it is intended to be inherited by the YieldPeer contract.
 /// @notice Fees are collected on every chain during deposit.
 /// @notice Fees are taken in YieldPeer::_initiateDeposit
-abstract contract YieldFees is Ownable2Step {
+abstract contract YieldFees is Ownable2Step, IYieldFees {
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS
     //////////////////////////////////////////////////////////////*/

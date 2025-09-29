@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-interface IYieldPeer {
+import {IYieldFees} from "./IYieldFees.sol";
+
+interface IYieldPeer is IYieldFees {
     struct Strategy {
         bytes32 protocolId;
         uint64 chainSelector;

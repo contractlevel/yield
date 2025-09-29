@@ -373,22 +373,18 @@ contract Invariant is StdInvariant, BaseTest {
     }
 
     /// @notice Fee rate should always be within valid bounds
-    function invariant_feeRate_bounds() public view {
+    function invariant_feeRate_bounds() public {
+        handler.forEachChainSelector(this.checkFeeRateBoundsPerChainSelector);
+    }
+
+    function checkFeeRateBoundsPerChainSelector(uint64 chainSelector) external view {
+        IYieldPeer peer = IYieldPeer(handler.chainSelectorsToPeers(chainSelector));
         assertTrue(
-            parent.getFeeRate() <= parent.getMaxFeeRate(),
-            "Invariant violated: Fee rate should not exceed maximum allowed fee rate"
-        );
-        assertTrue(
-            child1.getFeeRate() <= child1.getMaxFeeRate(),
-            "Invariant violated: Fee rate should not exceed maximum allowed fee rate"
-        );
-        assertTrue(
-            child2.getFeeRate() <= child2.getMaxFeeRate(),
+            peer.getFeeRate() <= peer.getMaxFeeRate(),
             "Invariant violated: Fee rate should not exceed maximum allowed fee rate"
         );
     }
 
-    // @review
     /// @notice Fee amount integrity: Total fees per user should equal sum of individual deposit fees
     function invariant_fee_integrity_perUser() public {
         handler.forEachUser(this.checkFeeIntegrityPerUser);
