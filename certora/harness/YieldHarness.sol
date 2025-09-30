@@ -36,8 +36,8 @@ contract YieldHarness is YieldPeer, HelperHarness {
         _handleCCIPWithdrawCallback(tokenAmounts, data);
     }
 
-    function handleCCIPRebalanceNewStrategy(bytes memory data) public {
-        _handleCCIPRebalanceNewStrategy(data);
+    function handleCCIPRebalanceNewStrategy(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data) public {
+        _handleCCIPRebalanceNewStrategy(tokenAmounts, data);
     }
 
     function depositToStrategy(address strategyAdapter, uint256 amount) public {
@@ -50,5 +50,9 @@ contract YieldHarness is YieldPeer, HelperHarness {
     
     function decodeWithdrawChainSelector(bytes calldata data) public view returns (uint64) {
         return _decodeWithdrawChainSelector(data);
+    }
+
+    function calculateFee(uint256 stablecoinDepositAmount) public view returns (uint256) {
+        return _calculateFee(stablecoinDepositAmount);
     }
 }

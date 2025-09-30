@@ -400,9 +400,8 @@ contract Invariant is StdInvariant, BaseTest {
         }
     }
 
-    // @review this was written when fee was taken in shares
     /// @notice Total fees taken should equal sum of all individual deposit fees
-    function invariant_totalFeesFromDepositRecords() public view {
+    function invariant_totalFees_equals_sumOfDepositFees() public view {
         uint256 totalFeesFromEvents = handler.ghost_event_totalFeesTakenInStablecoin();
         // @review would it be cleaner to do these calculations in invariant or handler?
         uint256 totalFeesFromDepositRecords = handler.calculateTotalExpectedFeesFromDepositRecords();
@@ -423,6 +422,7 @@ contract Invariant is StdInvariant, BaseTest {
 
     /// @notice Strategy Registry: Active protocol must be registered in StrategyRegistry
     // @review is this verified with certora?
+    // where should it be verified? BasePeer.spec? Parent.spec because of getStrategy()?
     function invariant_activeProtocol_registered() public view {
         bytes32 protocolId = parent.getStrategy().protocolId;
         address adapter = strategyRegistryParent.getStrategyAdapter(protocolId);

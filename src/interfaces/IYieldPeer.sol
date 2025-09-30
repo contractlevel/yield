@@ -5,7 +5,7 @@ import {IYieldFees} from "./IYieldFees.sol";
 
 interface IYieldPeer is IYieldFees {
     struct Strategy {
-        bytes32 protocolId;
+        bytes32 protocolId; // ie keccak256("aave-v3") or keccak256("compound-v3")
         uint64 chainSelector;
     }
 

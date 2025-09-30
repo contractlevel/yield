@@ -211,3 +211,5 @@ rule onTokenTransfer_decreases_share_totalSupply() {
 
     assert share.totalSupply() == shareTotalSupplyBefore - shareBurnAmount;
 }
+
+// @review - test fees here?

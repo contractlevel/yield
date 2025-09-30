@@ -64,4 +64,9 @@ contract ParentHarness is ParentPeer, HelperHarness {
     function getStrategyAdapterFromProtocol(bytes32 protocolId) public view returns (address) {
         return _getStrategyAdapterFromProtocol(protocolId);
     }
+
+    // @review this can be modularized across peer harnesses
+    function calculateFee(uint256 stablecoinDepositAmount) public view returns (uint256) {
+        return _calculateFee(stablecoinDepositAmount);
+    }
 }

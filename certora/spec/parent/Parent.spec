@@ -29,6 +29,8 @@ methods {
     function _.withdraw(address,uint256) external => DISPATCHER(true);
     function _.deposit(address,uint256) external => DISPATCHER(true);
     function _.getTotalValue(address) external => DISPATCHER(true);
+    function _.balanceOf(address) external => DISPATCHER(true);
+    function _.transfer(address,uint256) external => DISPATCHER(true);
 
     // Harness helper methods
     function bytes32ToUint256(bytes32) external returns (uint256) envfree;
@@ -43,6 +45,7 @@ methods {
     function createStrategy(uint64,bytes32) external returns (IYieldPeer.Strategy memory) envfree;
     function convertUsdcToShare(uint256) external returns (uint256) envfree;
     function getStrategyAdapterFromProtocol(bytes32) external returns (address) envfree;
+    function calculateFee(uint256) external returns (uint256) envfree;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -269,6 +272,7 @@ invariant totalShares_consistency()
 rule deposit_transfersUsdcToStrategy_when_parent_is_strategy() {
     env e;
     uint256 amountToDeposit;
+    uint256 fee = calculateFee(amountToDeposit);
     require getStrategy().chainSelector == getThisChainSelector();
     address strategyPool = getActiveStrategyAdapter().getStrategyPool(e);
 
@@ -281,8 +285,9 @@ rule deposit_transfersUsdcToStrategy_when_parent_is_strategy() {
 
     deposit(e, amountToDeposit);
 
-    assert usdc.balanceOf(strategyPool) == strategyPoolBalanceBefore + amountToDeposit;
+    assert usdc.balanceOf(strategyPool) == strategyPoolBalanceBefore + amountToDeposit - fee;
     assert usdc.balanceOf(e.msg.sender) == depositorBalanceBefore - amountToDeposit;
+    assert usdc.balanceOf(currentContract) == fee;
 }
 
 rule deposit_mintsShares_when_parent_is_strategy() {
@@ -317,19 +322,7 @@ rule withdraw_edgecase() {
     assert usdc.balanceOf(user) == balanceBefore + 1000000;
 }
 
-rule deposit_emits_2_SharesMinted_when_parent_is_strategy_and_feeRate_is_set() {
-    env e;
-    calldataarg args;
-    require getStrategy().chainSelector == getThisChainSelector();
-    require currentContract.s_feeRate > 0;
-
-    require ghost_sharesMinted_eventCount == 0;
-    deposit(e, args);
-    // we expect 2 events to be emitted because 1 for the user and 1 for the fee
-    assert ghost_sharesMinted_eventCount == 2;
-}
-
-rule deposit_emits_1_SharesMinted_when_parent_is_strategy_and_no_feeRate_is_set() {
+rule deposit_emits_SharesMinted_when_parent_is_strategy() {
     env e;
     calldataarg args;
     require getStrategy().chainSelector == getThisChainSelector();
@@ -337,20 +330,20 @@ rule deposit_emits_1_SharesMinted_when_parent_is_strategy_and_no_feeRate_is_set(
 
     require ghost_sharesMinted_eventCount == 0;
     deposit(e, args);
-    // we expect 1 event to be emitted because 1 for the user
     assert ghost_sharesMinted_eventCount == 1;
 }
 
 rule deposit_emits_CCIPMessageSent_when_strategy_is_differentChain() {
     env e;
     uint256 amountToDeposit;
+    uint256 fee = calculateFee(amountToDeposit);
     require getStrategy().chainSelector != getThisChainSelector();
 
     require ghost_ccipMessageSent_eventCount == 0;
     deposit(e, amountToDeposit);
     assert ghost_ccipMessageSent_eventCount == 1;
     assert ghost_ccipMessageSent_txType_emitted == 1; // DepositToStrategy
-    assert ghost_ccipMessageSent_bridgeAmount_emitted == amountToDeposit;
+    assert ghost_ccipMessageSent_bridgeAmount_emitted == amountToDeposit - fee;
 }
 
 // --- onTokenTransfer --- //
@@ -546,15 +539,10 @@ rule handleCCIPDepositCallbackParent_mintsShares_when_depositChain_is_parent() {
 
     require shareBalanceBefore + expectedShareMintAmount <= max_uint256;
 
-    uint256 feeRate = currentContract.s_feeRate;
-
+ 
     require ghost_sharesMinted_eventCount == 0;
     handleCCIPDepositCallbackParent(e, encodedDepositData);
-
-    // we expect 2 events to be emitted because 1 for the user and 1 for the fee
-    assert feeRate > 0 => ghost_sharesMinted_eventCount == 2;
-    // if the fee rate is 0, no shares are minted for the fee
-    assert feeRate == 0 => ghost_sharesMinted_eventCount == 1;
+    assert ghost_sharesMinted_eventCount == 1;
 
     assert share.balanceOf(depositor) == shareBalanceBefore + expectedShareMintAmount;
     assert getTotalShares() == totalSharesBefore + expectedShareMintAmount;
@@ -956,35 +944,40 @@ rule setFeeRate_success() {
     assert currentContract.s_feeRate == newFeeRate;
 }
 
-// --- withdrawFees --- //
+// --- withdrawFees --- // // @review we can probably move this to a base/yieldpeer spec
 rule withdrawFees_revertsWhen_notOwner() {
     env e;
+    calldataarg args;
 
     require e.msg.sender != currentContract._owner;
 
-    withdrawFees@withrevert(e);
+    withdrawFees@withrevert(e, args);
     assert lastReverted;
 }
 
 rule withdrawFees_revertsWhen_noFeesToWithdraw() {
     env e;
+    address feeToken;
+    require feeToken.balanceOf(e, currentContract) == 0;
 
-    require share.balanceOf(currentContract) == 0;
-
-    withdrawFees@withrevert(e);
+    withdrawFees@withrevert(e, feeToken);
     assert lastReverted;
 }
 
 rule withdrawFees_success() {
     env e;
+    address feeToken;
 
-    uint256 ownerBalanceBefore = share.balanceOf(currentContract._owner);
-    uint256 fees = share.balanceOf(currentContract);
+    uint256 ownerBalanceBefore = feeToken.balanceOf(e, currentContract._owner);
+    uint256 fees = feeToken.balanceOf(e, currentContract);
     require fees > 0;
     require ownerBalanceBefore + fees <= max_uint256;
     require currentContract != currentContract._owner;
 
-    withdrawFees(e);
-    assert share.balanceOf(currentContract) == 0;
-    assert share.balanceOf(currentContract._owner) == ownerBalanceBefore + fees;
+    /// @dev as more stablecoins are added, we will need to update this: feeToken == usdc || feeToken == usdt etc
+    require feeToken == usdc;
+
+    withdrawFees(e, feeToken);
+    assert feeToken.balanceOf(e, currentContract) == 0;
+    assert feeToken.balanceOf(e, currentContract._owner) == ownerBalanceBefore + fees;
 }

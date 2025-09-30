@@ -36,6 +36,7 @@ methods {
     function buildEncodedDepositData(address,uint256,uint256,uint256,uint64) external returns (bytes memory) envfree;
     function buildEncodedWithdrawData(address,uint256,uint256,uint256,uint64) external returns (bytes memory) envfree;
     function calculateWithdrawAmount(uint256,uint256,uint256) external returns (uint256) envfree;
+    function calculateFee(uint256) external returns (uint256) envfree;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -190,6 +191,7 @@ rule child_onTokenTransfer_emits_CCIPMessageSent() {
 rule child_deposit_emits_CCIPMessageSent() {
     env e;
     uint256 amountToDeposit;
+    uint256 fee = calculateFee(amountToDeposit);
     require ghost_ccipMessageSent_eventCount == 0;
     deposit(e, amountToDeposit);
     assert ghost_ccipMessageSent_eventCount == 1;
@@ -199,7 +201,7 @@ rule child_deposit_emits_CCIPMessageSent() {
         ghost_ccipMessageSent_bridgeAmount_emitted == 0;
     assert getActiveStrategyAdapter() == 0 => 
         ghost_ccipMessageSent_txType_emitted == 0 && // CcipTxType.DepositToParent
-        ghost_ccipMessageSent_bridgeAmount_emitted == amountToDeposit;
+        ghost_ccipMessageSent_bridgeAmount_emitted == amountToDeposit - fee;
 }
 
 rule child_deposit_isStrategy_emits_correct_params() {
@@ -220,6 +222,7 @@ rule child_deposit_isStrategy_emits_correct_params() {
 rule child_deposit_notStrategy_emits_correct_params() {
     env e;
     uint256 amountToDeposit;
+    uint256 fee = calculateFee(amountToDeposit);
 
     require getActiveStrategyAdapter() == 0;
 
@@ -228,7 +231,7 @@ rule child_deposit_notStrategy_emits_correct_params() {
     require ghost_ccipMessageSent_txType_emitted == 0;
     deposit(e, amountToDeposit);
     assert ghost_depositToStrategyCompleted_eventCount == 0;
-    assert ghost_ccipMessageSent_bridgeAmount_emitted == amountToDeposit;
+    assert ghost_ccipMessageSent_bridgeAmount_emitted == amountToDeposit - fee;
     assert ghost_ccipMessageSent_txType_emitted == 0; // CcipTxType.DepositToParent
 }
 
@@ -562,7 +565,7 @@ rule handleCCIPMessage_RebalanceNewStrategy() {
     bytes data;
     uint64 sourceChainSelector;
 
-    require usdc.balanceOf(currentContract) > 0;
+    require tokenAmounts.length > 0 && tokenAmounts[0].token == usdc && tokenAmounts[0].amount > 0;
 
     require ghost_depositToStrategy_eventCount == 0;
     require ghost_activeStrategyAdapterUpdated_eventCount == 0;
