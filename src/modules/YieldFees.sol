@@ -10,8 +10,9 @@ import {IYieldFees} from "../interfaces/IYieldFees.sol";
 /// @author @contractlevel
 /// @notice Module for managing fees for the YieldCoin system
 /// @notice This contract is abstract because it is intended to be inherited by the YieldPeer contract.
-/// @notice Fees are collected on every chain during deposit.
+/// @notice Fees are collected on every chain during deposit if s_feeRate is not 0.
 /// @notice Fees are taken in YieldPeer::_initiateDeposit
+/// @notice FV for this contract is in certora/spec/yield/BasePeer.spec
 abstract contract YieldFees is Ownable2Step, IYieldFees {
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS

@@ -13,15 +13,21 @@ methods {
     function getAllowedChain(uint64) external returns (bool) envfree;
     function getThisChainSelector() external returns (uint64) envfree;
     function getActiveStrategyAdapter() external returns (address) envfree;
+    function getMaxFeeRate() external returns (uint256) envfree;
 
     // External methods
     function share.totalSupply() external returns (uint256) envfree;
     function usdc.balanceOf(address) external returns (uint256) envfree;
 
+    // Wildcard dispatcher summaries
+    function _.balanceOf(address) external => DISPATCHER(true);
+    function _.transfer(address,uint256) external => DISPATCHER(true);
+
     // Harness helper methods
     function encodeUint64(uint64 value) external returns (bytes memory) envfree;
     function bytes32ToUint8(bytes32 value) external returns (uint8) envfree;
     function bytes32ToUint256(bytes32 value) external returns (uint256) envfree;
+    function calculateFee(uint256) external returns (uint256) envfree;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -50,6 +56,18 @@ definition SharesMintedEvent() returns bytes32 =
 definition WithdrawCompletedEvent() returns bytes32 =
 // keccak256(abi.encodePacked("WithdrawCompleted(address,uint256)"))
     to_bytes32(0x60188009b974c2fa66ee3b916d93f64d6534ea2204e0c466f9784ace689e8e49);
+
+definition FeeRateSetEvent() returns bytes32 =
+// keccak256(abi.encodePacked("FeeRateSet(uint256)"))
+    to_bytes32(0x45398c451b1a31b88dbaed4e7b89a632f43cc4b50149d437db03a5300afe40d1);
+
+definition FeeTakenEvent() returns bytes32 =
+// keccak256(abi.encodePacked("FeeTaken(uint256)"))
+    to_bytes32(0x28ecfa9863ff521e372e36eca8b2401df92e9ed1deb428d178c53b727eb9b3cf);
+
+definition FeesWithdrawnEvent() returns bytes32 =
+// keccak256(abi.encodePacked("FeesWithdrawn(uint256)"))
+    to_bytes32(0x9800e6f57aeb4360eaa72295a820a4293e1e66fbfcabcd8874ae141304a76deb);
 
 /*//////////////////////////////////////////////////////////////
                              GHOSTS
@@ -94,6 +112,36 @@ ghost mathint ghost_ccipMessageSent_bridgeAmount_emitted {
     init_state axiom ghost_ccipMessageSent_bridgeAmount_emitted == 0;
 }
 
+/// @notice EventCount: track amount of FeeRateSet event is emitted
+ghost mathint ghost_feeRateSet_eventCount {
+    init_state axiom ghost_feeRateSet_eventCount == 0;
+}
+
+/// @notice EmittedValue: track the feeRate emitted by FeeRateSet event
+ghost mathint ghost_feeRateSet_feeRate_emitted {
+    init_state axiom ghost_feeRateSet_feeRate_emitted == 0;
+}
+
+/// @notice EventCount: track amount of FeeTaken event is emitted
+ghost mathint ghost_feeTaken_eventCount {
+    init_state axiom ghost_feeTaken_eventCount == 0;
+}
+
+/// @notice EmittedValue: track the fee emitted by FeeTaken event
+ghost mathint ghost_feeTaken_fee_emitted {
+    init_state axiom ghost_feeTaken_fee_emitted == 0;
+}
+
+/// @notice EventCount: track amount of FeesWithdrawn event is emitted
+ghost mathint ghost_feesWithdrawn_eventCount {
+    init_state axiom ghost_feesWithdrawn_eventCount == 0;
+}
+
+/// @notice EmittedValue: track the feesWithdrawn emitted by FeesWithdrawn event
+ghost mathint ghost_feesWithdrawn_feesWithdrawn_emitted {
+    init_state axiom ghost_feesWithdrawn_feesWithdrawn_emitted == 0;
+}
+
 /*//////////////////////////////////////////////////////////////
                              HOOKS
 //////////////////////////////////////////////////////////////*/
@@ -112,6 +160,21 @@ hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
     if (t0 == SharesBurnedEvent()) ghost_sharesBurned_eventCount = ghost_sharesBurned_eventCount + 1;
     if (t0 == SharesMintedEvent()) ghost_sharesMinted_eventCount = ghost_sharesMinted_eventCount + 1;
     if (t0 == WithdrawCompletedEvent()) ghost_withdrawCompleted_eventCount = ghost_withdrawCompleted_eventCount + 1;
+}
+
+hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
+    if (t0 == FeeRateSetEvent()) {
+        ghost_feeRateSet_eventCount = ghost_feeRateSet_eventCount + 1;
+        ghost_feeRateSet_feeRate_emitted = bytes32ToUint256(t1);
+    }
+    if (t0 == FeeTakenEvent()) {
+        ghost_feeTaken_eventCount = ghost_feeTaken_eventCount + 1;
+        ghost_feeTaken_fee_emitted = bytes32ToUint256(t1);
+    }
+    if (t0 == FeesWithdrawnEvent()) {
+        ghost_feesWithdrawn_eventCount = ghost_feesWithdrawn_eventCount + 1;
+        ghost_feesWithdrawn_feesWithdrawn_emitted = bytes32ToUint256(t1);
+    }
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -212,4 +275,109 @@ rule onTokenTransfer_decreases_share_totalSupply() {
     assert share.totalSupply() == shareTotalSupplyBefore - shareBurnAmount;
 }
 
-// @review - test fees here?
+// --- withdrawFees --- //
+rule withdrawFees_revertsWhen_notOwner() {
+    env e;
+    calldataarg args;
+
+    require e.msg.sender != currentContract._owner;
+
+    withdrawFees@withrevert(e, args);
+    assert lastReverted;
+}
+
+rule withdrawFees_revertsWhen_noFeesToWithdraw() {
+    env e;
+    address feeToken;
+    require feeToken.balanceOf(e, currentContract) == 0;
+
+    withdrawFees@withrevert(e, feeToken);
+    assert lastReverted;
+}
+
+rule withdrawFees_success() {
+    env e;
+    address feeToken;
+
+    uint256 ownerBalanceBefore = feeToken.balanceOf(e, currentContract._owner);
+    uint256 fees = feeToken.balanceOf(e, currentContract);
+    require fees > 0;
+    require ownerBalanceBefore + fees <= max_uint256;
+    require currentContract != currentContract._owner;
+
+    /// @dev as more stablecoins are added, we will need to update this: feeToken == usdc || feeToken == usdt etc
+    require feeToken == usdc;
+
+    require ghost_feesWithdrawn_eventCount == 0;
+    require ghost_feesWithdrawn_feesWithdrawn_emitted == 0;
+
+    withdrawFees(e, feeToken);
+
+    assert ghost_feesWithdrawn_eventCount == 1;
+    assert ghost_feesWithdrawn_feesWithdrawn_emitted == fees;
+    assert feeToken.balanceOf(e, currentContract) == 0;
+    assert feeToken.balanceOf(e, currentContract._owner) == ownerBalanceBefore + fees;
+}
+
+// --- setFeeRate --- //
+rule setFeeRate_revertsWhen_notOwner() {
+    env e;
+    calldataarg args;
+
+    require e.msg.sender != currentContract._owner;
+
+    setFeeRate@withrevert(e, args);
+    assert lastReverted;
+}
+
+rule setFeeRate_revertsWhen_maxFeeRateExceeded() {
+    env e;
+    uint256 newFeeRate;
+    require newFeeRate > getMaxFeeRate();
+
+    setFeeRate@withrevert(e, newFeeRate);
+    assert lastReverted;
+}
+
+rule setFeeRate_success() {
+    env e;
+    uint256 newFeeRate;
+
+    require ghost_feeRateSet_eventCount == 0;
+    require ghost_feeRateSet_feeRate_emitted == 0;
+
+    setFeeRate(e, newFeeRate);
+
+    assert ghost_feeRateSet_eventCount == 1;
+    assert ghost_feeRateSet_feeRate_emitted == newFeeRate;
+    assert currentContract.s_feeRate == newFeeRate;
+}
+
+// --- deposit takes fees --- //
+rule deposit_takesFees_when_feeRate_is_set() {
+    env e;
+    uint256 amountToDeposit;
+    uint256 fee = calculateFee(amountToDeposit);
+
+    uint256 depositorBalanceBefore = usdc.balanceOf(e.msg.sender);
+    uint256 contractBalanceBefore = usdc.balanceOf(currentContract);
+
+    require depositorBalanceBefore - amountToDeposit >= 0, "should not cause underflow";
+    require contractBalanceBefore + fee <= max_uint256, "should not cause overflow";
+
+    require currentContract.s_feeRate > 0, "deposit should take fee when fee rate is set";
+
+    require e.msg.sender != getActiveStrategyAdapter().getStrategyPool(e), "msg.sender should not be the active strategy pool";
+    require e.msg.sender != currentContract, "msg.sender should not be the current contract";
+
+    require ghost_feeTaken_eventCount == 0;
+    require ghost_feeTaken_fee_emitted == 0;
+
+    deposit(e, amountToDeposit);
+
+    assert ghost_feeTaken_eventCount == 1;
+    assert ghost_feeTaken_fee_emitted == fee;
+
+    assert usdc.balanceOf(e.msg.sender) == depositorBalanceBefore - amountToDeposit;
+    assert usdc.balanceOf(currentContract) == contractBalanceBefore + fee;
+}

@@ -328,7 +328,6 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         amountToDepositMinusFee = amountToDeposit - fee;
         if (fee > 0) emit FeeTaken(fee);
 
-        // @review certora and invariants: amountToDepositMinusFee used to be amountToDeposit
         emit DepositInitiated(msg.sender, amountToDepositMinusFee, i_thisChainSelector);
     }
 
