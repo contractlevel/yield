@@ -103,6 +103,7 @@ contract ParentPeer is YieldPeer {
             _depositToStrategy(activeStrategyAdapter, amountToDeposit);
 
             /// @dev mint share tokens (YieldCoin) to msg.sender based on amount deposited and total value of the system
+            // @review deposit complete event?
             _mintShares(msg.sender, shareMintAmount);
         }
         // 2. This Parent is not the Strategy. Therefore the deposit must be sent to the strategy and get totalValue.
@@ -295,6 +296,7 @@ contract ParentPeer is YieldPeer {
         /// @dev handle the case where the deposit was made on this parent chain
         if (depositData.chainSelector == i_thisChainSelector) {
             //slither-disable-next-line reentrancy-events
+            // @review deposit complete event?
             _mintShares(depositData.depositor, depositData.shareMintAmount);
         }
         /// @dev handle the case where the deposit was made on a child chain
@@ -406,7 +408,7 @@ contract ParentPeer is YieldPeer {
     }
 
     /// @notice Handles moving strategy to a different chain
-    /// @param oldStrategyPool The address of the old strategy pool
+    /// @param oldStrategyPool The address of the old strategy pool // @review this needs to be renamed
     /// @param totalValue The total value of the system
     /// @param newStrategy The new strategy
     function _handleStrategyMoveToNewChain(address oldStrategyPool, uint256 totalValue, Strategy memory newStrategy)

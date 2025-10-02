@@ -89,8 +89,6 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
         Ownable(msg.sender)
         FunctionsClient(functionsRouter)
     {
-        // @review - should these be configurable?
-        // a: no because the Rebalancer itself is configurable in parent
         i_donId = donId;
         i_clfSubId = clfSubId;
     }
@@ -152,6 +150,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
             IYieldPeer.Strategy memory newStrategy =
                 IYieldPeer.Strategy({chainSelector: chainSelector, protocolId: protocolId});
             IYieldPeer.CcipTxType txType;
+            // @review naming?
             address oldStrategyAdapter = IYieldPeer(parentPeer).getStrategyAdapter(newStrategy.protocolId);
             // slither-disable-next-line uninitialized-local
             uint256 totalValue;
