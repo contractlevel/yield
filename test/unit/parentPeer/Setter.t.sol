@@ -3,6 +3,7 @@ pragma solidity 0.8.26;
 
 import {BaseTest, Vm, console2, IYieldPeer, Log} from "../../BaseTest.t.sol";
 
+// @review should be in a yieldFees folder, not parentPeer
 contract SetterTest is BaseTest {
     // --- setRebalancer --- //
     function test_yield_parentPeer_setRebalancer_revertsWhen_notOwner() public {

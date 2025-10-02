@@ -13,6 +13,7 @@ import {IStrategyRegistry} from "../interfaces/IStrategyRegistry.sol";
 /// @author @contractlevel
 /// @notice Combination of previous ParentRebalancer and ParentCLF contracts
 /// @notice Rebalances YieldCoin TVL across all protocols
+/// @notice This contract is only deployed on the Parent chain
 contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2Step {
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS
