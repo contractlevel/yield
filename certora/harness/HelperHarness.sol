@@ -68,6 +68,10 @@ contract HelperHarness {
         return uint256(value);
     }
 
+    function bytes32ToUint64(bytes32 value) public pure returns (uint64) {
+        return uint64(uint256(value));
+    }
+
     function bytes32ToAddress(bytes32 value) public pure returns (address) {
         return address(uint160(uint256(value)));
     }
@@ -78,6 +82,10 @@ contract HelperHarness {
 
     function uint8ToBytes32(uint8 value) public pure returns (bytes32) {
         return bytes32(uint256(value));
+    }
+
+    function bytes32ToBool(bytes32 value) public pure returns (bool) {
+        return uint256(value) != 0;
     }
 
     function calculateWithdrawAmount(

@@ -915,3 +915,5 @@ rule setInitialActiveStrategy_updatesStorage() {
     assert currentContract.s_strategy.chainSelector == getThisChainSelector();
     assert currentContract.s_strategy.protocolId == protocolId;
 }
+
+// @review set rebalancer needs to be verified

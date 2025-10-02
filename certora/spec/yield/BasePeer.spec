@@ -28,11 +28,21 @@ methods {
     function bytes32ToUint8(bytes32 value) external returns (uint8) envfree;
     function bytes32ToUint256(bytes32 value) external returns (uint256) envfree;
     function calculateFee(uint256) external returns (uint256) envfree;
+    function bytes32ToUint64(bytes32 value) external returns (uint64) envfree;
+    function bytes32ToBool(bytes32 value) external returns (bool) envfree;
+    function bytes32ToAddress(bytes32 value) external returns (address) envfree;
 }
 
 /*//////////////////////////////////////////////////////////////
                           DEFINITIONS
 //////////////////////////////////////////////////////////////*/
+/// @notice functions that can only be called by the owner
+definition onlyOwner(method f) returns bool = 
+    f.selector == sig:setAllowedChain(uint64,bool).selector ||
+    f.selector == sig:setAllowedPeer(uint64,address).selector ||
+    f.selector == sig:setCCIPGasLimit(uint256).selector ||
+    f.selector == sig:setStrategyRegistry(address).selector;
+
 definition WithdrawInitiatedEvent() returns bytes32 =
 // keccak256(abi.encodePacked("WithdrawInitiated(address,uint256,uint64)"))
     to_bytes32(0x071730c3ee1a890531b67cec0adad1806a898c172618e7da6b2f77205b17ab0f);
@@ -68,6 +78,22 @@ definition FeeTakenEvent() returns bytes32 =
 definition FeesWithdrawnEvent() returns bytes32 =
 // keccak256(abi.encodePacked("FeesWithdrawn(uint256)"))
     to_bytes32(0x9800e6f57aeb4360eaa72295a820a4293e1e66fbfcabcd8874ae141304a76deb);
+
+definition AllowedChainSetEvent() returns bytes32 =
+// keccak256(abi.encodePacked("AllowedChainSet(uint64,bool)"))
+    to_bytes32(0x42495b3125ef4e9597e7a2b5e95801bd4f99bd0303d24b38cbf449046b89281c);
+
+definition AllowedPeerSetEvent() returns bytes32 =
+// keccak256(abi.encodePacked("AllowedPeerSet(uint64,address)"))
+    to_bytes32(0x14e51845b92c487641d948a073f73a08c932e03f3db5f1e1d0b4fd802dbe9d4f);
+
+definition CCIPGasLimitSetEvent() returns bytes32 =
+// keccak256(abi.encodePacked("CCIPGasLimitSet(uint256)"))
+    to_bytes32(0x3b4d93bc2f3cc141ff9b9f3e05fad12abe4166256b2c3ee960e3a5f3f79480e8);
+
+definition StrategyRegistrySetEvent() returns bytes32 =
+// keccak256(abi.encodePacked("StrategyRegistrySet(address)"))
+    to_bytes32(0xc8f6f976c20221cfca1498913573ed2bc921d8f3c6e4b7d1fcf4d228628bbd10);
 
 /*//////////////////////////////////////////////////////////////
                              GHOSTS
@@ -142,6 +168,46 @@ ghost mathint ghost_feesWithdrawn_feesWithdrawn_emitted {
     init_state axiom ghost_feesWithdrawn_feesWithdrawn_emitted == 0;
 }
 
+/// @notice EventCount: track amount of AllowedChainSet event is emitted
+ghost mathint ghost_allowedChainSet_eventCount {
+    init_state axiom ghost_allowedChainSet_eventCount == 0;
+}
+
+/// @notice EmittedValue: track the allowedChain emitted by AllowedChainSet event
+ghost mapping(uint64 => bool) ghost_allowedChainSet_allowedChain_emitted {
+    init_state axiom forall uint64 chainSelector. ghost_allowedChainSet_allowedChain_emitted[chainSelector] == false;
+}
+
+/// @notice EventCount: track amount of AllowedPeerSet event is emitted
+ghost mathint ghost_allowedPeerSet_eventCount {
+    init_state axiom ghost_allowedPeerSet_eventCount == 0;
+}
+
+/// @notice EmittedValue: track the allowedPeer emitted by AllowedPeerSet event
+ghost mapping(uint64 => address) ghost_allowedPeerSet_allowedPeer_emitted {
+    init_state axiom forall uint64 chainSelector. ghost_allowedPeerSet_allowedPeer_emitted[chainSelector] == 0;
+}
+
+/// @notice EventCount: track amount of CCIPGasLimitSet event is emitted
+ghost mathint ghost_ccipGasLimitSet_eventCount {
+    init_state axiom ghost_ccipGasLimitSet_eventCount == 0;
+}
+
+/// @notice EmittedValue: track the ccipGasLimit emitted by CCIPGasLimitSet event
+ghost mathint ghost_ccipGasLimitSet_ccipGasLimit_emitted {
+    init_state axiom ghost_ccipGasLimitSet_ccipGasLimit_emitted == 0;
+}
+
+/// @notice EventCount: track amount of StrategyRegistrySet event is emitted
+ghost mathint ghost_strategyRegistrySet_eventCount {
+    init_state axiom ghost_strategyRegistrySet_eventCount == 0;
+}
+
+/// @notice EmittedValue: track the strategyRegistry emitted by StrategyRegistrySet event
+ghost address ghost_strategyRegistrySet_strategyRegistry_emitted {
+    init_state axiom ghost_strategyRegistrySet_strategyRegistry_emitted == 0;
+}
+
 /*//////////////////////////////////////////////////////////////
                              HOOKS
 //////////////////////////////////////////////////////////////*/
@@ -160,6 +226,14 @@ hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
     if (t0 == SharesBurnedEvent()) ghost_sharesBurned_eventCount = ghost_sharesBurned_eventCount + 1;
     if (t0 == SharesMintedEvent()) ghost_sharesMinted_eventCount = ghost_sharesMinted_eventCount + 1;
     if (t0 == WithdrawCompletedEvent()) ghost_withdrawCompleted_eventCount = ghost_withdrawCompleted_eventCount + 1;
+    if (t0 == AllowedChainSetEvent()) {
+        ghost_allowedChainSet_eventCount = ghost_allowedChainSet_eventCount + 1;
+        ghost_allowedChainSet_allowedChain_emitted[bytes32ToUint64(t1)] = bytes32ToBool(t2);
+    }
+    if (t0 == AllowedPeerSetEvent()) {
+        ghost_allowedPeerSet_eventCount = ghost_allowedPeerSet_eventCount + 1;
+        ghost_allowedPeerSet_allowedPeer_emitted[bytes32ToUint64(t1)] = bytes32ToAddress(t2);
+    }
 }
 
 hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
@@ -174,6 +248,14 @@ hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
     if (t0 == FeesWithdrawnEvent()) {
         ghost_feesWithdrawn_eventCount = ghost_feesWithdrawn_eventCount + 1;
         ghost_feesWithdrawn_feesWithdrawn_emitted = bytes32ToUint256(t1);
+    }
+    if (t0 == CCIPGasLimitSetEvent()) {
+        ghost_ccipGasLimitSet_eventCount = ghost_ccipGasLimitSet_eventCount + 1;
+        ghost_ccipGasLimitSet_ccipGasLimit_emitted = bytes32ToUint256(t1);
+    }
+    if (t0 == StrategyRegistrySetEvent()) {
+        ghost_strategyRegistrySet_eventCount = ghost_strategyRegistrySet_eventCount + 1;
+        ghost_strategyRegistrySet_strategyRegistry_emitted = bytes32ToAddress(t1);
     }
 }
 
@@ -380,4 +462,92 @@ rule deposit_takesFees_when_feeRate_is_set() {
 
     assert usdc.balanceOf(e.msg.sender) == depositorBalanceBefore - amountToDeposit;
     assert usdc.balanceOf(currentContract) == contractBalanceBefore + fee;
+}
+
+// --- onlyOwner setters --- //
+rule onlyOwner_setters_revertWhen_notOwner(method f) 
+    filtered {f -> onlyOwner(f)}  {
+    env e;
+    calldataarg args;
+
+    require e.msg.sender != currentContract._owner;
+
+    f@withrevert(e, args);
+    assert lastReverted;
+}
+
+rule setAllowedChain_success() {
+    env e;
+    uint64 chainSelector;
+    bool isAllowed;
+
+    require ghost_allowedChainSet_eventCount == 0;
+    require ghost_allowedChainSet_allowedChain_emitted[chainSelector] == !isAllowed;
+    require currentContract.s_allowedChains[chainSelector] == !isAllowed;
+
+    setAllowedChain(e, chainSelector, isAllowed);
+
+    assert currentContract.s_allowedChains[chainSelector] == isAllowed;
+    assert ghost_allowedChainSet_eventCount == 1;
+    assert ghost_allowedChainSet_allowedChain_emitted[chainSelector] == isAllowed;
+}
+
+rule setAllowedPeer_revertsWhen_chainNotAllowed() {
+    env e;
+    uint64 chainSelector;
+    address peer;
+
+    require !getAllowedChain(chainSelector);
+    require e.msg.sender == currentContract._owner;
+
+    setAllowedPeer@withrevert(e, chainSelector, peer);
+    assert lastReverted;
+}
+
+rule setAllowedPeer_success() {
+    env e;
+    uint64 chainSelector;
+    address peer;
+
+    require ghost_allowedPeerSet_eventCount == 0;
+    require ghost_allowedPeerSet_allowedPeer_emitted[chainSelector] == 0;
+    require currentContract.s_peers[chainSelector] == 0;
+    require peer != 0;
+
+    setAllowedPeer(e, chainSelector, peer);
+    assert ghost_allowedPeerSet_eventCount == 1;
+    assert ghost_allowedPeerSet_allowedPeer_emitted[chainSelector] == peer;
+    assert currentContract.s_peers[chainSelector] == peer;
+}
+
+rule setCCIPGasLimit_success() {
+    env e;
+    uint256 gasLimit;
+
+    require ghost_ccipGasLimitSet_eventCount == 0;
+    require ghost_ccipGasLimitSet_ccipGasLimit_emitted == 0;
+    require currentContract.s_ccipGasLimit == 0;
+    require gasLimit > 0;
+
+    setCCIPGasLimit(e, gasLimit);
+
+    assert ghost_ccipGasLimitSet_eventCount == 1;
+    assert ghost_ccipGasLimitSet_ccipGasLimit_emitted == gasLimit;
+    assert currentContract.s_ccipGasLimit == gasLimit;
+}
+
+rule setStrategyRegistry_success() {
+    env e;
+    address strategyRegistry;
+
+    require ghost_strategyRegistrySet_eventCount == 0;
+    require ghost_strategyRegistrySet_strategyRegistry_emitted == 0;
+    require currentContract.s_strategyRegistry == 0;
+    require strategyRegistry != 0;
+
+    setStrategyRegistry(e, strategyRegistry);
+
+    assert ghost_strategyRegistrySet_eventCount == 1;
+    assert ghost_strategyRegistrySet_strategyRegistry_emitted == strategyRegistry;
+    assert currentContract.s_strategyRegistry == strategyRegistry;
 }
