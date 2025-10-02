@@ -108,8 +108,8 @@ contract ParentPeer is YieldPeer {
         // 2. This Parent is not the Strategy. Therefore the deposit must be sent to the strategy and get totalValue.
         else {
             DepositData memory depositData = _buildDepositData(amountToDeposit);
-            _ccipSend(strategy.chainSelector, CcipTxType.DepositToStrategy, abi.encode(depositData), amountToDeposit);
             emit DepositForwardedToStrategy(amountToDeposit, strategy.chainSelector);
+            _ccipSend(strategy.chainSelector, CcipTxType.DepositToStrategy, abi.encode(depositData), amountToDeposit);
         }
     }
 
@@ -225,9 +225,11 @@ contract ParentPeer is YieldPeer {
         uint64 sourceChainSelector
     ) internal override {
         if (txType == CcipTxType.DepositToParent) _handleCCIPDepositToParent(tokenAmounts, data);
+        //slither-disable-next-line reentrancy-no-eth
         if (txType == CcipTxType.DepositCallbackParent) _handleCCIPDepositCallbackParent(data);
         if (txType == CcipTxType.WithdrawToParent) _handleCCIPWithdrawToParent(data, sourceChainSelector);
         if (txType == CcipTxType.WithdrawCallback) _handleCCIPWithdrawCallback(tokenAmounts, data);
+        //slither-disable-next-line reentrancy-events
         if (txType == CcipTxType.RebalanceNewStrategy) _handleCCIPRebalanceNewStrategy(tokenAmounts, data);
     }
 
@@ -333,6 +335,7 @@ contract ParentPeer is YieldPeer {
                 emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
                 _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
             } else {
+                // @review emit event here?
                 _ccipSend(
                     withdrawData.chainSelector,
                     CcipTxType.WithdrawCallback,
@@ -343,10 +346,10 @@ contract ParentPeer is YieldPeer {
         }
         // 2. If the parent is not the strategy, we want to forward the withdrawData to the strategy
         else {
+            emit WithdrawForwardedToStrategy(withdrawData.shareBurnAmount, strategy.chainSelector);
             _ccipSend(
                 strategy.chainSelector, CcipTxType.WithdrawToStrategy, abi.encode(withdrawData), ZERO_BRIDGE_AMOUNT
             );
-            emit WithdrawForwardedToStrategy(withdrawData.shareBurnAmount, strategy.chainSelector);
         }
     }
 

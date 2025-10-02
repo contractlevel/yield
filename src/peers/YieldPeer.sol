@@ -239,6 +239,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
             _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
 
         /// @dev compare 0 amounts for the scenario a strategy rebalance occurs when there have been no deposits
+        //slither-disable-next-line uninitialized-local
         uint256 totalValue;
         if (tokenAmounts.length > 0) totalValue = tokenAmounts[0].amount;
 
