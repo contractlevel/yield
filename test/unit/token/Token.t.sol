@@ -26,11 +26,14 @@ contract TokenTest is BaseTest {
         baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
         baseParentPeer.deposit(DEPOSIT_AMOUNT);
 
+        uint256 fee = _getFee(DEPOSIT_AMOUNT);
+        uint256 userPrincipal = DEPOSIT_AMOUNT - fee;
+
         address link = baseParentPeer.getLink();
         address ccipRouter = baseNetworkConfig.ccip.ccipRouter;
 
         /// @dev sanity check
-        uint256 tokenAmount = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
+        uint256 tokenAmount = userPrincipal * INITIAL_SHARE_PRECISION;
         assertEq(baseShare.totalSupply(), tokenAmount);
 
         /// @dev build CCIP message

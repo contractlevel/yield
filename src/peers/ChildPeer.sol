@@ -150,7 +150,6 @@ contract ChildPeer is YieldPeer {
     /// withdraw -> parent -> strategy (HERE) -> callback to withdraw chain
     /// @notice If this strategy chain is the same as the withdraw chain, we transfer the USDC to the withdrawer, concluding the withdrawal process.
     /// @param data The encoded WithdrawData
-    // @review this has similar functionality to ParentPeer::_handleCCIPWithdrawToParent - check for DRY/modular optimizations
     function _handleCCIPWithdrawToStrategy(bytes memory data) internal {
         WithdrawData memory withdrawData = _decodeWithdrawData(data);
         withdrawData.usdcWithdrawAmount = _withdrawFromStrategyAndGetUsdcWithdrawAmount(withdrawData);
@@ -164,7 +163,7 @@ contract ChildPeer is YieldPeer {
             _ccipSend(
                 withdrawData.chainSelector,
                 CcipTxType.WithdrawCallback,
-                abi.encode(withdrawData), // @review solady calldata compression?
+                abi.encode(withdrawData), // @review solady calldata compression for all encoded crosschain data?
                 withdrawData.usdcWithdrawAmount
             );
         }

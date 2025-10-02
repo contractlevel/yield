@@ -8,6 +8,10 @@ import {console2} from "forge-std/Test.sol";
 contract ChildWithdrawTest is BaseTest {
     function setUp() public override {
         super.setUp();
+
+        /// @dev an initial rate is set in the YieldFees constructor, so rather than accounting for fee in these tests, we set the fee rate to 0
+        _setFeeRate(0);
+
         /// @dev optFork is a child chain
         _selectFork(optFork);
         deal(address(optUsdc), withdrawer, DEPOSIT_AMOUNT);

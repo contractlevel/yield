@@ -27,12 +27,11 @@ contract ParentPeer is YieldPeer {
     /// @dev total share tokens (YieldCoin) minted across all chains
     // @invariant s_totalShares == ghost_totalSharesMinted - ghost_totalSharesBurned
     uint256 internal s_totalShares;
-    // @review optimal storage layout of the next 3 variables - s_strategy is subject to change during modular stablecoin task
+    /// @dev The current strategy: chainSelector and protocol
+    Strategy internal s_strategy;
     /// @dev This address handles automated CCIP rebalance calls with Log-trigger Automation, based on Function request callbacks
     /// @notice See ./src/modules/Rebalancer.sol
     address internal s_rebalancer;
-    /// @dev The current strategy: chainSelector and protocol
-    Strategy internal s_strategy;
     /// @dev Whether the initial active strategy adapter has been set
     bool internal s_initialActiveStrategySet;
 
@@ -64,9 +63,7 @@ contract ParentPeer is YieldPeer {
     /// @param share The address of the share token native to this system that is minted in exchange for USDC deposits (YieldCoin)
     constructor(address ccipRouter, address link, uint64 thisChainSelector, address usdc, address share)
         YieldPeer(ccipRouter, link, thisChainSelector, usdc, share)
-    {
-        // @review set initial fee rate?
-    }
+    {}
 
     /*//////////////////////////////////////////////////////////////
                                 EXTERNAL
@@ -408,14 +405,14 @@ contract ParentPeer is YieldPeer {
     }
 
     /// @notice Handles moving strategy to a different chain
-    /// @param oldStrategyPool The address of the old strategy pool // @review this needs to be renamed
+    /// @param oldStrategyAdapter The address of the old strategy adapter
     /// @param totalValue The total value of the system
     /// @param newStrategy The new strategy
-    function _handleStrategyMoveToNewChain(address oldStrategyPool, uint256 totalValue, Strategy memory newStrategy)
+    function _handleStrategyMoveToNewChain(address oldStrategyAdapter, uint256 totalValue, Strategy memory newStrategy)
         internal
     {
         _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
-        if (totalValue != 0) _withdrawFromStrategy(oldStrategyPool, totalValue);
+        if (totalValue != 0) _withdrawFromStrategy(oldStrategyAdapter, totalValue);
         _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, abi.encode(newStrategy), totalValue);
     }
 

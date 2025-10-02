@@ -151,7 +151,8 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
                 IYieldPeer.Strategy({chainSelector: chainSelector, protocolId: protocolId});
             IYieldPeer.CcipTxType txType;
             // @review naming?
-            address oldStrategyAdapter = IYieldPeer(parentPeer).getStrategyAdapter(newStrategy.protocolId);
+            // address oldStrategyAdapter = IYieldPeer(parentPeer).getStrategyAdapter(newStrategy.protocolId);
+            address oldStrategyAdapter = IYieldPeer(parentPeer).getActiveStrategyAdapter();
             // slither-disable-next-line uninitialized-local
             uint256 totalValue;
 
@@ -262,7 +263,6 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     /// @notice Sets the strategy registry
     /// @param strategyRegistry The address of the strategy registry
     /// @dev Revert if the caller is not the owner
-    // @review we set this in every yield peer. so maybe we should read this from the parent and remove strategy registry logic from rebalancer
     // slither-disable-next-line missing-zero-check
     function setStrategyRegistry(address strategyRegistry) external onlyOwner {
         s_strategyRegistry = strategyRegistry;

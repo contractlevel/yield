@@ -56,8 +56,6 @@ contract AaveV3Adapter is StrategyAdapter {
 
         address aavePool = _getAavePool();
         uint256 withdrawnAmount = IPool(aavePool).withdraw(usdc, amount, address(this));
-        // @review this return and unit test
-        // context: this review comment was left because aderyn flagged unused return from pool.withdraw()
         if (withdrawnAmount != amount) revert AaveV3Adapter__IncorrectWithdrawAmount();
         _transferTokenTo(usdc, i_yieldPeer, amount);
     }

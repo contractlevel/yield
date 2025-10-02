@@ -594,6 +594,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @notice Get the strategy adapter for a protocol
     /// @param protocolId The protocol ID to get the strategy adapter for
     /// @return strategyAdapter The strategy adapter address
+    // @review this isnt covered in unit tests
     function getStrategyAdapter(bytes32 protocolId) external view returns (address strategyAdapter) {
         strategyAdapter = _getStrategyAdapterFromProtocol(protocolId);
     }

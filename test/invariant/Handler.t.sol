@@ -184,6 +184,7 @@ contract Handler is Test {
         chainSelectors.add(child2ChainSelector);
 
         /// @dev admin deposits USDC to the system to mitigate share inflation attacks
+        setFeeRate(0);
         _adminDeposit();
 
         uint256 halfMax = type(uint256).max / 2;

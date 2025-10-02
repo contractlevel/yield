@@ -32,6 +32,8 @@ abstract contract YieldFees is Ownable2Step, IYieldFees {
     uint256 internal constant FEE_RATE_DIVISOR = 1_000_000; // 1e6 (same as USDC decimals)
     /// @dev The maximum fee rate: 1% = 10_000 / 1e6
     uint256 internal constant MAX_FEE_RATE = 10_000;
+    /// @dev The initial fee rate
+    uint256 internal constant INITIAL_FEE_RATE = 1_000; // 0.1%
 
     /// @dev The fee rate
     uint256 internal s_feeRate;
@@ -45,6 +47,13 @@ abstract contract YieldFees is Ownable2Step, IYieldFees {
     event FeeTaken(uint256 indexed feeAmountInStablecoin);
     /// @notice Emitted when fees are withdrawn
     event FeesWithdrawn(uint256 indexed feesWithdrawn);
+
+    /*//////////////////////////////////////////////////////////////
+                              CONSTRUCTOR
+    //////////////////////////////////////////////////////////////*/
+    constructor() {
+        s_feeRate = INITIAL_FEE_RATE;
+    }
 
     /*//////////////////////////////////////////////////////////////
                                 WITHDRAW
@@ -70,10 +79,9 @@ abstract contract YieldFees is Ownable2Step, IYieldFees {
     /// @return fee The fee for the deposit
     /// @notice The fee is paid to the YieldCoin infrastructure to cover development and Chainlink costs
     function _calculateFee(uint256 stablecoinDepositAmount) internal view returns (uint256 fee) {
-        // @review how much more optimal in terms of gas would it be to just assign this to fee? readability would decrease
-        uint256 feeRate = s_feeRate;
+        fee = s_feeRate;
         // @review should we be using solady fixedpointmath?
-        if (feeRate != 0) fee = (stablecoinDepositAmount * feeRate) / FEE_RATE_DIVISOR;
+        if (fee != 0) fee = (stablecoinDepositAmount * fee) / FEE_RATE_DIVISOR;
     }
 
     /*//////////////////////////////////////////////////////////////

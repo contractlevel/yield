@@ -43,7 +43,7 @@ contract CheckLogTest is BaseTest {
     function test_yield_rebalancer_checkLog_rebalanceNewStrategy() public view {
         uint64 parentChainSelector = baseParentPeer.getThisChainSelector();
         uint64 newChainSelector = optChainSelector;
-        bytes32 newProtocolId = keccak256(abi.encodePacked("aave-v3"));
+        bytes32 newProtocolId = keccak256(abi.encodePacked("compound-v3"));
 
         Log memory log =
             _createStrategyUpdatedLog(address(baseParentPeer), newChainSelector, newProtocolId, parentChainSelector);
@@ -70,7 +70,7 @@ contract CheckLogTest is BaseTest {
     function test_yield_rebalancer_checkLog_rebalanceOldStrategy() public view {
         uint64 newChainSelector = optChainSelector;
         uint64 oldChainSelector = ethChainSelector;
-        bytes32 newProtocolId = keccak256(abi.encodePacked("aave-v3"));
+        bytes32 newProtocolId = keccak256(abi.encodePacked("compound-v3"));
 
         Log memory log =
             _createStrategyUpdatedLog(address(baseParentPeer), newChainSelector, newProtocolId, oldChainSelector);

@@ -59,4 +59,10 @@ contract ConstructorTest is BaseTest {
         vm.expectRevert(abi.encodeWithSignature("YieldPeer__NotStrategyChain()"));
         ethChildPeer.getTotalValue();
     }
+
+    function test_yield_yieldFees_initialFeeRate() public view {
+        assertEq(baseParentPeer.getFeeRate(), 1e3);
+        assertEq(optChildPeer.getFeeRate(), 1e3);
+        assertEq(ethChildPeer.getFeeRate(), 1e3);
+    }
 }
