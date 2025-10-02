@@ -7,6 +7,7 @@ import {FunctionsRequest} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/l
 import {ILogAutomation, Log} from "@chainlink/contracts/src/v0.8/automation/interfaces/ILogAutomation.sol";
 import {AutomationBase} from "@chainlink/contracts/src/v0.8/automation/AutomationBase.sol";
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {IStrategyRegistry} from "../interfaces/IStrategyRegistry.sol";
 
 /// @title Rebalancer
@@ -113,6 +114,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
         req.initializeRequest(FunctionsRequest.Location.Inline, FunctionsRequest.CodeLanguage.JavaScript, SOURCE);
         req.addSecretsReference(ETH_SEPOLIA_ENCRYPTED_SECRET);
 
+        // @review storing lastRequestId and checking against callback
         _sendRequest(req.encodeCBOR(), i_clfSubId, CLF_GAS_LIMIT, i_donId);
     }
 
@@ -210,7 +212,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
             return;
         }
         (uint256 decodedSelector, bytes32 protocolId) = abi.decode(response, (uint256, bytes32));
-        uint64 chainSelector = uint64(decodedSelector);
+        uint64 chainSelector = SafeCast.toUint64(decodedSelector);
 
         address parentPeer = s_parentPeer;
 

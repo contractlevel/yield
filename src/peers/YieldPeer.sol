@@ -117,6 +117,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @notice Modifier to check if the chain selector and peer are allowed to send CCIP messages
     /// @param chainSelector The chain selector to check
     /// @param peer The peer to check
+    // @review consider moving this inline to function because it is only used once
     modifier onlyAllowed(uint64 chainSelector, address peer) {
         if (!s_allowedChains[chainSelector]) revert YieldPeer__ChainNotAllowed(chainSelector);
         if (peer != s_peers[chainSelector]) revert YieldPeer__PeerNotAllowed(peer);
