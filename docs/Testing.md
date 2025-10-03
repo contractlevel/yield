@@ -236,6 +236,8 @@ https://dacian.me/find-highs-before-external-auditors-using-certora-formal-verif
 
 https://docs.certora.com/en/latest/docs/user-guide/tutorials.html#stanford-defi-security-summit certora stanford defi security
 
+https://docs.certora.com/projects/tutorials/en/latest/ certora tutorials
+
 ## Mutation tests
 
 https://docs.certora.com/en/latest/docs/gambit/mutation-verifier.html
