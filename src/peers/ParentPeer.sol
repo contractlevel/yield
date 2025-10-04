@@ -100,7 +100,6 @@ contract ParentPeer is YieldPeer {
             _depositToStrategy(activeStrategyAdapter, amountToDeposit);
 
             /// @dev mint share tokens (YieldCoin) to msg.sender based on amount deposited and total value of the system
-            // @review deposit complete event?
             _mintShares(msg.sender, shareMintAmount);
         }
         // 2. This Parent is not the Strategy. Therefore the deposit must be sent to the strategy and get totalValue.
@@ -154,7 +153,8 @@ contract ParentPeer is YieldPeer {
             if (usdcWithdrawAmount != 0) _withdrawFromStrategy(activeStrategyAdapter, usdcWithdrawAmount);
 
             if (withdrawChainSelector == i_thisChainSelector) {
-                // @review do we want to emit this event outside of these brackets? need to check if it is also emitted in the ccipSend's receive
+                /// @dev we emit this event when we complete the withdrawal and transfer the stablecoin to the withdrawer
+                /// @dev it gets emitted in the WithdrawCallback too
                 emit WithdrawCompleted(withdrawer, usdcWithdrawAmount);
                 if (usdcWithdrawAmount != 0) _transferUsdcTo(withdrawer, usdcWithdrawAmount);
             } else {
@@ -292,8 +292,10 @@ contract ParentPeer is YieldPeer {
 
         /// @dev handle the case where the deposit was made on this parent chain
         if (depositData.chainSelector == i_thisChainSelector) {
+            // @review deposit complete event? yes we want a deposit complete event here
+            // @review we want to emit a DepositCompleted event every where we mint shares at the end of a deposit
+            // DepositCompleted(depositData.depositor, depositData.shareMintAmount, depositData.amount);
             //slither-disable-next-line reentrancy-events
-            // @review deposit complete event?
             _mintShares(depositData.depositor, depositData.shareMintAmount);
         }
         /// @dev handle the case where the deposit was made on a child chain
@@ -329,12 +331,10 @@ contract ParentPeer is YieldPeer {
             withdrawData.usdcWithdrawAmount = _withdrawFromStrategyAndGetUsdcWithdrawAmount(withdrawData);
 
             if (withdrawData.chainSelector == i_thisChainSelector) {
-                // @review would it be better to emit an event outside of these brackets, for both conditions?
                 //slither-disable-next-line reentrancy-events
                 emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
                 _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
             } else {
-                // @review emit event here?
                 _ccipSend(
                     withdrawData.chainSelector,
                     CcipTxType.WithdrawCallback,

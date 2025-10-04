@@ -1,14 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {BaseTest, Vm, console2, IYieldPeer, Log} from "../../BaseTest.t.sol";
-import {Share} from "../../../src/token/Share.sol";
-import {
-    ERC20,
-    IERC20
-} from "@chainlink/contracts/src/v0.8/vendor/openzeppelin-solidity/v4.8.3/contracts/token/ERC20/ERC20.sol";
+import {BaseTest} from "../../BaseTest.t.sol";
 
-// @review should be in a yieldFees folder, not parentPeer
 contract WithdrawFeesTest is BaseTest {
     function setUp() public override {
         super.setUp();

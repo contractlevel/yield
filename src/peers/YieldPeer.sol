@@ -92,6 +92,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
 
     /// @notice Emitted when a user deposits USDC into the system
     event DepositInitiated(address indexed depositor, uint256 indexed amount, uint64 indexed thisChainSelector);
+    // @review maybe we should replace this event with DepositCompleted when shares are minted to the user
     /// @notice Emitted when a deposit to the strategy is completed
     event DepositToStrategyCompleted(
         address indexed strategyAdapter, uint256 indexed amount, uint256 indexed totalValue
@@ -117,7 +118,6 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @notice Modifier to check if the chain selector and peer are allowed to send CCIP messages
     /// @param chainSelector The chain selector to check
     /// @param peer The peer to check
-    // @review consider moving this inline to function because it is only used once
     modifier onlyAllowed(uint64 chainSelector, address peer) {
         if (!s_allowedChains[chainSelector]) revert YieldPeer__ChainNotAllowed(chainSelector);
         if (peer != s_peers[chainSelector]) revert YieldPeer__PeerNotAllowed(peer);
@@ -240,12 +240,8 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
             _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
 
         /// @dev compare 0 amounts for the scenario a strategy rebalance occurs when there have been no deposits
-        //slither-disable-next-line uninitialized-local
-        uint256 totalValue;
-        if (tokenAmounts.length > 0) totalValue = tokenAmounts[0].amount;
-
         /// @dev deposit to the new strategy
-        if (totalValue != 0) _depositToStrategy(newActiveStrategyAdapter, totalValue);
+        if (tokenAmounts.length > 0) _depositToStrategy(newActiveStrategyAdapter, tokenAmounts[0].amount);
     }
 
     /// @notice Internal helper to handle active strategy adapter updates
@@ -296,6 +292,8 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         returns (uint256 totalValue)
     {
         totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, address(i_usdc));
+        // @review i think we should get rid of this event. we are already emitting an event in _depositToStrategy
+        // so whats the point in this one with totalValue?
         emit DepositToStrategyCompleted(activeStrategyAdapter, amount, totalValue);
         _depositToStrategy(activeStrategyAdapter, amount);
     }

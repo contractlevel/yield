@@ -136,6 +136,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
         address parentPeer = s_parentPeer;
         uint64 thisChainSelector = IParentPeer(parentPeer).getThisChainSelector();
 
+        /// @dev we are only interested in StrategyUpdated events from the ParentPeer
         if (log.source == parentPeer && log.topics[0] == eventSignature) {
             uint64 chainSelector = uint64(uint256(log.topics[1]));
             bytes32 protocolId = log.topics[2];
@@ -150,8 +151,6 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
             IYieldPeer.Strategy memory newStrategy =
                 IYieldPeer.Strategy({chainSelector: chainSelector, protocolId: protocolId});
             IYieldPeer.CcipTxType txType;
-            // @review naming?
-            // address oldStrategyAdapter = IYieldPeer(parentPeer).getStrategyAdapter(newStrategy.protocolId);
             address oldStrategyAdapter = IYieldPeer(parentPeer).getActiveStrategyAdapter();
             // slither-disable-next-line uninitialized-local
             uint256 totalValue;

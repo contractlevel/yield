@@ -15,6 +15,7 @@ contract Handler is Test {
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
+    /// @dev we are making an assumption that no deposit higher than 1m usdc will happen
     uint256 internal constant MAX_DEPOSIT_AMOUNT = 1_000_000_000_000;
     uint256 internal constant MIN_DEPOSIT_AMOUNT = 1_000_000;
     uint256 internal constant INITIAL_DEPOSIT_AMOUNT = 100_000_000;

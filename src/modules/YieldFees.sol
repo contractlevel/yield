@@ -4,6 +4,7 @@ pragma solidity 0.8.26;
 import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {FixedPointMathLib} from "solady/utils/FixedPointMathLib.sol";
 import {IYieldFees} from "../interfaces/IYieldFees.sol";
 
 /// @title YieldFees
@@ -80,8 +81,9 @@ abstract contract YieldFees is Ownable2Step, IYieldFees {
     /// @notice The fee is paid to the YieldCoin infrastructure to cover development and Chainlink costs
     function _calculateFee(uint256 stablecoinDepositAmount) internal view returns (uint256 fee) {
         fee = s_feeRate;
-        // @review should we be using solady fixedpointmath?
+        // @review check if certora timeouts with solady
         if (fee != 0) fee = (stablecoinDepositAmount * fee) / FEE_RATE_DIVISOR;
+        // if (fee != 0) fee = FixedPointMathLib.mulDivUp(stablecoinDepositAmount, fee, FEE_RATE_DIVISOR);
     }
 
     /*//////////////////////////////////////////////////////////////
