@@ -51,8 +51,6 @@ contract Handler is Test {
     /*//////////////////////////////////////////////////////////////
                                  GHOSTS
     //////////////////////////////////////////////////////////////*/
-    // 1 // @review these ghosts - are they needed? - context: every ghost with // 1 comment is indicating it is appearing once, and therefore not used
-    uint256 public ghost_state_totalSharesMinted;
     /// @dev track the total shares burned by incrementing by shareBurnAmount everytime share.transferAndCall is used to withdraw USDC
     uint256 public ghost_state_totalSharesBurned;
 
@@ -63,22 +61,15 @@ contract Handler is Test {
 
     /// @dev track total USDC deposited across the system
     uint256 public ghost_state_totalUsdcDeposited;
-    // 1
-    uint256 public ghost_state_totalUsdcWithdrawn;
 
     /// @dev track the total USDC deposited as user principal (initial deposit amount minus fees)
     uint256 public ghost_state_totalUsdcDeposited_userPrincipal;
 
-    // 1
-    uint256 public ghost_event_totalUsdcDeposited;
     /// @dev track the total USDC withdrawn amount according to WithdrawCompleted events emitted by Peers
     uint256 public ghost_event_totalUsdcWithdrawn;
 
     /// @dev track total USDC deposited per user in user principal (initial deposit amount minus fees)
     mapping(address user => uint256 usdcDepositAmount) public ghost_state_totalUsdcDepositedPerUser_userPrincipal;
-    /// @dev track total USDC withdrawn per user
-    // 1
-    mapping(address user => uint256 usdcWithdrawAmount) public ghost_state_totalUsdcWithdrawnPerUser;
 
     /// @dev tracks the total usdc withdrawn per user emitted by WithdrawCompleted events
     mapping(address user => uint256 usdcWithdrawAmount) public ghost_event_totalUsdcWithdrawnPerUser;
@@ -93,27 +84,18 @@ contract Handler is Test {
     /// @dev incremented by 1 everytime a ShareBurnUpdate event is emitted
     uint256 public ghost_event_shareBurnUpdate_emissions;
 
-    /// @dev tracks the number of deposits per user
-    mapping(address user => uint256 numOfDeposits) public ghost_numOfDepositsPerUser;
-
     /// @dev tracks the total shares minted per user - based on ShareMintUpdate events
     mapping(address user => uint256 totalSharesMinted) public ghost_event_totalSharesMintedPerUser;
     /// @dev track total shares burnt per user - based on value passed to share.transferAndCall
     mapping(address user => uint256 shareBurnAmount) public ghost_state_totalSharesBurnedPerUser;
 
-    // /// @dev tracks the total fees taken, in Yieldcoin token stablecoin
-    // uint256 public ghost_state_totalFeesTaken;
-    /// @dev tracks the total fees withdrawn, in Yieldcoin token stablecoin
+    /// @dev tracks the total fees withdrawn, in stablecoin
     uint256 public ghost_state_totalFeesWithdrawnInStablecoin;
-
-    /// @dev tracks the total fees withdrawn - based on FeesWithdrawn events
-    // 1
-    uint256 public ghost_event_totalFeesWithdrawn;
 
     /// @dev tracks the number of FeeTaken events
     uint256 public ghost_event_feeTaken_emissions;
     /// @dev tracks the number of FeeWithdrawn events
-    uint256 public ghost_event_feeWithdrawn_emissions;
+    uint256 public ghost_event_feeWithdrawn_emissions; // unused
 
     /// @dev tracks the total fees taken in stablecoins per user - based on FeeTaken events
     mapping(address user => uint256 totalFeesTaken) public ghost_event_totalFeesTakenInStablecoinPerUser;
@@ -412,9 +394,8 @@ contract Handler is Test {
     function _updateDepositGhosts(address depositor, uint256 depositAmount) internal {
         uint256 userPrincipal = depositAmount - _calculateFee(depositAmount);
         ghost_state_totalUsdcDeposited_userPrincipal += userPrincipal;
-        // ghost_state_totalUsdcDeposited += depositAmount;
         ghost_state_totalUsdcDepositedPerUser_userPrincipal[depositor] += userPrincipal;
-        console2.log("total deposited:", ghost_state_totalUsdcDeposited);
+        ghost_state_totalUsdcDeposited += depositAmount;
 
         /// @dev record the deposit with current fee rate
         _recordDeposit(depositor, depositAmount);

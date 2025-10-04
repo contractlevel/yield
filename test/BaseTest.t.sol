@@ -660,21 +660,6 @@ contract BaseTest is Test {
         _stopPrank();
     }
 
-    // @review delete
-    /// @notice Helper function to get the fee for a deposit
-    /// @param totalShareMintAmount The amount of shares (yieldcoin tokens) being minted
-    /// @param stablecoinDepositAmount The amount of stablecoin being deposited
-    /// @return feeShareMintAmount The fee for the deposit in shares (yieldcoin tokens)
-    function _getFeeShareMintAmount(uint256 totalShareMintAmount, uint256 stablecoinDepositAmount)
-        internal
-        view
-        returns (uint256 feeShareMintAmount)
-    {
-        uint256 feeAmountInStablecoin =
-            (stablecoinDepositAmount * baseParentPeer.getFeeRate()) / baseParentPeer.getFeeRateDivisor();
-        feeShareMintAmount = (totalShareMintAmount * feeAmountInStablecoin) / stablecoinDepositAmount;
-    }
-
     /// @notice Helper function to get the fee for a deposit
     /// @param stablecoinDepositAmount The amount of stablecoin being deposited
     /// @return fee The fee for the deposit
