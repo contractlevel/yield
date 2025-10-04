@@ -266,7 +266,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @param strategyAdapter The strategy adapter to deposit to
     /// @param amount The amount of USDC to deposit
     /// @dev Emit DepositToStrategy event
-    // @review passing this an address asset param instead of address(i_usdc) - this will be part of the additional stablecoins task
+    // @review:stablecoins passing this an address asset param instead of address(i_usdc) - this will be part of the additional stablecoins task
     function _depositToStrategy(address strategyAdapter, uint256 amount) internal {
         emit DepositToStrategy(strategyAdapter, amount);
         _transferUsdcTo(strategyAdapter, amount);
@@ -331,7 +331,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         emit DepositInitiated(msg.sender, amountToDepositMinusFee, i_thisChainSelector);
     }
 
-    // @review we will update 2 helpers these in the additional/modular stablecoins task
+    // @review:stablecoins we will update 2 helpers these in the additional/modular stablecoins task
     /// @notice Transfer USDC to an address
     /// @param to The address to transfer USDC to
     /// @param amount The amount of USDC to transfer

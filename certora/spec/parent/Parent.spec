@@ -916,4 +916,4 @@ rule setInitialActiveStrategy_updatesStorage() {
     assert currentContract.s_strategy.protocolId == protocolId;
 }
 
-// @review set rebalancer needs to be verified
+// @review:certora set rebalancer needs to be verified

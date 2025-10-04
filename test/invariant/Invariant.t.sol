@@ -421,7 +421,7 @@ contract Invariant is StdInvariant, BaseTest {
     }
 
     /// @notice Strategy Registry: Active protocol must be registered in StrategyRegistry
-    // @review is this verified with certora?
+    // @review:certora is this verified with certora?
     // where should it be verified? BasePeer.spec? Parent.spec because of getStrategy()?
     function invariant_activeProtocol_registered() public view {
         bytes32 protocolId = parent.getStrategy().protocolId;
@@ -430,7 +430,7 @@ contract Invariant is StdInvariant, BaseTest {
     }
 
     /// @notice Strategy Registry: Active adapter must match registered adapter for strategyprotocolId stored in ParentPeer
-    // @review is this verified with certora?
+    // @review:certora is this verified with certora?
     function invariant_adapterMatchesRegistryOnActiveChain() public view {
         bytes32 protocolId = parent.getStrategy().protocolId;
         address activePeer = handler.chainSelectorsToPeers(parent.getStrategy().chainSelector);

@@ -155,7 +155,6 @@ contract ChildPeer is YieldPeer {
         withdrawData.usdcWithdrawAmount = _withdrawFromStrategyAndGetUsdcWithdrawAmount(withdrawData);
 
         if (i_thisChainSelector == withdrawData.chainSelector) {
-            // @review would it be better to emit an event outside of these brackets, for both conditions?
             //slither-disable-next-line reentrancy-events
             emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
             _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);

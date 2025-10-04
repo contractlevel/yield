@@ -99,7 +99,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     /// @notice Called by Chainlink Automation to send a Chainlink Functions request
     /// @notice The nature of the request is to fetch the strategy with the highest yield
     /// @dev Revert if the caller is not the Chainlink Automation upkeep address
-    // @review should be pausable?
+    // @review:pausable should be pausable?
     // a: yes, but we will want to review using time-based automation vs incentivized public keepers
     // @review - pausable and time-based abstraction are 2 different tasks
     // although this may not necessarily need to be pausable because the rebalancer is configurable in parent

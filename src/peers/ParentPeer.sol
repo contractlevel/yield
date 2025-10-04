@@ -176,7 +176,7 @@ contract ParentPeer is YieldPeer {
         }
     }
 
-    // @review these 2 functions can probably combined into a single one and the naming improved
+    // @review:rebalancer these 2 functions can probably combined into a single one and the naming improved
     /// @dev Revert if msg.sender is not the ParentRebalancer
     /// @dev Handle moving strategy from this parent chain to a different chain
     /// @param oldStrategyAdapter The address of the old strategy adapter

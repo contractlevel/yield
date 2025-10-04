@@ -111,7 +111,7 @@ hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
         ghost_activeStrategyAdapterUpdated_eventCount = ghost_activeStrategyAdapterUpdated_eventCount + 1;
 }
 
-// @review commented code? why is this commented and not deleted or uncommented?
+// @review:certora commented code? why is this commented and not deleted or uncommented?
 
 // hook Sstore s_strategyAdapters[KEY IYieldPeer.Protocol protocol] address newValue (address oldValue) {
 //     if (newValue != oldValue) 
