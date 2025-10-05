@@ -140,7 +140,7 @@ contract ChildPeer is YieldPeer {
     /// deposit on this chain -> parent -> strategy -> callback to parent -> callback to child (HERE)
     /// @param data The encoded DepositData
     function _handleCCIPDepositCallbackChild(bytes memory data) internal {
-        // @review maybe we want a deposit complete event here?
+        // @review DepositCompleted event?
         DepositData memory depositData = _decodeDepositData(data);
         _mintShares(depositData.depositor, depositData.shareMintAmount);
     }

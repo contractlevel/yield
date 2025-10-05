@@ -92,11 +92,8 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
 
     /// @notice Emitted when a user deposits USDC into the system
     event DepositInitiated(address indexed depositor, uint256 indexed amount, uint64 indexed thisChainSelector);
-    // @review maybe we should replace this event with DepositCompleted when shares are minted to the user
-    /// @notice Emitted when a deposit to the strategy is completed
-    event DepositToStrategyCompleted(
-        address indexed strategyAdapter, uint256 indexed amount, uint256 indexed totalValue
-    );
+    // @review DepositCompleted event?
+
     /// @notice Emitted when a user initiates a withdrawal of USDC from the system
     event WithdrawInitiated(address indexed withdrawer, uint256 indexed amount, uint64 indexed thisChainSelector);
     /// @notice Emitted when a withdrawal is completed and the USDC is sent to the user
@@ -277,7 +274,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @param strategyAdapter The strategy adapter to withdraw from
     /// @param amount The amount of USDC to withdraw
     /// @dev Emit WithdrawFromStrategy event
-    // @review passing this an address asset param instead of address(i_usdc) - additional/modular stablecoins task
+    // @review:stablecoins passing this an address asset param instead of address(i_usdc) - additional/modular stablecoins task
     function _withdrawFromStrategy(address strategyAdapter, uint256 amount) internal {
         emit WithdrawFromStrategy(strategyAdapter, amount);
         IStrategyAdapter(strategyAdapter).withdraw(address(i_usdc), amount);
@@ -292,9 +289,6 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         returns (uint256 totalValue)
     {
         totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, address(i_usdc));
-        // @review i think we should get rid of this event. we are already emitting an event in _depositToStrategy
-        // so whats the point in this one with totalValue?
-        emit DepositToStrategyCompleted(activeStrategyAdapter, amount, totalValue);
         _depositToStrategy(activeStrategyAdapter, amount);
     }
 

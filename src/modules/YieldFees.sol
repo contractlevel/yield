@@ -81,7 +81,7 @@ abstract contract YieldFees is Ownable2Step, IYieldFees {
     /// @notice The fee is paid to the YieldCoin infrastructure to cover development and Chainlink costs
     function _calculateFee(uint256 stablecoinDepositAmount) internal view returns (uint256 fee) {
         fee = s_feeRate;
-        // @review check if certora timeouts with solady
+        // @review:certora check if certora timeouts with solady
         if (fee != 0) fee = (stablecoinDepositAmount * fee) / FEE_RATE_DIVISOR;
         // if (fee != 0) fee = FixedPointMathLib.mulDivUp(stablecoinDepositAmount, fee, FEE_RATE_DIVISOR);
     }

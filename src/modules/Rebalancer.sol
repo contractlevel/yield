@@ -112,7 +112,6 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
         req.initializeRequest(FunctionsRequest.Location.Inline, FunctionsRequest.CodeLanguage.JavaScript, SOURCE);
         req.addSecretsReference(ETH_SEPOLIA_ENCRYPTED_SECRET);
 
-        // @review storing lastRequestId and checking against callback
         _sendRequest(req.encodeCBOR(), i_clfSubId, CLF_GAS_LIMIT, i_donId);
     }
 

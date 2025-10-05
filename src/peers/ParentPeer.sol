@@ -292,8 +292,7 @@ contract ParentPeer is YieldPeer {
 
         /// @dev handle the case where the deposit was made on this parent chain
         if (depositData.chainSelector == i_thisChainSelector) {
-            // @review deposit complete event? yes we want a deposit complete event here
-            // @review we want to emit a DepositCompleted event every where we mint shares at the end of a deposit
+            // @review DepositCompleted event? we want to emit a DepositCompleted event every where we mint shares at the end of a deposit
             // DepositCompleted(depositData.depositor, depositData.shareMintAmount, depositData.amount);
             //slither-disable-next-line reentrancy-events
             _mintShares(depositData.depositor, depositData.shareMintAmount);
@@ -314,7 +313,6 @@ contract ParentPeer is YieldPeer {
     /// @dev Updates s_totalShares and emits ShareBurnUpdate
     /// @param data The encoded WithdrawData
     /// @param sourceChainSelector The chain selector of the chain where the withdraw originated from and shares were burned
-    // @review this has similar functionality to ChildPeer::_handleCCIPWithdrawToStrategy - check for DRY/modular optimizations
     function _handleCCIPWithdrawToParent(bytes memory data, uint64 sourceChainSelector) internal {
         WithdrawData memory withdrawData = _decodeWithdrawData(data);
         withdrawData.totalShares = s_totalShares;
