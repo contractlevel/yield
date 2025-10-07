@@ -183,11 +183,22 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
         ) = abi.decode(performData, (address, IYieldPeer.Strategy, IYieldPeer.CcipTxType, uint64, address, uint256));
 
         /// @dev We don't facilitate parent -> parent here because it would have already been handled by the CLF callback.
+        // if (txType == IYieldPeer.CcipTxType.RebalanceNewStrategy) {
+        //     IParentPeer(parentPeer).rebalanceNewStrategy(oldStrategyAdapter, totalValue, strategy);
+        // } else {
+        //     IParentPeer(parentPeer).rebalanceOldStrategy(oldChainSelector, strategy);
+        // }
+
+        // @review George - This might be the better more clear option
+        // Option 1 - 2 calls, clearer readability
         if (txType == IYieldPeer.CcipTxType.RebalanceNewStrategy) {
-            IParentPeer(parentPeer).rebalanceNewStrategy(oldStrategyAdapter, totalValue, strategy);
+            IParentPeer(parentPeer).rebalanceParentToChildStrategy(oldStrategyAdapter, totalValue, strategy);
         } else {
-            IParentPeer(parentPeer).rebalanceOldStrategy(oldChainSelector, strategy);
+            IParentPeer(parentPeer).rebalanceChildToOtherStrategy(oldChainSelector, strategy);
         }
+
+        /// @reviewGeorge - Do I need this?
+        // Option 2 - 1 call
     }
 
     /*//////////////////////////////////////////////////////////////

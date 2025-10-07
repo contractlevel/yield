@@ -184,11 +184,19 @@ contract ParentPeer is YieldPeer {
     /// @param newStrategy The new strategy
     /// @notice This function is called by the ParentRebalancer's Log-trigger Automation performUpkeep
     /// @notice This is called when the strategy is on this chain and is being moved to a different chain
-    function rebalanceNewStrategy(address oldStrategyAdapter, uint256 totalValue, Strategy memory newStrategy)
+    // function rebalanceNewStrategy(address oldStrategyAdapter, uint256 totalValue, Strategy memory newStrategy)
+    //     external
+    // {
+    //     _revertIfMsgSenderIsNotRebalancer();
+    //     _handleStrategyMoveToNewChain(oldStrategyAdapter, totalValue, newStrategy);
+    // }
+
+    // @reviewGeorge - Updated name from "rebalanceNewStrategy" to be more clear
+    function rebalanceParentToChildStrategy(address oldStrategyAdapter, uint256 totalValue, Strategy memory newStrategy)
         external
     {
         _revertIfMsgSenderIsNotRebalancer();
-        _handleStrategyMoveToNewChain(oldStrategyAdapter, totalValue, newStrategy);
+        _moveFundsFromParentToChildStrategy(oldStrategyAdapter, totalValue, newStrategy);
     }
 
     /// @dev Revert if msg.sender is not the ParentRebalancer
@@ -197,9 +205,15 @@ contract ParentPeer is YieldPeer {
     /// @param newStrategy The new strategy
     /// @notice This function is called by the ParentRebalancer's Log-trigger Automation performUpkeep
     /// @notice This is called when the old strategy is on a different chain to this chain, a remote child
-    function rebalanceOldStrategy(uint64 oldChainSelector, Strategy memory newStrategy) external {
+    // function rebalanceOldStrategy(uint64 oldChainSelector, Strategy memory newStrategy) external {
+    //     _revertIfMsgSenderIsNotRebalancer();
+    //     _handleRebalanceFromDifferentChain(oldChainSelector, newStrategy);
+    // }
+
+    // @reviewGeorge - Updated name from "rebalanceOldStrategy" to be more clear
+    function rebalanceChildToOtherStrategy(uint64 oldChainSelector, Strategy memory newStrategy) external {
         _revertIfMsgSenderIsNotRebalancer();
-        _handleRebalanceFromDifferentChain(oldChainSelector, newStrategy);
+        _moveFundsFromChildToOtherStrategy(oldChainSelector, newStrategy);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -406,9 +420,20 @@ contract ParentPeer is YieldPeer {
     /// @param oldStrategyAdapter The address of the old strategy adapter
     /// @param totalValue The total value of the system
     /// @param newStrategy The new strategy
-    function _handleStrategyMoveToNewChain(address oldStrategyAdapter, uint256 totalValue, Strategy memory newStrategy)
-        internal
-    {
+    // function _handleStrategyMoveToNewChain(address oldStrategyAdapter, uint256 totalValue, Strategy memory newStrategy)
+    //     internal
+    // {
+    //     _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
+    //     if (totalValue != 0) _withdrawFromStrategy(oldStrategyAdapter, totalValue);
+    //     _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, abi.encode(newStrategy), totalValue);
+    // }
+
+    // @reviewGeorge - Renamed from "_handleStrategyMoveToNewChain"
+    function _moveFundsFromParentToChildStrategy(
+        address oldStrategyAdapter,
+        uint256 totalValue,
+        Strategy memory newStrategy
+    ) internal {
         _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
         if (totalValue != 0) _withdrawFromStrategy(oldStrategyAdapter, totalValue);
         _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, abi.encode(newStrategy), totalValue);
@@ -418,7 +443,12 @@ contract ParentPeer is YieldPeer {
     /// @param oldChainSelector The chain selector of the old strategy
     /// @param newStrategy The new strategy
     /// @notice This function is sending a crosschain message to the old strategy to rebalance funds to the new strategy
-    function _handleRebalanceFromDifferentChain(uint64 oldChainSelector, Strategy memory newStrategy) internal {
+    // function _handleRebalanceFromDifferentChain(uint64 oldChainSelector, Strategy memory newStrategy) internal {
+    //     _ccipSend(oldChainSelector, CcipTxType.RebalanceOldStrategy, abi.encode(newStrategy), ZERO_BRIDGE_AMOUNT);
+    // }
+
+    // @reviewGeorge - Renamed from "_handleRebalanceFromDifferentChain"
+    function _moveFundsFromChildToOtherStrategy(uint64 oldChainSelector, Strategy memory newStrategy) internal {
         _ccipSend(oldChainSelector, CcipTxType.RebalanceOldStrategy, abi.encode(newStrategy), ZERO_BRIDGE_AMOUNT);
     }
 
