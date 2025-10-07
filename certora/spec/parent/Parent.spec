@@ -796,6 +796,7 @@ rule rebalanceNewStrategy_revertsWhen_notParentRebalancer() {
     assert lastReverted;
 }
 
+// @review:certora vacuous rule
 rule rebalanceNewStrategy_movesStrategyToNewChain() {
     env e;
     uint64 chainSelector;
