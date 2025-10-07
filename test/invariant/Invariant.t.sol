@@ -12,6 +12,7 @@ import {MockCCIPRouter} from "@chainlink-local/test/mocks/MockRouter.sol";
 import {AaveV3Adapter} from "../../src/adapters/AaveV3Adapter.sol";
 import {CompoundV3Adapter} from "../../src/adapters/CompoundV3Adapter.sol";
 import {StrategyRegistry} from "../../src/modules/StrategyRegistry.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @notice We are making the assumption that the gasLimit set for CCIP works correctly
 contract Invariant is StdInvariant, BaseTest {
@@ -38,6 +39,8 @@ contract Invariant is StdInvariant, BaseTest {
     ChildPeer internal child1;
     /// @dev Child Peer contract
     ChildPeer internal child2;
+    /// @dev USDC contract
+    IERC20 internal usdc;
     /// @dev Share contract
     Share internal share;
     /// @dev Chainlink Automation Time-based Upkeep Address
@@ -81,7 +84,7 @@ contract Invariant is StdInvariant, BaseTest {
             child2,
             share,
             networkConfig.ccip.ccipRouter,
-            networkConfig.tokens.usdc,
+            address(usdc),
             upkeep,
             networkConfig.clf.functionsRouter,
             aavePool,
@@ -90,10 +93,12 @@ contract Invariant is StdInvariant, BaseTest {
         );
 
         /// @dev define appropriate function selectors
-        bytes4[] memory selectors = new bytes4[](3);
+        bytes4[] memory selectors = new bytes4[](5);
         selectors[0] = Handler.deposit.selector;
         selectors[1] = Handler.withdraw.selector;
         selectors[2] = Handler.fulfillRequest.selector;
+        selectors[3] = Handler.withdrawFees.selector;
+        selectors[4] = Handler.setFeeRate.selector;
 
         /// @dev target handler and appropriate function selectors
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
@@ -104,6 +109,7 @@ contract Invariant is StdInvariant, BaseTest {
     function _deployInfra() internal override {
         helperConfig = new HelperConfig();
         networkConfig = helperConfig.getOrCreateAnvilEthConfig();
+        usdc = IERC20(networkConfig.tokens.usdc);
         share = Share(networkConfig.tokens.share);
         aavePool = IPoolAddressesProvider(networkConfig.protocols.aavePoolAddressesProvider).getPool();
         rebalancer =
@@ -274,7 +280,7 @@ contract Invariant is StdInvariant, BaseTest {
     }
 
     function checkTotalDepositsAgainstTotalValuePerChainSelector(uint64 chainSelector) external view {
-        uint256 totalDeposited = handler.ghost_state_totalUsdcDeposited();
+        uint256 totalDeposited = handler.ghost_state_totalUsdcDeposited_userPrincipal();
         uint256 totalWithdrawn = handler.ghost_event_totalUsdcWithdrawn();
         uint256 netDeposits = totalDeposited > totalWithdrawn ? totalDeposited - totalWithdrawn : 0;
         if (chainSelector == parent.getStrategy().chainSelector) {
@@ -294,6 +300,8 @@ contract Invariant is StdInvariant, BaseTest {
             address user = handler.getUserAt(i);
             sumOfBalances += share.balanceOf(user);
         }
+        sumOfBalances += share.balanceOf(address(parent));
+        sumOfBalances += share.balanceOf(parent.owner());
 
         assertEq(
             parent.getTotalShares(),
@@ -320,14 +328,14 @@ contract Invariant is StdInvariant, BaseTest {
         );
     }
 
-    /// @notice Users should always be able to withdraw what they deposited (minus fees, but those arent implemented yet)
+    /// @notice Users should always be able to withdraw what they deposited
     /// @dev this is a critical invariant that ensures the integrity of user deposit redemption
     function invariant_stablecoinRedemptionIntegrity() public {
         handler.forEachUser(this.checkRedemptionIntegrityPerUser);
     }
 
     function checkRedemptionIntegrityPerUser(address user) external view {
-        uint256 deposited = handler.ghost_state_totalUsdcDepositedPerUser(user);
+        uint256 deposited = handler.ghost_state_totalUsdcDepositedPerUser_userPrincipal(user);
         uint256 withdrawn = handler.ghost_event_totalUsdcWithdrawnPerUser(user);
         uint256 netDeposits = deposited > withdrawn ? deposited - withdrawn : 0;
         uint256 userShares = share.balanceOf(user);
@@ -339,7 +347,7 @@ contract Invariant is StdInvariant, BaseTest {
         uint256 totalShares = parent.getTotalShares();
 
         if (totalShares > 0) {
-            uint256 withdrawable = (userShares * totalValueConverted) / totalShares;
+            uint256 withdrawable = totalShares > 0 ? (userShares * totalValueConverted) / totalShares : 0;
             uint256 withdrawableConverted = _convertShareToUsdc(withdrawable);
             uint256 minWithdrawable = netDeposits * 990 / 1000; // Allow 1% slippage
             assertTrue(
@@ -349,5 +357,97 @@ contract Invariant is StdInvariant, BaseTest {
         } else {
             assertTrue(netDeposits == 0, "Invariant violated: User should be able to withdraw what they deposited");
         }
+    }
+
+    /// @notice Fees Consistency: The total withdrawable fees taken should be equal to the total fees taken minus total fees withdrawn
+    function invariant_fees_consistency() public view {
+        uint256 parentFees = usdc.balanceOf(address(parent));
+        uint256 child1Fees = usdc.balanceOf(address(child1));
+        uint256 child2Fees = usdc.balanceOf(address(child2));
+        uint256 availableFees = parentFees + child1Fees + child2Fees;
+        assertEq(
+            handler.ghost_event_totalFeesTakenInStablecoin() - handler.ghost_state_totalFeesWithdrawnInStablecoin(),
+            availableFees,
+            "Invariant violated: The total withdrawable fees taken should be equal to the total fees taken minus total fees withdrawn"
+        );
+    }
+
+    /// @notice Fee rate should always be within valid bounds
+    function invariant_feeRate_bounds() public {
+        handler.forEachChainSelector(this.checkFeeRateBoundsPerChainSelector);
+    }
+
+    function checkFeeRateBoundsPerChainSelector(uint64 chainSelector) external view {
+        IYieldPeer peer = IYieldPeer(handler.chainSelectorsToPeers(chainSelector));
+        assertTrue(
+            peer.getFeeRate() <= peer.getMaxFeeRate(),
+            "Invariant violated: Fee rate should not exceed maximum allowed fee rate"
+        );
+    }
+
+    /// @notice Fee amount integrity: Total fees per user should equal sum of individual deposit fees
+    function invariant_fee_integrity_perUser() public {
+        handler.forEachUser(this.checkFeeIntegrityPerUser);
+    }
+
+    function checkFeeIntegrityPerUser(address user) external view {
+        if (handler.ghost_state_totalUsdcDepositedPerUser_userPrincipal(user) > 0) {
+            assertTrue(
+                handler.ghost_event_totalFeesTakenInStablecoinPerUser(user)
+                    == handler.calculateExpectedFeesFromDepositRecords(user),
+                "Invariant violated: Total fees per user should equal sum of individual deposit fees"
+            );
+        }
+    }
+
+    /// @notice Total fees taken should equal sum of all individual deposit fees
+    function invariant_totalFees_equals_sumOfDepositFees() public view {
+        uint256 totalFeesFromEvents = handler.ghost_event_totalFeesTakenInStablecoin();
+        // @review would it be cleaner to do these calculations in invariant or handler?
+        uint256 totalFeesFromDepositRecords = handler.calculateTotalExpectedFeesFromDepositRecords();
+
+        assertEq(
+            totalFeesFromEvents,
+            totalFeesFromDepositRecords,
+            "Invariant violated: Total fees taken should equal sum of all individual deposit fees"
+        );
+    }
+
+    /// @notice Fee withdrawal integrity: Non-owner should not be able to withdraw fees
+    function invariant_feeWithdrawal_onlyOwner() public view {
+        assertFalse(
+            handler.ghost_nonOwner_withdrewFees(), "Invariant violated: Fees should only be withdrawable by owner"
+        );
+    }
+
+    /// @notice Strategy Registry: Active protocol must be registered in StrategyRegistry
+    // @review:certora is this verified with certora?
+    // where should it be verified? BasePeer.spec? Parent.spec because of getStrategy()?
+    function invariant_activeProtocol_registered() public view {
+        bytes32 protocolId = parent.getStrategy().protocolId;
+        address adapter = strategyRegistryParent.getStrategyAdapter(protocolId);
+        assertTrue(adapter != address(0), "Invariant violated: Active protocol must be registered in StrategyRegistry");
+    }
+
+    /// @notice Strategy Registry: Active adapter must match registered adapter for strategyprotocolId stored in ParentPeer
+    // @review:certora is this verified with certora?
+    function invariant_adapterMatchesRegistryOnActiveChain() public view {
+        bytes32 protocolId = parent.getStrategy().protocolId;
+        address activePeer = handler.chainSelectorsToPeers(parent.getStrategy().chainSelector);
+        assertEq(
+            IYieldPeer(activePeer).getActiveStrategyAdapter(),
+            StrategyRegistry(IYieldPeer(activePeer).getStrategyRegistry()).getStrategyAdapter(protocolId),
+            "Invariant violated: Active adapter must match registered adapter for protocolId stored in ParentPeer"
+        );
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                UTILITY
+    //////////////////////////////////////////////////////////////*/
+    /// @notice Helper function to calculate the fee for a deposit
+    /// @param stablecoinDepositAmount The amount of stablecoin being deposited
+    /// @return fee The fee for the deposit in stablecoin amount
+    function _calculateFee(uint256 stablecoinDepositAmount) internal view returns (uint256 fee) {
+        fee = (stablecoinDepositAmount * parent.getFeeRate()) / parent.getFeeRateDivisor();
     }
 }

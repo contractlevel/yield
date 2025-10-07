@@ -36,6 +36,7 @@ methods {
     function buildEncodedDepositData(address,uint256,uint256,uint256,uint64) external returns (bytes memory) envfree;
     function buildEncodedWithdrawData(address,uint256,uint256,uint256,uint64) external returns (bytes memory) envfree;
     function calculateWithdrawAmount(uint256,uint256,uint256) external returns (uint256) envfree;
+    function calculateFee(uint256) external returns (uint256) envfree;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -64,10 +65,6 @@ definition SharesMintedEvent() returns bytes32 =
 definition WithdrawCompletedEvent() returns bytes32 =
 // keccak256(abi.encodePacked("WithdrawCompleted(address,uint256)"))
     to_bytes32(0x60188009b974c2fa66ee3b916d93f64d6534ea2204e0c466f9784ace689e8e49);
-
-definition DepositToStrategyCompletedEvent() returns bytes32 =
-// keccak256(abi.encodePacked("DepositToStrategyCompleted(address,uint256,uint256)"))
-    to_bytes32(0x5dc1c8c6eb36d9a773352a8cb5652038317adcbcdfa4571eef012c5d74070814);
 
 definition WithdrawFromStrategyEvent() returns bytes32 =
 // keccak256(abi.encodePacked("WithdrawFromStrategy(address,uint256)"))
@@ -124,11 +121,6 @@ ghost mathint ghost_ccipMessageSent_bridgeAmount_emitted {
     init_state axiom ghost_ccipMessageSent_bridgeAmount_emitted == 0;
 }
 
-/// @notice EventCount: track amount of DepositToStrategyCompleted event is emitted
-ghost mathint ghost_depositToStrategyCompleted_eventCount {
-    init_state axiom ghost_depositToStrategyCompleted_eventCount == 0;
-}
-
 /// @notice EventCount: track amount of WithdrawFromStrategy event is emitted
 ghost mathint ghost_withdrawFromStrategy_eventCount {
     init_state axiom ghost_withdrawFromStrategy_eventCount == 0;
@@ -156,7 +148,6 @@ hook LOG4(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2, bytes32 
         ghost_ccipMessageSent_txType_emitted = bytes32ToUint8(t2);
         ghost_ccipMessageSent_bridgeAmount_emitted = bytes32ToUint256(t3);
     }
-    if (t0 == DepositToStrategyCompletedEvent()) ghost_depositToStrategyCompleted_eventCount = ghost_depositToStrategyCompleted_eventCount + 1;
 }
 
 hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
@@ -190,6 +181,7 @@ rule child_onTokenTransfer_emits_CCIPMessageSent() {
 rule child_deposit_emits_CCIPMessageSent() {
     env e;
     uint256 amountToDeposit;
+    uint256 fee = calculateFee(amountToDeposit);
     require ghost_ccipMessageSent_eventCount == 0;
     deposit(e, amountToDeposit);
     assert ghost_ccipMessageSent_eventCount == 1;
@@ -199,7 +191,7 @@ rule child_deposit_emits_CCIPMessageSent() {
         ghost_ccipMessageSent_bridgeAmount_emitted == 0;
     assert getActiveStrategyAdapter() == 0 => 
         ghost_ccipMessageSent_txType_emitted == 0 && // CcipTxType.DepositToParent
-        ghost_ccipMessageSent_bridgeAmount_emitted == amountToDeposit;
+        ghost_ccipMessageSent_bridgeAmount_emitted == amountToDeposit - fee;
 }
 
 rule child_deposit_isStrategy_emits_correct_params() {
@@ -209,10 +201,8 @@ rule child_deposit_isStrategy_emits_correct_params() {
     require getActiveStrategyAdapter() != 0;
 
     require ghost_ccipMessageSent_bridgeAmount_emitted == 0;
-    require ghost_depositToStrategyCompleted_eventCount == 0;
     require ghost_ccipMessageSent_txType_emitted == 0;
     deposit(e, amountToDeposit);
-    assert ghost_depositToStrategyCompleted_eventCount == 1;
     assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;
     assert ghost_ccipMessageSent_txType_emitted == 2; // CcipTxType.DepositCallbackParent
 }
@@ -220,15 +210,14 @@ rule child_deposit_isStrategy_emits_correct_params() {
 rule child_deposit_notStrategy_emits_correct_params() {
     env e;
     uint256 amountToDeposit;
+    uint256 fee = calculateFee(amountToDeposit);
 
     require getActiveStrategyAdapter() == 0;
 
     require ghost_ccipMessageSent_bridgeAmount_emitted == 0;
-    require ghost_depositToStrategyCompleted_eventCount == 0;
     require ghost_ccipMessageSent_txType_emitted == 0;
     deposit(e, amountToDeposit);
-    assert ghost_depositToStrategyCompleted_eventCount == 0;
-    assert ghost_ccipMessageSent_bridgeAmount_emitted == amountToDeposit;
+    assert ghost_ccipMessageSent_bridgeAmount_emitted == amountToDeposit - fee;
     assert ghost_ccipMessageSent_txType_emitted == 0; // CcipTxType.DepositToParent
 }
 
@@ -486,9 +475,7 @@ rule handleCCIPMessage_DepositToStrategy() {
     uint64 sourceChainSelector;
 
     require ghost_ccipMessageSent_eventCount == 0;
-    require ghost_depositToStrategyCompleted_eventCount == 0;
     handleCCIPMessage(e, txType, tokenAmounts, data, sourceChainSelector);
-    assert ghost_depositToStrategyCompleted_eventCount == 1;
     assert ghost_ccipMessageSent_eventCount == 1;
     assert ghost_ccipMessageSent_txType_emitted == 2; // CcipTxType.DepositCallbackParent
     assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;
@@ -562,7 +549,7 @@ rule handleCCIPMessage_RebalanceNewStrategy() {
     bytes data;
     uint64 sourceChainSelector;
 
-    require usdc.balanceOf(currentContract) > 0;
+    require tokenAmounts.length > 0 && tokenAmounts[0].token == usdc && tokenAmounts[0].amount > 0;
 
     require ghost_depositToStrategy_eventCount == 0;
     require ghost_activeStrategyAdapterUpdated_eventCount == 0;

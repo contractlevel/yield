@@ -111,6 +111,8 @@ hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
         ghost_activeStrategyAdapterUpdated_eventCount = ghost_activeStrategyAdapterUpdated_eventCount + 1;
 }
 
+// @review:certora commented code? why is this commented and not deleted or uncommented?
+
 // hook Sstore s_strategyAdapters[KEY IYieldPeer.Protocol protocol] address newValue (address oldValue) {
 //     if (newValue != oldValue) 
 //         ghost_storage_strategyAdapters[protocol] = newValue;
@@ -257,28 +259,36 @@ rule handleCCIPRebalanceNewStrategy_emits_ActiveStrategyAdapterUpdated() {
     assert ghost_activeStrategyAdapterUpdated_eventCount == 1;
 }
 
-rule handleCCIPRebalanceNewStrategy_depositsToNewStrategy() {
+rule handleCCIPRebalanceNewStrategy_depositsToNewStrategy_and_updatesActiveStrategyAdapter() {
     env e;
+    Client.EVMTokenAmount[] tokenAmounts;
     bytes32 protocolId;
     bytes32 aaveV3ProtocolId;
     bytes32 compoundV3ProtocolId;
     bytes strategyData = encodeStrategy(getThisChainSelector(), protocolId);
 
+    /// @dev _handleCCIPRebalanceNewStrategy handles cases where TVL is 0, but an optimal strategy change occurs
+    require tokenAmounts[0].token == usdc;
+    uint256 tokenAmountsValueBefore = tokenAmounts[0].amount;
+
     /// @dev require the storage mappings for active strategy adapters to be the correct contracts
     require strategyRegistry.getStrategyAdapter(aaveV3ProtocolId)     == aaveV3Adapter;
     require strategyRegistry.getStrategyAdapter(compoundV3ProtocolId) == compoundV3Adapter;
 
-    uint256 usdcBalanceBefore = usdc.balanceOf(currentContract);
+    uint256 totalValueBefore = tokenAmounts[0].amount;
     mathint depositToStrategy_eventCountBefore = ghost_depositToStrategy_eventCount;
 
-    handleCCIPRebalanceNewStrategy(e, strategyData);
+    handleCCIPRebalanceNewStrategy(e, tokenAmounts, strategyData);
 
     assert protocolId == aaveV3ProtocolId => getActiveStrategyAdapter() == aaveV3Adapter;
     assert protocolId == compoundV3ProtocolId => getActiveStrategyAdapter() == compoundV3Adapter;
 
-    assert usdcBalanceBefore > 0 && protocolId == aaveV3ProtocolId => aUsdc.balanceOf(e, getActiveStrategyAdapter()) >= usdcBalanceBefore;
-    assert usdcBalanceBefore > 0 && protocolId == compoundV3ProtocolId => compound.balanceOf(e, getActiveStrategyAdapter()) >= usdcBalanceBefore;
-    assert usdcBalanceBefore > 0 => ghost_depositToStrategy_eventCount == depositToStrategy_eventCountBefore + 1;
+    assert tokenAmounts.length > 0 && tokenAmountsValueBefore > 0 && protocolId == aaveV3ProtocolId 
+        => aUsdc.balanceOf(e, getActiveStrategyAdapter()) >= tokenAmountsValueBefore;
+    assert tokenAmounts.length > 0 && tokenAmountsValueBefore > 0 && protocolId == compoundV3ProtocolId 
+        => compound.balanceOf(e, getActiveStrategyAdapter()) >= tokenAmountsValueBefore;
+    assert tokenAmounts.length > 0 && tokenAmountsValueBefore > 0 
+        => ghost_depositToStrategy_eventCount == depositToStrategy_eventCountBefore + 1;
 }
 
 // --- depositToStrategy --- //

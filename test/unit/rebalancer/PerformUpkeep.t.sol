@@ -5,10 +5,8 @@ import {BaseTest, Vm, console2, IYieldPeer, Log, IPoolAddressesProvider} from ".
 
 contract PerformUpkeepTest is BaseTest {
     function test_yield_rebalancer_performUpkeep_revertsWhen_notForwarder() public {
-        bytes memory performData =
-            _createPerformData(0, 0, IYieldPeer.CcipTxType.RebalanceNewStrategy, 0, address(0), 0);
         vm.expectRevert(abi.encodeWithSignature("Rebalancer__OnlyForwarder()"));
-        baseRebalancer.performUpkeep(performData);
+        baseRebalancer.performUpkeep("");
     }
 
     function test_yield_rebalancer_performUpkeep_rebalanceNewStrategy() public {

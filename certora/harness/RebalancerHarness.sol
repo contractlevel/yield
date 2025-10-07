@@ -36,18 +36,16 @@ contract RebalancerHarness is Rebalancer, HelperHarness {
 
     function decodePerformData(bytes memory performData) public pure returns (
         address,
-        address,
         IYieldPeer.Strategy memory,
         IYieldPeer.CcipTxType,
         uint64,
         address,
         uint256
     ) {
-        return abi.decode(performData, (address, address, IYieldPeer.Strategy, IYieldPeer.CcipTxType, uint64, address, uint256));
+        return abi.decode(performData, (address, IYieldPeer.Strategy, IYieldPeer.CcipTxType, uint64, address, uint256));
     }
 
     function createPerformData(
-        address forwarder,
         address parentPeer,
         IYieldPeer.Strategy memory strategy,
         IYieldPeer.CcipTxType txType,
@@ -55,7 +53,7 @@ contract RebalancerHarness is Rebalancer, HelperHarness {
         address oldStrategyPool,
         uint256 totalValue
     ) public pure returns (bytes memory) {
-        return abi.encode(forwarder, parentPeer, strategy, txType, oldChainSelector, oldStrategyPool, totalValue);
+        return abi.encode(parentPeer, strategy, txType, oldChainSelector, oldStrategyPool, totalValue);
     }
 
     function getTotalValueFromParentPeer() public view returns (uint256) {

@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-interface IYieldPeer {
+import {IYieldFees} from "./IYieldFees.sol";
+
+interface IYieldPeer is IYieldFees {
     struct Strategy {
-        bytes32 protocolId;
+        bytes32 protocolId; // ie keccak256("aave-v3") or keccak256("compound-v3")
         uint64 chainSelector;
     }
 
@@ -33,7 +35,7 @@ interface IYieldPeer {
         uint256 shareBurnAmount; // amount of shares burned
         uint256 totalShares; // total shares in the system (updated on the parent chain)
         uint256 usdcWithdrawAmount; // amount of USDC to withdraw
-        uint64 chainSelector; // chain selector of the chain the withdrawal originated from
+        uint64 chainSelector; // chain selector of the chain the withdrawn stablecoins are sent to
     }
 
     function deposit(uint256 amountToDeposit) external;
@@ -45,4 +47,5 @@ interface IYieldPeer {
     function getAllowedChain(uint64 chainSelector) external view returns (bool);
     function getAllowedPeer(uint64 chainSelector) external view returns (address);
     function getActiveStrategyAdapter() external view returns (address);
+    function getStrategyRegistry() external view returns (address);
 }

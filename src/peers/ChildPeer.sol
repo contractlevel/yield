@@ -43,8 +43,10 @@ contract ChildPeer is YieldPeer {
     /// 2. This Child is not the Strategy
     /// @param amountToDeposit The amount of USDC to deposit into the system
     /// @dev Revert if amountToDeposit is less than 1e6 (1 USDC)
+    /// @notice User must approve this contract to spend their stablecoin
     function deposit(uint256 amountToDeposit) external override {
-        _initiateDeposit(amountToDeposit);
+        /// @dev takes a fee
+        amountToDeposit = _initiateDeposit(amountToDeposit);
 
         address activeStrategyAdapter = _getActiveStrategyAdapter();
         DepositData memory depositData = _buildDepositData(amountToDeposit);
@@ -109,11 +111,13 @@ contract ChildPeer is YieldPeer {
         uint64 /* sourceChainSelector */
     ) internal override {
         if (txType == CcipTxType.DepositToStrategy) _handleCCIPDepositToStrategy(tokenAmounts, data);
+        //slither-disable-next-line reentrancy-events
         if (txType == CcipTxType.DepositCallbackChild) _handleCCIPDepositCallbackChild(data);
         if (txType == CcipTxType.WithdrawToStrategy) _handleCCIPWithdrawToStrategy(data);
         if (txType == CcipTxType.WithdrawCallback) _handleCCIPWithdrawCallback(tokenAmounts, data);
+        //slither-disable-next-line reentrancy-no-eth
         if (txType == CcipTxType.RebalanceOldStrategy) _handleCCIPRebalanceOldStrategy(data);
-        if (txType == CcipTxType.RebalanceNewStrategy) _handleCCIPRebalanceNewStrategy(data);
+        if (txType == CcipTxType.RebalanceNewStrategy) _handleCCIPRebalanceNewStrategy(tokenAmounts, data);
     }
 
     /// @notice This function handles a deposit sent from Parent to this Strategy-Child
@@ -136,6 +140,7 @@ contract ChildPeer is YieldPeer {
     /// deposit on this chain -> parent -> strategy -> callback to parent -> callback to child (HERE)
     /// @param data The encoded DepositData
     function _handleCCIPDepositCallbackChild(bytes memory data) internal {
+        // @review DepositCompleted event?
         DepositData memory depositData = _decodeDepositData(data);
         _mintShares(depositData.depositor, depositData.shareMintAmount);
     }
@@ -150,13 +155,14 @@ contract ChildPeer is YieldPeer {
         withdrawData.usdcWithdrawAmount = _withdrawFromStrategyAndGetUsdcWithdrawAmount(withdrawData);
 
         if (i_thisChainSelector == withdrawData.chainSelector) {
-            _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
+            //slither-disable-next-line reentrancy-events
             emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
+            _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
         } else {
             _ccipSend(
                 withdrawData.chainSelector,
                 CcipTxType.WithdrawCallback,
-                abi.encode(withdrawData),
+                abi.encode(withdrawData), // @review solady calldata compression for all encoded crosschain data?
                 withdrawData.usdcWithdrawAmount
             );
         }
@@ -168,23 +174,26 @@ contract ChildPeer is YieldPeer {
     /// @dev Rebalances funds from the old strategy to the new strategy
     /// @param data The data to decode - decodes to Strategy (chainSelector, protocolId)
     function _handleCCIPRebalanceOldStrategy(bytes memory data) internal {
-        /// @dev withdraw from the old strategy
+        /// @dev cache the old active strategy adapter
         address oldActiveStrategyAdapter = _getActiveStrategyAdapter();
-        uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, address(i_usdc));
-        if (totalValue != 0) _withdrawFromStrategy(oldActiveStrategyAdapter, totalValue);
 
         /// @dev update strategy pool to either protocol on this chain or address(0) if on a different chain
         Strategy memory newStrategy = abi.decode(data, (Strategy));
         address newActiveStrategyAdapter =
             _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
 
+        /// @dev withdraw from the old strategy
+        uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, address(i_usdc));
+        if (totalValue != 0) _withdrawFromStrategy(oldActiveStrategyAdapter, totalValue);
+
         // if the new strategy is this chain, but different protocol, then we need to deposit to the new strategy
         if (newStrategy.chainSelector == i_thisChainSelector) {
-            _depositToStrategy(newActiveStrategyAdapter, i_usdc.balanceOf(address(this)));
+            //slither-disable-next-line reentrancy-events
+            _depositToStrategy(newActiveStrategyAdapter, totalValue);
         }
         // if the new strategy is a different chain, then we need to send the usdc we just withdrew to the new strategy
         else {
-            _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, data, i_usdc.balanceOf(address(this)));
+            _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, data, totalValue);
         }
     }
 

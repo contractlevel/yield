@@ -44,7 +44,6 @@ methods {
         (Rebalancer.Log) envfree;
     function decodePerformData(bytes) external returns (
         address,
-        address,
         IYieldPeer.Strategy memory,
         IYieldPeer.CcipTxType,
         uint64,
@@ -56,7 +55,6 @@ methods {
     function createNonEmptyBytes() external returns (bytes) envfree;
     function createEmptyBytes() external returns (bytes) envfree;
     function createPerformData(
-        address,
         address,
         IYieldPeer.Strategy,
         IYieldPeer.CcipTxType,
@@ -383,7 +381,6 @@ rule checkLog_returnsTrueWhen_oldStrategyChild() {
     assert upkeepNeeded;
     assert performData.length > 0;
 
-    address forwarder;
     address parentPeer;
     IYieldPeer.Strategy strategy;
     IYieldPeer.CcipTxType txType;
@@ -392,7 +389,6 @@ rule checkLog_returnsTrueWhen_oldStrategyChild() {
     uint256 totalValue;
 
     (
-    forwarder,
     parentPeer,
     strategy,
     txType,
@@ -401,7 +397,6 @@ rule checkLog_returnsTrueWhen_oldStrategyChild() {
     totalValue
     ) = decodePerformData(performData);
 
-    assert forwarder == getForwarder();
     assert parentPeer == getParentPeer();
     assert strategy.chainSelector == newChainSelector;
     assert strategy.protocolId == protocolId;
@@ -440,7 +435,6 @@ rule checkLog_returnsTrueWhen_oldStrategyParent_newStrategyChild() {
     assert upkeepNeeded;
     assert performData.length > 0;
 
-    address forwarder;
     address parentPeer;
     IYieldPeer.Strategy strategy;
     IYieldPeer.CcipTxType txType;
@@ -449,7 +443,6 @@ rule checkLog_returnsTrueWhen_oldStrategyParent_newStrategyChild() {
     uint256 totalValue;
 
     (
-    forwarder,
     parentPeer,
     strategy,
     txType,
@@ -458,7 +451,6 @@ rule checkLog_returnsTrueWhen_oldStrategyParent_newStrategyChild() {
     totalValue
     ) = decodePerformData(performData);
 
-    assert forwarder == getForwarder();
     assert parentPeer == getParentPeer();
     assert strategy.chainSelector == newChainSelector;
     assert strategy.protocolId == protocolId;
@@ -475,7 +467,6 @@ rule performUpkeep_revertsWhen_notForwarder() {
     bytes32 protocolId;
     IYieldPeer.Strategy strategy = createStrategy(chainSelector, protocolId);
     bytes performData = createPerformData(
-        getForwarder(),
         getParentPeer(),
         strategy,
         IYieldPeer.CcipTxType.RebalanceOldStrategy,
@@ -484,7 +475,7 @@ rule performUpkeep_revertsWhen_notForwarder() {
         0
     );
 
-    require e.msg.sender != getForwarder();
+    require e.msg.sender != currentContract.s_forwarder;
 
     performUpkeep@withrevert(e, performData);
     assert lastReverted;
@@ -506,7 +497,6 @@ rule performUpkeep_rebalanceNewStrategy() {
     IYieldPeer.Strategy strategy = createStrategy(chainSelector, protocolId);
     uint256 totalValue = getTotalValueFromParentPeer();
     bytes performData = createPerformData(
-        getForwarder(),
         getParentPeer(),
         strategy,
         IYieldPeer.CcipTxType.RebalanceNewStrategy,
@@ -529,7 +519,6 @@ rule performUpkeep_rebalanceOldStrategy() {
     bytes32 protocolId;
     IYieldPeer.Strategy strategy = createStrategy(chainSelector, protocolId);
     bytes performData = createPerformData(
-        getForwarder(),
         getParentPeer(),
         strategy,
         IYieldPeer.CcipTxType.RebalanceOldStrategy,

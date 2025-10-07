@@ -24,3 +24,5 @@ flattened/
 test/TestTest.t.sol
 gambit_out/
 mutation_campaign/
+test/PoC2.t.sol
+test/PoC.t.sol

@@ -81,7 +81,6 @@ A live demo site with Ethereum, Base and Avalanche testnets is available at [con
     - [DefiLlama API not providing testnet data](#defillama-api-not-providing-testnet-data)
     - [Incorrect placement of `networkConfig` cache before `vm.startBroadcast` in deploy script](#incorrect-placement-of-networkconfig-cache-before-vmstartbroadcast-in-deploy-script)
   - [Frontend](#frontend)
-  - [Additional Comments](#additional-comments)
   - [Acknowledgement](#acknowledgement)
 
 ## Overview
@@ -455,7 +454,7 @@ The [`Rebalancer`](https://github.com/contractlevel/yield/blob/main/certora/spec
 certoraRun ./certora/conf/modules/Rebalancer.conf --nondet_difficult_funcs
 ```
 
-The `--nondet_difficult_funcs` flag is required for `Rebalance` to [automatically summarize functions](https://docs.certora.com/en/latest/docs/prover/cli/options.html#nondet-difficult-funcs) in the `FunctionsRequest` library because otherwise the Certora Prover will timeout. The Certora Prover explores all possible paths and the `FunctionsRequest::encodeCBOR` includes an extremely high path count, making it difficult to verify.
+The `--nondet_difficult_funcs` flag is required for `Rebalancer` to [automatically summarize functions](https://docs.certora.com/en/latest/docs/prover/cli/options.html#nondet-difficult-funcs) in the `FunctionsRequest` library because otherwise the Certora Prover will timeout. The Certora Prover explores all possible paths and the `FunctionsRequest::encodeCBOR` includes an extremely high path count, making it difficult to verify.
 
 Verifying behaviour in the `checkLog()` function would result in vacuous rules with basic sanity enabled. I thought this was because of returning false when upkeep wasn't needed, and that reverting instead would improve the verification, but that resulted in vacuous rules too. For now basic sanity has been left enabled, and comments in the spec indicate the vacuous rules. Reverts instead of returning false when upkeep is not needed has been kept in place. It doesn't make any functional difference either way and is purely aesthetic, especially when both options deliver vacuous rules.
 
@@ -704,37 +703,6 @@ cd frontend
 npm i
 npm run dev
 ```
-
-## Additional Comments
-
-The `DepositToStrategyCompleted` event is emitted in `YieldPeer::_depositToStrategyAndGetTotalValue()`.
-
-The `DepositToStrategy` event is emitted in `YieldPeer::_depositToStrategy()`.
-
-`_depositToStrategyAndGetTotalValue()` calls `_depositToStrategy()`.
-
-```
-    /// @notice Deposits USDC to the strategy and returns the total value of the system
-    /// @param amount The amount of USDC to deposit
-    /// @return totalValue The total value of the system // _getTotalValueAndDepositToStrategy
-    function _depositToStrategyAndGetTotalValue(uint256 amount) internal returns (uint256 totalValue) {
-        address strategyPool = _getStrategyPool();
-        totalValue = _getTotalValueFromStrategy(strategyPool);
-        _depositToStrategy(strategyPool, amount);
-        emit DepositToStrategyCompleted(strategyPool, amount, totalValue);
-    }
-
-    /// @notice Internal helper to deposit to the strategy
-    /// @param strategyPool The strategy pool to deposit to
-    /// @param amount The amount of USDC to deposit
-    /// @dev Emit DepositToStrategy event
-    function _depositToStrategy(address strategyPool, uint256 amount) internal {
-        ProtocolOperations._depositToStrategy(strategyPool, _getProtocolConfig(), amount);
-        emit DepositToStrategy(strategyPool, amount);
-    }
-```
-
-The naming of these events is slightly confusing (and needs further review), but their purposes differ in that `DepositToStrategyCompleted` is only emitted for user deposits. Whereas `DepositToStrategy` is emitted for both user deposits and rebalance deposits.
 
 ## Acknowledgement
 

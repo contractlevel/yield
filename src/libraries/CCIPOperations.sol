@@ -62,7 +62,7 @@ library CCIPOperations {
         uint256 fees = IRouterClient(ccipRouter).getFee(dstChainSelector, evm2AnyMessage);
         uint256 linkBalance = LinkTokenInterface(link).balanceOf(address(this));
         if (fees > linkBalance) revert CCIPOperations__NotEnoughLink(linkBalance, fees);
-        LinkTokenInterface(link).approve(ccipRouter, fees);
+        IERC20(link).safeIncreaseAllowance(ccipRouter, fees);
     }
 
     /// @notice Prepares the token amounts for a given transaction

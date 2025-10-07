@@ -14,15 +14,17 @@ import {DataStructures} from "../libraries/DataStructures.sol";
 import {CCIPOperations} from "../libraries/CCIPOperations.sol";
 import {IStrategyAdapter} from "../interfaces/IStrategyAdapter.sol";
 import {IStrategyRegistry} from "../interfaces/IStrategyRegistry.sol";
+import {YieldFees} from "../modules/YieldFees.sol";
 
 /// @title YieldPeer
 /// @author @contractlevel
 /// @notice YieldPeer is the base contract for the Parent and Child Peers in the Contract Level Yield system
-abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYieldPeer {
+abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYieldPeer, YieldFees {
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS
     //////////////////////////////////////////////////////////////*/
     using SafeERC20 for IERC20;
+    using SafeERC20 for IShare;
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -90,10 +92,8 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
 
     /// @notice Emitted when a user deposits USDC into the system
     event DepositInitiated(address indexed depositor, uint256 indexed amount, uint64 indexed thisChainSelector);
-    /// @notice Emitted when a deposit to the strategy is completed
-    event DepositToStrategyCompleted(
-        address indexed strategyAdapter, uint256 indexed amount, uint256 indexed totalValue
-    );
+    // @review DepositCompleted event?
+
     /// @notice Emitted when a user initiates a withdrawal of USDC from the system
     event WithdrawInitiated(address indexed withdrawer, uint256 indexed amount, uint64 indexed thisChainSelector);
     /// @notice Emitted when a withdrawal is completed and the USDC is sent to the user
@@ -128,7 +128,8 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @param link The address of the Chainlink token
     /// @param thisChainSelector The chain selector for this chain
     /// @param usdc The address of the USDC token
-    /// @param share The address of the Share token, native to this system that is minted in return for deposits
+    /// @param share The address of the YieldCoin Share token, native to this system that is minted in return for deposits
+    //slither-disable-next-line missing-zero-check
     constructor(address ccipRouter, address link, uint64 thisChainSelector, address usdc, address share)
         CCIPReceiver(ccipRouter)
         Ownable(msg.sender)
@@ -137,8 +138,6 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
         i_thisChainSelector = thisChainSelector;
         i_usdc = IERC20(usdc);
         i_share = IShare(share);
-        // /// @dev Set to address(1) to get past check in setStrategyAdapter for initial active strategy
-        // s_activeStrategyAdapter = address(1);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -208,6 +207,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
 
         bytes32 ccipMessageId = IRouterClient(i_ccipRouter).ccipSend(destChainSelector, evm2AnyMessage);
 
+        //slither-disable-next-line reentrancy-events
         emit CCIPMessageSent(ccipMessageId, txType, bridgeAmount);
     }
 
@@ -228,16 +228,17 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @notice The message this function handles is sent by the old strategy when the strategy is updated
     /// @dev Updates the strategy pool to the new strategy
     /// @dev Deposits USDC totalValue of the system into the new strategy
+    /// @param tokenAmounts The token amounts received in the CCIP message
     /// @param data The data to decode - decodes to Strategy (chainSelector, protocolId)
-    function _handleCCIPRebalanceNewStrategy(bytes memory data) internal {
+    function _handleCCIPRebalanceNewStrategy(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data) internal {
         /// @dev update strategy pool to protocol on this chain
         Strategy memory newStrategy = abi.decode(data, (Strategy));
         address newActiveStrategyAdapter =
             _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
 
+        /// @dev compare 0 amounts for the scenario a strategy rebalance occurs when there have been no deposits
         /// @dev deposit to the new strategy
-        uint256 usdcBalance = i_usdc.balanceOf(address(this));
-        if (usdcBalance != 0) _depositToStrategy(newActiveStrategyAdapter, usdcBalance);
+        if (tokenAmounts.length > 0) _depositToStrategy(newActiveStrategyAdapter, tokenAmounts[0].amount);
     }
 
     /// @notice Internal helper to handle active strategy adapter updates
@@ -262,21 +263,21 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @param strategyAdapter The strategy adapter to deposit to
     /// @param amount The amount of USDC to deposit
     /// @dev Emit DepositToStrategy event
-    // @review passing this an address asset param instead of address(i_usdc)
+    // @review:stablecoins passing this an address asset param instead of address(i_usdc) - this will be part of the additional stablecoins task
     function _depositToStrategy(address strategyAdapter, uint256 amount) internal {
+        emit DepositToStrategy(strategyAdapter, amount);
         _transferUsdcTo(strategyAdapter, amount);
         IStrategyAdapter(strategyAdapter).deposit(address(i_usdc), amount);
-        emit DepositToStrategy(strategyAdapter, amount);
     }
 
     /// @notice Internal helper to withdraw from the strategy
     /// @param strategyAdapter The strategy adapter to withdraw from
     /// @param amount The amount of USDC to withdraw
     /// @dev Emit WithdrawFromStrategy event
-    // @review passing this an address asset param instead of address(i_usdc)
+    // @review:stablecoins passing this an address asset param instead of address(i_usdc) - additional/modular stablecoins task
     function _withdrawFromStrategy(address strategyAdapter, uint256 amount) internal {
-        IStrategyAdapter(strategyAdapter).withdraw(address(i_usdc), amount);
         emit WithdrawFromStrategy(strategyAdapter, amount);
+        IStrategyAdapter(strategyAdapter).withdraw(address(i_usdc), amount);
     }
 
     /// @notice Deposits USDC to the strategy and returns the total value of the system
@@ -289,7 +290,6 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     {
         totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, address(i_usdc));
         _depositToStrategy(activeStrategyAdapter, amount);
-        emit DepositToStrategyCompleted(activeStrategyAdapter, amount, totalValue);
     }
 
     /// @notice Withdraws from the strategy and returns the USDC withdraw amount
@@ -311,12 +311,21 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @dev Revert if amountToDeposit is less than 1e6 (1 USDC)
     /// @dev Transfer USDC from msg.sender to this contract
     /// @dev Emit DepositInitiated event
-    function _initiateDeposit(uint256 amountToDeposit) internal {
+    /// @dev Takes a fee and emits FeeTaken event (if fee rate is not 0)
+    /// @return amountToDepositMinusFee The amount of USDC deposited by the user minus the fee
+    function _initiateDeposit(uint256 amountToDeposit) internal returns (uint256 amountToDepositMinusFee) {
         if (amountToDeposit < USDC_DECIMALS) revert YieldPeer__InsufficientAmount();
         _transferUsdcFrom(msg.sender, address(this), amountToDeposit);
-        emit DepositInitiated(msg.sender, amountToDeposit, i_thisChainSelector);
+
+        /// @dev take fee
+        uint256 fee = _calculateFee(amountToDeposit);
+        amountToDepositMinusFee = amountToDeposit - fee;
+        if (fee > 0) emit FeeTaken(fee);
+
+        emit DepositInitiated(msg.sender, amountToDepositMinusFee, i_thisChainSelector);
     }
 
+    // @review:stablecoins we will update 2 helpers these in the additional/modular stablecoins task
     /// @notice Transfer USDC to an address
     /// @param to The address to transfer USDC to
     /// @param amount The amount of USDC to transfer
@@ -509,6 +518,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @notice Set the strategy registry
     /// @param strategyRegistry The strategy registry to set
     /// @dev Access control: onlyOwner
+    //slither-disable-next-line missing-zero-check
     function setStrategyRegistry(address strategyRegistry) external onlyOwner {
         s_strategyRegistry = strategyRegistry;
         emit StrategyRegistrySet(strategyRegistry);
@@ -584,5 +594,11 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @return activeStrategyAdapter The active strategy adapter address
     function getActiveStrategyAdapter() external view returns (address activeStrategyAdapter) {
         activeStrategyAdapter = _getActiveStrategyAdapter();
+    }
+
+    /// @notice Get the strategy registry
+    /// @return strategyRegistry The strategy registry address
+    function getStrategyRegistry() external view returns (address strategyRegistry) {
+        strategyRegistry = s_strategyRegistry;
     }
 }

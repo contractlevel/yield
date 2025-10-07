@@ -7,12 +7,14 @@ import {FunctionsRequest} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/l
 import {ILogAutomation, Log} from "@chainlink/contracts/src/v0.8/automation/interfaces/ILogAutomation.sol";
 import {AutomationBase} from "@chainlink/contracts/src/v0.8/automation/AutomationBase.sol";
 import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {IStrategyRegistry} from "../interfaces/IStrategyRegistry.sol";
 
 /// @title Rebalancer
 /// @author @contractlevel
 /// @notice Combination of previous ParentRebalancer and ParentCLF contracts
 /// @notice Rebalances YieldCoin TVL across all protocols
+/// @notice This contract is only deployed on the Parent chain
 contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2Step {
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS
@@ -97,7 +99,10 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     /// @notice Called by Chainlink Automation to send a Chainlink Functions request
     /// @notice The nature of the request is to fetch the strategy with the highest yield
     /// @dev Revert if the caller is not the Chainlink Automation upkeep address
-    // @review should be pausable?
+    // @review:pausable should be pausable?
+    // a: yes, but we will want to review using time-based automation vs incentivized public keepers
+    // @review - pausable and time-based abstraction are 2 different tasks
+    // although this may not necessarily need to be pausable because the rebalancer is configurable in parent
     function sendCLFRequest() external {
         if (msg.sender != s_upkeepAddress) revert Rebalancer__OnlyUpkeep();
 
@@ -126,8 +131,8 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
         bytes32 eventSignature = keccak256("StrategyUpdated(uint64,bytes32,uint64)");
         address parentPeer = s_parentPeer;
         uint64 thisChainSelector = IParentPeer(parentPeer).getThisChainSelector();
-        address forwarder = s_forwarder;
 
+        /// @dev we are only interested in StrategyUpdated events from the ParentPeer
         if (log.source == parentPeer && log.topics[0] == eventSignature) {
             uint64 chainSelector = uint64(uint256(log.topics[1]));
             bytes32 protocolId = log.topics[2];
@@ -142,7 +147,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
             IYieldPeer.Strategy memory newStrategy =
                 IYieldPeer.Strategy({chainSelector: chainSelector, protocolId: protocolId});
             IYieldPeer.CcipTxType txType;
-            address oldStrategyAdapter = IYieldPeer(parentPeer).getStrategyAdapter(newStrategy.protocolId);
+            address oldStrategyAdapter = IYieldPeer(parentPeer).getActiveStrategyAdapter();
             // slither-disable-next-line uninitialized-local
             uint256 totalValue;
 
@@ -153,8 +158,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
                 txType = IYieldPeer.CcipTxType.RebalanceOldStrategy;
             }
 
-            performData =
-                abi.encode(forwarder, parentPeer, newStrategy, txType, oldChainSelector, oldStrategyAdapter, totalValue);
+            performData = abi.encode(parentPeer, newStrategy, txType, oldChainSelector, oldStrategyAdapter, totalValue);
             upkeepNeeded = true;
         } else {
             performData = "";
@@ -168,20 +172,17 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     /// @dev Revert if caller is not the Chainlink Automation forwarder
     /// @param performData The performData returned by the checkLog function
     function performUpkeep(bytes calldata performData) external {
+        if (msg.sender != s_forwarder) revert Rebalancer__OnlyForwarder();
         (
-            address forwarder,
             address parentPeer,
             IYieldPeer.Strategy memory strategy,
             IYieldPeer.CcipTxType txType,
             uint64 oldChainSelector,
             address oldStrategyAdapter,
             uint256 totalValue
-        ) = abi.decode(
-            performData, (address, address, IYieldPeer.Strategy, IYieldPeer.CcipTxType, uint64, address, uint256)
-        );
+        ) = abi.decode(performData, (address, IYieldPeer.Strategy, IYieldPeer.CcipTxType, uint64, address, uint256));
 
-        if (msg.sender != forwarder) revert Rebalancer__OnlyForwarder();
-
+        /// @dev We don't facilitate parent -> parent here because it would have already been handled by the CLF callback.
         if (txType == IYieldPeer.CcipTxType.RebalanceNewStrategy) {
             IParentPeer(parentPeer).rebalanceNewStrategy(oldStrategyAdapter, totalValue, strategy);
         } else {
@@ -206,7 +207,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
             return;
         }
         (uint256 decodedSelector, bytes32 protocolId) = abi.decode(response, (uint256, bytes32));
-        uint64 chainSelector = uint64(decodedSelector);
+        uint64 chainSelector = SafeCast.toUint64(decodedSelector);
 
         address parentPeer = s_parentPeer;
 
@@ -257,6 +258,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     /// @notice Sets the strategy registry
     /// @param strategyRegistry The address of the strategy registry
     /// @dev Revert if the caller is not the owner
+    // slither-disable-next-line missing-zero-check
     function setStrategyRegistry(address strategyRegistry) external onlyOwner {
         s_strategyRegistry = strategyRegistry;
         emit StrategyRegistrySet(strategyRegistry);

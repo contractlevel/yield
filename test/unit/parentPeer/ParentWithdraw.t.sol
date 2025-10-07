@@ -9,6 +9,10 @@ import {IYieldPeer} from "../../../src/interfaces/IYieldPeer.sol";
 contract ParentWithdrawTest is BaseTest {
     function setUp() public override {
         super.setUp();
+
+        /// @dev an initial rate is set in the YieldFees constructor, so rather than accounting for fee in these tests, we set the fee rate to 0
+        _setFeeRate(0);
+
         /// @dev baseFork is the parent chain
         _selectFork(baseFork);
         deal(address(baseUsdc), withdrawer, DEPOSIT_AMOUNT);

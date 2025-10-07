@@ -6,6 +6,10 @@ import {BaseTest, IERC20, Vm, IYieldPeer, IComet} from "../../BaseTest.t.sol";
 contract RebalanceTest is BaseTest {
     function setUp() public override {
         super.setUp();
+
+        /// @dev an initial rate is set in the YieldFees constructor, so rather than accounting for fee in these tests, we set the fee rate to 0
+        _setFeeRate(0);
+
         /// @dev baseFork is the parent chain
         _selectFork(baseFork);
         deal(address(baseUsdc), depositor, DEPOSIT_AMOUNT);
@@ -14,7 +18,7 @@ contract RebalanceTest is BaseTest {
     }
 
     /// @notice Scenario: New Strategy is same as the old
-    function test_yield_rebalance_sameStrategy() public {
+    function test_yield_parentPeer_rebalance_sameStrategy() public {
         /// @dev arrange
         baseParentPeer.deposit(DEPOSIT_AMOUNT);
         /// @dev sanity check
@@ -56,7 +60,7 @@ contract RebalanceTest is BaseTest {
     }
 
     /// @notice Scenario: Old Strategy and New are both on Parent, but different protocols
-    function test_yield_rebalance_oldParent_newParent() public {
+    function test_yield_parentPeer_rebalance_oldParent_newParent() public {
         /// @dev arrange
         /// @notice the current/old strategy chain is the parent (base) whereas the protocl is Aave
         baseParentPeer.deposit(DEPOSIT_AMOUNT);
@@ -87,7 +91,7 @@ contract RebalanceTest is BaseTest {
     }
 
     /// @notice Scenario: Old Strategy is on child chain, New Strategy is on same child chain, but different protocol
-    function test_yield_rebalance_oldChild_newChild() public {
+    function test_yield_parentPeer_rebalance_oldChild_newChild() public {
         _setStrategy(optChainSelector, keccak256(abi.encodePacked("aave-v3")));
         _selectFork(baseFork);
         _changePrank(depositor);
@@ -138,7 +142,7 @@ contract RebalanceTest is BaseTest {
     }
 
     /// @notice Scenario: Old Strategy is on Parent, New Strategy is on child chain
-    function test_yield_rebalance_oldParent_newChild() public {
+    function test_yield_parentPeer_rebalance_oldParent_newChild() public {
         _setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
         _selectFork(baseFork);
         _changePrank(depositor);
@@ -186,7 +190,7 @@ contract RebalanceTest is BaseTest {
     }
 
     /// @notice Scenario: Old Strategy is on child chain, New Strategy is on Parent
-    function test_yield_rebalance_oldChild_newParent() public {
+    function test_yield_parentPeer_rebalance_oldChild_newParent() public {
         _setStrategy(optChainSelector, keccak256(abi.encodePacked("aave-v3")));
         _selectFork(baseFork);
         _changePrank(depositor);
@@ -238,7 +242,7 @@ contract RebalanceTest is BaseTest {
     }
 
     /// @notice Scenario: Old Strategy is on a Child chain, New Strategy is on a different Child chain ("Chain C")
-    function test_yield_rebalance_oldChild_newChainC() public {
+    function test_yield_parentPeer_rebalance_oldChild_newChainC() public {
         _setStrategy(optChainSelector, keccak256(abi.encodePacked("aave-v3")));
         _selectFork(baseFork);
         _changePrank(depositor);
@@ -288,14 +292,14 @@ contract RebalanceTest is BaseTest {
         );
     }
 
-    function test_yield_rebalanceNewStrategy_revertsWhen_notRebalancer() public {
+    function test_yield_parentPeer_rebalanceNewStrategy_revertsWhen_notRebalancer() public {
         vm.expectRevert(abi.encodeWithSignature("ParentPeer__OnlyRebalancer()"));
         baseParentPeer.rebalanceNewStrategy(
             address(0), 0, IYieldPeer.Strategy({chainSelector: 0, protocolId: keccak256(abi.encodePacked("aave-v3"))})
         );
     }
 
-    function test_yield_rebalanceOldStrategy_revertsWhen_notRebalancer() public {
+    function test_yield_parentPeer_rebalanceOldStrategy_revertsWhen_notRebalancer() public {
         vm.expectRevert(abi.encodeWithSignature("ParentPeer__OnlyRebalancer()"));
         baseParentPeer.rebalanceOldStrategy(
             0, IYieldPeer.Strategy({chainSelector: 0, protocolId: keccak256(abi.encodePacked("aave-v3"))})

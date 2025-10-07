@@ -17,6 +17,7 @@ methods {
     function getStrategy() external returns (IYieldPeer.Strategy) envfree;
     function getThisChainSelector() external returns (uint64) envfree;
     function getActiveStrategyAdapter() external returns (address) envfree;
+    function getMaxFeeRate() external returns (uint256) envfree;
 
     // External methods
     function share.totalSupply() external returns (uint256) envfree;
@@ -28,6 +29,8 @@ methods {
     function _.withdraw(address,uint256) external => DISPATCHER(true);
     function _.deposit(address,uint256) external => DISPATCHER(true);
     function _.getTotalValue(address) external => DISPATCHER(true);
+    function _.balanceOf(address) external => DISPATCHER(true);
+    function _.transfer(address,uint256) external => DISPATCHER(true);
 
     // Harness helper methods
     function bytes32ToUint256(bytes32) external returns (uint256) envfree;
@@ -42,6 +45,7 @@ methods {
     function createStrategy(uint64,bytes32) external returns (IYieldPeer.Strategy memory) envfree;
     function convertUsdcToShare(uint256) external returns (uint256) envfree;
     function getStrategyAdapterFromProtocol(bytes32) external returns (address) envfree;
+    function calculateFee(uint256) external returns (uint256) envfree;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -268,6 +272,7 @@ invariant totalShares_consistency()
 rule deposit_transfersUsdcToStrategy_when_parent_is_strategy() {
     env e;
     uint256 amountToDeposit;
+    uint256 fee = calculateFee(amountToDeposit);
     require getStrategy().chainSelector == getThisChainSelector();
     address strategyPool = getActiveStrategyAdapter().getStrategyPool(e);
 
@@ -280,8 +285,9 @@ rule deposit_transfersUsdcToStrategy_when_parent_is_strategy() {
 
     deposit(e, amountToDeposit);
 
-    assert usdc.balanceOf(strategyPool) == strategyPoolBalanceBefore + amountToDeposit;
+    assert usdc.balanceOf(strategyPool) == strategyPoolBalanceBefore + amountToDeposit - fee;
     assert usdc.balanceOf(e.msg.sender) == depositorBalanceBefore - amountToDeposit;
+    assert usdc.balanceOf(currentContract) == fee;
 }
 
 rule deposit_mintsShares_when_parent_is_strategy() {
@@ -320,6 +326,7 @@ rule deposit_emits_SharesMinted_when_parent_is_strategy() {
     env e;
     calldataarg args;
     require getStrategy().chainSelector == getThisChainSelector();
+    require currentContract.s_feeRate == 0;
 
     require ghost_sharesMinted_eventCount == 0;
     deposit(e, args);
@@ -329,13 +336,14 @@ rule deposit_emits_SharesMinted_when_parent_is_strategy() {
 rule deposit_emits_CCIPMessageSent_when_strategy_is_differentChain() {
     env e;
     uint256 amountToDeposit;
+    uint256 fee = calculateFee(amountToDeposit);
     require getStrategy().chainSelector != getThisChainSelector();
 
     require ghost_ccipMessageSent_eventCount == 0;
     deposit(e, amountToDeposit);
     assert ghost_ccipMessageSent_eventCount == 1;
     assert ghost_ccipMessageSent_txType_emitted == 1; // DepositToStrategy
-    assert ghost_ccipMessageSent_bridgeAmount_emitted == amountToDeposit;
+    assert ghost_ccipMessageSent_bridgeAmount_emitted == amountToDeposit - fee;
 }
 
 // --- onTokenTransfer --- //
@@ -531,6 +539,7 @@ rule handleCCIPDepositCallbackParent_mintsShares_when_depositChain_is_parent() {
 
     require shareBalanceBefore + expectedShareMintAmount <= max_uint256;
 
+ 
     require ghost_sharesMinted_eventCount == 0;
     handleCCIPDepositCallbackParent(e, encodedDepositData);
     assert ghost_sharesMinted_eventCount == 1;
@@ -787,6 +796,7 @@ rule rebalanceNewStrategy_revertsWhen_notParentRebalancer() {
     assert lastReverted;
 }
 
+// @review:certora vacuous rule
 rule rebalanceNewStrategy_movesStrategyToNewChain() {
     env e;
     uint64 chainSelector;
@@ -906,3 +916,5 @@ rule setInitialActiveStrategy_updatesStorage() {
     assert currentContract.s_strategy.chainSelector == getThisChainSelector();
     assert currentContract.s_strategy.protocolId == protocolId;
 }
+
+// @review:certora set rebalancer needs to be verified

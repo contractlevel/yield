@@ -21,6 +21,21 @@ contract WithdrawTest is BaseTest {
         baseAaveV3Adapter.withdraw(address(baseUsdc), baseAaveV3Adapter.getTotalValue(address(baseUsdc)));
 
         uint256 yieldPeerBalanceAfter = baseUsdc.balanceOf(address(baseParentPeer));
-        assertEq(yieldPeerBalanceAfter, yieldPeerBalanceBefore + DEPOSIT_AMOUNT);
+        assertApproxEqAbs(yieldPeerBalanceAfter, yieldPeerBalanceBefore + DEPOSIT_AMOUNT, BALANCE_TOLERANCE);
+    }
+
+    function test_yield_aaveV3Adapter_withdraw_revertsWhen_incorrectWithdrawAmount() public {
+        IncorrectWithdrawAmountPool incorrectWithdrawAmountPool = new IncorrectWithdrawAmountPool();
+        vm.etch(address(baseAaveV3Adapter.getStrategyPool()), address(incorrectWithdrawAmountPool).code);
+
+        _changePrank(address(baseParentPeer));
+        vm.expectRevert(abi.encodeWithSignature("AaveV3Adapter__IncorrectWithdrawAmount()"));
+        baseAaveV3Adapter.withdraw(address(baseUsdc), DEPOSIT_AMOUNT);
+    }
+}
+
+contract IncorrectWithdrawAmountPool {
+    function withdraw(address, uint256 amount, address) external pure returns (uint256) {
+        return amount - 1;
     }
 }

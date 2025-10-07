@@ -16,3 +16,6 @@
 [submodule "lib/chainlink-local"]
 	path = lib/chainlink-local
 	url = https://github.com/contractlevel/chainlink-local
+[submodule "lib/solady"]
+	path = lib/solady
+	url = https://github.com/vectorized/solady
