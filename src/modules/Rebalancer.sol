@@ -125,11 +125,8 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     function checkLog(Log calldata log, bytes memory)
         external
         view
-        returns (
-            // cannotExecute // @review uncomment
-            bool upkeepNeeded,
-            bytes memory performData
-        )
+        cannotExecute
+        returns (bool upkeepNeeded, bytes memory performData)
     {
         bytes32 eventSignature = keccak256("StrategyUpdated(uint64,bytes32,uint64)");
         address parentPeer = s_parentPeer;
