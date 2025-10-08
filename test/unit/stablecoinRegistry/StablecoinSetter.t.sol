@@ -8,7 +8,7 @@ contract StablecoinSetter is Test {
     StablecoinRegistry public stablecoinRegistry;
     StablecoinRegistry.Stablecoin public usdcStablecoin;
 
-    address public owner = makeAddr("owner");
+    address public owner = makeAddr("owner"); //small comment change - testing git commit
     address public usdc = makeAddr("usdc");
     address public holder = makeAddr("holder");
 
