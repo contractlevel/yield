@@ -20,9 +20,8 @@ contract MockCCIPRouter is IRouterClient {
 
     function ccipSend(uint64, Client.EVM2AnyMessage calldata message) external payable returns (bytes32) {
         for (uint256 i = 0; i < message.tokenAmounts.length; ++i) {
-            IERC20(message.tokenAmounts[i].token).safeTransferFrom(
-                msg.sender, address(this), message.tokenAmounts[i].amount
-            );
+            IERC20(message.tokenAmounts[i].token)
+                .safeTransferFrom(msg.sender, address(this), message.tokenAmounts[i].amount);
         }
 
         uint256 nonce = s_nonce;

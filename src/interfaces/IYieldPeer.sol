@@ -19,7 +19,6 @@ interface IYieldPeer is IYieldFees {
         WithdrawCallback, // 6 - withdraw callback from strategy to withdraw chain (to send USDC to withdrawer)
         RebalanceOldStrategy, // 7 - message from parent to old strategy (to move funds to new strategy)
         RebalanceNewStrategy // 8 - reallocate funds from old strategy to new strategy
-
     }
 
     struct DepositData {
