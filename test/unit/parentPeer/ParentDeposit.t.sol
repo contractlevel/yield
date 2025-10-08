@@ -8,8 +8,9 @@ import {IComet} from "../../../src/interfaces/IComet.sol";
 import {IYieldPeer} from "../../../src/interfaces/IYieldPeer.sol";
 import {USDCTokenPool} from "@chainlink/contracts/src/v0.8/ccip/pools/USDC/USDCTokenPool.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import {CCTPMessageTransmitterProxy} from
-    "@chainlink/contracts/src/v0.8/ccip/pools/USDC/CCTPMessageTransmitterProxy.sol";
+import {
+    CCTPMessageTransmitterProxy
+} from "@chainlink/contracts/src/v0.8/ccip/pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {ParentPeer} from "../../../src/peers/ParentPeer.sol";
 
 contract ParentDepositTest is BaseTest {

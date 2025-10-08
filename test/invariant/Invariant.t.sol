@@ -231,9 +231,8 @@ contract Invariant is StdInvariant, BaseTest {
     function checkActiveStrategyAdapterPerChainSelector(uint64 chainSelector) external view {
         if (chainSelector == parent.getStrategy().chainSelector) {
             assertEq(
-                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getStrategyAdapter(
-                    parent.getStrategy().protocolId
-                ),
+                IYieldPeer(handler.chainSelectorsToPeers(chainSelector))
+                    .getStrategyAdapter(parent.getStrategy().protocolId),
                 IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter(),
                 "Invariant violated: Active strategy adapter on active strategy chain should match the protocol stored in ParentPeer"
             );

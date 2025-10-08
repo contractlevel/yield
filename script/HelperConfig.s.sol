@@ -463,7 +463,9 @@ contract HelperConfig is Script {
                 registryModuleOwnerCustom: address(0) // dummy value
             }),
             tokens: TokensConfig({link: address(link), usdc: address(usdc), share: address(share)}),
-            protocols: ProtocolsConfig({aavePoolAddressesProvider: address(poolAddressesProvider), comet: address(comet)}),
+            protocols: ProtocolsConfig({
+                aavePoolAddressesProvider: address(poolAddressesProvider), comet: address(comet)
+            }),
             clf: CLFConfig({
                 functionsRouter: address(functionsRouter),
                 donId: "",

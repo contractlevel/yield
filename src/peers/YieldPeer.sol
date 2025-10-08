@@ -154,9 +154,7 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @param withdrawer The address that sent the SHARE token to withdraw USDC
     /// @param shareBurnAmount The amount of SHARE token sent
     /// @notice This function is overridden and implemented in the ChildPeer and ParentPeer contracts
-    function onTokenTransfer(address withdrawer, uint256 shareBurnAmount, bytes calldata /* data */ )
-        external
-        virtual;
+    function onTokenTransfer(address withdrawer, uint256 shareBurnAmount, bytes calldata /* data */) external virtual;
 
     /*//////////////////////////////////////////////////////////////
                                 INTERNAL
