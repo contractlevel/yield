@@ -9,7 +9,7 @@ contract PerformUpkeepTest is BaseTest {
         baseRebalancer.performUpkeep("");
     }
 
-    function test_yield_rebalancer_performUpkeep_rebalanceNewStrategy() public {
+    function test_yield_rebalancer_performUpkeep_rebalanceParentToChildStrategy() public {
         address aavePool = IPoolAddressesProvider(baseAaveV3Adapter.getPoolAddressesProvider()).getPool();
         deal(address(baseUsdc), aavePool, DEPOSIT_AMOUNT);
 
@@ -43,7 +43,7 @@ contract PerformUpkeepTest is BaseTest {
         assertTrue(ccipMessageSentEventFound, "CCIPMessageSent log not found");
     }
 
-    function test_yield_rebalancer_performUpkeep_rebalanceOldStrategy() public {
+    function test_yield_rebalancer_performUpkeep_rebalanceChildToOtherStrategy() public {
         address aavePool = IPoolAddressesProvider(baseAaveV3Adapter.getPoolAddressesProvider()).getPool();
         deal(address(baseUsdc), aavePool, DEPOSIT_AMOUNT);
 

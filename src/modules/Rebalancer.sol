@@ -183,25 +183,11 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
         ) = abi.decode(performData, (address, IYieldPeer.Strategy, IYieldPeer.CcipTxType, uint64, address, uint256));
 
         /// @dev We don't facilitate parent -> parent here because it would have already been handled by the CLF callback.
-        // if (txType == IYieldPeer.CcipTxType.RebalanceNewStrategy) {
-        //     IParentPeer(parentPeer).rebalanceNewStrategy(oldStrategyAdapter, totalValue, strategy);
-        // } else {
-        //     IParentPeer(parentPeer).rebalanceOldStrategy(oldChainSelector, strategy);
-        // }
-
-        // @reviewGeorge - This might be the more clear option?
-        // Option 1 - 2 separate external calls like before but more descriptive function names
         if (txType == IYieldPeer.CcipTxType.RebalanceNewStrategy) {
             IParentPeer(parentPeer).rebalanceParentToChildStrategy(oldStrategyAdapter, totalValue, strategy);
         } else {
             IParentPeer(parentPeer).rebalanceChildToOtherStrategy(oldChainSelector, strategy);
         }
-
-        /// @reviewGeorge - Passing in extra variables that may or may not be used depending on where it goes, wasted gas?
-        // Option 2 - 1 external call and then later in Parent routed to internal call
-        IParentPeer(parentPeer).rebalanceParentToRemoteOrChildToOtherStrategy(
-            oldStrategyAdapter, oldChainSelector, totalValue, strategy, txType
-        );
     }
 
     /*//////////////////////////////////////////////////////////////
