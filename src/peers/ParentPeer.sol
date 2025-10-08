@@ -176,6 +176,24 @@ contract ParentPeer is YieldPeer {
         }
     }
 
+    // @reviewGeorge Trying 1 external function for rebalancing, can't think of a less rough name
+    function rebalanceParentToChildOrChildToOtherStrategy(
+        address oldStrategyAdapter,
+        uint64 oldChainSelector,
+        uint256 totalValue,
+        Strategy memory newStrategy,
+        CcipTxType txType
+    ) external {
+        _revertIfMsgSenderIsNotRebalancer();
+
+        if (txType == CcipTxType.RebalanceNewStrategy) {
+            _moveFundsFromParentToChildStrategy(oldStrategyAdapter, totalValue, newStrategy);
+        }
+        if (txType == CcipTxType.RebalanceOldStrategy) {
+            _moveFundsFromChildToOtherStrategy(oldChainSelector, newStrategy);
+        }
+    }
+
     // @review:rebalancer these 2 functions can probably combined into a single one and the naming improved
     /// @dev Revert if msg.sender is not the ParentRebalancer
     /// @dev Handle moving strategy from this parent chain to a different chain
