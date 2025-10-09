@@ -14,46 +14,61 @@ import {AaveV3Adapter} from "../../src/adapters/AaveV3Adapter.sol";
 import {CompoundV3Adapter} from "../../src/adapters/CompoundV3Adapter.sol";
 import {IYieldPeer} from "../../src/interfaces/IYieldPeer.sol";
 import {StrategyRegistry} from "../../src/modules/StrategyRegistry.sol";
+import {StablecoinRegistry} from "../../src/modules/StablecoinRegistry.sol";
 
 contract DeployChild is Script {
+    struct DeploymentConfig {
+        Share share;
+        SharePool sharePool;
+        ChildPeer childPeer;
+        HelperConfig config;
+        StrategyRegistry strategyRegistry;
+        AaveV3Adapter aaveV3Adapter;
+        CompoundV3Adapter compoundV3Adapter;
+        StablecoinRegistry stablecoinRegistry;
+    }
+
     /*//////////////////////////////////////////////////////////////
                                   RUN
     //////////////////////////////////////////////////////////////*/
-    function run()
-        public
-        returns (Share, SharePool, ChildPeer, HelperConfig, StrategyRegistry, AaveV3Adapter, CompoundV3Adapter)
-    {
-        HelperConfig config = new HelperConfig();
-        HelperConfig.NetworkConfig memory networkConfig = config.getActiveNetworkConfig();
+    function run() public returns (DeploymentConfig memory childDeploy) {
+        childDeploy.config = new HelperConfig();
 
         vm.startBroadcast();
-        Share share = new Share();
-        SharePool sharePool = new SharePool(address(share), networkConfig.ccip.rmnProxy, networkConfig.ccip.ccipRouter);
-        RegistryModuleOwnerCustom(networkConfig.ccip.registryModuleOwnerCustom).registerAdminViaOwner(address(share));
-        ITokenAdminRegistry(networkConfig.ccip.tokenAdminRegistry).acceptAdminRole(address(share));
-        ITokenAdminRegistry(networkConfig.ccip.tokenAdminRegistry).setPool(address(share), address(sharePool));
+        HelperConfig.NetworkConfig memory networkConfig = childDeploy.config.getActiveNetworkConfig();
+        childDeploy.share = new Share();
+        childDeploy.sharePool =
+            new SharePool(address(childDeploy.share), networkConfig.ccip.rmnProxy, networkConfig.ccip.ccipRouter);
+        RegistryModuleOwnerCustom(networkConfig.ccip.registryModuleOwnerCustom)
+            .registerAdminViaOwner(address(childDeploy.share));
+        ITokenAdminRegistry(networkConfig.ccip.tokenAdminRegistry).acceptAdminRole(address(childDeploy.share));
+        ITokenAdminRegistry(networkConfig.ccip.tokenAdminRegistry)
+            .setPool(address(childDeploy.share), address(childDeploy.sharePool));
 
-        ChildPeer childPeer = new ChildPeer(
+        childDeploy.childPeer = new ChildPeer(
             networkConfig.ccip.ccipRouter,
             networkConfig.tokens.link,
             networkConfig.ccip.thisChainSelector,
             networkConfig.tokens.usdc,
-            address(share),
+            address(childDeploy.share),
             networkConfig.ccip.parentChainSelector
         );
-        share.grantMintAndBurnRoles(address(sharePool));
-        share.grantMintAndBurnRoles(address(childPeer));
+        childDeploy.share.grantMintAndBurnRoles(address(childDeploy.sharePool));
+        childDeploy.share.grantMintAndBurnRoles(address(childDeploy.childPeer));
 
-        StrategyRegistry strategyRegistry = new StrategyRegistry();
-        AaveV3Adapter aaveV3Adapter =
-            new AaveV3Adapter(address(childPeer), networkConfig.protocols.aavePoolAddressesProvider);
-        CompoundV3Adapter compoundV3Adapter = new CompoundV3Adapter(address(childPeer), networkConfig.protocols.comet);
-        strategyRegistry.setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(aaveV3Adapter));
-        strategyRegistry.setStrategyAdapter(keccak256(abi.encodePacked("compound-v3")), address(compoundV3Adapter));
-        childPeer.setStrategyRegistry(address(strategyRegistry));
+        childDeploy.strategyRegistry = new StrategyRegistry();
+        childDeploy.aaveV3Adapter =
+            new AaveV3Adapter(address(childDeploy.childPeer), networkConfig.protocols.aavePoolAddressesProvider);
+        childDeploy.compoundV3Adapter =
+            new CompoundV3Adapter(address(childDeploy.childPeer), networkConfig.protocols.comet);
+        childDeploy.strategyRegistry
+            .setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(childDeploy.aaveV3Adapter));
+        childDeploy.strategyRegistry
+            .setStrategyAdapter(keccak256(abi.encodePacked("compound-v3")), address(childDeploy.compoundV3Adapter));
+        childDeploy.childPeer.setStrategyRegistry(address(childDeploy.strategyRegistry));
+        childDeploy.stablecoinRegistry = new StablecoinRegistry();
+        // populate Child stablecoin registry
 
         vm.stopBroadcast();
-
-        return (share, sharePool, childPeer, config, strategyRegistry, aaveV3Adapter, compoundV3Adapter);
     }
 }

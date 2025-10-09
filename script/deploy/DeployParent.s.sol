@@ -19,6 +19,7 @@ import {AaveV3Adapter} from "../../src/adapters/AaveV3Adapter.sol";
 import {CompoundV3Adapter} from "../../src/adapters/CompoundV3Adapter.sol";
 import {IYieldPeer} from "../../src/interfaces/IYieldPeer.sol";
 import {StrategyRegistry} from "../../src/modules/StrategyRegistry.sol";
+import {StablecoinRegistry} from "../../src/modules/StablecoinRegistry.sol";
 
 contract DeployParent is Script {
     struct DeploymentConfig {
@@ -31,6 +32,7 @@ contract DeployParent is Script {
         StrategyRegistry strategyRegistry;
         AaveV3Adapter aaveV3Adapter;
         CompoundV3Adapter compoundV3Adapter;
+        StablecoinRegistry stablecoinRegistry;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -82,6 +84,8 @@ contract DeployParent is Script {
         deploy.parentPeer.setStrategyRegistry(address(deploy.strategyRegistry));
         deploy.rebalancer.setStrategyRegistry(address(deploy.strategyRegistry));
         deploy.parentPeer.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")));
+        deploy.stablecoinRegistry = new StablecoinRegistry();
+        // populate Parentstablecoin registry
 
         vm.stopBroadcast();
     }
