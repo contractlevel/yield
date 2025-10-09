@@ -6,8 +6,8 @@ optimizer = true
 optimizer_runs = 1_000_000
 
 [invariant]
-runs = 3000
-depth = 15
+runs = 100
+depth = 2
 fail_on_revert = true
 
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

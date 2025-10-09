@@ -72,6 +72,7 @@ contract BaseTest is Test {
     StrategyRegistry internal baseStrategyRegistry;
     AaveV3Adapter internal baseAaveV3Adapter;
     CompoundV3Adapter internal baseCompoundV3Adapter;
+    StablecoinRegistry internal baseStablecoinRegistry;
 
     Share internal optShare;
     SharePool internal optSharePool;
@@ -85,6 +86,7 @@ contract BaseTest is Test {
     StrategyRegistry internal optStrategyRegistry;
     AaveV3Adapter internal optAaveV3Adapter;
     CompoundV3Adapter internal optCompoundV3Adapter;
+    StablecoinRegistry internal optStablecoinRegistry;
 
     Share internal ethShare;
     SharePool internal ethSharePool;
@@ -98,6 +100,7 @@ contract BaseTest is Test {
     StrategyRegistry internal ethStrategyRegistry;
     AaveV3Adapter internal ethAaveV3Adapter;
     CompoundV3Adapter internal ethCompoundV3Adapter;
+    StablecoinRegistry internal ethStablecoinRegistry;
 
     address internal owner = makeAddr("owner");
     address internal depositor = makeAddr("depositor");
@@ -154,6 +157,7 @@ contract BaseTest is Test {
         baseStrategyRegistry = baseDeploy.strategyRegistry;
         baseAaveV3Adapter = baseDeploy.aaveV3Adapter;
         baseCompoundV3Adapter = baseDeploy.compoundV3Adapter;
+        baseStablecoinRegistry = baseDeploy.stablecoinRegistry;
         vm.makePersistent(address(baseShare));
         vm.makePersistent(address(baseSharePool));
         vm.makePersistent(address(baseParentPeer));
@@ -170,8 +174,15 @@ contract BaseTest is Test {
         assertEq(block.chainid, OPTIMISM_MAINNET_CHAIN_ID);
 
         DeployChild optDeployChild = new DeployChild();
-        (optShare, optSharePool, optChildPeer, optConfig, optStrategyRegistry, optAaveV3Adapter, optCompoundV3Adapter) =
-            optDeployChild.run();
+        DeployChild.DeploymentConfig memory optDeploy = optDeployChild.run();
+        optShare = optDeploy.share;
+        optSharePool = optDeploy.sharePool;
+        optChildPeer = optDeploy.childPeer;
+        optConfig = optDeploy.config;
+        optStrategyRegistry = optDeploy.strategyRegistry;
+        optAaveV3Adapter = optDeploy.aaveV3Adapter;
+        optCompoundV3Adapter = optDeploy.compoundV3Adapter;
+        optStablecoinRegistry = optDeploy.stablecoinRegistry;
         vm.makePersistent(address(optShare));
         vm.makePersistent(address(optSharePool));
         vm.makePersistent(address(optChildPeer));
@@ -187,8 +198,15 @@ contract BaseTest is Test {
         assertEq(block.chainid, ETHEREUM_MAINNET_CHAIN_ID);
 
         DeployChild ethDeployChild = new DeployChild();
-        (ethShare, ethSharePool, ethChildPeer, ethConfig, ethStrategyRegistry, ethAaveV3Adapter, ethCompoundV3Adapter) =
-            ethDeployChild.run();
+        DeployChild.DeploymentConfig memory ethDeploy = ethDeployChild.run();
+        ethShare = ethDeploy.share;
+        ethSharePool = ethDeploy.sharePool;
+        ethChildPeer = ethDeploy.childPeer;
+        ethConfig = ethDeploy.config;
+        ethStrategyRegistry = ethDeploy.strategyRegistry;
+        ethAaveV3Adapter = ethDeploy.aaveV3Adapter;
+        ethCompoundV3Adapter = ethDeploy.compoundV3Adapter;
+        ethStablecoinRegistry = ethDeploy.stablecoinRegistry;
         vm.makePersistent(address(ethShare));
         vm.makePersistent(address(ethSharePool));
         vm.makePersistent(address(ethChildPeer));

@@ -3,7 +3,7 @@ pragma solidity 0.8.26;
 
 import {BaseTest} from "../../BaseTest.t.sol";
 
-contract SetterTest is BaseTest {
+contract SetStrategyRegistryTest is BaseTest {
     function test_yield_strategyRegistry_setStrategyAdapter_revertsWhen_notOwner() public {
         _changePrank(holder);
         vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", holder));
