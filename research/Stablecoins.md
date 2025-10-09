@@ -1,16 +1,80 @@
-# Additional Stablecoin Integration Research
+# Stablecoin Integration Research
 
-## Initial Questions Oct 7 2025
+## Overview
 
-### What are the options for swapping between stablecoins?
+Research document for integrating stablecoin swapping capabilities into the yield protocol. This document explores various DEX options, integration approaches, and considerations for cross-chain stablecoin operations.
 
-for each of the dex options can you show what the integration would look like?
-please make the params relevant to our system and mention all contracts/interfaces we'd need to integrate for just a simple clean swap
+---
 
-- UniV4,
+## Fundamental Limitations & Risks
+
+### 1. Liquidity Constraints
+
+**USDC/USDT Liquidity Fragmentation**
+
+- Chain-specific liquidity limitations
+- **Potential Solution**: Concero/Lanca unified liquidity approach
+
+**Critical Questions:**
+
+- Is current liquidity sufficient for full TVL swaps?
+- Will large TVL impact APR through slippage?
+
+### 2. Rebalancing Frequency Optimization
+
+**Slippage vs. Performance Trade-off**
+
+- Frequent rebalancing may cause more loss than gain
+- Large TVL + frequent rebalancing = significant slippage costs
+- **Solution**: Optimize rebalancing frequency based on TVL size
+
+### 3. Single-Point-of-Failure Risks
+
+**USDC/Concero Dependency**
+
+- Dependency on single routing mechanism
+- **Mitigation**: Implement monitoring and fallback routes
+- **Goal**: Multi-path routing for redundancy
+
+### 4. TVL Risk Management
+
+**Error Handling & Fallback Logic**
+
+- Failed swaps put entire TVL at risk
+- **Protection**: TWAP (Time-Weighted Average Price) mechanisms
+- **Requirement**: Robust error recovery systems
+
+### 5. Security Considerations
+
+**Attack Surface Expansion**
+
+- Each integration introduces new attack vectors
+- **Mitigation**: Comprehensive security audits
+- **Strategy**: Minimal viable integration approach
+
+### 6. Gas Cost Optimization
+
+**Scaling Challenges**
+
+- Gas costs increase with user deposit volume
+- Small deposits still require full swap processing
+- **Solution**: Implement batching mechanisms
+
+### 7. Emergency Scenarios
+
+**Depeg Risk Management**
+
+- Handle stablecoin depeg events
+- **Requirement**: Emergency pause and withdrawal mechanisms
+- **Protection**: Circuit breakers for extreme market conditions
+
+## DEX Integration Options
+
+### Uniswap V4
+
+**Integration Example:**
 
 ```javascript
-
 import { UniversalRouter } from "@uniswap/universal-router/contracts/UniversalRouter.sol";
 import { Commands } from "@uniswap/universal-router/contracts/libraries/Commands.sol";
 import { IPoolManager } from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
@@ -20,373 +84,548 @@ import { IPermit2 } from "@uniswap/permit2/src/interfaces/IPermit2.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { StateLibrary } from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
 
-    constructor(address _router, address _poolManager, address _permit2) {
-        router = UniversalRouter(payable(_router)); // Main Interface for executing swaps
-        poolManager = IPoolManager(_poolManager);  // Interface for interacting with v4 pools
-        permit2 = IPermit2(_permit2);             // Interface to interact with Permit2, provides enhanced token approval functionality
-    }
+contract UniswapV4Swapper {
+  UniversalRouter public router;
+  IPoolManager public poolManager;
+  IPermit2 public permit2;
 
-    function swapExactInputSingle(
-    PoolKey calldata key, // PoolKey struct that identifies the v4 pool
-    uint128 amountIn, // Exact amount of tokens to swap
-    uint128 minAmountOut, // Minimum amount of output tokens expected
-    uint256 deadline // Timestamp after which the transaction will revert
-) external returns (uint256 amountOut) {
-   //...implementation of swap
-   }
+  constructor(
+    address _router,
+    address _poolManager,
+    address _permit2
+  ) {
+    router = UniversalRouter(payable(_router));
+    poolManager = IPoolManager(_poolManager);
+    permit2 = IPermit2(_permit2);
+  }
+
+  function swapExactInputSingle(
+    PoolKey calldata key,
+    uint128 amountIn,
+    uint128 minAmountOut,
+    uint256 deadline
+  ) external returns (uint256 amountOut) {
+    // Implementation of swap
+  }
+}
+
 ```
 
-- PROS:
-  Hooks allow custom logic, MEV PROTECTION
-  Single contract reduces gas costs
-  Adds gas optimizations
+**Pros:**
 
-- CONS:
-  More complex due to hooks, audit hooks
-  New (2024), liquidity still migrating -- USDC/USDT Pool on Ethereum v4 24.8M, on v3 22.4 M || Base Pool: 300k || Arb Pool: v4 8.6M v3 2.8M
+- ✅ Hooks allow custom logic and MEV protection
+- ✅ Single contract reduces gas costs
+- ✅ Advanced gas optimizations
 
-- UniV3:
+**Cons:**
+
+- ❌ More complex due to hooks (requires audit)
+- ❌ New protocol (2024), liquidity still migrating
+- ❌ Current liquidity: USDC/USDT Pool on Ethereum v4 24.8M, v3 22.4M
+
+**Liquidity Status:**
+
+- Ethereum: v4 24.8M, v3 22.4M
+- Base: v4 300k
+- Arbitrum: v4 8.6M, v3 2.8M
+
+### Uniswap V3
+
+**Integration Example:**
 
 ```javascript
 import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
 import "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
 
-function swapUSDTForUSDC(uin256 amountIn) external returns(uint256 amountOut){
-   //*TransferHelper code for transfering amount to Swapper.sol or/and TransferHelper code for approving router
-   // fee:   The fee tier of the pool, used to determine the correct pool contract in which to execute the swap
-   // deadline: the unix time after which a swap will fail, to protect against long-pending transactions and wild swings in prices
-   // sqrtPriceLimitX96:  this value can be used to set the limit for the price the swap will push the pool to, which can help protect against price impact or for setting up logic in a variety of price-relevant mechanisms.
+contract UniswapV3Swapper {
+  ISwapRouter public swapRouter;
 
-   ISwapRouter.ExactInputSingleParams memory params =
-            ISwapRouter.ExactInputSingleParams({
-                tokenIn: USDT,
-                tokenOut: USDC,
-                fee: feeTier,
-                recipient: msg.sender,
-                deadline: block.timestamp,
-                amountIn: amountIn,
-                amountOutMinimum: minOut,
-                sqrtPriceLimitX96: priceLimit
-            });
-        // The call to `exactInputSingle` executes the swap.
-        // swapRouter set in constructor or more complex logic for choosing
-        amountOut = swapRouter.exactInputSingle(params);
+  function swapUSDTForUSDC(uint256 amountIn)
+    external
+    returns (uint256 amountOut)
+  {
+    // TransferHelper code for transferring amount to Swapper.sol
+    // TransferHelper code for approving router
+
+    ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
+      .ExactInputSingleParams({
+        tokenIn: USDT,
+        tokenOut: USDC,
+        fee: feeTier, // Fee tier of the pool (0.01% for stables)
+        recipient: msg.sender,
+        deadline: block.timestamp,
+        amountIn: amountIn,
+        amountOutMinimum: minOut,
+        sqrtPriceLimitX96: priceLimit // Price limit for MEV protection
+      });
+
+    amountOut = swapRouter.exactInputSingle(params);
+  }
 }
-```
-
-- PROS:
-
-Deep liquidity (mentioned above), better efficiency for swaps, low slippage 0.01% fee tier for stables
-Multiple chains with strong USDC/USDT liquidity
-Battle-tested
-
-- CONS:
-
-Higher gas costs than v2
-((check chain deployments))
-
-- UniV2, OUDATED, just skip
-
-```javascript
 
 ```
 
-- PROS:
+**Pros:**
 
-Simple architecture
-Lower gas costs than v3
-Easy integration
+- ✅ Deep liquidity across multiple chains
+- ✅ Better efficiency for swaps
+- ✅ Low slippage with 0.01% fee tier for stables
+- ✅ Battle-tested protocol
+- ✅ Strong USDC/USDT liquidity on multiple chains
 
-- CONS:
+**Cons:**
 
-Less liquidity depth for stables
-Phasing out
-Slippage (?)
+- ❌ Higher gas costs than V2
+- ❌ Requires chain deployment verification
 
-- Lanca (Concero),
+### Uniswap V2
 
-  2 options: SDK-Based Integration(Javascript/TS) and Smart-Contract Integration(Solidity)
+_Note: Considered outdated for stablecoin swaps_
 
-```javascript
+**Pros:**
+
+- ✅ Simple architecture
+- ✅ Lower gas costs than V3
+- ✅ Easy integration
+
+**Cons:**
+
+- ❌ Less liquidity depth for stables
+- ❌ Protocol phasing out
+- ❌ Higher slippage for stablecoin pairs
+
+---
+
+### Lanca (Concero)
+
+**Two Integration Options:**
+
+1. SDK-Based Integration (JavaScript/TypeScript)
+2. Smart Contract Integration (Solidity)
+
+**SDK Integration Example:**
+
+```typescript
 import { LancaClient } from "@lanca/sdk";
 import type { ILancaClientConfig, IExecutionConfig } from "@lanca/sdk";
 import { createWalletClient, http, custom } from "viem";
 
-// Code... Set up ILancaClientConfig
- const lancaClient = new LancaClient(config) // Create LancaClient
+// Initialize LancaClient
+const lancaClient = new LancaClient(config);
 
- //createRoute
+// Create route
 const route = await lancaClient.getRoute({
-   fromChainId: ...,
-   toChainId: ...,
-   fromToken: ...,
-   toToken: ...,
-	amount: ...,
-	fromAddress: ...,
-	toAddress: ...,
-	slippageTolerance: '0.5',
-})
+  fromChainId: 1, // Ethereum
+  toChainId: 8453, // Base
+  fromToken: "USDT",
+  toToken: "USDC",
+  amount: "1000000", // 1 USDT (6 decimals)
+  fromAddress: "0x...",
+  toAddress: "0x...",
+  slippageTolerance: "0.5",
+});
 
-// creates a wallet client for authorization
+// Create wallet client for authorization
 const walletClient = createWalletClient({
-	chain: ...,
-	transport: custom(window.ethereum!),
-})
+  chain: ethereum,
+  transport: custom(window.ethereum!),
+});
 
- // executionConfig
+// Execution configuration
 const executionConfig: IExecutionConfig = {
-	switchChainHook: async (chainId: number) => {
-		console.log(chainId)
-	},
-	updateRouteStatusHook: (route: IRouteType) => console.log(route),
+  switchChainHook: async (chainId: number) => {
+    console.log(`Switching to chain: ${chainId}`);
+  },
+  updateRouteStatusHook: (route: IRouteType) => console.log(route),
+};
+
+// Execute route
+const routeWithStatus = await lancaClient.executeRoute(
+  route,
+  walletClient,
+  executionConfig
+);
+
+// Get route status
+const routeStatus = await lancaClient.getRouteStatus(routeId);
+```
+
+**Pros:**
+
+- ✅ Native CCIP integration (aligned with our stack)
+- ✅ Cross-chain swaps in a single transaction
+- ✅ Better rates through Concero optimization
+- ✅ ~0 slippage for bridging (mint/burn mechanism)
+
+**Cons:**
+
+- ❌ Limited adoption currently
+- ❌ May require significant integration time
+- ❌ Learning curve for Concero ecosystem
+
+### XSwap
+
+**Pros:**
+
+- ✅ Promising technology
+
+**Cons:**
+
+- ❌ Very early stage development
+- ❌ Limited documentation and adoption
+
+---
+
+### Cowswap
+
+_Note: INCOMPATIBLE with CCIP message flow_
+
+**Pros:**
+
+- ✅ Strong MEV protection
+- ✅ Virtually 0 slippage
+- ✅ EVM compatible
+
+**Cons:**
+
+- ❌ Batch execution may slow process
+- ❌ Cross-chain via CCIP integration challenges
+- ❌ Limited to EVM chains
+
+---
+
+### Curve Finance
+
+**Integration Example:**
+
+```javascript
+// Curve uses Vyper contracts, requires Solidity interface implementation
+interface ICurvePool {
+  function exchange(
+    int128 i,
+    int128 j,
+    uint256 dx,
+    uint256 min_dy
+  ) external returns (uint256);
 }
 
-// executeRoute, does the swap if specified
-const routeWithStatus = await lancaClient.executeRoute(route, walletClient, executionConfig)
+contract CurveSwapper {
+  ICurvePool public curvePool;
 
-//retrieve the current status of the route, including any updates or changes that have occurred during the exchange process
-const routeStatus = await lancaClient.getRouteStatus(
-	'0x231b5f78e90bf71996fd65a05c93a0d0fdb562a2cd8eb6944a833c80bae39b3e',
-)
-```
-
-- PROS:
-
-Native CCIP Integration - Aligned with stack
-Cross-Chain SWAPS in a single tx
-Better rates (?? -> Concero!)
-~0 slippage for bridging -mint/burn
-
-- CONS:
-
-Adoption (?)
-May take time to integrate/understand (-> Concero!)
-
-- XSwap,
-
-```javascript
+  function swapStablecoins(
+    int128 fromIndex,
+    int128 toIndex,
+    uint256 amountIn,
+    uint256 minAmountOut
+  ) external returns (uint256 amountOut) {
+    amountOut = curvePool.exchange(fromIndex, toIndex, amountIn, minAmountOut);
+  }
+}
 
 ```
 
-- PROS:
+**Pros:**
 
-sounds great
+- ✅ Built specifically for stablecoins
+- ✅ Deepest liquidity: Eth 3Pool DAI/USDC/USDT 177M
+- ✅ Multi-chain deployment
+- ✅ Low fees (0.04% typically)
+- ✅ Minimal slippage for stablecoin pairs
 
-- CONS:
+**Cons:**
 
-eaaaarly stage
+- ❌ Adding stables beyond USDC/USDT/DAI is complex
+- ❌ Requires chain availability verification
+- ❌ Vyper contracts need Solidity interface implementation
 
-- Cowswap - INCOMPATIBLE with CCIP message flow
+---
 
-  - PROS:
+### DEX Aggregators (1inch, Paraswap, etc.)
 
-  Strong MEV protection
-  Virtually 0 slippage
-  Mainly on EVM, that's fine
+_Note: Overkill for simple USDC/USDT swaps_
 
-  - CONS:
+**Cons:**
 
-  Mainly on EVM, that's fine for now
-  Executes in batches, may slow whole process
-  Cross-Chain via CCIP might be tricky (?)
+- ❌ Dependency on underlying DEX liquidity
+- ❌ Additional complexity and gas costs
+- ❌ API complexity and potential front-running risks
+- ❌ Unnecessary overhead for straightforward stablecoin swaps
 
-- Curve Finance ||
+---
 
-Vyper Contracts -> Solidity: Needs Interface implementation from official curve docs step by step
+## Liquidity Considerations & Limitations
 
-```javascript
- function exchange(int128 i, int128 j, uint256 dx, uint256 min_dy) external returns (uint256);
+### Key Concerns
+
+#### 1. Chain-Specific Liquidity Depth
+
+- Different chains have varying liquidity depths for stablecoin pairs
+- USDC/USDT pairs typically have the deepest liquidity across most chains
+- Need to verify liquidity availability before executing large swaps
+
+#### 2. Stablecoin Support Fragmentation
+
+- Stablecoin support varies significantly across protocols and chains
+- Whitelisted stables differ between DEXs and chains
+- Some chains may not support certain stablecoins
+
+#### 3. Liquidity Fragmentation
+
+- Multiple chains, pool versions, and fee tiers create fragmentation
+- Future need to choose optimal swap locations based on multiple factors
+- USDC pre-swapping may become the most efficient approach
+- **Lanca/Concero addresses this by treating cross-chain pools as unified**
+
+#### 4. Liquidity Reliability
+
+- Risk of liquidity exit during high volatility periods
+- V1 should focus on most liquid pairs (typically USDC/USDT)
+- Need circuit breakers for extreme market conditions
+
+#### 5. Slippage Management
+
+- Pre-execution slippage estimation required
+- Route through deepest available pools
+- Implement dynamic slippage tolerance based on trade size
+
+#### 6. Risk Mitigation Strategies
+
+- Monitor pool health and liquidity
+- Implement fallback routes for failed swaps
+- Consider Curve Finance for stablecoin-specific pools
+- Depeg protection mechanisms
+
+---
+
+## USDC as Cross-Chain Standard
+
+### CCIP Lane Analysis
+
+**Question:** Is it substantially better to always pre-emptively swap to USDC?
+
+**Answer: YES** - USDT has limited 1st phase CCIP lanes (only ETH, Optimism, and Base)
+
+### USDC Advantages
+
+#### 1. Superior CCIP Coverage
+
+- **USDC**: Deep liquidity on Ethereum, Base, Arbitrum, Avalanche, Polygon
+- **USDT**: Substantially lower liquidity on Base, limited CCIP lanes
+
+#### 2. Native Integration Benefits
+
+- Native mint/burn mechanism (no wrappers required)
+- Lower bridging fees through Concero
+- Direct CCIP integration
+
+#### 3. Recommended Architecture
+
+```
+Source Chain: Any Stablecoin → USDC → CCIP Bridge
+Destination Chain: CCIP Bridge → USDC → Target Stablecoin
 ```
 
-- PROS:
+**Benefits:**
 
-Built for stablecoins
-Deepest Liquidity Eth 3Pool DAI/USDC/USDT 177M
-Multi-Chain
-Fees at 0.04% typically
-Minimal Slippage
+- ✅ Minimizes complexity
+- ✅ Leverages CCIP infrastructure
+- ✅ Reduces bridging costs
+- ✅ Standardizes cross-chain operations
 
-- CONS:
+---
 
-Adding more stables other than USDC/USDT/DAI tricky
-((Check availability across chains))
+## Slippage Management Strategy
 
-(more?)
+### Core Principle
 
-- DEX Aggregators (1inch, Paraswap, etc) - Overkill for just USDC/USDT swaps
+**Goal:** Minimize slippage while ensuring transaction success
 
-  - CONS:
+### Slippage Optimization Techniques
 
-  Dependancy on aforementioned DEXs liquidity, extra steps, GAS/API complexity, front-running???
+#### 1. Dynamic Slippage Tolerance
 
-### What do we need to be concerned about for liquidity? What are the fundamental limitations to what we are trying to achieve?
+- **Large trades**: 0.5% slippage tolerance
+- **Small trades**: Tighter tolerance (0.1-0.3%)
+- **Risk**: Very low tolerance may cause transaction failures
 
-- Chain-Specific Liquidity Depth
-- Stablecoin Support vastly different across protocols/chains (whitelisted stables)
-- Fragmentation of each protocol's liquidity: multiple chains, pool versions, fees, in the future we might need to choose where and when we do each swap based on multiple factors and end up with USDC preswapping being the most efficient. LANCA specifically addresses that by treating chain pools together (->Concero!)
-- Liquidity Reliability: Exit during volatility, shouldn't be the case for v1, chains' strongest pair is usually USDC/USDT
-- Slippage: pre-execution slippage estimation, deep pools
-- Depeg? Circuit breakers?
-- Monitor pools of choice
-- Implement fallback routes?
-- Use Curve
+#### 2. Pool Selection Strategy
 
-### What are implications on liquidity of USDC being the stablecoin with the most CCIP lanes?
+- Route through deepest available pools
+- Avoid small DEX pools with limited liquidity
+- Target 0.05% fee stable pools (ideal for pegged pairs)
+- Higher fee pools often have deeper liquidity
 
-- Is it substantially better to always pre-emptively swap to USDC?
-  YES, USDT has no 1st phase lanes except ETH, Optimism(?) and BASE
-  - USDC deep liquidity on Ethereum, Base (USDT substantially low), Arbitrum, Avalanche, Polygon
-  - native mint/burn, no wrappers
-  - lower fees (? -> concero)
-    Design system with USDC as cross-chain standard,
-    SWAP to USDC on source if Parent/Child deposit -> CrossChain
-    SWAP from USDC on destination
-    minimizes complexity and leverages CCIP,
+#### 3. Cross-Chain Slippage Mitigation
 
-### What do we need to think about in terms of slippage?
+- Use pegged bridges for 0 cross-chain slippage
+- Leverage Concero's mint/burn mechanism
+- Minimize intermediate swaps
 
-- Consider: We want to lose as little to slippage as possible whilst still having successful transactions.
+#### 4. Advanced Slippage Management
 
-  - Tight slippage tolerance: low slippage settings 0.5% for large trades, ensures it executes if price impact is small, although might cause Tx failures, latency
-  - Max Pool Depth: Route through the deepest available pools, avoid small DEX pools
-  - Stable Pools: Pools having deeper liquidity might be bc of higher fees, so liq providers choose them. Find 0.05% stable pools, ideal for pegged pairs
-  - Route via Pegged Bridges for 0 cross-chain slippage
-  - Very low slippage tolerance -> Tx reverting risk, balance of slippage and tx success
-  - Maybe query Chainlink for fair prices and compare to decide acceptable slippage before the swap
-  - Cumulative Slippage from 2+ swaps
-  - Time sensitivity, deadline checks
-  - Route splitting for very large swaps? Might be needed due to TVL being swapped from (cross-chain)Strategy to Strategy
+- Query Chainlink for fair prices pre-swap
+- Compare market rates to determine acceptable slippage
+- Implement deadline checks for time sensitivity
+- Consider cumulative slippage from multiple swaps
 
-### Do we need additional contract(s) for DEX integration?
+#### 5. Large Trade Handling
 
-Depends on DEX vs Cross-Chain Swap Abstraction choice. If we use multiple DEX's - YES! Need to handle logic and paths for routing/swaps
+- Route splitting for very large swaps
+- Essential for TVL movements between cross-chain strategies
+- Distribute across multiple pools to minimize impact
 
-- What are the additional requirements for it?
-  Swapper.sol
+---
 
-  1. DEX Abstraction
+## Contract Architecture Requirements
 
-     - Unified interface for multiple DEXs
-     - Adapt pattern for each DEX
-     - Add/Remove DEXs
+### Do we need additional contracts for DEX integration?
 
-  2. Route optimization
+**Answer:** Depends on DEX vs Cross-Chain Swap Abstraction choice. If using multiple DEXs - **YES!**
 
-     - Query multiple DEXs
-     - Select best rate
-     - Split routes for large trades
+### Swapper.sol Requirements
 
-  3. Slippage Protection
+#### 1. DEX Abstraction Layer
 
-     - Auto slippage calculations
-     - MinOut enforcements
+- Unified interface for multiple DEXs
+- Adapter pattern for each DEX integration
+- Dynamic DEX addition/removal capability
 
-  4. MEV
+#### 2. Route Optimization Engine
 
-     - MEV-protected relayers
+- Query multiple DEXs for best rates
+- Intelligent route selection algorithm
+- Route splitting for large trades
 
-  5. Safety Mechanics
+#### 3. Slippage Protection System
 
-     - Deadline enforcements
-     - Emergency Pausing
+- Automatic slippage calculations
+- Minimum output enforcement
+- Dynamic tolerance adjustment
 
-  6. Gas Optimizations
+#### 4. MEV Protection
 
-     - Batch operations where possible (TVL moving + deposits happening?)
-     - Efficient encoding
-     - Token approvals?
+- MEV-protected relayers integration
+- Private mempool routing options
 
-  7. Monitoring
+#### 5. Safety Mechanisms
 
-     - Event emissions for all swaps
-     - Slippage tracking
+- Deadline enforcement
+- Emergency pause functionality
+- Circuit breakers for extreme conditions
 
-  8. Upgradeability
+#### 6. Gas Optimization
 
-     - Allow more DEXs
-     - Allow more Stables
-     - Various adjustments
+- Batch operations where possible
+- Efficient encoding for CCIP messages
+- Optimized token approval patterns
 
-  9. More considerations
+#### 7. Monitoring & Analytics
 
-     - Failed swap handling
-     - Before or after CCIP message? - Obviously depends on where we initiate the swap, but which contract sends the CCIP message afterall?
-     - Including, testing and succesfully implementing swap logic inside CCIP Messages introduces huge headaches, advil insufficient
-     - Audit complexity
+- Comprehensive event emissions
+- Slippage tracking and reporting
+- Performance metrics collection
 
-### Can Concero abstract the swap process through cross-chain messages also facilitating DEX swaps or is it always a 2-step process?
+#### 8. Upgradeability Framework
 
-1. ASK DURING CONCERO MEET:
+- Modular DEX integration
+- Dynamic stablecoin support
+- Configurable parameters
 
-   - Can we include data to facilitate swaps (cross-chain swapping) ?
-     - Which services can be plug-N-play?
-     - Does Lanca do exactly that for them?
-     - v1 / v2 ?
-     - Ask for walkthrough by team member
+#### 9. Critical Considerations
 
-2. Use Concero Embedded Swaps
+- **Failed swap handling**: Robust error recovery
+- **CCIP message timing**: Before or after swap execution
+- **Integration complexity**: Swap logic in CCIP messages adds significant complexity
+- **Audit requirements**: Increased surface area for security reviews
 
-   - CCIP message includes fromToken, toToken, minOutput
-   - Concero executes swaps with their integrated DEXs
-   - Single Tx
+---
 
-   ASK Concero:
+## Concero Integration Strategy
 
-   - Slippage protection handling?
-   - Swap fallback logic?
+### Can Concero abstract the swap process through cross-chain messages?
 
-3. Hybrid Approach
-   - Concero for CCIP messaging, USDC Bridgin
-   - Implement own Swapper.sol for source and destination chain swaps
-   - Include destination swap parameters in CCIP message
-     => Flex, optimizable, better error handling, transparent to us (and users?)
+### Integration Options
 
-### How do we minimize MEV via Uniswap?
+#### 1. Concero Embedded Swaps
 
-- UniswapX: Offers protection against MEV, meta-aggregator, currently on ETH and BASE
-- UniswapWallet : Private Pools
+**Approach:** Single transaction with embedded swap logic
 
-- Large trades on shallow pools are getting hit by MEV -> Trade on deep liquidity pools
-- Front-running less profitable with 0.01-0.1% spreads, MEV minimal for stablecoin swaps
+```
+CCIP Message: { fromToken, toToken, minOutput, swapParams }
+Concero: Executes swaps with integrated DEXs
+```
 
-- Protection Strategies:
-  - Flashbots Protect: sends Tx directly to builders (slower)
-  - MEV Blocker: RPC endpoint that prevents front-running
-  - Uniswap v4 has hooks that allow custom MEV protection
+**Questions for Concero Team:**
 
-### Fundamental Limitations
+- Can we include swap data in cross-chain messages?
+- Which services are plug-and-play compatible?
+- Does Lanca provide this functionality?
+- v1 vs v2 capabilities?
+- Slippage protection handling?
+- Swap fallback logic implementation?
 
-- USDC/USDT Liquidity on each chain // Liquidity Fragmentation (Maybe Concero/Lanca fixes)
+#### 2. Hybrid Approach
 
-  - Is it enough for us to a whole TVL swap for deposit?
-  - If the TVL becomes big enough, will the APR change?
+**Architecture:**
 
-- Rebalancing Frequency
+- Concero: CCIP messaging + USDC bridging
+- Custom Swapper.sol: Source and destination chain swaps
+- CCIP message: Includes destination swap parameters
 
-  - Is this something that might cause more loss than gain due to slippage?
-  - How often will the rebalancing happen? Too often & TVL big -> $$ lost to slippage, users lose potential gains
+**Benefits:**
 
-- USDC as bridge, Concero as bridge
+- ✅ Maximum flexibility and optimization
+- ✅ Better error handling and transparency
+- ✅ Custom slippage and routing logic
+- ✅ Full control over swap execution
 
-- Dependancy on single-point routing
-- Ideally: monitoring/fallback routes
+#### 3. Questions for Concero Meeting
 
-- TVL Handling
+- Cross-chain swap data inclusion capabilities
+- Integrated DEX service availability
+- Lanca integration specifics
+- Version compatibility (v1/v2)
+- Team walkthrough request
 
-  - Error Handling, Fallback Logic
-  - If swaps revert/not favourable, the whole TVL is at risk
-  - TWAP
+---
 
-- Attack Surface
+## MEV Protection Strategies
 
-  - Each integration introduces more and more potential attack vectors
+### Uniswap MEV Mitigation
 
-- GAS Costs
+#### 1. UniswapX Integration
 
-  - Ramping up due to user deposits
-  - Small deposits will still be swapped back and forth and handled into the strategy
-  - Might need batching
+- **MEV Protection**: Meta-aggregator with built-in protection
+- **Availability**: Currently on Ethereum and Base
+- **Benefits**: Advanced MEV protection for large trades
 
-- Edge Case of DEPEG
+#### 2. UniswapWallet Private Pools
 
-  - Handle emergency
+- Private pool functionality
+- Reduced MEV exposure for sensitive trades
+
+#### 3. Pool Selection Strategy
+
+- **Deep Liquidity Focus**: Trade on pools with highest liquidity
+- **Shallow Pool Risk**: Large trades on shallow pools are MEV targets
+- **Stablecoin Advantage**: 0.01-0.1% spreads make front-running less profitable
+
+#### 4. Protection Mechanisms
+
+##### Flashbots Protect
+
+- Sends transactions directly to builders
+- **Trade-off**: Slower execution for MEV protection
+
+##### MEV Blocker
+
+- RPC endpoint that prevents front-running
+- Real-time MEV protection
+
+##### Uniswap V4 Hooks
+
+- Custom MEV protection through hooks
+- Advanced protection strategies
+- Programmable MEV mitigation
+
+---
