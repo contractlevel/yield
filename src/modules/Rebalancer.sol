@@ -184,9 +184,9 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
 
         /// @dev We don't facilitate parent -> parent here because it would have already been handled by the CLF callback.
         if (txType == IYieldPeer.CcipTxType.RebalanceNewStrategy) {
-            IParentPeer(parentPeer).rebalanceParentToChildStrategy(oldStrategyAdapter, totalValue, strategy);
+            IParentPeer(parentPeer).rebalanceParentToChild(oldStrategyAdapter, totalValue, strategy);
         } else {
-            IParentPeer(parentPeer).rebalanceChildToOtherStrategy(oldChainSelector, strategy);
+            IParentPeer(parentPeer).rebalanceChildToOther(oldChainSelector, strategy);
         }
     }
 

@@ -177,6 +177,8 @@ contract ParentPeer is YieldPeer {
     }
 
     // @review:rebalancer these 2 functions can probably combined into a single one and the naming improved
+    // a: George - combining into one means having to pass more variables which won't all be used depending
+    // on the internal function call, gas is wasted. Keeping as 2 is easier to name and more gas efficient.
     /// @dev Revert if msg.sender is not the ParentRebalancer
     /// @dev Handle moving strategy from this parent chain to a different chain
     /// @param oldStrategyAdapter The address of the old strategy adapter
@@ -184,7 +186,7 @@ contract ParentPeer is YieldPeer {
     /// @param newStrategy The new strategy
     /// @notice This function is called by the ParentRebalancer's Log-trigger Automation performUpkeep
     /// @notice This is called when the strategy is on this chain and is being moved to a different chain
-    function rebalanceParentToChildStrategy(address oldStrategyAdapter, uint256 totalValue, Strategy memory newStrategy)
+    function rebalanceParentToChild(address oldStrategyAdapter, uint256 totalValue, Strategy memory newStrategy)
         external
     {
         _revertIfMsgSenderIsNotRebalancer();
@@ -197,7 +199,7 @@ contract ParentPeer is YieldPeer {
     /// @param newStrategy The new strategy
     /// @notice This function is called by the ParentRebalancer's Log-trigger Automation performUpkeep
     /// @notice This is called when the old strategy is on a different chain to this chain, a remote child
-    function rebalanceChildToOtherStrategy(uint64 oldChainSelector, Strategy memory newStrategy) external {
+    function rebalanceChildToOther(uint64 oldChainSelector, Strategy memory newStrategy) external {
         _revertIfMsgSenderIsNotRebalancer();
         _moveFundsFromChildToOtherStrategy(oldChainSelector, newStrategy);
     }
