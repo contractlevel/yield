@@ -292,32 +292,16 @@ contract RebalanceTest is BaseTest {
         );
     }
 
-    // function test_yield_parentPeer_rebalanceNewStrategy_revertsWhen_notRebalancer() public {
-    //     vm.expectRevert(abi.encodeWithSignature("ParentPeer__OnlyRebalancer()"));
-    //     baseParentPeer.rebalanceNewStrategy(
-    //         address(0), 0, IYieldPeer.Strategy({chainSelector: 0, protocolId: keccak256(abi.encodePacked("aave-v3"))})
-    //     );
-    // }
-
-    // @reviewGeorge Updated test for new rebalance strategy name
     function test_yield_parentPeer_rebalanceNewStrategy_revertsWhen_notRebalancer() public {
         vm.expectRevert(abi.encodeWithSignature("ParentPeer__OnlyRebalancer()"));
-        baseParentPeer.rebalanceParentToChildStrategy(
+        baseParentPeer.rebalanceParentToChild(
             address(0), 0, IYieldPeer.Strategy({chainSelector: 0, protocolId: keccak256(abi.encodePacked("aave-v3"))})
         );
     }
 
-    // function test_yield_parentPeer_rebalanceOldStrategy_revertsWhen_notRebalancer() public {
-    //     vm.expectRevert(abi.encodeWithSignature("ParentPeer__OnlyRebalancer()"));
-    //     baseParentPeer.rebalanceOldStrategy(
-    //         0, IYieldPeer.Strategy({chainSelector: 0, protocolId: keccak256(abi.encodePacked("aave-v3"))})
-    //     );
-    // }
-
-    // @reviewGeorge Updated test for new rebalance strategy name
     function test_yield_parentPeer_rebalanceOldStrategy_revertsWhen_notRebalancer() public {
         vm.expectRevert(abi.encodeWithSignature("ParentPeer__OnlyRebalancer()"));
-        baseParentPeer.rebalanceChildToOtherStrategy(
+        baseParentPeer.rebalanceChildToOther(
             0, IYieldPeer.Strategy({chainSelector: 0, protocolId: keccak256(abi.encodePacked("aave-v3"))})
         );
     }

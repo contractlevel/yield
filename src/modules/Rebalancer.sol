@@ -125,8 +125,11 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     function checkLog(Log calldata log, bytes memory)
         external
         view
-        cannotExecute
-        returns (bool upkeepNeeded, bytes memory performData)
+        returns (
+            //cannotExecute
+            bool upkeepNeeded,
+            bytes memory performData
+        )
     {
         bytes32 eventSignature = keccak256("StrategyUpdated(uint64,bytes32,uint64)");
         address parentPeer = s_parentPeer;
@@ -169,6 +172,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
 
     /// @notice Called by the Chainlink Automation forwarder
     /// @notice Triggers CCIP rebalance messages from the ParentPeer
+    /// @notice Rebalance messages will either send strategy from Parent to Child or from Child to another
     /// @dev Revert if caller is not the Chainlink Automation forwarder
     /// @param performData The performData returned by the checkLog function
     function performUpkeep(bytes calldata performData) external {
@@ -183,6 +187,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
         ) = abi.decode(performData, (address, IYieldPeer.Strategy, IYieldPeer.CcipTxType, uint64, address, uint256));
 
         /// @dev We don't facilitate parent -> parent here because it would have already been handled by the CLF callback.
+        /// @dev Local rebalance on Parent is handled when new strategy is updated there.
         if (txType == IYieldPeer.CcipTxType.RebalanceNewStrategy) {
             IParentPeer(parentPeer).rebalanceParentToChild(oldStrategyAdapter, totalValue, strategy);
         } else {

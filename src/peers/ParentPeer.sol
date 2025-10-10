@@ -176,29 +176,31 @@ contract ParentPeer is YieldPeer {
         }
     }
 
-    /// @dev Revert if msg.sender is not the ParentRebalancer
-    /// @dev Handle moving strategy from this parent chain to a different chain
+    /// @dev Revert if msg.sender is not the Rebalancer
+    /// @dev Handle moving strategy (both funds & new strategy info) from this parent chain to a child chain
+    /// @notice This function is called by the Rebalancer's Log-trigger Automation performUpkeep
+    /// @notice Called when the strategy is on this chain and is being moved to a child chain
     /// @param oldStrategyAdapter The address of the old strategy adapter
     /// @param totalValue The total value of the system
     /// @param newStrategy The new strategy
-    /// @notice This function is called by the Rebalancer's Log-trigger Automation performUpkeep
-    /// @notice This is called when the strategy is on this chain and is being moved to a different chain
     function rebalanceParentToChild(address oldStrategyAdapter, uint256 totalValue, Strategy memory newStrategy)
         external
     {
         _revertIfMsgSenderIsNotRebalancer();
-        _handleRebalanceFromParentToChildStrategy(oldStrategyAdapter, totalValue, newStrategy);
+        _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
+        if (totalValue != 0) _withdrawFromStrategy(oldStrategyAdapter, totalValue);
+        _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, abi.encode(newStrategy), totalValue);
     }
 
-    /// @dev Revert if msg.sender is not the ParentRebalancer
-    /// @dev Handle rebalancing from a different chain
+    /// @dev Revert if msg.sender is not the Rebalancer
+    /// @dev Handle rebalancing on a child chain by sending it new Strategy info
+    /// @notice This function is called by the Rebalancer's Log-trigger Automation performUpkeep
+    /// @notice This is called when the old strategy is on a child chain and needs to be rebalanaced (either to another local protocol or chain)
     /// @param oldChainSelector The chain selector of the old strategy
     /// @param newStrategy The new strategy
-    /// @notice This function is called by the Rebalancer's Log-trigger Automation performUpkeep
-    /// @notice This is called when the old strategy is on a different chain to this chain, a remote child
     function rebalanceChildToOther(uint64 oldChainSelector, Strategy memory newStrategy) external {
         _revertIfMsgSenderIsNotRebalancer();
-        _handleRebalanceFromChildToOtherStrategy(oldChainSelector, newStrategy);
+        _ccipSend(oldChainSelector, CcipTxType.RebalanceOldStrategy, abi.encode(newStrategy), ZERO_BRIDGE_AMOUNT);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -399,28 +401,6 @@ contract ParentPeer is YieldPeer {
 
         //slither-disable-next-line reentrancy-events
         _depositToStrategy(newActiveStrategyAdapter, totalValue);
-    }
-
-    /// @notice Handles moving strategy from Parent to a Child chain
-    /// @param oldStrategyAdapter The address of the old strategy adapter
-    /// @param totalValue The total value of the system
-    /// @param newStrategy The new strategy
-    function _handleRebalanceFromParentToChildStrategy(
-        address oldStrategyAdapter,
-        uint256 totalValue,
-        Strategy memory newStrategy
-    ) internal {
-        _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
-        if (totalValue != 0) _withdrawFromStrategy(oldStrategyAdapter, totalValue);
-        _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, abi.encode(newStrategy), totalValue);
-    }
-
-    /// @notice Handles rebalancing when strategy is on a Child chain
-    /// @param oldChainSelector The chain selector of the old strategy
-    /// @param newStrategy The new strategy
-    /// @notice This function is sending a crosschain message to the old strategy to rebalance funds to the new strategy
-    function _handleRebalanceFromChildToOtherStrategy(uint64 oldChainSelector, Strategy memory newStrategy) internal {
-        _ccipSend(oldChainSelector, CcipTxType.RebalanceOldStrategy, abi.encode(newStrategy), ZERO_BRIDGE_AMOUNT);
     }
 
     /*//////////////////////////////////////////////////////////////
