@@ -41,7 +41,7 @@ Research document for integrating stablecoin swapping capabilities into the yiel
 **Error Handling & Fallback Logic**
 
 - Failed swaps put entire TVL at risk
-- **Protection**: TWAP (Time-Weighted Average Price) mechanisms
+- **Protection**: TWAP mechanisms
 - **Requirement**: Robust error recovery systems
 
 ### 5. Security Considerations
@@ -72,49 +72,12 @@ Research document for integrating stablecoin swapping capabilities into the yiel
 
 ### Uniswap V4
 
-**Integration Example:**
-
-```javascript
-import { UniversalRouter } from "@uniswap/universal-router/contracts/UniversalRouter.sol";
-import { Commands } from "@uniswap/universal-router/contracts/libraries/Commands.sol";
-import { IPoolManager } from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
-import { IV4Router } from "@uniswap/v4-periphery/src/interfaces/IV4Router.sol";
-import { Actions } from "@uniswap/v4-periphery/src/libraries/Actions.sol";
-import { IPermit2 } from "@uniswap/permit2/src/interfaces/IPermit2.sol";
-import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { StateLibrary } from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
-
-contract UniswapV4Swapper {
-  UniversalRouter public router;
-  IPoolManager public poolManager;
-  IPermit2 public permit2;
-
-  constructor(
-    address _router,
-    address _poolManager,
-    address _permit2
-  ) {
-    router = UniversalRouter(payable(_router));
-    poolManager = IPoolManager(_poolManager);
-    permit2 = IPermit2(_permit2);
-  }
-
-  function swapExactInputSingle(
-    PoolKey calldata key,
-    uint128 amountIn,
-    uint128 minAmountOut,
-    uint256 deadline
-  ) external returns (uint256 amountOut) {
-    // Implementation of swap
-  }
-}
-
-```
+**Code Integration:** See [Uniswap V4 Integration](#uniswap-v4-integration) for implementation details.
 
 **Pros:**
 
 - ✅ Hooks allow custom logic and MEV protection
-- ✅ Single contract reduces gas costs
+- ✅ Singleton contract reduces gas costs, liquidity depth increased
 - ✅ Advanced gas optimizations
 
 **Cons:**
@@ -131,39 +94,7 @@ contract UniswapV4Swapper {
 
 ### Uniswap V3
 
-**Integration Example:**
-
-```javascript
-import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
-import "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
-
-contract UniswapV3Swapper {
-  ISwapRouter public swapRouter;
-
-  function swapUSDTForUSDC(uint256 amountIn)
-    external
-    returns (uint256 amountOut)
-  {
-    // TransferHelper code for transferring amount to Swapper.sol
-    // TransferHelper code for approving router
-
-    ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
-      .ExactInputSingleParams({
-        tokenIn: USDT,
-        tokenOut: USDC,
-        fee: feeTier, // Fee tier of the pool (0.01% for stables)
-        recipient: msg.sender,
-        deadline: block.timestamp,
-        amountIn: amountIn,
-        amountOutMinimum: minOut,
-        sqrtPriceLimitX96: priceLimit // Price limit for MEV protection
-      });
-
-    amountOut = swapRouter.exactInputSingle(params);
-  }
-}
-
-```
+**Code Integration:** See [Uniswap V3 Integration](#uniswap-v3-integration) for implementation details.
 
 **Pros:**
 
@@ -198,57 +129,12 @@ _Note: Considered outdated for stablecoin swaps_
 
 ### Lanca (Concero)
 
+**Code Integration:** See [Lanca (Concero) Integration](#lanca-concero-integration) for implementation details.
+
 **Two Integration Options:**
 
 1. SDK-Based Integration (JavaScript/TypeScript)
 2. Smart Contract Integration (Solidity)
-
-**SDK Integration Example:**
-
-```typescript
-import { LancaClient } from "@lanca/sdk";
-import type { ILancaClientConfig, IExecutionConfig } from "@lanca/sdk";
-import { createWalletClient, http, custom } from "viem";
-
-// Initialize LancaClient
-const lancaClient = new LancaClient(config);
-
-// Create route
-const route = await lancaClient.getRoute({
-  fromChainId: 1, // Ethereum
-  toChainId: 8453, // Base
-  fromToken: "USDT",
-  toToken: "USDC",
-  amount: "1000000", // 1 USDT (6 decimals)
-  fromAddress: "0x...",
-  toAddress: "0x...",
-  slippageTolerance: "0.5",
-});
-
-// Create wallet client for authorization
-const walletClient = createWalletClient({
-  chain: ethereum,
-  transport: custom(window.ethereum!),
-});
-
-// Execution configuration
-const executionConfig: IExecutionConfig = {
-  switchChainHook: async (chainId: number) => {
-    console.log(`Switching to chain: ${chainId}`);
-  },
-  updateRouteStatusHook: (route: IRouteType) => console.log(route),
-};
-
-// Execute route
-const routeWithStatus = await lancaClient.executeRoute(
-  route,
-  walletClient,
-  executionConfig
-);
-
-// Get route status
-const routeStatus = await lancaClient.getRouteStatus(routeId);
-```
 
 **Pros:**
 
@@ -263,7 +149,7 @@ const routeStatus = await lancaClient.getRouteStatus(routeId);
 - ❌ May require significant integration time
 - ❌ Learning curve for Concero ecosystem
 
-### XSwap
+### XSwap --- Ongoing talks on discord with their support for more information!
 
 **Pros:**
 
@@ -296,33 +182,7 @@ _Note: INCOMPATIBLE with CCIP message flow_
 
 ### Curve Finance
 
-**Integration Example:**
-
-```javascript
-// Curve uses Vyper contracts, requires Solidity interface implementation
-interface ICurvePool {
-  function exchange(
-    int128 i,
-    int128 j,
-    uint256 dx,
-    uint256 min_dy
-  ) external returns (uint256);
-}
-
-contract CurveSwapper {
-  ICurvePool public curvePool;
-
-  function swapStablecoins(
-    int128 fromIndex,
-    int128 toIndex,
-    uint256 amountIn,
-    uint256 minAmountOut
-  ) external returns (uint256 amountOut) {
-    amountOut = curvePool.exchange(fromIndex, toIndex, amountIn, minAmountOut);
-  }
-}
-
-```
+**Code Integration:** See [Curve Finance Integration](#curve-finance-integration) for implementation details.
 
 **Pros:**
 
@@ -563,6 +423,7 @@ Concero: Executes swaps with integrated DEXs
 - v1 vs v2 capabilities?
 - Slippage protection handling?
 - Swap fallback logic implementation?
+- Are the swap data encrypted, can we encrypt to minimize attacks
 
 #### 2. Hybrid Approach
 
@@ -627,5 +488,194 @@ Concero: Executes swaps with integrated DEXs
 - Custom MEV protection through hooks
 - Advanced protection strategies
 - Programmable MEV mitigation
+
+---
+
+## DEX Integration Code Examples
+
+This section contains detailed code implementation examples for each DEX integration option. Use these as reference when implementing the actual integration.
+
+### Uniswap V4 Integration
+
+- Interaction Model: To use Uniswap v4, you do not call swap directly. You call the unlock function, which then calls your contract back. Inside this callback, your contract calls swap.
+
+- Smart Contract Intermediaries: All interactions with the PoolManager's core functions must be performed through a smart contract that implements the IUnlockCallback interface.
+
+This is used for the low-level, direct interaction with PoolManager.
+
+```javascript
+import {SafeCallback} from "v4-periphery/src/base/SafeCallback.sol";
+
+contract IntegratingContract is SafeCallback {
+    constructor(IPoolManager _poolManager) SafeCallback(_poolManager) {}
+    function unlockCallback(bytes calldata rawData) external returns (bytes memory);
+}
+```
+
+- Transient Storage for Efficiency: The lock is implemented using gas-efficient transient storage (tstore/tload), which maintains state only for the duration of a single transaction.
+
+- Enforced Currency Settlement: The NonzeroDeltaCount mechanism guarantees that all token deltas are fully settled, ensuring the pool's accounting is balanced before a transaction can succeed.
+
+This is used for the high-level, recommended approach using the Universal Router.
+
+Libraries for interacting with the Universal Router:
+
+```javascript
+forge install uniswap/v4-core
+forge install uniswap/v4-periphery
+forge install uniswap/permit2
+forge install uniswap/universal-router
+forge install uniswap/v3-core
+forge install uniswap/v2-core
+forge install OpenZeppelin/openzeppelin-contracts
+```
+
+```javascript
+import { UniversalRouter } from "@uniswap/universal-router/contracts/UniversalRouter.sol";
+import { Commands } from "@uniswap/universal-router/contracts/libraries/Commands.sol";
+import { IPoolManager } from "@uniswap/v4-core/src/interfaces/IPoolManager.sol";
+import { IV4Router } from "@uniswap/v4-periphery/src/interfaces/IV4Router.sol";
+import { Actions } from "@uniswap/v4-periphery/src/libraries/Actions.sol";
+import { IPermit2 } from "@uniswap/permit2/src/interfaces/IPermit2.sol";
+import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { StateLibrary } from "@uniswap/v4-core/src/libraries/StateLibrary.sol";
+
+contract UniswapV4Swapper {
+  UniversalRouter public router;
+  IPoolManager public poolManager;
+  IPermit2 public permit2;
+
+  constructor(
+    address _router,
+    address _poolManager,
+    address _permit2,
+    address _usdt,
+    address _usdc
+  ) {
+    router = UniversalRouter(payable(_router));
+    poolManager = IPoolManager(_poolManager);
+    permit2 = IPermit2(_permit2);
+    USDT = _usdt;
+    USDC = _usdc;
+  }
+
+  struct PoolKey {
+    /// @notice The lower currency of the pool, sorted numerically.
+    ///         For native ETH, Currency currency0 = Currency.wrap(address(0));
+    Currency currency0;
+    /// @notice The higher currency of the pool, sorted numerically
+    Currency currency1;
+    /// @notice The pool LP fee, capped at 1_000_000. If the highest bit is 1, the pool has a dynamic fee and must be exactly equal to 0x800000
+    uint24 fee;
+    /// @notice Ticks that involve positions must be a multiple of tick spacing
+    int24 tickSpacing;
+    /// @notice The hooks of the pool
+    IHooks hooks;
+}
+
+//This function first approves Permit2 to spend the token, then uses Permit2 to approve the UniversalRouter with a specific amount and expiration time
+function approveTokenWithPermit2(
+    address token,
+    uint160 amount,
+    uint48 expiration
+) external {
+    IERC20(token).approve(address(permit2), type(uint256).max);
+    permit2.approve(token, address(router), amount, expiration);
+}
+
+  function swapExactInputSingle(
+    PoolKey calldata key, // PoolKey struct that identifies the v4 pool
+    uint128 amountIn,     // Exact amount of tokens to swap
+    uint128 minAmountOut, // Minimum amount of output tokens expected
+    uint256 deadline      // Timestamp after which the transaction will rever
+  ) external returns (uint256 amountOut) {
+    // Implementation of swap
+  }
+}
+```
+
+### Uniswap V3 Integration
+
+```javascript
+import "@uniswap/v3-periphery/contracts/interfaces/ISwapRouter.sol";
+import "@uniswap/v3-periphery/contracts/libraries/TransferHelper.sol";
+
+contract UniswapV3Swapper {
+  ISwapRouter public swapRouter;
+  address public constant USDT = 0x12345;
+  address public constant USDC = 0x54321;
+  uint24 public constant FEE_TIER = 100;
+
+  //*Deposit & Withdraw with _swapUSDTForUSDC call
+  // code...
+  //
+
+
+  function _swapUSDTForUSDC(uint256 amountIn)
+    external
+    returns (uint256 amountOut)
+  {
+    // TransferHelper code for transferring amount to Swapper.sol
+    // TransferHelper code for approving router
+
+    // set up parameters based on preference
+    // can ExactOutputSingleParams as well
+    ISwapRouter.ExactInputSingleParams memory params = ISwapRouter
+      .ExactInputSingleParams({
+        tokenIn: USDT,
+        tokenOut: USDC,
+        fee: feeTier, // Fee tier of the pool (0.01% for stables)
+        recipient: msg.sender,
+        deadline: block.timestamp,
+        amountIn: amountIn,
+        amountOutMinimum: minOut,
+        sqrtPriceLimitX96: priceLimit // Price limit for MEV protection
+      });
+
+    amountOut = swapRouter.exactInputSingle(params);
+  }
+}
+```
+
+### Lanca (Concero) Integration
+
+#### Lanca for Bridging USDC + Message, Concero for Messages
+
+==> Abstracted Bridge & Swap discontinued.
+
+### Curve Finance Integration
+
+`cast interface from https://polygonscan.com/address/0xF0d4c12A5768D806021F80a262B4d39d26C58b8D`
+
+```javascript
+// Curve uses Vyper contracts, requires Solidity interface implementation
+interface ICurvePool {
+  function exchange(
+    int128 i,
+    int128 j,
+    uint256 dx,
+    uint256 min_dy
+  ) external returns (uint256);
+}
+
+contract CurveSwapper {
+  ICurvePool public curvePool;
+
+  function swapStablecoins(
+    int128 fromIndex,
+    int128 toIndex,
+    uint256 amountIn,
+    uint256 minAmountOut
+  ) external returns (uint256 amountOut) {
+    amountOut = curvePool.exchange(fromIndex, toIndex, amountIn, minAmountOut);
+  }
+}
+```
+
+https://github.com/ensuro/swap-library
+
+### Balancer Integration
+
+https://github.com/balancer/balancer-v3-monorepo/tree/main
 
 ---
