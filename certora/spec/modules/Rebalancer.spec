@@ -23,8 +23,8 @@ methods {
     function _.balanceOf(address) external => DISPATCHER(true);
     function _.getPool() external => DISPATCHER(true);
     function _.getReserveData(address) external => DISPATCHER(true);
-    function _.rebalanceNewStrategy(address, uint256, IYieldPeer.Strategy) external => DISPATCHER(true);
-    function _.rebalanceOldStrategy(uint64, IYieldPeer.Strategy) external => DISPATCHER(true);
+    function _.rebalanceParentToChild(address, uint256, IYieldPeer.Strategy) external => DISPATCHER(true);
+    function _.rebalanceChildToOther(uint64, IYieldPeer.Strategy) external => DISPATCHER(true);
     function _.getFee(uint64, Client.EVM2AnyMessage) external => DISPATCHER(true);
     function _.approve(address, uint256) external => DISPATCHER(true);
     function _.ccipSend(uint64, Client.EVM2AnyMessage) external => DISPATCHER(true);
