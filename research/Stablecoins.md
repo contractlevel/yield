@@ -6,6 +6,11 @@ Research document for integrating stablecoin swapping capabilities into the yiel
 
 ---
 
+Emerging Questions during research:
+
+- What if we deposit to DEX LPs? Some are "AAVE boosted" --- seemingly lower APY % than AAVE, needs investigation
+- What about the newer EVM chains? Some are CCIP connected + instituational usage is already there
+
 ## Fundamental Limitations & Risks
 
 ### 1. Liquidity Constraints
@@ -26,7 +31,9 @@ Research document for integrating stablecoin swapping capabilities into the yiel
 
 - Frequent rebalancing may cause more loss than gain
 - Large TVL + frequent rebalancing = significant slippage costs
-- **Solution**: Optimize rebalancing frequency based on TVL size
+- Large TVL deposits might/will impact Strategy APY %, need to account for that before switching strategies
+- This can also be attacked to mess with Rebalancer
+- **Solution**: Optimize rebalancing frequency based on TVL size, more Rebalancer logic to handle Strategy changes due to own TVL deposits
 
 ### 3. Single-Point-of-Failure Risks
 
@@ -679,3 +686,34 @@ https://github.com/ensuro/swap-library
 https://github.com/balancer/balancer-v3-monorepo/tree/main
 
 ---
+
+### USDC & USDT Liquidity Pools Across Chains
+
+| Chain         | Protocol   | Pool                   | Fee Tier | Liquidity | Notes                      | Pool Address                                                                                |
+| ------------- | ---------- | ---------------------- | -------- | --------- | -------------------------- | ------------------------------------------------------------------------------------------- |
+| **Ethereum**  | Uniswap V3 | USDC/USDT              | 0.01%    | $25.1M    | Add. 1M pool               | `0x3416cf6c708da44db2624d63ea0aaef7113527c6`                                                |
+|               | Uniswap V4 | USDC/USDT              | -        | $23.8M    | Add. 0.75M pool            | `v4 PoolId: 0x8aa4e11cbdf30eedc92100f4c8a31ff748e201d44712cc8c90d189edaa8e4e47`             |
+|               | Curve      | 3Pool (USDC/USDT/DAI)  | -        | $177M     |                            | `0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7`                                                |
+|               | Balancer   | 3Pool (USDC/USDT/GHO)  | -        | $23.6M    | AAVE boosted               | `0x85b2b559bc2d21104c4defdd6efca8a20343361d`                                                |
+| **Arbitrum**  | Uniswap V3 | USDC/USD₮0             | 0.01%    | $3.5M     | Add. shallow               | `0xbe3ad6a5669dc0b8b12febc03608860c31e2eef6`                                                |
+|               | Uniswap V4 | USDC/USD₮0             | -        | $7.8M     |                            | `v4 0xab05003a63d2f34ac7eec4670bca3319f0e3d2f62af5c2b9cbd69d03fd804fd2`                     |
+|               | Curve      | USDC/USD₮0             | -        | $3.9M     |                            | `0x7f90122BF0700F9E7e1F688fe926940E8839F353`                                                |
+|               | Balancer   | 3Pool (USDC/USD₮0/GHO) | -        | $11M      | AAVE boosted               | `0x19B001e6Bc2d89154c18e2216eec5C8c6047b6d8`                                                |
+| **Avalanche** | Uniswap V3 | USDC/USDt              | 0.01%    | $635K     | USDt used                  | `0x804226cA4EDb38e7eF56D16d16E92dc3223347A0`                                                |
+|               | Uniswap V4 | USDC/USDt              | -        | $181K     | USDt used                  | v4 UniPool                                                                                  |
+|               | Curve      | USDC/USDt              | -        | $150K-2M  | weird??                    | [Curve Avalanche](https://www.curve.finance/dex/avalanche/pools?filter=usd&sortBy=tvl)      |
+|               | Balancer   | 3Pool USDC/GHO/USDt    | -        | $314K     | AAVE boosted               | `0xfCec3c8D86329DEfB548202Fe1b86Ff2188603A8`                                                |
+| **Base**      | Uniswap V3 | USDC/USDT              | 0.01%    | $137K     |                            | `0xd56da2b74ba826f19015e6b7dd9dae1903e85da1`                                                |
+|               | Uniswap V4 | USDC/USDT              | -        | $37K      | Very new                   | `v4 0x841c1a22d9a505cbba3e9bf90fd43e1201a09932ca0a90816579346be5f092af`                     |
+|               | Balancer   | USDC/USDT              | -        | $20K      |                            | `0xa42c17f94558430cd8f8ef3d924e761084fca6f0`                                                |
+|               | Curve      | 4Pool                  | -        |           | no USDT                    | [Curve Base](https://www.curve.finance/dex/base/pools?filter=usd)                           |
+| **Polygon**   | Uniswap V3 | USDC.e/USDT0           | 0.01%    | $852K     | USDC, USDC.e, USDT0        | `0xDaC8A8E6DBf8c690ec6815e0fF03491B2770255D`                                                |
+|               | Uniswap V4 | USDC/USDT0             | -        | $244.6K   | Add 100K USDC.e/USDT0 pool | `v4 0xa37d3e6da98dfeb7dc8103a6614f586916a6e04d41ea0a929bc19a029de1a399`                     |
+|               | Curve      | 5Pool                  | -        | $3.8M     | wBTC,wETH mixed            | `0x92215849c439E1f8612b6646060B4E3E5ef822cC`                                                |
+|               | Balancer   | 4Pool V2               | -        | $98K      | DAI, miMATIC               | `0x06df3b2bbb68adc8b0e302443692037ed9f91b42`                                                |
+| **Optimism**  | Uniswap V3 | USDC/USDT              | 0.01%    | $240.6K   | Add. USDC.e                | `0xa73c628eaf6e283e26a7b1f8001cf186aa4c0e8e` & `0xF1F199342687A7d78bCC16fce79fa2665EF870E1` |
+|               | Uniswap V4 | USDC/USDT              | -        | $392.3K   |                            | `v4 0xebe9db89947dd14b34817843231b74044084b04d5b4fea5b4cd1b433b3e5b99f`                     |
+|               | Curve      | 3Pool USDC/USDT/DAI    | -        | $1.2M     |                            | `0x1337BedC9D22ecbe766dF105c9623922A27963EC`                                                |
+|               | Balancer   | USDC/USDT              | -        | $10K      | 99-1 weighted              |                                                                                             |
+
+#### Key Findings:
