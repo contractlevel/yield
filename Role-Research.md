@@ -109,3 +109,10 @@ Manages cross-chain messaging security. Aligns with Chainlink's emphasis on secu
     * Perhaps the Fee Manager/Withdrawer could could this.
 * **Swapper Role**
     * Specific role for swapping the TVL when rebalancing. Maybe this is redundant as this would be handled somewhere by the Rebalancer maybe?
+
+## Other Resources
+Chainlink Pausable with Access Control
+https://github.com/code-423n4/2024-12-chainlink/blob/main/src/PausableWithAccessControl.sol
+
+Chainlink Payment Abstraction Roles Library
+https://github.com/code-423n4/2024-12-chainlink/blob/main/src/libraries/Roles.sol
