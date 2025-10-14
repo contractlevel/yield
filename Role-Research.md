@@ -1,7 +1,8 @@
 # Research for new YieldCoin system roles
 - George Gorzhiyev
 
-## Overview
+## Overview and Challenge
+Thinking of custom and granular roles to avoid centralization around using only "onlyOwner". The challenge is to break it up into roles that make sense, group tasks but not make so many roles it gets confusing and ridiculous.
 
 ### How many usages of onlyOwner in YieldCoin?
 #### (14) - as of Oct 13, 2025
@@ -18,7 +19,7 @@
 
 --> (1) in token/Share.sol
 
-## Deeper look 
+## Deeper Look 
 --> (4) in modules/Rebalancer.sol
 ```solidity
     setUpkeepAddress(address upkeepAddress) external onlyOwner {} /// @notice Set the Chainlink Automation upkeep address
@@ -57,7 +58,7 @@
     setCCIPAdmin(address newAd) external onlyOwner {} /// @notice Transfers the CCIPAdmin role to a new address
 ```
 
-## Patterns (according to AI)
+## Patterns (according to AI - Grok)
 1. **Integration/Configuration Setters** *(e.g., setUpkeepAddress, setForwarder, setParentPeer, setStrategyRegistry, setRebalancer, setCCIPGasLimit)*: 
 These update addresses or params for external services (Chainlink Automation, CCIP) or internal dependencies. High-risk if misused, as they could redirect funds or break integrations.
 
@@ -69,3 +70,42 @@ Handles economic parameters and withdrawals. Often isolated to prevent unauthori
 
 4. **CCIP-Specific Controls** *(e.g., setAllowedChain, setAllowedPeer, setCCIPAdmin*): 
 Manages cross-chain messaging security. Aligns with Chainlink's emphasis on secure CCIP configs.
+
+## Thoughts & Brainstorming
+
+<u>*Ideas for roles as system is currently:*</u>
+
+`setInitialActiveStrategy` - in *peers/ParentPeer.sol* probably needs to stay as onlyOwner so when system is deployed by owner it can be used to set a strategy immediately too. Since it's a one time call, no point in making a special role for it.
+
+* **Integration Management / System Admin Role**
+    * `setUpkeepAddress`, `setForwarder`, `setParentPeer`, `setStrategyRegistry` - in *modules/Rebalancer.sol*
+    * `setRebalancer` - in *peers/ParentPeer.sol*
+    * `setStrategyRegistry` - in *peers/YieldPeer.sol*
+    * A general 'system admin' role to set various addresses of protocol contracts. Is this managing too much?
+    * Could possibly not have `setStrategyRegistry` and Strategy Management Role could handle that.
+* **Strategy Management Role**
+    * `setStrategyAdapter` - in *modules/StrategyRegistry.sol*
+    * Manages adding new strategy adapters on each chains strategy registers.
+    * Could also alternatively handle `setStrategyRegistry` on Rebalancer/Peers if a new Strategy Registry is deployed and function more of an admin for Strategys as a whole.
+    * Could possibly also handle `setFeeRate` as a sort of 'financial manager' that does new strategy adapters and fees for the system.
+* **Fee Management Role / Fee Withdrawer Role**
+    * `withdrawFees`, `setFeeRate` - both in *modules/YieldFees.sol*
+    * Role for withdrawing fees and setting the system fee rate. Alternatively, `setFeeRate` could be grouped with Strategy Management Role and this serve as a system fee withdrawer.
+* **Cross-Chain Management Role**
+    * `setCCIPAdmin` - in *token/Share.sol* ?? - maybe onlyOwner/Role Admin instead
+    * `setAllowedChain`, `setAllowedPeer`, `setCCIPGasLimit` - in *peers/YieldPeer.sol*
+    * Role to manage cross chain variables by setting ccip gas limits on each peer as well as allowed chains and peers. If/as new cross chain protocols are integrated, this role could handle those tasks.
+
+<br>
+
+<u>*Ideas for roles based on new features:*</u>
+
+* **Role Admin**
+    * Role administrator for granting/removing roles from users. Probably needed if doing role based access control.
+* **System Pauser Role** 
+    * Pausing/unpausing the system in case of emergency. More necessary when/if Pausing is integrated.
+* **Dust Collector Role** 
+    * Possible 'janitorial' role that goes to protocols and checks if theres dust and collects it, this could even be a contract that checks all protocols in system for any value and withdraws it etc.
+    * Perhaps the Fee Manager/Withdrawer could could this.
+* **Swapper Role**
+    * Specific role for swapping the TVL when rebalancing. Maybe this is redundant as this would be handled somewhere by the Rebalancer maybe?
