@@ -50,18 +50,18 @@ contract RebalancerHarness is Rebalancer, HelperHarness {
         IYieldPeer.Strategy memory strategy,
         IYieldPeer.CcipTxType txType,
         uint64 oldChainSelector,
-        address oldStrategyPool,
+        address oldStrategyAdapter,
         uint256 totalValue
     ) public pure returns (bytes memory) {
-        return abi.encode(parentPeer, strategy, txType, oldChainSelector, oldStrategyPool, totalValue);
+        return abi.encode(parentPeer, strategy, txType, oldChainSelector, oldStrategyAdapter, totalValue);
     }
 
     function getTotalValueFromParentPeer() public view returns (uint256) {
         return IParentPeer(s_parentPeer).getTotalValue();
     }
 
-    function getStrategyPoolFromParentPeer() public view returns (address) {
-        return IParentPeer(s_parentPeer).getStrategyPool();
+    function getActiveStrategyAdapterFromParentPeer() public view returns (address) {
+        return IParentPeer(s_parentPeer).getActiveStrategyAdapter();
     }
 
     function createNonEmptyBytes() public pure returns (bytes memory) {
@@ -80,13 +80,3 @@ contract RebalancerHarness is Rebalancer, HelperHarness {
         return IParentPeer(s_parentPeer).getStrategy();
     }
 }
-
-/**
- * address forwarder,
-            address parentPeer,
-            IYieldPeer.Strategy memory strategy,
-            IYieldPeer.CcipTxType txType,
-            uint64 oldChainSelector,
-            address oldStrategyPool,
-            uint256 totalValue
- */
