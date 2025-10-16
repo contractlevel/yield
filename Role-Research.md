@@ -73,7 +73,7 @@ Manages cross-chain messaging security. Aligns with Chainlink's emphasis on secu
 
 ## Thoughts & Brainstorming
 
-<u>*Ideas for roles as system is currently:*</u>
+<u>*ROUGH first Ideas for roles as system is currently:*</u>
 
 `setInitialActiveStrategy` - in *peers/ParentPeer.sol* probably needs to stay as onlyOwner so when system is deployed by owner it can be used to set a strategy immediately too. Since it's a one time call, no point in making a special role for it.
 
@@ -98,7 +98,7 @@ Manages cross-chain messaging security. Aligns with Chainlink's emphasis on secu
 
 <br>
 
-<u>*Ideas for roles based on new features:*</u>
+<u>*ROUGH Ideas for roles based on new features:*</u>
 
 * **Role Admin**
     * Role administrator for granting/removing roles from users. Probably needed if doing role based access control.
@@ -116,3 +116,34 @@ https://github.com/code-423n4/2024-12-chainlink/blob/main/src/PausableWithAccess
 
 Chainlink Payment Abstraction Roles Library
 https://github.com/code-423n4/2024-12-chainlink/blob/main/src/libraries/Roles.sol
+
+## Must Haves (based on conversations)
+    * EMERGENCY_PAUSER
+    * CROSSCHAIN_ADMIN or CROSSCHAIN_SETTER
+    * FEES_WITHDRAWER
+    * Set fees different from fees withdrawer
+    * Setter roles, possibly leave as onlyOwner
+    * DEFAULT_ADMIN or ROLES_ADMIN
+
+## What is Chainlink doing?
+    * CCIP
+        * Lots of "onlyOwner" use, no specific role other than for CCT token admin but otherwise "setters" are onlyOwner
+        * LOTS of ownable2StepMessenger
+        * Cross chain stuff like removing/add offRamps and such is still onlyOwner
+        * Fee withdrawal has no access control but sends to a desginated fee aggregator contract on each chain (I think)
+    * FeeQuoter
+        * onlyOwner!
+    * Workflow Registry
+        * All the setters are onlyOwner!
+    * DataFeeds
+        * A fee admin for setting configs
+
+    * Payment Abstraction
+        * It's for Chainlink to collect payments for chainlink services
+        * Contracts to take payment and use swaps to convert things to LINK
+        *
+
+    Roles seem more prominently used in Payment Abstraction and Fee Aggregation. 
+    General system contract stuff all across Chainlink just heavily uses onlyOwner other than limit things to specific contracts which can call etc.
+
+    Fee Aggregator contract is where Chainlink fees for services are sent to and from there the swapping and such happens.
