@@ -6,12 +6,6 @@ import {StablecoinRegistry} from "../../../src/modules/StablecoinRegistry.sol";
 
 contract SetStablecoinTest is BaseTest {
     StablecoinRegistry.Stablecoin public usdcStablecoin;
-    // @dev Uncomment this to use Foundry's local network
-    // StablecoinRegistry public baseStablecoinRegistry;
-
-    // function setUp() public override {
-    //     baseStablecoinRegistry = new StablecoinRegistry();
-    // }
 
     function test_yield_stablecoinRegistry_setStablecoin_revertsWhen_notOwner() public {
         _changePrank(holder);
@@ -21,12 +15,13 @@ contract SetStablecoinTest is BaseTest {
 
     function test_yield_stablecoinRegistry_setStablecoin_success() public {
         bytes32 usdcId = keccak256(abi.encodePacked("usdcAddress"));
-        address usdc = makeAddr("usdc");
-        usdcStablecoin = StablecoinRegistry.Stablecoin(usdc, 6);
+        address usdc = address(baseUsdc);
+        uint8 decimals = baseUsdc.decimals();
+        usdcStablecoin = StablecoinRegistry.Stablecoin(usdc, decimals);
 
         _changePrank(baseStablecoinRegistry.owner());
         baseStablecoinRegistry.setStablecoin(usdcId, usdcStablecoin);
         assertEq(baseStablecoinRegistry.getStablecoin(usdcId).stablecoin, usdc);
-        assertEq(baseStablecoinRegistry.getStablecoin(usdcId).decimals, 6);
+        assertEq(baseStablecoinRegistry.getStablecoin(usdcId).decimals, decimals);
     }
 }
