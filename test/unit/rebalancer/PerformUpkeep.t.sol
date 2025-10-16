@@ -16,14 +16,14 @@ contract PerformUpkeepTest is BaseTest {
         uint64 oldChainSelector = baseParentPeer.getThisChainSelector();
         bytes32 newProtocolId = keccak256(abi.encodePacked("aave-v3"));
         uint64 newChainSelector = optChainSelector;
-        address newStrategyPool = baseParentPeer.getActiveStrategyAdapter();
+        address oldStrategyAdapter = baseParentPeer.getActiveStrategyAdapter();
         uint256 totalValue = baseParentPeer.getTotalValue();
         bytes memory performData = _createPerformData(
             newChainSelector,
             newProtocolId,
             IYieldPeer.CcipTxType.RebalanceNewStrategy,
             oldChainSelector,
-            newStrategyPool,
+            oldStrategyAdapter,
             totalValue
         );
         _changePrank(forwarder);
@@ -50,14 +50,14 @@ contract PerformUpkeepTest is BaseTest {
         uint64 oldChainSelector = ethChainSelector;
         uint64 newChainSelector = optChainSelector;
         bytes32 newProtocolId = keccak256(abi.encodePacked("aave-v3"));
-        address newStrategyPool = baseParentPeer.getActiveStrategyAdapter();
+        address oldStrategyAdapter = baseParentPeer.getActiveStrategyAdapter();
         uint256 totalValue = baseParentPeer.getTotalValue();
         bytes memory performData = _createPerformData(
             newChainSelector,
             newProtocolId,
             IYieldPeer.CcipTxType.RebalanceOldStrategy,
             oldChainSelector,
-            newStrategyPool,
+            oldStrategyAdapter,
             totalValue
         );
         _changePrank(forwarder);
