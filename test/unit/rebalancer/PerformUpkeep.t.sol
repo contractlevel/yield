@@ -9,21 +9,21 @@ contract PerformUpkeepTest is BaseTest {
         baseRebalancer.performUpkeep("");
     }
 
-    function test_yield_rebalancer_performUpkeep_rebalanceNewStrategy() public {
+    function test_yield_rebalancer_performUpkeep_rebalanceParentToChildStrategy() public {
         address aavePool = IPoolAddressesProvider(baseAaveV3Adapter.getPoolAddressesProvider()).getPool();
         deal(address(baseUsdc), aavePool, DEPOSIT_AMOUNT);
 
         uint64 oldChainSelector = baseParentPeer.getThisChainSelector();
         bytes32 newProtocolId = keccak256(abi.encodePacked("aave-v3"));
         uint64 newChainSelector = optChainSelector;
-        address newStrategyPool = baseParentPeer.getActiveStrategyAdapter();
+        address oldStrategyAdapter = baseParentPeer.getActiveStrategyAdapter();
         uint256 totalValue = baseParentPeer.getTotalValue();
         bytes memory performData = _createPerformData(
             newChainSelector,
             newProtocolId,
             IYieldPeer.CcipTxType.RebalanceNewStrategy,
             oldChainSelector,
-            newStrategyPool,
+            oldStrategyAdapter,
             totalValue
         );
         _changePrank(forwarder);
@@ -43,21 +43,21 @@ contract PerformUpkeepTest is BaseTest {
         assertTrue(ccipMessageSentEventFound, "CCIPMessageSent log not found");
     }
 
-    function test_yield_rebalancer_performUpkeep_rebalanceOldStrategy() public {
+    function test_yield_rebalancer_performUpkeep_rebalanceChildToOtherStrategy() public {
         address aavePool = IPoolAddressesProvider(baseAaveV3Adapter.getPoolAddressesProvider()).getPool();
         deal(address(baseUsdc), aavePool, DEPOSIT_AMOUNT);
 
         uint64 oldChainSelector = ethChainSelector;
         uint64 newChainSelector = optChainSelector;
         bytes32 newProtocolId = keccak256(abi.encodePacked("aave-v3"));
-        address newStrategyPool = baseParentPeer.getActiveStrategyAdapter();
+        address oldStrategyAdapter = baseParentPeer.getActiveStrategyAdapter();
         uint256 totalValue = baseParentPeer.getTotalValue();
         bytes memory performData = _createPerformData(
             newChainSelector,
             newProtocolId,
             IYieldPeer.CcipTxType.RebalanceOldStrategy,
             oldChainSelector,
-            newStrategyPool,
+            oldStrategyAdapter,
             totalValue
         );
         _changePrank(forwarder);

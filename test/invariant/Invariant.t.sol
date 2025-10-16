@@ -223,25 +223,6 @@ contract Invariant is StdInvariant, BaseTest {
     /*//////////////////////////////////////////////////////////////
                                INVARIANTS
     //////////////////////////////////////////////////////////////*/
-    /// @notice Strategy Consistency: Strategy Pool should only be set on the strategy chain
-    function invariant_strategy_consistency() public {
-        handler.forEachChainSelector(this.checkStrategyPoolPerChainSelector);
-    }
-
-    function checkStrategyPoolPerChainSelector(uint64 chainSelector) external view {
-        if (chainSelector == parent.getStrategy().chainSelector) {
-            assertTrue(
-                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter() != address(0),
-                "Invariant violated: Strategy pool should be set on the strategy chain"
-            );
-        } else {
-            assertTrue(
-                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter() == address(0),
-                "Invariant violated: Strategy pool should not be set on non-strategy chains"
-            );
-        }
-    }
-
     /// @notice Active Strategy Adapter Consistency: Active strategy adapter on active strategy chain should match the protocol stored in ParentPeer
     function invariant_activeStrategyAdapter_consistency() public {
         handler.forEachChainSelector(this.checkActiveStrategyAdapterPerChainSelector);
@@ -254,6 +235,10 @@ contract Invariant is StdInvariant, BaseTest {
                     .getStrategyAdapter(parent.getStrategy().protocolId),
                 IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter(),
                 "Invariant violated: Active strategy adapter on active strategy chain should match the protocol stored in ParentPeer"
+            );
+            assertTrue(
+                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter() != address(0),
+                "Invariant violated: Active strategy adapter should be non-zero on the strategy chain"
             );
         } else {
             assertEq(

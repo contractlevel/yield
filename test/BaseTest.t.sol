@@ -632,19 +632,19 @@ contract BaseTest is Test {
     /// @param protocolId The protocol ID of the strategy
     /// @param txType The type of CCIP message to send
     /// @param oldChainSelector The chain selector of the old strategy
-    /// @param oldStrategyPool The address of the old strategy pool
+    /// @param oldStrategyAdapter The address of the old strategy adapter
     function _createPerformData(
         uint64 chainSelector,
         bytes32 protocolId,
         IYieldPeer.CcipTxType txType,
         uint64 oldChainSelector,
-        address oldStrategyPool,
+        address oldStrategyAdapter,
         uint256 totalValue
     ) internal view returns (bytes memory) {
         address parentPeer = address(baseRebalancer.getParentPeer());
         IYieldPeer.Strategy memory newStrategy =
             IYieldPeer.Strategy({chainSelector: chainSelector, protocolId: protocolId});
-        return abi.encode(parentPeer, newStrategy, txType, oldChainSelector, oldStrategyPool, totalValue);
+        return abi.encode(parentPeer, newStrategy, txType, oldChainSelector, oldStrategyAdapter, totalValue);
     }
 
     /// @notice Helper function to convert USDC to Share

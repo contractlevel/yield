@@ -786,18 +786,19 @@ rule setStrategy_no_localStrategyChange_when_newStrategy_is_different() {
 }
 
 // --- RebalanceNewStrategy --- //
-rule rebalanceNewStrategy_revertsWhen_notParentRebalancer() {
+rule rebalanceParentToChild_revertsWhen_notRebalancer() {
     env e;
     calldataarg args;
 
     require e.msg.sender != currentContract.s_rebalancer;
 
-    rebalanceNewStrategy@withrevert(e, args);
+    rebalanceParentToChild@withrevert(e, args);
     assert lastReverted;
 }
 
 // @review:certora vacuous rule
-rule rebalanceNewStrategy_movesStrategyToNewChain() {
+// @review-George: rule/functions renamed to correspondent to new rebalancing functions
+rule rebalanceParentToChild_movesStrategyToNewChain() {
     env e;
     uint64 chainSelector;
     bytes32 protocolId;
@@ -817,7 +818,7 @@ rule rebalanceNewStrategy_movesStrategyToNewChain() {
     require usdc.balanceOf(currentContract) == 0;
 
     require ghost_ccipMessageSent_eventCount == 0;
-    rebalanceNewStrategy(e, strategyPool, totalValue, newStrategy);
+    rebalanceParentToChild(e, strategyPool, totalValue, newStrategy);
     assert ghost_ccipMessageSent_eventCount == 1;
     assert ghost_ccipMessageSent_txType_emitted == 8; // RebalanceNewStrategy
     assert ghost_ccipMessageSent_bridgeAmount_emitted == totalValue;
@@ -826,17 +827,17 @@ rule rebalanceNewStrategy_movesStrategyToNewChain() {
 }
 
 // --- RebalanceOldStrategy --- //
-rule rebalanceOldStrategy_revertsWhen_notParentRebalancer() {
+rule rebalanceChildToOther_revertsWhen_notRebalancer() {
     env e;
     calldataarg args;
 
     require e.msg.sender != currentContract.s_rebalancer;
 
-    rebalanceOldStrategy@withrevert(e, args);
+    rebalanceChildToOther@withrevert(e, args);
     assert lastReverted;
 }
 
-rule rebalanceOldStrategy_forwardsRebalanceToOldStrategy() {
+rule rebalanceChildToOther_forwardsRebalanceToOldStrategy() {
     env e;
     uint64 chainSelector;
     bytes32 protocolId;
@@ -847,7 +848,7 @@ rule rebalanceOldStrategy_forwardsRebalanceToOldStrategy() {
             oldStrategy.chainSelector != chainSelector;
 
     require ghost_ccipMessageSent_eventCount == 0;
-    rebalanceOldStrategy(e, oldStrategy.chainSelector, createStrategy(chainSelector, protocolId));
+    rebalanceChildToOther(e, oldStrategy.chainSelector, createStrategy(chainSelector, protocolId));
     assert ghost_ccipMessageSent_eventCount == 1;
     assert ghost_ccipMessageSent_txType_emitted == 7; // RebalanceOldStrategy
     assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;
