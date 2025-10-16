@@ -127,7 +127,7 @@ Contracts that inherit `YieldPeer` must implement the following functions:
 - `onTokenTransfer(address,uint256,bytes)` - user exit point for the system where YieldCoin is burned and USDC is withdrawn
 - `_handleCCIPMessage(CcipTxType,Client.EVMTokenAmount[],bytes,uint64)` - executed following `_ccipReceive` checks to handle various CCIP tx types
 
-The Peer with the current active strategy will return a non-zero address from `YieldPeer::getStrategyPool()`.
+The Peer with the current active strategy will return a non-zero address from `YieldPeer::getActiveStrategyAdapter()`.
 
 #### IYieldPeer Interface
 

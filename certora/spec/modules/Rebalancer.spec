@@ -23,8 +23,8 @@ methods {
     function _.balanceOf(address) external => DISPATCHER(true);
     function _.getPool() external => DISPATCHER(true);
     function _.getReserveData(address) external => DISPATCHER(true);
-    function _.rebalanceNewStrategy(address, uint256, IYieldPeer.Strategy) external => DISPATCHER(true);
-    function _.rebalanceOldStrategy(uint64, IYieldPeer.Strategy) external => DISPATCHER(true);
+    function _.rebalanceParentToChild(address, uint256, IYieldPeer.Strategy) external => DISPATCHER(true);
+    function _.rebalanceChildToOther(uint64, IYieldPeer.Strategy) external => DISPATCHER(true);
     function _.getFee(uint64, Client.EVM2AnyMessage) external => DISPATCHER(true);
     function _.approve(address, uint256) external => DISPATCHER(true);
     function _.ccipSend(uint64, Client.EVM2AnyMessage) external => DISPATCHER(true);
@@ -51,7 +51,7 @@ methods {
         uint256
     ) envfree;
     function getTotalValueFromParentPeer() external returns (uint256) envfree;
-    function getStrategyPoolFromParentPeer() external returns (address) envfree;
+    function getActiveStrategyAdapterFromParentPeer() external returns (address) envfree;
     function createNonEmptyBytes() external returns (bytes) envfree;
     function createEmptyBytes() external returns (bytes) envfree;
     function createPerformData(
@@ -385,7 +385,7 @@ rule checkLog_returnsTrueWhen_oldStrategyChild() {
     IYieldPeer.Strategy strategy;
     IYieldPeer.CcipTxType txType;
     uint64 decodedOldChainSelector;
-    address oldStrategyPool;
+    address oldStrategyAdapter;
     uint256 totalValue;
 
     (
@@ -393,7 +393,7 @@ rule checkLog_returnsTrueWhen_oldStrategyChild() {
     strategy,
     txType,
     decodedOldChainSelector,
-    oldStrategyPool,
+    oldStrategyAdapter,
     totalValue
     ) = decodePerformData(performData);
 
@@ -402,7 +402,7 @@ rule checkLog_returnsTrueWhen_oldStrategyChild() {
     assert strategy.protocolId == protocolId;
     assert txType == IYieldPeer.CcipTxType.RebalanceOldStrategy;
     assert decodedOldChainSelector == oldChainSelector;
-    assert oldStrategyPool == 0;
+    assert oldStrategyAdapter == 0;
     assert totalValue == 0;
 }
 
@@ -439,7 +439,7 @@ rule checkLog_returnsTrueWhen_oldStrategyParent_newStrategyChild() {
     IYieldPeer.Strategy strategy;
     IYieldPeer.CcipTxType txType;
     uint64 decodedOldChainSelector;
-    address oldStrategyPool;
+    address oldStrategyAdapter;
     uint256 totalValue;
 
     (
@@ -447,7 +447,7 @@ rule checkLog_returnsTrueWhen_oldStrategyParent_newStrategyChild() {
     strategy,
     txType,
     decodedOldChainSelector,
-    oldStrategyPool,
+    oldStrategyAdapter,
     totalValue
     ) = decodePerformData(performData);
 
@@ -456,7 +456,7 @@ rule checkLog_returnsTrueWhen_oldStrategyParent_newStrategyChild() {
     assert strategy.protocolId == protocolId;
     assert txType == IYieldPeer.CcipTxType.RebalanceNewStrategy;
     assert decodedOldChainSelector == oldChainSelector;
-    assert oldStrategyPool == getStrategyPoolFromParentPeer();
+    assert oldStrategyAdapter == getActiveStrategyAdapterFromParentPeer();
     assert totalValue == getTotalValueFromParentPeer();
 }
 
@@ -501,7 +501,7 @@ rule performUpkeep_rebalanceNewStrategy() {
         strategy,
         IYieldPeer.CcipTxType.RebalanceNewStrategy,
         getParentChainSelector(),
-        getStrategyPoolFromParentPeer(),
+        getActiveStrategyAdapterFromParentPeer(),
         totalValue
     );
 
