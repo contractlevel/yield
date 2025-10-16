@@ -9,7 +9,8 @@ Research document for integrating stablecoin swapping capabilities into the yiel
 Emerging Questions during research:
 
 - What if we deposit to DEX LPs? Some are "AAVE boosted" --- seemingly lower APY % than AAVE, needs investigation
-- What about the newer EVM chains? Some are CCIP connected + instituational usage is already there
+- What about the newer EVM chains? Some are CCIP connected + institutional usage is already there
+- There are additional Chain-specific DEXs, with substantially bigger pools for USDC/USDT. Consider making own DEX Aggregator for such cases, or search for established ones. (eg Blackhole on AVAX with 24M USDC/USDT pool `0x859592a4a469610e573f96ef87a0e5565f9a94c8`, Aerodrome on BASE with 2.7M `0xa41bc0affba7fd420d186b84899d7ab2ac57fcd1`)
 
 ## Fundamental Limitations & Risks
 
@@ -689,31 +690,128 @@ https://github.com/balancer/balancer-v3-monorepo/tree/main
 
 ### USDC & USDT Liquidity Pools Across Chains
 
-| Chain         | Protocol   | Pool                   | Fee Tier | Liquidity | Notes                      | Pool Address                                                                                |
-| ------------- | ---------- | ---------------------- | -------- | --------- | -------------------------- | ------------------------------------------------------------------------------------------- |
-| **Ethereum**  | Uniswap V3 | USDC/USDT              | 0.01%    | $25.1M    | Add. 1M pool               | `0x3416cf6c708da44db2624d63ea0aaef7113527c6`                                                |
-|               | Uniswap V4 | USDC/USDT              | -        | $23.8M    | Add. 0.75M pool            | `v4 PoolId: 0x8aa4e11cbdf30eedc92100f4c8a31ff748e201d44712cc8c90d189edaa8e4e47`             |
-|               | Curve      | 3Pool (USDC/USDT/DAI)  | -        | $177M     |                            | `0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7`                                                |
-|               | Balancer   | 3Pool (USDC/USDT/GHO)  | -        | $23.6M    | AAVE boosted               | `0x85b2b559bc2d21104c4defdd6efca8a20343361d`                                                |
-| **Arbitrum**  | Uniswap V3 | USDC/USD₮0             | 0.01%    | $3.5M     | Add. shallow               | `0xbe3ad6a5669dc0b8b12febc03608860c31e2eef6`                                                |
-|               | Uniswap V4 | USDC/USD₮0             | -        | $7.8M     |                            | `v4 0xab05003a63d2f34ac7eec4670bca3319f0e3d2f62af5c2b9cbd69d03fd804fd2`                     |
-|               | Curve      | USDC/USD₮0             | -        | $3.9M     |                            | `0x7f90122BF0700F9E7e1F688fe926940E8839F353`                                                |
-|               | Balancer   | 3Pool (USDC/USD₮0/GHO) | -        | $11M      | AAVE boosted               | `0x19B001e6Bc2d89154c18e2216eec5C8c6047b6d8`                                                |
-| **Avalanche** | Uniswap V3 | USDC/USDt              | 0.01%    | $635K     | USDt used                  | `0x804226cA4EDb38e7eF56D16d16E92dc3223347A0`                                                |
-|               | Uniswap V4 | USDC/USDt              | -        | $181K     | USDt used                  | v4 UniPool                                                                                  |
-|               | Curve      | USDC/USDt              | -        | $150K-2M  | weird??                    | [Curve Avalanche](https://www.curve.finance/dex/avalanche/pools?filter=usd&sortBy=tvl)      |
-|               | Balancer   | 3Pool USDC/GHO/USDt    | -        | $314K     | AAVE boosted               | `0xfCec3c8D86329DEfB548202Fe1b86Ff2188603A8`                                                |
-| **Base**      | Uniswap V3 | USDC/USDT              | 0.01%    | $137K     |                            | `0xd56da2b74ba826f19015e6b7dd9dae1903e85da1`                                                |
-|               | Uniswap V4 | USDC/USDT              | -        | $37K      | Very new                   | `v4 0x841c1a22d9a505cbba3e9bf90fd43e1201a09932ca0a90816579346be5f092af`                     |
-|               | Balancer   | USDC/USDT              | -        | $20K      |                            | `0xa42c17f94558430cd8f8ef3d924e761084fca6f0`                                                |
-|               | Curve      | 4Pool                  | -        |           | no USDT                    | [Curve Base](https://www.curve.finance/dex/base/pools?filter=usd)                           |
-| **Polygon**   | Uniswap V3 | USDC.e/USDT0           | 0.01%    | $852K     | USDC, USDC.e, USDT0        | `0xDaC8A8E6DBf8c690ec6815e0fF03491B2770255D`                                                |
-|               | Uniswap V4 | USDC/USDT0             | -        | $244.6K   | Add 100K USDC.e/USDT0 pool | `v4 0xa37d3e6da98dfeb7dc8103a6614f586916a6e04d41ea0a929bc19a029de1a399`                     |
-|               | Curve      | 5Pool                  | -        | $3.8M     | wBTC,wETH mixed            | `0x92215849c439E1f8612b6646060B4E3E5ef822cC`                                                |
-|               | Balancer   | 4Pool V2               | -        | $98K      | DAI, miMATIC               | `0x06df3b2bbb68adc8b0e302443692037ed9f91b42`                                                |
-| **Optimism**  | Uniswap V3 | USDC/USDT              | 0.01%    | $240.6K   | Add. USDC.e                | `0xa73c628eaf6e283e26a7b1f8001cf186aa4c0e8e` & `0xF1F199342687A7d78bCC16fce79fa2665EF870E1` |
-|               | Uniswap V4 | USDC/USDT              | -        | $392.3K   |                            | `v4 0xebe9db89947dd14b34817843231b74044084b04d5b4fea5b4cd1b433b3e5b99f`                     |
-|               | Curve      | 3Pool USDC/USDT/DAI    | -        | $1.2M     |                            | `0x1337BedC9D22ecbe766dF105c9623922A27963EC`                                                |
-|               | Balancer   | USDC/USDT              | -        | $10K      | 99-1 weighted              |                                                                                             |
+| Chain         | Protocol   | Pool                   | Fee Tier | Liquidity     | Notes                       | Pool Address                                                                                                                                 |
+| ------------- | ---------- | ---------------------- | -------- | ------------- | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Ethereum**  | Uniswap V3 | USDC/USDT              | 0.01%    | $25.1M        | Add. 1M pool                | `0x3416cf6c708da44db2624d63ea0aaef7113527c6`                                                                                                 |
+|               | Uniswap V4 | USDC/USDT              | -        | $23.8M        | Add. 0.75M pool             | `v4 PoolId: 0x8aa4e11cbdf30eedc92100f4c8a31ff748e201d44712cc8c90d189edaa8e4e47`                                                              |
+|               | Curve      | 3Pool (USDC/USDT/DAI)  | -        | $177M         |                             | `0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7`                                                                                                 |
+|               | Balancer   | 3Pool (USDC/USDT/GHO)  | -        | $23.6M        | AAVE boosted                | `0x85b2b559bc2d21104c4defdd6efca8a20343361d`                                                                                                 |
+| **Arbitrum**  | Uniswap V3 | USDC/USD₮0             | 0.01%    | $3.5M         | Add. shallow                | `0xbe3ad6a5669dc0b8b12febc03608860c31e2eef6`                                                                                                 |
+|               | Uniswap V4 | USDC/USD₮0             | -        | $7.8M         |                             | `v4 0xab05003a63d2f34ac7eec4670bca3319f0e3d2f62af5c2b9cbd69d03fd804fd2`                                                                      |
+|               | Curve      | USDC/USD₮0             | -        | $3.9M         |                             | `0x7f90122BF0700F9E7e1F688fe926940E8839F353`                                                                                                 |
+|               | Balancer   | 3Pool (USDC/USD₮0/GHO) | -        | $11M          | AAVE boosted                | `0x19B001e6Bc2d89154c18e2216eec5C8c6047b6d8`                                                                                                 |
+| **Avalanche** | Uniswap V3 | USDC/USDt              | 0.01%    | $635K         | USDt used                   | `0x804226cA4EDb38e7eF56D16d16E92dc3223347A0`                                                                                                 |
+|               | Uniswap V4 | USDC/USDt              | -        | $400K         | USDt used                   | `v4 0x8dc096ecc5cb7565daa9615d6b6b4e6d1ffb3b16cca4e0971dfaf0ed9cb55c63`                                                                      |
+|               | Curve      | USDC/USDt              | -        | $150K-2M      | weird??                     | [Curve Avalanche](https://www.curve.finance/dex/avalanche/pools?filter=usd&sortBy=tvl)                                                       |
+|               | Balancer   | 3Pool USDC/GHO/USDt    | -        | $314K         | AAVE boosted                | `0xfCec3c8D86329DEfB548202Fe1b86Ff2188603A8`                                                                                                 |
+| **Base**      | Uniswap V3 | USDC/USDT              | 0.01%    | $137K         |                             | `0xd56da2b74ba826f19015e6b7dd9dae1903e85da1`                                                                                                 |
+|               | Uniswap V4 | USDC/USDT              | -        | $320K         | 2 Pools                     | `v4 0x841c1a22d9a505cbba3e9bf90fd43e1201a09932ca0a90816579346be5f092af` `0xf13203ddbf2c9816a79b656a1a952521702715d92fea465b84ae2ed6e94a7f22` |
+|               | Balancer   | USDC/USDT              | -        | $20K          |                             | `0xa42c17f94558430cd8f8ef3d924e761084fca6f0`                                                                                                 |
+|               | Curve      | 4Pool                  | -        |               | no USDT                     | [Curve Base](https://www.curve.finance/dex/base/pools?filter=usd)                                                                            |
+| **Polygon**   | Uniswap V3 | USDC.e/USDT0           | 0.01%    | $854K + $500K | 2Pools: USDC, USDC.e, USDT0 | `0xDaC8A8E6DBf8c690ec6815e0fF03491B2770255D` & `0x31083a78e11b18e450fd139f9abea98cd53181b7`                                                  |
+|               | Uniswap V4 | USDC/USDT0             | -        | $244.6K       | Add 100K USDC.e/USDT0 pool  | `v4 0xa37d3e6da98dfeb7dc8103a6614f586916a6e04d41ea0a929bc19a029de1a399`                                                                      |
+|               | Curve      | 5Pool                  | -        | $3.8M         | wBTC,wETH mixed             | `0x92215849c439E1f8612b6646060B4E3E5ef822cC`                                                                                                 |
+|               | Balancer   | 4Pool V2               | -        | $98K          | DAI, miMATIC                | `0x06df3b2bbb68adc8b0e302443692037ed9f91b42`                                                                                                 |
+| **Optimism**  | Uniswap V3 | USDC/USDT              | 0.01%    | $240.6K       | Add. USDC.e                 | `0xa73c628eaf6e283e26a7b1f8001cf186aa4c0e8e` & `0xF1F199342687A7d78bCC16fce79fa2665EF870E1`                                                  |
+|               | Uniswap V4 | USDC/USDT              | -        | $392.3K       |                             | `v4 0xebe9db89947dd14b34817843231b74044084b04d5b4fea5b4cd1b433b3e5b99f`                                                                      |
+|               | Curve      | 3Pool USDC/USDT/DAI    | -        | $200K         |                             | `0x1337BedC9D22ecbe766dF105c9623922A27963EC`                                                                                                 |
+|               | Balancer   | USDC/USDT              | -        | $10K          | 99-1 weighted               |                                                                                                                                              |
 
-#### Key Findings:
+## Traditional DEX vs PMMs
+
+### Bebop
+
+#### What is Bebop?
+
+Bebop is a trading app and a suite of APIs that finds the best route for any trade, executing trades for any tokens in any size at the best prices, created by Wintermute.
+
+It uses a dual model system of:
+
+1. **Request for Quote (RFQ) on-chain:**
+
+   - Sources liquidity from private market makers who constantly stream their pricing to Bebop
+   - Orders are sent to private market makers and then settled on-chain
+
+2. **Bebop JAM:**
+   - Just-In-Time aggregation model designed to complement the existing RFQ system, offering trade outcomes with optimal prices and even the possibility of trade surpluses
+   - Solvers compete to find best execution paths, combining both liquidity from private (market makers) and on-chain sources
+
+**Bebop JAM contracts + Comprehensive README:** https://github.com/bebop-dex/bebop-jam-contracts
+
+#### How it works:
+
+1. User requests a quote
+2. Private Market Makers provide quotes with gas included
+3. User accepts or rejects quote
+4. Smart contract settles the trade without Bebop taking custody of fund
+
+#### The Appeal
+
+- ✅ Price certainty / zero slippage in RFQ mode (max slippage 0.2%)
+- ✅ No MEV
+- ✅ Maker Depth: USDT Liquidity on certain chains is dry and a solution needs to be found
+- ✅ Multi-Chain support: Ethereum, Avalanche, Arbitrum, Base, Optimism, Polygon supported
+- ✅ Offers API/router for path-finding, quoting and solver matching
+- ✅ Includes GAS in final price
+
+#### The Problems
+
+- ❌ **API Dependency:** This sounds simpler than it is. Bebop requires API calls to get RFQ quotes, submit trades. Cannot be done purely on-chain which means => Chainlink Functions, additional point of failure, more complex than direct DEX integration
+
+- ❌ **Trust:** Need to trust Bebop for everything. We can only verify if quote is better than DEX, not overall.
+
+- ❌ **Quote Validity Time:** RFQ quotes expire (~60 seconds)
+
+  **What this means:**
+
+  - Time 0: Rebalance threshold triggered, Functions Call to Parent Peer (maybe to Bebop API simultaneously)
+  - Time 30: Parent Peer updated, Rebalance initiated, CCIP/Lanca/Concero Calls started
+  - Time 120 (Optimistic): Withdraw from protocol
+  - Time 240: USDC burned on old Strategy chained // or deposited to Bebop on old chain ===>>> Makes CCIP obsolete!
+  - Time 360: Bebop quote EXPIRED (Need to check expiration for confirmation) Need new quote
+  - Time ???: dynamically getting quote at this point is unfeasible
+
+- ❌ **Centralization Risk:** API goes down, MMs paused, hack, private oracles for their pricing, we might need to check their test suite (reentrancy through them?)
+
+**For all those risks, we'll have to introduce fallbacks -> Traditional AMMs implementation still needs to happen**
+
+#### Comparison
+
+| Feature                    | Bebop                           | Curve Finance                     | Uniswap V3                           |
+| -------------------------- | ------------------------------- | --------------------------------- | ------------------------------------ |
+| **Slippage**               | 0% (RFQ mode), max 0.2%         | Minimal for stables (~0.01-0.05%) | Low with 0.01% fee tier (~0.01-0.1%) |
+| **MEV Protection**         | ✅ Complete protection          | ❌ Vulnerable to MEV              | ❌ Vulnerable to MEV                 |
+| **Price Certainty**        | ✅ Guaranteed execution price   | ❌ Price impact varies            | ❌ Price impact varies               |
+| **Gas Costs**              | ✅ Included in quote            | ❌ User pays gas                  | ❌ User pays gas                     |
+| **Integration Complexity** | ❌ High (API dependency)        | ✅ Direct contract calls          | ✅ Direct contract calls             |
+| **Multi-Chain Support**    | ✅ 6 chains supported           | ✅ Multi-chain deployment         | ✅ Multi-chain deployment            |
+| **Liquidity Depth**        | ✅ Private MM + on-chain        | ✅ Deepest for stables (177M ETH) | ✅ Deep liquidity (25M+ ETH)         |
+| **Trust Model**            | ❌ Centralized (API dependency) | ✅ Decentralized                  | ✅ Decentralized                     |
+| **Quote Validity**         | ❌ ~60 seconds expiration       | ✅ Real-time pricing              | ✅ Real-time pricing                 |
+| **Fallback Mechanisms**    | ❌ Requires AMM fallback        | ✅ Built-in redundancy            | ✅ Multiple pools available          |
+| **Audit Requirements**     | ❌ API + contract audits        | ✅ Battle-tested contracts        | ✅ Battle-tested contracts           |
+| **CCIP Compatibility**     | ❌ Complex (quote timing)       | ✅ Direct integration             | ✅ Direct integration                |
+| **Best Use Case**          | Large trades, MEV-sensitive     | Stablecoin swaps                  | General token swaps                  |
+| **Risk Level**             | Medium (centralization)         | Low (proven)                      | Low (proven)                         |
+
+**Recommendation**: Use conventional AMMs (Curve/Uniswap V3) for V1 implementation due to:
+
+- Simpler integration with CCIP
+- No API dependencies
+- Proven track record
+- Better suited for automated rebalancing
+
+Consider Bebop for V2 if MEV protection becomes critical for large TVL movements.
+
+**OR**: Hybrid approach for V1 implementation by:
+
+- Using AMMs as the default on-chain swap path
+- Interating Bebop as an optonal route / fallback when AMM quores are unfavourable or have high slippage // at this point are we comfortable thinking of a DEX solver as a solution?
+- Using Bebop for large TVL swaps (>$1M/$3M depending on specific chain liquidity depth)
+
+#### Further questions
+
+- Which chains are available for RFQ API / JAM Api. (eg: Base on RFQ not JAM)
+- Quotes and quote expiration
+- Solver response time
+- Bebop's contract security, github test suites questionable
