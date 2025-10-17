@@ -1,5 +1,7 @@
 # YieldCoin aka Contract Level Yield (CLY)
 
+**This branch is an archive of the project as it was when submitted to the Chainlink Chromion 2025 Hackathon.**
+
 This project has been built for the Chainlink Chromion Hackathon, and is an automated, crosschain, stablecoin yield optimizer, powered by Chainlink Automation, Functions, and CCIP.
 
 Whatever the highest yield is for stablecoins across chains is what users can earn in one click with Contract Level Yield (YieldCoin).
