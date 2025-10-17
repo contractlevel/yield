@@ -5,7 +5,6 @@ pragma solidity 0.8.26;
 library Roles {
     /// @dev example for creating a role
     /// bytes32 public constant ROLE = keccak256("ROLE");
-
     /*----------> Baseline Considerations <----------*/
     /// @notice Current existing function calls have been included as example of possible controls for each role.
 
@@ -39,7 +38,7 @@ library Roles {
 
     /// @notice Role for setting the protocol fee rate.
     /// - setFeeRate - (in modules/YieldFees.sol)
-    bytes32 public constant FEE_RATE_ADJUSTER_ROLE = keccak256("FEE_RATE_ADJUSTER_ROLE");
+    bytes32 public constant FEE_RATE_SETTER_ROLE = keccak256("FEE_RATE_SETTER_ROLE");
 
     /*----------> Other Considerations <----------*/
     /// @notice Role for withdrawing the TVL from system in case of emergency and protocol needs to be saved.
@@ -47,8 +46,4 @@ library Roles {
 
     /// @notice Role for adjusting TVL swap parameters as well as adding/removing supported stablecoins from YieldCoin system.
     bytes32 public constant ASSET_ADMIN_ROLE = keccak256("ASSET_ADMIN_ROLE");
-
-    /// @notice Role for collecting 'dust' in protocols where YieldCoin TVL has been.
-    /// Once TVL is large enough, between delays in a withdraw, a sizeable chunk amount may sit in a protocol and collect APY.
-    bytes32 public constant DUST_COLLECTOR_ROLE = keccak256("DUST_COLLECTOR_ROLE");
 }
