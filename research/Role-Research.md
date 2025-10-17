@@ -25,7 +25,7 @@ The roles work as both restricting the contract that could call it and the user.
 ### Any other important considerations
 * Emergency withdraw role for withdrawing the TVL funds from a protocol in case of YieldCoin compromise.
 
-* An asset admin role to allow adding/removing new stablecoins as well as adjusting TVL swap parameters.
+* An asset admin role to allow adding/removing new stablecoins as well as adjusting TVL swap parameters. Although this depends on how adjustable these params will be, as in, will it be governed by a DAO or just an admin?
 
 * Dust collector role that can go to protocols and withdraw any dust leftover from rebalancing latency that may have accrued APY. Depending on how often swaps/rebalancing happens, there may be a protocol  that sits with leftover TVL dust that accrues a chunk.
 
