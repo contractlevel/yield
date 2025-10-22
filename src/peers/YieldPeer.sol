@@ -2,12 +2,12 @@
 pragma solidity 0.8.26;
 
 import {LinkTokenInterface} from "@chainlink/contracts/src/v0.8/shared/interfaces/LinkTokenInterface.sol";
-import {CCIPReceiver} from "@chainlink/contracts/src/v0.8/ccip/applications/CCIPReceiver.sol";
+import {CCIPReceiver, IAny2EVMMessageReceiver} from "@chainlink/contracts/src/v0.8/ccip/applications/CCIPReceiver.sol";
 import {IRouterClient, Client} from "@chainlink/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
 import {IERC677Receiver} from "@chainlink/contracts/src/v0.8/shared/interfaces/IERC677Receiver.sol";
-import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {PausableWithAccessControl, Roles, IAccessControlEnumerable} from "../modules/PausableWithAccessControl.sol";
 import {IShare} from "../interfaces/IShare.sol";
 import {IYieldPeer} from "../interfaces/IYieldPeer.sol";
 import {DataStructures} from "../libraries/DataStructures.sol";
@@ -19,7 +19,15 @@ import {YieldFees} from "../modules/YieldFees.sol";
 /// @title YieldPeer
 /// @author @contractlevel
 /// @notice YieldPeer is the base contract for the Parent and Child Peers in the Contract Level Yield system
-abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYieldPeer, YieldFees {
+abstract contract YieldPeer is
+    IAny2EVMMessageReceiver,
+    CCIPReceiver,
+    IAccessControlEnumerable,
+    PausableWithAccessControl,
+    IERC677Receiver,
+    IYieldPeer,
+    YieldFees
+{
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS
     //////////////////////////////////////////////////////////////*/
@@ -132,7 +140,8 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     //slither-disable-next-line missing-zero-check
     constructor(address ccipRouter, address link, uint64 thisChainSelector, address usdc, address share)
         CCIPReceiver(ccipRouter)
-        Ownable(msg.sender)
+        PausableWithAccessControl(3 days, msg.sender) // @reviewGeorge: check transfer delay
+
     {
         i_link = LinkTokenInterface(link);
         i_thisChainSelector = thisChainSelector;
@@ -154,7 +163,11 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @param withdrawer The address that sent the SHARE token to withdraw USDC
     /// @param shareBurnAmount The amount of SHARE token sent
     /// @notice This function is overridden and implemented in the ChildPeer and ParentPeer contracts
-    function onTokenTransfer(address withdrawer, uint256 shareBurnAmount, bytes calldata /* data */ )
+    function onTokenTransfer(
+        address withdrawer,
+        uint256 shareBurnAmount,
+        bytes calldata /* data */
+    )
         external
         virtual;
 
@@ -491,8 +504,8 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @notice Set chains that are allowed to send CCIP messages to this peer
     /// @param chainSelector The chain selector to set
     /// @param isAllowed Whether the chain is allowed to send CCIP messages to this peer
-    /// @dev Access control: onlyOwner
-    function setAllowedChain(uint64 chainSelector, bool isAllowed) external onlyOwner {
+    /// @dev Access control: CROSS_CHAIN_ADMIN_ROLE
+    function setAllowedChain(uint64 chainSelector, bool isAllowed) external onlyRole(Roles.CROSS_CHAIN_ADMIN_ROLE) {
         s_allowedChains[chainSelector] = isAllowed;
         emit AllowedChainSet(chainSelector, isAllowed);
     }
@@ -500,26 +513,28 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @notice Set the peer contract for an allowed chain selector
     /// @param chainSelector The chain selector to set
     /// @param peer The peer to set
-    /// @dev Access control: onlyOwner
-    function setAllowedPeer(uint64 chainSelector, address peer) external onlyOwner {
-        if (!s_allowedChains[chainSelector]) revert YieldPeer__ChainNotAllowed(chainSelector);
+    /// @dev Access control: CROSS_CHAIN_ADMIN_ROLE
+    function setAllowedPeer(uint64 chainSelector, address peer) external onlyRole(Roles.CROSS_CHAIN_ADMIN_ROLE) {
+        if (!s_allowedChains[chainSelector]) {
+            revert YieldPeer__ChainNotAllowed(chainSelector);
+        }
         s_peers[chainSelector] = peer;
         emit AllowedPeerSet(chainSelector, peer);
     }
 
     /// @notice Set the CCIP gas limit
     /// @param gasLimit The gas limit to set
-    /// @dev Access control: onlyOwner
-    function setCCIPGasLimit(uint256 gasLimit) external onlyOwner {
+    /// @dev Access control: CROSS_CHAIN_ADMIN_ROLE
+    function setCCIPGasLimit(uint256 gasLimit) external onlyRole(Roles.CROSS_CHAIN_ADMIN_ROLE) {
         s_ccipGasLimit = gasLimit;
         emit CCIPGasLimitSet(gasLimit);
     }
 
     /// @notice Set the strategy registry
     /// @param strategyRegistry The strategy registry to set
-    /// @dev Access control: onlyOwner
+    /// @dev Access control: CONFIG_ADMIN_ROLE
     //slither-disable-next-line missing-zero-check
-    function setStrategyRegistry(address strategyRegistry) external onlyOwner {
+    function setStrategyRegistry(address strategyRegistry) external onlyRole(Roles.CONFIG_ADMIN_ROLE) {
         s_strategyRegistry = strategyRegistry;
         emit StrategyRegistrySet(strategyRegistry);
     }
@@ -600,5 +615,18 @@ abstract contract YieldPeer is CCIPReceiver, Ownable2Step, IERC677Receiver, IYie
     /// @return strategyRegistry The strategy registry address
     function getStrategyRegistry() external view returns (address strategyRegistry) {
         strategyRegistry = s_strategyRegistry;
+    }
+
+    // @reviewGeorge - needed to override from ccipreceiver/access control
+    // @reviewGeorge - just check ccip or also pausable access control?
+    /// @notice Checks if interface supported
+    function supportsInterface(bytes4 interfaceId)
+        public
+        view
+        virtual
+        override(CCIPReceiver, PausableWithAccessControl)
+        returns (bool)
+    {
+        return interfaceId == type(IAny2EVMMessageReceiver).interfaceId || super.supportsInterface(interfaceId);
     }
 }

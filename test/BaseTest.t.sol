@@ -21,8 +21,9 @@ import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAd
 import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
 import {DataTypes} from "@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol";
 import {USDCTokenPool} from "@chainlink/contracts/src/v0.8/ccip/pools/USDC/USDCTokenPool.sol";
-import {IFunctionsSubscriptions} from
-    "@chainlink/contracts/src/v0.8/functions/v1_0_0/interfaces/IFunctionsSubscriptions.sol";
+import {
+    IFunctionsSubscriptions
+} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/interfaces/IFunctionsSubscriptions.sol";
 import {IFunctionsRouter} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/interfaces/IFunctionsRouter.sol";
 import {FunctionsClient} from "@chainlink/contracts/src/v0.8/functions/v1_3_0/FunctionsClient.sol";
 import {LinkTokenInterface} from "@chainlink/contracts/src/v0.8/shared/interfaces/LinkTokenInterface.sol";
@@ -32,6 +33,7 @@ import {IComet} from "../src/interfaces/IComet.sol";
 import {AaveV3Adapter} from "../src/adapters/AaveV3Adapter.sol";
 import {CompoundV3Adapter} from "../src/adapters/CompoundV3Adapter.sol";
 import {StrategyRegistry} from "../src/modules/StrategyRegistry.sol";
+import {Roles} from "../src/libraries/Roles.sol";
 
 contract BaseTest is Test {
     /*//////////////////////////////////////////////////////////////
@@ -270,34 +272,40 @@ contract BaseTest is Test {
 
     function _setCrossChainPeers() internal virtual {
         _selectFork(baseFork);
+        baseParentPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, baseParentPeer.owner()); //@reviewGeorge: grant
         baseParentPeer.setCCIPGasLimit(INITIAL_CCIP_GAS_LIMIT);
         baseParentPeer.setAllowedChain(optChainSelector, true);
         baseParentPeer.setAllowedChain(ethChainSelector, true);
         baseParentPeer.setAllowedChain(baseChainSelector, true);
         baseParentPeer.setAllowedPeer(optChainSelector, address(optChildPeer));
         baseParentPeer.setAllowedPeer(ethChainSelector, address(ethChildPeer));
+        baseParentPeer.revokeRole(Roles.CROSS_CHAIN_ADMIN_ROLE, baseParentPeer.owner()); //@reviewGeorge: revoke
         assertEq(baseParentPeer.getAllowedChain(optChainSelector), true);
         assertEq(baseParentPeer.getAllowedChain(ethChainSelector), true);
         assertEq(baseParentPeer.getAllowedPeer(optChainSelector), address(optChildPeer));
         assertEq(baseParentPeer.getAllowedPeer(ethChainSelector), address(ethChildPeer));
 
         _selectFork(optFork);
+        optChildPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, optChildPeer.owner()); //@reviewGeorge: grant
         optChildPeer.setCCIPGasLimit(INITIAL_CCIP_GAS_LIMIT);
         optChildPeer.setAllowedChain(baseChainSelector, true);
         optChildPeer.setAllowedChain(ethChainSelector, true);
         optChildPeer.setAllowedPeer(baseChainSelector, address(baseParentPeer));
         optChildPeer.setAllowedPeer(ethChainSelector, address(ethChildPeer));
+        optChildPeer.revokeRole(Roles.CROSS_CHAIN_ADMIN_ROLE, optChildPeer.owner()); //@reviewGeorge: revoke
         assertEq(optChildPeer.getAllowedChain(baseChainSelector), true);
         assertEq(optChildPeer.getAllowedChain(ethChainSelector), true);
         assertEq(optChildPeer.getAllowedPeer(baseChainSelector), address(baseParentPeer));
         assertEq(optChildPeer.getAllowedPeer(ethChainSelector), address(ethChildPeer));
 
         _selectFork(ethFork);
+        ethChildPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, ethChildPeer.owner()); //@reviewGeorge: grant
         ethChildPeer.setCCIPGasLimit(INITIAL_CCIP_GAS_LIMIT);
         ethChildPeer.setAllowedChain(baseChainSelector, true);
         ethChildPeer.setAllowedChain(optChainSelector, true);
         ethChildPeer.setAllowedPeer(baseChainSelector, address(baseParentPeer));
         ethChildPeer.setAllowedPeer(optChainSelector, address(optChildPeer));
+        ethChildPeer.revokeRole(Roles.CROSS_CHAIN_ADMIN_ROLE, ethChildPeer.owner()); //@reviewGeorge: revoke
         assertEq(ethChildPeer.getAllowedChain(baseChainSelector), true);
         assertEq(ethChildPeer.getAllowedChain(optChainSelector), true);
         assertEq(ethChildPeer.getAllowedPeer(baseChainSelector), address(baseParentPeer));
@@ -473,12 +481,16 @@ contract BaseTest is Test {
 
         /// @dev set forwarder
         _changePrank(baseParentPeer.owner());
+        baseRebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner()); //@reviewGeorge: grant
         baseRebalancer.setForwarder(forwarder);
+        baseRebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner()); //@reviewGeorge: revoke
 
         /// @dev set upkeepAddress
         address parentPeerOwner = baseParentPeer.owner();
         _changePrank(parentPeerOwner);
+        baseRebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner()); //@reviewGeorge: grant
         baseRebalancer.setUpkeepAddress(upkeepAddress);
+        baseRebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner()); //@reviewGeorge: revoke
 
         /// @dev add ParentPeer as consumer to Chainlink Functions subscription
         address functionsRouter = baseNetworkConfig.clf.functionsRouter;
@@ -527,11 +539,7 @@ contract BaseTest is Test {
     /// @param poolAddressesProvider The address of the Aave pool addresses provider
     /// @param underlyingToken The address of the underlying token
     /// @return aTokenAddress The address of the Aave aToken
-    function _getATokenAddress(address poolAddressesProvider, address underlyingToken)
-        internal
-        view
-        returns (address)
-    {
+    function _getATokenAddress(address poolAddressesProvider, address underlyingToken) internal view returns (address) {
         address aavePool = IPoolAddressesProvider(poolAddressesProvider).getPool();
         DataTypes.ReserveData memory reserveData = IPool(aavePool).getReserveData(underlyingToken);
         return reserveData.aTokenAddress;
@@ -650,13 +658,19 @@ contract BaseTest is Test {
     function _setFeeRate(uint256 feeRate) internal {
         _selectFork(baseFork);
         _changePrank(baseParentPeer.owner());
+        baseParentPeer.grantRole(Roles.FEE_RATE_SETTER_ROLE, baseParentPeer.owner()); // @reviewGeorge: grant
         baseParentPeer.setFeeRate(feeRate);
+        baseParentPeer.revokeRole(Roles.FEE_RATE_SETTER_ROLE, baseParentPeer.owner()); // @reviewGeorge: revoke
         _selectFork(optFork);
         _changePrank(optChildPeer.owner());
+        optChildPeer.grantRole(Roles.FEE_RATE_SETTER_ROLE, optChildPeer.owner()); // @reviewGeorge: grant
         optChildPeer.setFeeRate(feeRate);
+        optChildPeer.revokeRole(Roles.FEE_RATE_SETTER_ROLE, optChildPeer.owner()); // @reviewGeorge: revoke
         _selectFork(ethFork);
         _changePrank(ethChildPeer.owner());
+        ethChildPeer.grantRole(Roles.FEE_RATE_SETTER_ROLE, ethChildPeer.owner()); // @reviewGeorge: grant
         ethChildPeer.setFeeRate(feeRate);
+        ethChildPeer.revokeRole(Roles.FEE_RATE_SETTER_ROLE, ethChildPeer.owner()); // @reviewGeorge: revoke
         _stopPrank();
     }
 

@@ -7,12 +7,14 @@ import {ChildPeer} from "../../src/peers/ChildPeer.sol";
 import {Share} from "../../src/token/Share.sol";
 import {SharePool} from "../../src/token/SharePool.sol";
 import {ITokenAdminRegistry} from "@chainlink/contracts/src/v0.8/ccip/interfaces/ITokenAdminRegistry.sol";
-import {RegistryModuleOwnerCustom} from
-    "@chainlink/contracts/src/v0.8/ccip/tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
+import {
+    RegistryModuleOwnerCustom
+} from "@chainlink/contracts/src/v0.8/ccip/tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
 import {AaveV3Adapter} from "../../src/adapters/AaveV3Adapter.sol";
 import {CompoundV3Adapter} from "../../src/adapters/CompoundV3Adapter.sol";
 import {IYieldPeer} from "../../src/interfaces/IYieldPeer.sol";
 import {StrategyRegistry} from "../../src/modules/StrategyRegistry.sol";
+import {Roles} from "../../src/libraries/Roles.sol";
 
 contract DeployChild is Script {
     /*//////////////////////////////////////////////////////////////
@@ -49,7 +51,9 @@ contract DeployChild is Script {
         CompoundV3Adapter compoundV3Adapter = new CompoundV3Adapter(address(childPeer), networkConfig.protocols.comet);
         strategyRegistry.setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(aaveV3Adapter));
         strategyRegistry.setStrategyAdapter(keccak256(abi.encodePacked("compound-v3")), address(compoundV3Adapter));
+        childPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, childPeer.owner()); // @reviewGeorge: grant
         childPeer.setStrategyRegistry(address(strategyRegistry));
+        childPeer.revokeRole(Roles.CONFIG_ADMIN_ROLE, childPeer.owner()); // @reviewGeorge: revoke
 
         vm.stopBroadcast();
 

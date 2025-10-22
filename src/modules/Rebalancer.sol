@@ -6,8 +6,8 @@ import {FunctionsClient} from "@chainlink/contracts/src/v0.8/functions/v1_3_0/Fu
 import {FunctionsRequest} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/libraries/FunctionsRequest.sol";
 import {ILogAutomation, Log} from "@chainlink/contracts/src/v0.8/automation/interfaces/ILogAutomation.sol";
 import {AutomationBase} from "@chainlink/contracts/src/v0.8/automation/AutomationBase.sol";
-import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
+import {PausableWithAccessControl, Roles} from "../modules/PausableWithAccessControl.sol";
 import {IStrategyRegistry} from "../interfaces/IStrategyRegistry.sol";
 
 /// @title Rebalancer
@@ -15,7 +15,7 @@ import {IStrategyRegistry} from "../interfaces/IStrategyRegistry.sol";
 /// @notice Combination of previous ParentRebalancer and ParentCLF contracts
 /// @notice Rebalances YieldCoin TVL across all protocols
 /// @notice This contract is only deployed on the Parent chain
-contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2Step {
+contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, PausableWithAccessControl {
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS
     //////////////////////////////////////////////////////////////*/
@@ -86,7 +86,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     /// @param donId The Chainlink Functions DON ID
     /// @param clfSubId The Chainlink Functions subscription ID
     constructor(address functionsRouter, bytes32 donId, uint64 clfSubId)
-        Ownable(msg.sender)
+        PausableWithAccessControl(3 days, msg.sender) // @reviewGeorge: check transfer delay
         FunctionsClient(functionsRouter)
     {
         i_donId = donId;
@@ -103,7 +103,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     // a: yes, but we will want to review using time-based automation vs incentivized public keepers
     // @review - pausable and time-based abstraction are 2 different tasks
     // although this may not necessarily need to be pausable because the rebalancer is configurable in parent
-    function sendCLFRequest() external {
+    function sendCLFRequest() external whenNotPaused {
         if (msg.sender != s_upkeepAddress) revert Rebalancer__OnlyUpkeep();
 
         /// @dev Send CLF request
@@ -125,7 +125,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     function checkLog(Log calldata log, bytes memory)
         external
         view
-        cannotExecute
+        //cannotExecute
         returns (bool upkeepNeeded, bytes memory performData)
     {
         bytes32 eventSignature = keccak256("StrategyUpdated(uint64,bytes32,uint64)");
@@ -234,7 +234,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     /// @param upkeepAddress The address of the Chainlink Automation upkeep
     /// @dev Revert if the caller is not the owner
     //slither-disable-next-line missing-zero-check
-    function setUpkeepAddress(address upkeepAddress) external onlyOwner {
+    function setUpkeepAddress(address upkeepAddress) external onlyRole(Roles.CONFIG_ADMIN_ROLE) {
         s_upkeepAddress = upkeepAddress;
         emit UpkeepAddressSet(upkeepAddress);
     }
@@ -243,7 +243,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     /// @param forwarder The address of the Chainlink Automation forwarder
     /// @dev Revert if the caller is not the owner
     // slither-disable-next-line missing-zero-check
-    function setForwarder(address forwarder) external onlyOwner {
+    function setForwarder(address forwarder) external onlyRole(Roles.CONFIG_ADMIN_ROLE) {
         s_forwarder = forwarder;
         emit ForwarderSet(forwarder);
     }
@@ -252,7 +252,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     /// @param parentPeer The address of the ParentPeer contract
     /// @dev Revert if the caller is not the owner
     // slither-disable-next-line missing-zero-check
-    function setParentPeer(address parentPeer) external onlyOwner {
+    function setParentPeer(address parentPeer) external onlyRole(Roles.CONFIG_ADMIN_ROLE) {
         s_parentPeer = parentPeer;
         emit ParentPeerSet(parentPeer);
     }
@@ -261,7 +261,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Ownable2
     /// @param strategyRegistry The address of the strategy registry
     /// @dev Revert if the caller is not the owner
     // slither-disable-next-line missing-zero-check
-    function setStrategyRegistry(address strategyRegistry) external onlyOwner {
+    function setStrategyRegistry(address strategyRegistry) external onlyRole(Roles.CONFIG_ADMIN_ROLE) {
         s_strategyRegistry = strategyRegistry;
         emit StrategyRegistrySet(strategyRegistry);
     }

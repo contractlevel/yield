@@ -7,16 +7,20 @@ import {Script} from "forge-std/Script.sol";
 import {HelperConfig} from "../HelperConfig.s.sol";
 import {Share} from "../../src/token/Share.sol";
 import {SharePool} from "../../src/token/SharePool.sol";
-import {IFunctionsSubscriptions} from
-    "@chainlink/contracts/src/v0.8/functions/v1_0_0/interfaces/IFunctionsSubscriptions.sol";
+import {
+    IFunctionsSubscriptions
+} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/interfaces/IFunctionsSubscriptions.sol";
 import {IFunctionsRouter} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/interfaces/IFunctionsRouter.sol";
 import {ITokenAdminRegistry} from "@chainlink/contracts/src/v0.8/ccip/interfaces/ITokenAdminRegistry.sol";
-import {RegistryModuleOwnerCustom} from
-    "@chainlink/contracts/src/v0.8/ccip/tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
+import {
+    RegistryModuleOwnerCustom
+} from "@chainlink/contracts/src/v0.8/ccip/tokenAdminRegistry/RegistryModuleOwnerCustom.sol";
 import {AaveV3Adapter} from "../../src/adapters/AaveV3Adapter.sol";
 import {CompoundV3Adapter} from "../../src/adapters/CompoundV3Adapter.sol";
 import {IYieldPeer} from "../../src/interfaces/IYieldPeer.sol";
 import {StrategyRegistry} from "../../src/modules/StrategyRegistry.sol";
+import {Roles} from "../../src/libraries/Roles.sol";
+import {console2} from "forge-std/console2.sol";
 
 contract DeployParent is Script {
     struct DeploymentConfig {
@@ -49,13 +53,11 @@ contract DeployParent is Script {
         deploy.sharePool =
             new SharePool(address(deploy.share), networkConfig.ccip.rmnProxy, networkConfig.ccip.ccipRouter);
 
-        RegistryModuleOwnerCustom(networkConfig.ccip.registryModuleOwnerCustom).registerAdminViaOwner(
-            address(deploy.share)
-        );
+        RegistryModuleOwnerCustom(networkConfig.ccip.registryModuleOwnerCustom)
+            .registerAdminViaOwner(address(deploy.share));
         ITokenAdminRegistry(networkConfig.ccip.tokenAdminRegistry).acceptAdminRole(address(deploy.share));
-        ITokenAdminRegistry(networkConfig.ccip.tokenAdminRegistry).setPool(
-            address(deploy.share), address(deploy.sharePool)
-        );
+        ITokenAdminRegistry(networkConfig.ccip.tokenAdminRegistry)
+            .setPool(address(deploy.share), address(deploy.sharePool));
 
         deploy.rebalancer = new Rebalancer(networkConfig.clf.functionsRouter, networkConfig.clf.donId, deploy.clfSubId);
         deploy.parentPeer = new ParentPeer(
@@ -68,22 +70,28 @@ contract DeployParent is Script {
 
         deploy.share.grantMintAndBurnRoles(address(deploy.sharePool));
         deploy.share.grantMintAndBurnRoles(address(deploy.parentPeer));
+        // @reviewGeorge: grant yourself config admin role to be able to set rebalancer config
+        deploy.rebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, deploy.rebalancer.owner());
         deploy.rebalancer.setParentPeer(address(deploy.parentPeer));
+        // @reviewGeorge: grant yourself config admin role to be able to set parent peer config
+        deploy.parentPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, deploy.parentPeer.owner());
         deploy.parentPeer.setRebalancer(address(deploy.rebalancer));
 
         deploy.strategyRegistry = new StrategyRegistry();
         deploy.aaveV3Adapter =
             new AaveV3Adapter(address(deploy.parentPeer), networkConfig.protocols.aavePoolAddressesProvider);
         deploy.compoundV3Adapter = new CompoundV3Adapter(address(deploy.parentPeer), networkConfig.protocols.comet);
-        deploy.strategyRegistry.setStrategyAdapter(
-            keccak256(abi.encodePacked("aave-v3")), address(deploy.aaveV3Adapter)
-        );
-        deploy.strategyRegistry.setStrategyAdapter(
-            keccak256(abi.encodePacked("compound-v3")), address(deploy.compoundV3Adapter)
-        );
+        deploy.strategyRegistry
+            .setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(deploy.aaveV3Adapter));
+        deploy.strategyRegistry
+            .setStrategyAdapter(keccak256(abi.encodePacked("compound-v3")), address(deploy.compoundV3Adapter));
         deploy.parentPeer.setStrategyRegistry(address(deploy.strategyRegistry));
         deploy.rebalancer.setStrategyRegistry(address(deploy.strategyRegistry));
         deploy.parentPeer.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")));
+
+        // @reviewGeorge: revoke config role from yourself after setting necessary configs
+        deploy.rebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, deploy.rebalancer.owner());
+        deploy.parentPeer.revokeRole(Roles.CONFIG_ADMIN_ROLE, deploy.parentPeer.owner());
 
         vm.stopBroadcast();
     }

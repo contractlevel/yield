@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {YieldPeer, Client, IRouterClient, CCIPOperations, IERC20, SafeERC20} from "./YieldPeer.sol";
+import {YieldPeer, Client, IRouterClient, CCIPOperations, IERC20, SafeERC20, Roles} from "./YieldPeer.sol";
 
 /// @title YieldCoin ParentPeer
 /// @author @contractlevel
@@ -74,7 +74,7 @@ contract ParentPeer is YieldPeer {
     /// 2. This Parent is not the Strategy
     /// @param amountToDeposit The amount of USDC to deposit into the system
     /// @dev Revert if amountToDeposit is less than 1e6 (1 USDC)
-    function deposit(uint256 amountToDeposit) external override {
+    function deposit(uint256 amountToDeposit) external override whenNotPaused {
         /// @dev takes a fee
         amountToDeposit = _initiateDeposit(amountToDeposit);
 
@@ -124,6 +124,7 @@ contract ParentPeer is YieldPeer {
     function onTokenTransfer(address withdrawer, uint256 shareBurnAmount, bytes calldata encodedWithdrawChainSelector)
         external
         override
+        whenNotPaused
     {
         _revertIfMsgSenderIsNotShare();
 
@@ -448,7 +449,7 @@ contract ParentPeer is YieldPeer {
     /// @dev Revert if already called
     /// @dev Called in deploy script, immediately after deploying initial strategy adapters, and setting them in YieldPeer::setStrategyAdapter
     /// @param protocolId The protocol ID of the initial active strategy
-    function setInitialActiveStrategy(bytes32 protocolId) external onlyOwner {
+    function setInitialActiveStrategy(bytes32 protocolId) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (s_initialActiveStrategySet) revert ParentPeer__InitialActiveStrategyAlreadySet();
         s_initialActiveStrategySet = true;
         s_strategy = Strategy({chainSelector: i_thisChainSelector, protocolId: protocolId});
@@ -459,7 +460,7 @@ contract ParentPeer is YieldPeer {
     /// @dev Revert if msg.sender is not the owner
     /// @param rebalancer The address of the rebalancer
     //slither-disable-next-line missing-zero-check
-    function setRebalancer(address rebalancer) external onlyOwner {
+    function setRebalancer(address rebalancer) external onlyRole(Roles.CONFIG_ADMIN_ROLE) {
         s_rebalancer = rebalancer;
         emit RebalancerSet(rebalancer);
     }

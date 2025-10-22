@@ -4,6 +4,7 @@ pragma solidity 0.8.26;
 import {BaseTest, IERC20} from "../../BaseTest.t.sol";
 import {IYieldPeer} from "../../../src/interfaces/IYieldPeer.sol";
 import {IComet} from "../../../src/interfaces/IComet.sol";
+import {Roles} from "../../../src/libraries/Roles.sol";
 import {console2} from "forge-std/console2.sol";
 
 contract ChildDepositTest is BaseTest {
@@ -21,6 +22,17 @@ contract ChildDepositTest is BaseTest {
     function test_yield_child_deposit_revertsWhen_insufficientAmount() public {
         vm.expectRevert(abi.encodeWithSignature("YieldPeer__InsufficientAmount()"));
         optChildPeer.deposit(1e6 - 1);
+    }
+
+    // @reviewGeorge: correct name? for when system paused
+    function test_yield_child_deposit_revertsWhen_ChildPaused() public {
+        _changePrank(optChildPeer.owner());
+        optChildPeer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, optChildPeer.owner());
+        optChildPeer.emergencyPause();
+        optChildPeer.revokeRole(Roles.EMERGENCY_PAUSER_ROLE, optChildPeer.owner());
+        _changePrank(depositor);
+        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
+        optChildPeer.deposit(DEPOSIT_AMOUNT);
     }
 
     // - child/deposit is strategy

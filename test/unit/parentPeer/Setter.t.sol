@@ -1,13 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {BaseTest, Vm, console2, IYieldPeer, Log} from "../../BaseTest.t.sol";
+import {BaseTest, Vm, console2, IYieldPeer, Log, Roles} from "../../BaseTest.t.sol";
 
 contract SetterTest is BaseTest {
     // --- setRebalancer --- //
-    function test_yield_parentPeer_setRebalancer_revertsWhen_notOwner() public {
+    function test_yield_parentPeer_setRebalancer_revertsWhen_notConfigAdmin() public {
         _changePrank(holder);
-        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", holder));
+        vm.expectRevert(
+            abi.encodeWithSignature(
+                "AccessControlUnauthorizedAccount(address,bytes32)", holder, Roles.CONFIG_ADMIN_ROLE
+            )
+        );
         baseParentPeer.setRebalancer(address(0));
     }
 
