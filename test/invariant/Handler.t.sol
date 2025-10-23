@@ -1,7 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {Test, Vm, console2, ParentPeer, ChildPeer, IERC20, Share, IYieldPeer, Rebalancer} from "../BaseTest.t.sol";
+import {
+    Test,
+    Vm,
+    console2,
+    ParentPeer,
+    ChildPeer,
+    IERC20,
+    Share,
+    IYieldPeer,
+    Rebalancer,
+    Roles
+} from "../BaseTest.t.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice This contract is used to handle fuzzed interactions with the external functions of the system to test invariants.
@@ -151,8 +162,11 @@ contract Handler is Test {
         aavePool = _aavePool;
         compoundPool = _compoundPool;
         rebalancer = _rebalancer;
-        vm.prank(rebalancer.owner());
+        vm.startPrank(rebalancer.owner());
+        rebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, rebalancer.owner()); // @reviewGeorge: grant
         rebalancer.setForwarder(forwarder);
+        rebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, rebalancer.owner()); // @reviewGeorge: revoke
+        vm.stopPrank();
 
         parentChainSelector = parent.getThisChainSelector();
         child1ChainSelector = child1.getThisChainSelector();
@@ -317,9 +331,21 @@ contract Handler is Test {
 
         /// @dev withdraw the fees
         _changePrank(parent.owner());
-        if (parentFees > 0) parent.withdrawFees(address(usdc));
-        if (child1Fees > 0) child1.withdrawFees(address(usdc));
-        if (child2Fees > 0) child2.withdrawFees(address(usdc));
+        if (parentFees > 0) {
+            parent.grantRole(Roles.FEE_WITHDRAWER_ROLE, parent.owner());
+            parent.withdrawFees(address(usdc));
+            parent.revokeRole(Roles.FEE_WITHDRAWER_ROLE, parent.owner());
+        }
+        if (child1Fees > 0) {
+            child1.grantRole(Roles.FEE_WITHDRAWER_ROLE, child1.owner());
+            child1.withdrawFees(address(usdc));
+            child1.revokeRole(Roles.FEE_WITHDRAWER_ROLE, child1.owner());
+        }
+        if (child2Fees > 0) {
+            child2.grantRole(Roles.FEE_WITHDRAWER_ROLE, child2.owner());
+            child2.withdrawFees(address(usdc));
+            child2.revokeRole(Roles.FEE_WITHDRAWER_ROLE, child2.owner());
+        }
     }
 
     /// @notice This function handles setting the fee rate
@@ -331,9 +357,15 @@ contract Handler is Test {
         ghost_state_feeRate = feeRate;
         /// @dev update the fee rate
         _changePrank(parent.owner());
+        parent.grantRole(Roles.FEE_RATE_SETTER_ROLE, parent.owner());
         parent.setFeeRate(feeRate);
+        parent.revokeRole(Roles.FEE_RATE_SETTER_ROLE, parent.owner());
+        child1.grantRole(Roles.FEE_RATE_SETTER_ROLE, child1.owner());
         child1.setFeeRate(feeRate);
+        child1.revokeRole(Roles.FEE_RATE_SETTER_ROLE, child1.owner());
+        child2.grantRole(Roles.FEE_RATE_SETTER_ROLE, child2.owner());
         child2.setFeeRate(feeRate);
+        child2.revokeRole(Roles.FEE_RATE_SETTER_ROLE, child2.owner());
     }
 
     /*//////////////////////////////////////////////////////////////

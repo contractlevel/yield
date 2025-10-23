@@ -2,7 +2,7 @@
 pragma solidity 0.8.26;
 
 import {StdInvariant} from "forge-std/StdInvariant.sol";
-import {BaseTest, Vm, console2, ParentPeer, ChildPeer, Share, IYieldPeer, Rebalancer} from "../BaseTest.t.sol";
+import {BaseTest, Vm, console2, ParentPeer, ChildPeer, Share, IYieldPeer, Rebalancer, Roles} from "../BaseTest.t.sol";
 import {Handler} from "./Handler.t.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {IRouterClient} from "@chainlink/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
@@ -126,9 +126,12 @@ contract Invariant is StdInvariant, BaseTest {
             networkConfig.tokens.usdc,
             networkConfig.tokens.share
         );
+        parent.grantRole(Roles.CONFIG_ADMIN_ROLE, parent.owner()); // @reviewGeorge grant
         parent.setRebalancer(address(rebalancer));
+        rebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, rebalancer.owner()); // @reviewGeorge grant
         rebalancer.setUpkeepAddress(upkeep);
         rebalancer.setParentPeer(address(parent));
+
         /// @dev deploy parent adapters
         strategyRegistryParent = new StrategyRegistry();
         aaveV3AdapterParent = new AaveV3Adapter(address(parent), networkConfig.protocols.aavePoolAddressesProvider);
@@ -140,6 +143,8 @@ contract Invariant is StdInvariant, BaseTest {
         rebalancer.setStrategyRegistry(address(strategyRegistryParent));
         parent.setStrategyRegistry(address(strategyRegistryParent));
         parent.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")));
+        parent.revokeRole(Roles.CONFIG_ADMIN_ROLE, parent.owner()); // @reviewGeorge revoke
+        rebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, rebalancer.owner()); // @reviewGeorge revoke
 
         /// @dev deploy at least 2 child peers to cover all CCIP tx types
         child1 = new ChildPeer(
@@ -154,7 +159,9 @@ contract Invariant is StdInvariant, BaseTest {
         strategyRegistryChild1 = new StrategyRegistry();
         aaveV3AdapterChild1 = new AaveV3Adapter(address(child1), networkConfig.protocols.aavePoolAddressesProvider);
         compoundV3AdapterChild1 = new CompoundV3Adapter(address(child1), networkConfig.protocols.comet);
+        child1.grantRole(Roles.CONFIG_ADMIN_ROLE, child1.owner());
         child1.setStrategyRegistry(address(strategyRegistryChild1));
+        child1.revokeRole(Roles.CONFIG_ADMIN_ROLE, child1.owner());
         strategyRegistryChild1.setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(aaveV3AdapterChild1));
         strategyRegistryChild1.setStrategyAdapter(
             keccak256(abi.encodePacked("compound-v3")), address(compoundV3AdapterChild1)
@@ -171,7 +178,9 @@ contract Invariant is StdInvariant, BaseTest {
         strategyRegistryChild2 = new StrategyRegistry();
         aaveV3AdapterChild2 = new AaveV3Adapter(address(child2), networkConfig.protocols.aavePoolAddressesProvider);
         compoundV3AdapterChild2 = new CompoundV3Adapter(address(child2), networkConfig.protocols.comet);
+        child2.grantRole(Roles.CONFIG_ADMIN_ROLE, child2.owner());
         child2.setStrategyRegistry(address(strategyRegistryChild2));
+        child2.revokeRole(Roles.CONFIG_ADMIN_ROLE, child2.owner());
         strategyRegistryChild2.setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(aaveV3AdapterChild2));
         strategyRegistryChild2.setStrategyAdapter(
             keccak256(abi.encodePacked("compound-v3")), address(compoundV3AdapterChild2)
@@ -190,6 +199,10 @@ contract Invariant is StdInvariant, BaseTest {
     }
 
     function _setCrossChainPeers() internal override {
+        parent.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, parent.owner());
+        child1.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, child1.owner());
+        child2.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, child2.owner());
+
         parent.setCCIPGasLimit(CCIP_GAS_LIMIT);
         child1.setCCIPGasLimit(CCIP_GAS_LIMIT);
         child2.setCCIPGasLimit(CCIP_GAS_LIMIT);
@@ -215,6 +228,10 @@ contract Invariant is StdInvariant, BaseTest {
         child2.setAllowedPeer(CHILD1_SELECTOR, address(child1));
         child2.setAllowedPeer(CHILD2_SELECTOR, address(child2));
 
+        parent.revokeRole(Roles.CROSS_CHAIN_ADMIN_ROLE, parent.owner());
+        child1.revokeRole(Roles.CROSS_CHAIN_ADMIN_ROLE, child1.owner());
+        child2.revokeRole(Roles.CROSS_CHAIN_ADMIN_ROLE, child2.owner());
+
         MockCCIPRouter(networkConfig.ccip.ccipRouter).setPeerToChainSelector(address(parent), PARENT_SELECTOR);
         MockCCIPRouter(networkConfig.ccip.ccipRouter).setPeerToChainSelector(address(child1), CHILD1_SELECTOR);
         MockCCIPRouter(networkConfig.ccip.ccipRouter).setPeerToChainSelector(address(child2), CHILD2_SELECTOR);
@@ -231,9 +248,8 @@ contract Invariant is StdInvariant, BaseTest {
     function checkActiveStrategyAdapterPerChainSelector(uint64 chainSelector) external view {
         if (chainSelector == parent.getStrategy().chainSelector) {
             assertEq(
-                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getStrategyAdapter(
-                    parent.getStrategy().protocolId
-                ),
+                IYieldPeer(handler.chainSelectorsToPeers(chainSelector))
+                    .getStrategyAdapter(parent.getStrategy().protocolId),
                 IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter(),
                 "Invariant violated: Active strategy adapter on active strategy chain should match the protocol stored in ParentPeer"
             );

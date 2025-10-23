@@ -18,14 +18,19 @@ contract SetterTest is BaseTest {
     function test_yield_parentPeer_setRebalancer_success() public {
         address newRebalancer = makeAddr("newRebalancer");
         _changePrank(baseParentPeer.owner());
+        baseParentPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, baseParentPeer.owner());
         baseParentPeer.setRebalancer(newRebalancer);
         assertEq(baseParentPeer.getRebalancer(), newRebalancer);
     }
 
     // --- setInitialActiveStrategy --- //
-    function test_yield_parentPeer_setInitialActiveStrategy_revertsWhen_notOwner() public {
+    function test_yield_parentPeer_setInitialActiveStrategy_revertsWhen_notDefaultAdmin() public {
+        bytes32 DEFAULT_ADMIN_ROLE = 0x00;
+
         _changePrank(holder);
-        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", holder));
+        vm.expectRevert(
+            abi.encodeWithSignature("AccessControlUnauthorizedAccount(address,bytes32)", holder, DEFAULT_ADMIN_ROLE)
+        );
         baseParentPeer.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")));
     }
 

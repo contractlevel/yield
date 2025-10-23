@@ -15,6 +15,7 @@ import {ParentPeer} from "../src/peers/ParentPeer.sol";
 import {ChildPeer} from "../src/peers/ChildPeer.sol";
 import {Rebalancer} from "../src/modules/Rebalancer.sol";
 import {SharePool} from "../src/token/SharePool.sol";
+import {Roles} from "../src/libraries/Roles.sol";
 
 contract HelperConfig is Script {
     /*//////////////////////////////////////////////////////////////
@@ -463,7 +464,9 @@ contract HelperConfig is Script {
                 registryModuleOwnerCustom: address(0) // dummy value
             }),
             tokens: TokensConfig({link: address(link), usdc: address(usdc), share: address(share)}),
-            protocols: ProtocolsConfig({aavePoolAddressesProvider: address(poolAddressesProvider), comet: address(comet)}),
+            protocols: ProtocolsConfig({
+                aavePoolAddressesProvider: address(poolAddressesProvider), comet: address(comet)
+            }),
             clf: CLFConfig({
                 functionsRouter: address(functionsRouter),
                 donId: "",
@@ -520,6 +523,8 @@ contract HelperConfig is Script {
         rebalancer = new Rebalancer(address(functionsRouter), "", 0);
         parent = new ParentPeer(address(ccipRouter), address(link), 1, address(usdc), address(share));
         child = new ChildPeer(address(ccipRouter), address(link), 2, address(usdc), address(share), 1);
+        parent.grantRole(Roles.CONFIG_ADMIN_ROLE, parent.owner());
         parent.setRebalancer(address(rebalancer));
+        parent.revokeRole(Roles.CONFIG_ADMIN_ROLE, parent.owner());
     }
 }
