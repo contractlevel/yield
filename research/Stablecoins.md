@@ -1,5 +1,48 @@
 # Stablecoin Integration Research
 
+## Table of Contents
+
+### Core Analysis
+
+- [Overview](#overview)
+- [Fundamental Limitations & Risks](#fundamental-limitations--risks)
+
+### DEX Integration Options
+
+- [Uniswap V4](#uniswap-v4)
+- [Uniswap V3](#uniswap-v3)
+- [Uniswap V2](#uniswap-v2)
+- [Lanca (Concero)](#lanca-concero)
+- [XSwap](#xswap---ongoing-talks-on-discord-with-their-support-for-more-information)
+- [Cowswap](#cowswap)
+- [Curve Finance](#curve-finance)
+- [DEX Aggregators](#dex-aggregators-1inch-paraswap-etc)
+
+### Technical Considerations
+
+- [Liquidity Considerations & Limitations](#liquidity-considerations--limitations)
+- [USDC as Cross-Chain Standard](#usdc-as-cross-chain-standard)
+- [Slippage Management Strategy](#slippage-management-strategy)
+- [Contract Architecture Requirements](#contract-architecture-requirements)
+- [Concero Integration Strategy](#concero-integration-strategy)
+- [MEV Protection Strategies](#mev-protection-strategies)
+
+### Implementation Details
+
+- [DEX Integration Code Examples](#dex-integration-code-examples)
+- [USDC & USDT Liquidity Pools Across Chains](#usdc--usdt-liquidity-pools-across-chains)
+
+### Market Analysis
+
+- [Traditional DEX vs PMMs](#traditional-dex-vs-pmms)
+
+### Rebalancing Strategy
+
+- [Cost-Benefit Analysis](#cost-benefit-analysis)
+- [Historical APY % Analysis on AAVE, COMPOUND](#historical-apy--analysis-on-aave-compound)
+
+---
+
 ## Overview
 
 Research document for integrating stablecoin swapping capabilities into the yield protocol. This document explores various DEX options, integration approaches, and considerations for cross-chain stablecoin operations.
@@ -11,6 +54,7 @@ Emerging Questions during research:
 - What if we deposit to DEX LPs? Some are "AAVE boosted" --- seemingly lower APY % than AAVE, needs investigation
 - What about the newer EVM chains? Some are CCIP connected + institutional usage is already there
 - There are additional Chain-specific DEXs, with substantially bigger pools for USDC/USDT. Consider making own DEX Aggregator for such cases, or search for established ones. (eg Blackhole on AVAX with 24M USDC/USDT pool `0x859592a4a469610e573f96ef87a0e5565f9a94c8`, Aerodrome on BASE with 2.7M `0xa41bc0affba7fd420d186b84899d7ab2ac57fcd1`)
+- Optimism Mainnet specifically has <$1M USDT liquidity pools. _BUT_ is supported by CCIP! Great opportunity to swap TVL into USDT in ETH/ARB and bridge USDT directly to OP(symbol oUSDT)! Might even become top strategy
 
 ## Fundamental Limitations & Risks
 
@@ -18,13 +62,15 @@ Emerging Questions during research:
 
 **USDC/USDT Liquidity Fragmentation**
 
-- Chain-specific liquidity limitations
-- **Potential Solution**: Concero/Lanca unified liquidity approach
+- Chain-specific liquidity limitations, specifically USDT
+- **Potential Solution**: Concero/Lanca unified liquidity approach, Concero with USDT?
+- **Potential Solution**: Curve/UniswapV3,V4 main approach, chain-specific DEXs
+- **Potential Solution**: Off-chain swaps
 
 **Critical Questions:**
 
-- Is current liquidity sufficient for full TVL swaps?
-- Will large TVL impact APR through slippage?
+- Is current liquidity sufficient for full TVL swaps? - Answer: Depends, potentially no.
+- Will large TVL impact APR through slippage? - Answer: Yes, even smaller TVL will have an impact on Rebalancer frequency, explored below.
 
 ### 2. Rebalancing Frequency Optimization
 
@@ -34,7 +80,9 @@ Emerging Questions during research:
 - Large TVL + frequent rebalancing = significant slippage costs
 - Large TVL deposits might/will impact Strategy APY %, need to account for that before switching strategies
 - This can also be attacked to mess with Rebalancer
-- **Solution**: Optimize rebalancing frequency based on TVL size, more Rebalancer logic to handle Strategy changes due to own TVL deposits
+- **Solution**: Optimize rebalancing frequency based on TVL size, more Rebalancer logic to handle Strategy changes due to own TVL deposits.
+  Furthermore, USDC strategies will eventually prove more profitable, just because no swaps will be performed. Moving TVL to another chain with USDC and depositing USDC to strategy costs virtually 0.
+- Attacks to Curve/Uniswap pools to mess with swapping, should be mitigated by at least encrypted TVL movements, Flash-bots.
 
 ### 3. Single-Point-of-Failure Risks
 
@@ -43,13 +91,14 @@ Emerging Questions during research:
 - Dependency on single routing mechanism
 - **Mitigation**: Implement monitoring and fallback routes
 - **Goal**: Multi-path routing for redundancy
+- **Potential Solution**: Fallback on CCIP routing
 
 ### 4. TVL Risk Management
 
 **Error Handling & Fallback Logic**
 
 - Failed swaps put entire TVL at risk
-- **Protection**: TWAP mechanisms
+- **Protection**: TWAP fallback mechanisms
 - **Requirement**: Robust error recovery systems
 
 ### 5. Security Considerations
@@ -67,6 +116,7 @@ Emerging Questions during research:
 - Gas costs increase with user deposit volume
 - Small deposits still require full swap processing
 - **Solution**: Implement batching mechanisms
+- **Potential Solution**: Implement chain-specific batching, deposit pools that move around when certain $$$ is gathered, or time has passed.
 
 ### 7. Emergency Scenarios
 
@@ -784,14 +834,14 @@ It uses a dual model system of:
 | **Price Certainty**        | ✅ Guaranteed execution price   | ❌ Price impact varies            | ❌ Price impact varies               |
 | **Gas Costs**              | ✅ Included in quote            | ❌ User pays gas                  | ❌ User pays gas                     |
 | **Integration Complexity** | ❌ High (API dependency)        | ✅ Direct contract calls          | ✅ Direct contract calls             |
-| **Multi-Chain Support**    | ✅ 6 chains supported           | ✅ Multi-chain deployment         | ✅ Multi-chain deployment            |
-| **Liquidity Depth**        | ✅ Private MM + on-chain        | ✅ Deepest for stables (177M ETH) | ✅ Deep liquidity (25M+ ETH)         |
+| **Multi-Chain Support**    | ✅ Relevant chains supported    | ✅ Multi-chain deployment         | ✅ Multi-chain deployment            |
+| **Liquidity Depth**        | ✅ Private MM + on-chain        | ❌ Chain Dependant                | ❌ Chain Dependant                   |
 | **Trust Model**            | ❌ Centralized (API dependency) | ✅ Decentralized                  | ✅ Decentralized                     |
 | **Quote Validity**         | ❌ ~60 seconds expiration       | ✅ Real-time pricing              | ✅ Real-time pricing                 |
 | **Fallback Mechanisms**    | ❌ Requires AMM fallback        | ✅ Built-in redundancy            | ✅ Multiple pools available          |
 | **Audit Requirements**     | ❌ API + contract audits        | ✅ Battle-tested contracts        | ✅ Battle-tested contracts           |
 | **CCIP Compatibility**     | ❌ Complex (quote timing)       | ✅ Direct integration             | ✅ Direct integration                |
-| **Best Use Case**          | Large trades, MEV-sensitive     | Stablecoin swaps                  | General token swaps                  |
+| **Best Use Case**          | Large trades, MEV-sensitive     | Stablecoin swaps                  | Expanded stables/token swaps         |
 | **Risk Level**             | Medium (centralization)         | Low (proven)                      | Low (proven)                         |
 
 **Recommendation**: Use conventional AMMs (Curve/Uniswap V3) for V1 implementation due to:
@@ -806,7 +856,7 @@ Consider Bebop for V2 if MEV protection becomes critical for large TVL movements
 **OR**: Hybrid approach for V1 implementation by:
 
 - Using AMMs as the default on-chain swap path
-- Interating Bebop as an optonal route / fallback when AMM quores are unfavourable or have high slippage // at this point are we comfortable thinking of a DEX solver as a solution?
+- Interating Bebop as an optonal route / fallback when AMM quotes are unfavourable or have high slippage // at this point are we comfortable thinking of a DEX solver as a solution?
 - Using Bebop for large TVL swaps (>$1M/$3M depending on specific chain liquidity depth)
 
 #### Further questions
@@ -815,3 +865,216 @@ Consider Bebop for V2 if MEV protection becomes critical for large TVL movements
 - Quotes and quote expiration
 - Solver response time
 - Bebop's contract security, github test suites questionable
+
+## Rebalancing
+
+### Cost-Benefit Analysis
+
+When contemplating moving funds from one chain/protocol/stablecoin to another, the key question is whether the extra yield outweighs all rebalancing costs: stablecoin swap fees and slippage, cross-chain bridge & messaging fees, and gas.
+
+#### Cost Breakdown
+
+**DEX Swap Costs:**
+
+- **Curve Finance**: USDC/USDT/DAI pool offers deep liquidity with minimal slippage (<0.01%) and 0.03% fees
+  - For $1M TVL: ~$400 in fees
+- **Uniswap V3**: Standard 0.05% fee tier for stables with ~0.1% slippage due to liquidity concerns
+  - For $1M TVL: ~$1,500 in fees
+
+**Cross-Chain Infrastructure:**
+
+- **CCIP**: Flat $0.50 fee for token transfer and messaging
+  - For $1M TVL: ~$0.50 in LINK fees
+- **Gas Costs**:
+  - Ethereum: ~$50 per rebalance (pessimistic estimate)
+  - Other chains: ~$5 per rebalance
+
+**Total Rebalancing Costs:**
+
+- **Curve Finance**: 0.04% of TVL
+- **Uniswap V3**: 0.15% of TVL
+- **$1M TVL Rebalance Cost**: $400-1,600
+
+#### Break-Even Analysis
+
+The rebalancing move should indicate an opportunity that covers at least **double** these costs to account for:
+
+- Opportunity costs during transit
+- Additional gas fees that may occur
+- Market volatility during the transition period
+
+This means the TVL should remain in the new strategy long enough to produce sufficient yield to justify the move.
+
+#### Napkin Formula
+
+**Mathematical Framework:**
+
+1. **Immediate Cost at t = 0**
+
+   ```
+   yield_diff = y₂ - y₁
+   fee% = total_cost_as_percentage_of_TVL
+   ```
+
+2. **Ongoing Gain**
+
+   ```
+   Gain_per_year = TVL × yield_diff
+   Gain_over_time = TVL × yield_diff × t
+   ```
+
+3. **Break-Even Conditions**
+
+   **Required Supply Time:**
+
+   ```
+   TVL × yield_diff × t = TVL × fee%
+   t = fee% / yield_diff
+   ```
+
+   **Required Yield Upgrade:**
+
+   ```
+   yield_diff = fee% / t
+   ```
+
+#### Results: Required ∆APY and USD Equivalent
+
+| Frequency      | Interval (years) | Required ∆APY (annual %) | USD/year needed (TVL = $100k) | USD/year needed (TVL = $500k) | USD/year needed (TVL = $1M) |
+| -------------- | ---------------- | ------------------------ | ----------------------------- | ----------------------------- | --------------------------- |
+| 3× per week    | 1/156 ≈ 0.006410 | ≈ 12.56%                 | $12,560                       | $62,500                       | $124,900                    |
+| 1 per month    | 1/12 ≈ 0.08333   | ≈ 0.97%                  | $970                          | $4,800                        | $9,600                      |
+| 1 per 6 months | 0.5              | ≈ 0.161%                 | $161                          | $800                          | $1,600                      |
+
+> **IMPORTANT NOTE:** This analysis covers **ONE SINGLE SWAP** and **ONE SINGLE BRIDGED TRANSFER**.
+>
+> - Costs **increase** for multiple swaps
+> - Costs **decrease** for same-chain strategy changes
+> - **Virtually no costs** for same-chain, same-currency rebalancing
+
+### Historical APY % Analysis on AAVE, COMPOUND
+
+> **IMPORTANT NOTE:** BULL v BEAR markets, currently in-between !! + ~2% average for bull
+
+**Data Sources:**
+
+- [AaveScan](https://aavescan.com/)
+- [YieldSamurai](https://yieldsamurai.com/)
+- [DefiLlama](https://defillama.com/)
+
+---
+
+#### AAVE USDC Historical Data
+
+| Chain         | Current | 1Y Average | 1Y Lows | 1Y Highs | Liquidity Impact               |
+| ------------- | ------- | ---------- | ------- | -------- | ------------------------------ |
+| **Ethereum**  | 3.55%   | 5.18%      | 2.20%   | 18.90%   | Negligible                     |
+| **Arbitrum**  | 3.05%   | 5.14%      | 2.20%   | 17.90%   | Negligible                     |
+| **Avalanche** | 4.86%   | 4.64%      | 1.92%   | 14.92%   | Negligible                     |
+| **Base**      | 4.61%   | 5.72%      | 2.71%   | 17.90%   | Negligible                     |
+| **Optimism**  | 4.46%   | 5.20%      | 1.83%   | 24.05%   | $1.00M deposit: 4.13% (-0.33%) |
+| **Polygon**   | 3.62%   | 5.33%      | 2.88%   | 16.80%   | $1.00M deposit: 3.46% (-0.16%) |
+
+**AAVE USDC Average Supply APR by Timeframe:**
+
+| Chain     | 1D    | 7D    | 30D   | 6M    | 1Y    |
+| --------- | ----- | ----- | ----- | ----- | ----- |
+| Ethereum  | 3.69% | 3.86% | 4.12% | 3.93% | 5.20% |
+| Arbitrum  | 3.21% | 3.29% | 4.28% | 3.95% | 5.14% |
+| Avalanche | 4.24% | 4.38% | 5.79% | 4.05% | 4.64% |
+| Base      | 4.89% | 5.35% | 5.67% | 4.58% | 5.72% |
+| Optimism  | 4.55% | 4.69% | 5.01% | 3.90% | 5.20% |
+| Polygon   | 3.80% | 4.29% | 4.53% | 4.02% | 5.33% |
+
+#### AAVE USDT Historical Data
+
+| Chain         | Current | 1Y Average | 1Y Lows | 1Y Highs | Liquidity Impact               |
+| ------------- | ------- | ---------- | ------- | -------- | ------------------------------ |
+| **Ethereum**  | 3.70%   | 4.71%      | 1.77%   | 17.50%   | Negligible                     |
+| **Arbitrum**  | 4.25%   | 5.33%      | 2.75%   | 18.20%   | Negligible                     |
+| **Avalanche** | 3.17%   | 4.18%      | 1.85%   | 19.75%   | Negligible                     |
+| **Base**      | --      | --         | --      | --       | --                             |
+| **Optimism**  | 3.98%   | 5.40%      | 1.41%   | 18.55%   | $1.00M deposit: 3.40% (-0.58%) |
+| **Polygon**   | 3.70%   | 5.38%      | 3.00%   | 14.09%   | $5.00M deposit: 3.06% (-0.64%) |
+
+**AAVE USDT Average Supply APR by Timeframe:**
+
+| Chain     | 1D    | 7D    | 30D   | 6M    | 1Y    |
+| --------- | ----- | ----- | ----- | ----- | ----- |
+| Ethereum  | 3.71% | 4.21% | 4.57% | 4.04% | 4.88% |
+| Arbitrum  | 4.12% | 4.25% | 4.92% | 4.05% | 5.33% |
+| Avalanche | 2.95% | 3.27% | 3.71% | 3.60% | 4.18% |
+| Base      | --    | --    | --    | --    | --    |
+| Optimism  | 4.23% | 5.29% | 5.02% | 4.20% | 5.40% |
+| Polygon   | 3.69% | 4.16% | 4.91% | 4.08% | 5.38% |
+
+---
+
+#### COMPOUND USDC Historical Data
+
+> **Note:** COMPOUND data incomplete. Additional research needed to populate current rates and historical data.
+
+| Chain         | Current | 1Y Average | 1Y Lows | 1Y Highs | Liquidity Impact |
+| ------------- | ------- | ---------- | ------- | -------- | ---------------- |
+| **Ethereum**  | 5.07%   | TBD        | 2.74%   | 23.58%   | Negligible       |
+| **Arbitrum**  | 4.12%   | TBD        | 3.52%   | 18.36%   | Negligible       |
+| **Avalanche** | --      | --         | --      | --       | --               |
+| **Base**      | 4.21%   | TBD        | 3.39%   | 22.77%   | TBD              |
+| **Optimism**  | 8.33%   | TBD        | 3.30%   | 18.95%   | TBD              |
+| **Polygon**   | 10.50%  | TBD        | 2.53%   | 33.89%   | TBD              |
+
+---
+
+#### COMPOUND USDT Historical Data
+
+> **Note:** COMPOUND data incomplete. Additional research needed to populate current rates and historical data.
+
+| Chain         | Current | 1Y Average | 1Y Lows | 1Y Highs | Liquidity Impact |
+| ------------- | ------- | ---------- | ------- | -------- | ---------------- |
+| **Ethereum**  | 3.71%   | TBD        | 2.60%   | 35.70%   | Negligible       |
+| **Arbitrum**  | 3.27%   | TBD        | 2.30%   | 24.07%   | Negligible       |
+| **Avalanche** | --      | --         | --      | --       | --               |
+| **Base**      | --      | --         | --      | --       | --               |
+| **Optimism**  | 4.58%   | TBD        | 3.03%   | 34.99%   | TBD              |
+| **Polygon**   | 3.97%   | TBD        | 2.34%   | 38.39%   | TBD              |
+
+---
+
+### Key Insights from Historical Data
+
+#### AAVE Performance Summary
+
+**USDC vs USDT Comparison:**
+
+- **USDC** generally shows higher yields across most chains
+- **USDT** has more volatile rates, particularly on Avalanche
+- **Base** shows strong performance for USDC but no USDT support
+
+**Chain Performance Ranking (by 1Y Average USDC):**
+
+1. **Base**: 5.72% average
+2. **Polygon**: 5.33% average
+3. **Ethereum**: 5.18% average
+4. **Optimism**: 5.20% average
+5. **Arbitrum**: 5.14% average
+6. **Avalanche**: 4.64% average
+
+**Liquidity Impact Analysis:**
+
+- Most chains show negligible impact for typical deposits
+- **Optimism** and **Polygon** show measurable impact for $1M+ deposits
+- **Polygon USDT** shows significant impact for $5M deposits (-0.64%)
+
+#### Rebalancing Considerations
+
+Based on the historical data, rebalancing between chains could be profitable when:
+
+- Yield differential exceeds 0.6% (6-month break-even threshold)
+- Yield differential exceeds 3.6% (monthly break-even threshold)
+- Current market conditions favor higher-yielding chains
+
+**Recommended Monitoring:**
+
+- Track yield differentials between chains
+- Monitor liquidity impact thresholds
+- Consider TVL size when evaluating rebalancing opportunities
