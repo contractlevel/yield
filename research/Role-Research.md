@@ -100,3 +100,5 @@ Manages cross-chain messaging security. Aligns with Chainlink's emphasis on secu
 
 `setInitialActiveStrategy` - in *peers/ParentPeer.sol* probably needs to stay as onlyOwner so when system is deployed by owner it can be used to set a strategy immediately too. Since it's a one time call, no point in making a special role for it.
 
+## QUESTIONS!
+- PausableWithAccessControl module deploys with a default admin and delay for tranferring the admin role. How long of delay would we want for being able to transfer the admin role to someone else? I just sent with 3 days for now.
