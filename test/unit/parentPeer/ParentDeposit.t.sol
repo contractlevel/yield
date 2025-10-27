@@ -33,12 +33,9 @@ contract ParentDepositTest is BaseTest {
         baseParentPeer.deposit(1e6 - 1);
     }
 
-    // @reviewGeorge: correct name? for when system paused
     function test_yield_parent_deposit_revertsWhen_parentPaused() public {
-        _changePrank(baseParentPeer.owner());
-        baseParentPeer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, baseParentPeer.owner());
+        _changePrank(emergency_pauser);
         baseParentPeer.emergencyPause();
-        baseParentPeer.revokeRole(Roles.EMERGENCY_PAUSER_ROLE, baseParentPeer.owner());
         _changePrank(depositor);
         vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
         baseParentPeer.deposit(DEPOSIT_AMOUNT);

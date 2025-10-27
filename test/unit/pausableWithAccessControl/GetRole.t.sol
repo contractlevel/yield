@@ -70,30 +70,28 @@ contract GetRoleTest is BaseTest {
             baseRebalancer.getRoleMemberCount(Roles.CONFIG_ADMIN_ROLE);
         uint256 returnedRebalancerCrossChainAdminRoleMemberCount =
             baseRebalancer.getRoleMemberCount(Roles.CROSS_CHAIN_ADMIN_ROLE);
-        uint256 returnedRebalancerEmergencyPauserRoleMemberCount =
-            baseRebalancer.getRoleMemberCount(Roles.EMERGENCY_PAUSER_ROLE);
-        uint256 returnedRebalancerEmergencyUnpauserRoleMemberCount =
+        uint256 returnedRebalancerPauserRoleMemberCount = baseRebalancer.getRoleMemberCount(Roles.EMERGENCY_PAUSER_ROLE);
+        uint256 returnedRebalancerUnpauserRoleMemberCount =
             baseRebalancer.getRoleMemberCount(Roles.EMERGENCY_UNPAUSER_ROLE);
 
         assertEq(returnedRebalancerConfigAdminRoleMemberCount, REBALANCER_CONFIG_ADMINS_NUM);
         assertEq(returnedRebalancerCrossChainAdminRoleMemberCount, REBALANCER_CROSSCHAIN_ADMINS_NUM);
-        assertEq(returnedRebalancerEmergencyPauserRoleMemberCount, REBALANCER_EMERGENCY_PAUSERS_NUM);
-        assertEq(returnedRebalancerEmergencyUnpauserRoleMemberCount, REBALANCER_EMERGENCY_UNPAUSERS_NUM);
+        assertEq(returnedRebalancerPauserRoleMemberCount, REBALANCER_EMERGENCY_PAUSERS_NUM);
+        assertEq(returnedRebalancerUnpauserRoleMemberCount, REBALANCER_EMERGENCY_UNPAUSERS_NUM);
     }
 
     function test_yield_pausableWithAccessControlYieldPeer_getRoleMemberCount_returnsRoleMemberCount() public view {
         uint256 returnedYieldPeerConfigAdminRoleMemberCount = baseParentPeer.getRoleMemberCount(Roles.CONFIG_ADMIN_ROLE);
         uint256 returnedYieldPeerCrossChainAdminRoleMemberCount =
             baseParentPeer.getRoleMemberCount(Roles.CROSS_CHAIN_ADMIN_ROLE);
-        uint256 returnedYieldPeerEmergencyPauserRoleMemberCount =
-            baseParentPeer.getRoleMemberCount(Roles.EMERGENCY_PAUSER_ROLE);
-        uint256 returnedYieldPeerEmergencyUnpauserRoleMemberCount =
+        uint256 returnedYieldPeerPauserRoleMemberCount = baseParentPeer.getRoleMemberCount(Roles.EMERGENCY_PAUSER_ROLE);
+        uint256 returnedYieldPeerUnpauserRoleMemberCount =
             baseParentPeer.getRoleMemberCount(Roles.EMERGENCY_UNPAUSER_ROLE);
 
         assertEq(returnedYieldPeerConfigAdminRoleMemberCount, YIELDPEER_CONFIG_ADMINS_NUM);
         assertEq(returnedYieldPeerCrossChainAdminRoleMemberCount, YIELDPEER_CROSSCHAIN_ADMINS_NUM);
-        assertEq(returnedYieldPeerEmergencyPauserRoleMemberCount, YIELDPEER_EMERGENCY_PAUSERS_NUM);
-        assertEq(returnedYieldPeerEmergencyUnpauserRoleMemberCount, YIELDPEER_EMERGENCY_UNPAUSERS_NUM);
+        assertEq(returnedYieldPeerPauserRoleMemberCount, YIELDPEER_EMERGENCY_PAUSERS_NUM);
+        assertEq(returnedYieldPeerUnpauserRoleMemberCount, YIELDPEER_EMERGENCY_UNPAUSERS_NUM);
     }
 
     function test_yield_pausableWithAccessControlRebalancer_getRoleMembers_returnsRoleMembers() public view {

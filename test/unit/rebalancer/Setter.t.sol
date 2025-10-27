@@ -27,8 +27,7 @@ contract SetterTest is BaseTest {
 
     function test_yield_rebalancer_setUpkeepAddress_success() public {
         address newUpkeepAddress = makeAddr("newUpkeepAddress");
-        _changePrank(baseRebalancer.owner());
-        baseRebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner());
+        _changePrank(config_admin);
         baseRebalancer.setUpkeepAddress(newUpkeepAddress);
         assertEq(baseRebalancer.getUpkeepAddress(), newUpkeepAddress);
     }
@@ -46,8 +45,7 @@ contract SetterTest is BaseTest {
 
     function test_yield_rebalancer_setForwarder_success() public {
         address newForwarder = makeAddr("newForwarder");
-        _changePrank(baseRebalancer.owner());
-        baseRebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner());
+        _changePrank(config_admin);
         baseRebalancer.setForwarder(newForwarder);
         assertEq(baseRebalancer.getForwarder(), newForwarder);
     }
@@ -66,9 +64,7 @@ contract SetterTest is BaseTest {
 
     function test_yield_rebalancer_setParentPeer_success() public {
         address newParentPeer = makeAddr("newParentPeer");
-        _changePrank(baseRebalancer.owner());
-        baseRebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner());
-
+        _changePrank(config_admin);
         baseRebalancer.setParentPeer(newParentPeer);
         assertEq(baseRebalancer.getParentPeer(), newParentPeer);
     }
@@ -87,9 +83,7 @@ contract SetterTest is BaseTest {
 
     function test_yield_rebalancer_setStrategyRegistry_success() public {
         address newStrategyRegistry = makeAddr("newStrategyRegistry");
-        _changePrank(baseRebalancer.owner());
-        baseRebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner());
-
+        _changePrank(config_admin);
         baseRebalancer.setStrategyRegistry(newStrategyRegistry);
         assertEq(baseRebalancer.getStrategyRegistry(), newStrategyRegistry);
     }

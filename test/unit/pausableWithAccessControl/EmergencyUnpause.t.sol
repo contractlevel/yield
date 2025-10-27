@@ -58,10 +58,10 @@ contract EmergencyUnpauseTest is BaseTest {
     function test_yield_pausableWithAccessControlRebalancer_emergencyUnpause_revertsWhen_noUnpauserRole() public {
         _changePrank(emergency_pauser);
         baseRebalancer.emergencyPause();
-        _changePrank(no_role_caller);
+        _changePrank(holder);
         vm.expectRevert(
             abi.encodeWithSignature(
-                "AccessControlUnauthorizedAccount(address,bytes32)", no_role_caller, Roles.EMERGENCY_UNPAUSER_ROLE
+                "AccessControlUnauthorizedAccount(address,bytes32)", holder, Roles.EMERGENCY_UNPAUSER_ROLE
             )
         );
         baseRebalancer.emergencyUnpause();
@@ -71,10 +71,10 @@ contract EmergencyUnpauseTest is BaseTest {
     function test_yield_pausableWithAccessControlYieldPeer_emergencyUnpause_revertsWhen_noUnpauserRole() public {
         _changePrank(emergency_pauser);
         baseParentPeer.emergencyPause();
-        _changePrank(no_role_caller);
+        _changePrank(holder);
         vm.expectRevert(
             abi.encodeWithSignature(
-                "AccessControlUnauthorizedAccount(address,bytes32)", no_role_caller, Roles.EMERGENCY_UNPAUSER_ROLE
+                "AccessControlUnauthorizedAccount(address,bytes32)", holder, Roles.EMERGENCY_UNPAUSER_ROLE
             )
         );
         baseParentPeer.emergencyUnpause();

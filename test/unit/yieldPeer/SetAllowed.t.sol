@@ -34,13 +34,12 @@ contract SetAllowedTest is BaseTest {
 
     function test_yield_setAllowedChain_revertsWhen_chainSelectorNotAllowed() public {
         /// @dev arrange
-        _changePrank(baseParentPeer.owner());
+        _changePrank(cross_chain_admin);
 
         uint64 invalidChainSelector = 100;
         address attemptedPeer = makeAddr("attemptedPeer");
 
         /// @dev act/assert
-        baseParentPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, baseParentPeer.owner());
         vm.expectRevert(abi.encodeWithSignature("YieldPeer__ChainNotAllowed(uint64)", invalidChainSelector));
         baseParentPeer.setAllowedPeer(invalidChainSelector, attemptedPeer);
     }

@@ -118,7 +118,7 @@ contract Handler is Test {
     uint256 public ghost_state_feeRate;
 
     /// @dev tracks if the non-owner withdrew fees
-    bool public ghost_nonOwner_withdrewFees;
+    bool public ghost_nonFeeWithdrawerRoleAddr_withdrewFees;
 
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT TRACKING
@@ -311,7 +311,10 @@ contract Handler is Test {
     }
 
     /// @notice This function handles withdrawing fees
-    function withdrawFees(address nonOwner) public {
+    function withdrawFees(address nonFeeWithdrawerRoleAddr) public {
+        /// @dev get the (first/default) fee withdrawer address
+        address fee_withdrawer = parent.getRoleMember(Roles.FEE_WITHDRAWER_ROLE, 0);
+
         uint256 parentFees = usdc.balanceOf(address(parent));
         uint256 child1Fees = usdc.balanceOf(address(child1));
         uint256 child2Fees = usdc.balanceOf(address(child2));
@@ -320,52 +323,43 @@ contract Handler is Test {
         /// @dev update the ghost state
         ghost_state_totalFeesWithdrawnInStablecoin += availableFees;
 
-        /// @dev try call from non-owner to assert it never succeeds
-        vm.assume(nonOwner != parent.owner());
-        _changePrank(nonOwner);
+        /// @dev try call from non-fee withdrawer to assert it never succeeds
+        vm.assume(nonFeeWithdrawerRoleAddr != fee_withdrawer);
+        _changePrank(nonFeeWithdrawerRoleAddr);
         try parent.withdrawFees(address(usdc)) {
-            ghost_nonOwner_withdrewFees = true;
+            ghost_nonFeeWithdrawerRoleAddr_withdrewFees = true;
         } catch {
-            console2.log("nonOwner withdrawFees failed");
+            console2.log("nonFeeWithdrawerRoleAddr withdrawFees failed");
         }
 
         /// @dev withdraw the fees
-        _changePrank(parent.owner());
+        _changePrank(fee_withdrawer);
         if (parentFees > 0) {
-            parent.grantRole(Roles.FEE_WITHDRAWER_ROLE, parent.owner());
             parent.withdrawFees(address(usdc));
-            parent.revokeRole(Roles.FEE_WITHDRAWER_ROLE, parent.owner());
         }
         if (child1Fees > 0) {
-            child1.grantRole(Roles.FEE_WITHDRAWER_ROLE, child1.owner());
             child1.withdrawFees(address(usdc));
-            child1.revokeRole(Roles.FEE_WITHDRAWER_ROLE, child1.owner());
         }
         if (child2Fees > 0) {
-            child2.grantRole(Roles.FEE_WITHDRAWER_ROLE, child2.owner());
             child2.withdrawFees(address(usdc));
-            child2.revokeRole(Roles.FEE_WITHDRAWER_ROLE, child2.owner());
         }
     }
 
     /// @notice This function handles setting the fee rate
     /// @param feeRate the fee rate to set
     function setFeeRate(uint256 feeRate) public {
+        /// @dev get the (first/default) fee rate setter address
+        address fee_rate_setter = parent.getRoleMember(Roles.FEE_RATE_SETTER_ROLE, 0);
+
         /// @dev bind the fee rate to the range of valid values
         feeRate = bound(feeRate, 0, parent.getMaxFeeRate());
         /// @dev update the ghost state
         ghost_state_feeRate = feeRate;
         /// @dev update the fee rate
-        _changePrank(parent.owner());
-        parent.grantRole(Roles.FEE_RATE_SETTER_ROLE, parent.owner());
+        _changePrank(fee_rate_setter);
         parent.setFeeRate(feeRate);
-        parent.revokeRole(Roles.FEE_RATE_SETTER_ROLE, parent.owner());
-        child1.grantRole(Roles.FEE_RATE_SETTER_ROLE, child1.owner());
         child1.setFeeRate(feeRate);
-        child1.revokeRole(Roles.FEE_RATE_SETTER_ROLE, child1.owner());
-        child2.grantRole(Roles.FEE_RATE_SETTER_ROLE, child2.owner());
         child2.setFeeRate(feeRate);
-        child2.revokeRole(Roles.FEE_RATE_SETTER_ROLE, child2.owner());
     }
 
     /*//////////////////////////////////////////////////////////////

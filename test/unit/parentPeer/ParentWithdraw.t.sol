@@ -29,12 +29,9 @@ contract ParentWithdrawTest is BaseTest {
         baseParentPeer.onTokenTransfer(msg.sender, DEPOSIT_AMOUNT, "");
     }
 
-    // @reviewGeorge: correct name? for when system paused
     function test_yield_parent_onTokenTransfer_revertsWhen_parentPaused() public {
-        _changePrank(baseParentPeer.owner());
-        baseParentPeer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, baseParentPeer.owner());
+        _changePrank(emergency_pauser);
         baseParentPeer.emergencyPause();
-        baseParentPeer.revokeRole(Roles.EMERGENCY_PAUSER_ROLE, baseParentPeer.owner());
         _changePrank(depositor);
         vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
         baseParentPeer.onTokenTransfer(msg.sender, DEPOSIT_AMOUNT, "");

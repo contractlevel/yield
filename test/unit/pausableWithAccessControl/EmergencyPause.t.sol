@@ -50,10 +50,10 @@ contract EmergencyPauseTest is BaseTest {
 
     /// @dev emergency pausing reverts on rebalancer if caller doesn't have correct pauser role
     function test_yield_pausableWithAccessControlRebalancer_emergencyPause_revertsWhen_noPauserRole() public {
-        _changePrank(no_role_caller);
+        _changePrank(holder);
         vm.expectRevert(
             abi.encodeWithSignature(
-                "AccessControlUnauthorizedAccount(address,bytes32)", no_role_caller, Roles.EMERGENCY_PAUSER_ROLE
+                "AccessControlUnauthorizedAccount(address,bytes32)", holder, Roles.EMERGENCY_PAUSER_ROLE
             )
         );
         baseRebalancer.emergencyPause();
@@ -61,10 +61,10 @@ contract EmergencyPauseTest is BaseTest {
 
     /// @dev emergency pausing reverts on yield peer if caller doesn't have correct pauser role
     function test_yield_pausableWithAccessControlYieldPeer_emergencyPause_revertsWhen_noPauserRole() public {
-        _changePrank(no_role_caller);
+        _changePrank(holder);
         vm.expectRevert(
             abi.encodeWithSignature(
-                "AccessControlUnauthorizedAccount(address,bytes32)", no_role_caller, Roles.EMERGENCY_PAUSER_ROLE
+                "AccessControlUnauthorizedAccount(address,bytes32)", holder, Roles.EMERGENCY_PAUSER_ROLE
             )
         );
         baseParentPeer.emergencyPause();

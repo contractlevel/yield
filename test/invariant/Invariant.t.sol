@@ -74,6 +74,7 @@ contract Invariant is StdInvariant, BaseTest {
     function setUp() public override {
         /// @dev deploy infrastructure
         _deployInfra();
+        _grantRoles();
         _dealLinkToPeers(true, address(parent), address(child1), address(child2), networkConfig.tokens.link);
         _setCrossChainPeers();
 
@@ -126,9 +127,10 @@ contract Invariant is StdInvariant, BaseTest {
             networkConfig.tokens.usdc,
             networkConfig.tokens.share
         );
-        parent.grantRole(Roles.CONFIG_ADMIN_ROLE, parent.owner()); // @reviewGeorge grant
+        /// @dev temp config admin role granted to deployer/owner to set necessary configs
+        parent.grantRole(Roles.CONFIG_ADMIN_ROLE, parent.owner());
         parent.setRebalancer(address(rebalancer));
-        rebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, rebalancer.owner()); // @reviewGeorge grant
+        rebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, rebalancer.owner());
         rebalancer.setUpkeepAddress(upkeep);
         rebalancer.setParentPeer(address(parent));
 
@@ -143,8 +145,8 @@ contract Invariant is StdInvariant, BaseTest {
         rebalancer.setStrategyRegistry(address(strategyRegistryParent));
         parent.setStrategyRegistry(address(strategyRegistryParent));
         parent.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")));
-        parent.revokeRole(Roles.CONFIG_ADMIN_ROLE, parent.owner()); // @reviewGeorge revoke
-        rebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, rebalancer.owner()); // @reviewGeorge revoke
+        parent.revokeRole(Roles.CONFIG_ADMIN_ROLE, parent.owner());
+        rebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, rebalancer.owner());
 
         /// @dev deploy at least 2 child peers to cover all CCIP tx types
         child1 = new ChildPeer(
@@ -159,7 +161,7 @@ contract Invariant is StdInvariant, BaseTest {
         strategyRegistryChild1 = new StrategyRegistry();
         aaveV3AdapterChild1 = new AaveV3Adapter(address(child1), networkConfig.protocols.aavePoolAddressesProvider);
         compoundV3AdapterChild1 = new CompoundV3Adapter(address(child1), networkConfig.protocols.comet);
-        child1.grantRole(Roles.CONFIG_ADMIN_ROLE, child1.owner());
+        child1.grantRole(Roles.CONFIG_ADMIN_ROLE, child1.owner()); /// @dev role granted to set registry
         child1.setStrategyRegistry(address(strategyRegistryChild1));
         child1.revokeRole(Roles.CONFIG_ADMIN_ROLE, child1.owner());
         strategyRegistryChild1.setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(aaveV3AdapterChild1));
@@ -178,7 +180,7 @@ contract Invariant is StdInvariant, BaseTest {
         strategyRegistryChild2 = new StrategyRegistry();
         aaveV3AdapterChild2 = new AaveV3Adapter(address(child2), networkConfig.protocols.aavePoolAddressesProvider);
         compoundV3AdapterChild2 = new CompoundV3Adapter(address(child2), networkConfig.protocols.comet);
-        child2.grantRole(Roles.CONFIG_ADMIN_ROLE, child2.owner());
+        child2.grantRole(Roles.CONFIG_ADMIN_ROLE, child2.owner()); /// @dev role granted to set registry
         child2.setStrategyRegistry(address(strategyRegistryChild2));
         child2.revokeRole(Roles.CONFIG_ADMIN_ROLE, child2.owner());
         strategyRegistryChild2.setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(aaveV3AdapterChild2));
@@ -198,7 +200,66 @@ contract Invariant is StdInvariant, BaseTest {
         deal(networkConfig.tokens.usdc, networkConfig.protocols.comet, STRATEGY_POOL_USDC_STARTING_BALANCE);
     }
 
+    function _grantRoles() internal override {
+        // grant roles - rebalancer
+        _changePrank(rebalancer.owner());
+        rebalancer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser);
+        rebalancer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser);
+        rebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, config_admin);
+        assert(rebalancer.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser));
+        assert(rebalancer.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser));
+        assert(rebalancer.hasRole(Roles.CONFIG_ADMIN_ROLE, config_admin));
+
+        // grant roles - parent
+        _changePrank(parent.owner());
+        parent.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser);
+        parent.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser);
+        parent.grantRole(Roles.CONFIG_ADMIN_ROLE, config_admin);
+        parent.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin);
+        parent.grantRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer);
+        parent.grantRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter);
+        assert(parent.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser));
+        assert(parent.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser));
+        assert(parent.hasRole(Roles.CONFIG_ADMIN_ROLE, config_admin));
+        assert(parent.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin));
+        assert(parent.hasRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer));
+        assert(parent.hasRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter));
+
+        // grant roles - child 1
+        _changePrank(child1.owner());
+        child1.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser);
+        child1.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser);
+        child1.grantRole(Roles.CONFIG_ADMIN_ROLE, config_admin);
+        child1.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin);
+        child1.grantRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer);
+        child1.grantRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter);
+        assert(child1.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser));
+        assert(child1.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser));
+        assert(child1.hasRole(Roles.CONFIG_ADMIN_ROLE, config_admin));
+        assert(child1.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin));
+        assert(child1.hasRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer));
+        assert(child1.hasRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter));
+
+        // grant roles - child 2
+        _changePrank(child2.owner());
+        child2.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser);
+        child2.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser);
+        child2.grantRole(Roles.CONFIG_ADMIN_ROLE, config_admin);
+        child2.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin);
+        child2.grantRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer);
+        child2.grantRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter);
+        assert(child2.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser));
+        assert(child2.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser));
+        assert(child2.hasRole(Roles.CONFIG_ADMIN_ROLE, config_admin));
+        assert(child2.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin));
+        assert(child2.hasRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer));
+        assert(child2.hasRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter));
+
+        _stopPrank();
+    }
+
     function _setCrossChainPeers() internal override {
+        /// @dev temp cross chain admin roles granted to set cross chain configs
         parent.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, parent.owner());
         child1.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, child1.owner());
         child2.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, child2.owner());
@@ -417,7 +478,8 @@ contract Invariant is StdInvariant, BaseTest {
     /// @notice Fee withdrawal integrity: Non-owner should not be able to withdraw fees
     function invariant_feeWithdrawal_onlyOwner() public view {
         assertFalse(
-            handler.ghost_nonOwner_withdrewFees(), "Invariant violated: Fees should only be withdrawable by owner"
+            handler.ghost_nonFeeWithdrawerRoleAddr_withdrewFees(),
+            "Invariant violated: Fees should only be withdrawable by fee withdrawer"
         );
     }
 

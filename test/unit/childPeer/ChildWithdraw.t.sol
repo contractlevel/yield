@@ -31,12 +31,9 @@ contract ChildWithdrawTest is BaseTest {
         optChildPeer.onTokenTransfer(msg.sender, DEPOSIT_AMOUNT, "");
     }
 
-    // @reviewGeorge: correct name? for when system paused
     function test_yield_child_onTokenTransfer_revertsWhen_childPaused() public {
-        _changePrank(optChildPeer.owner());
-        optChildPeer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, optChildPeer.owner());
+        _changePrank(emergency_pauser);
         optChildPeer.emergencyPause();
-        optChildPeer.revokeRole(Roles.EMERGENCY_PAUSER_ROLE, optChildPeer.owner());
         _changePrank(depositor);
         vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
         optChildPeer.onTokenTransfer(msg.sender, DEPOSIT_AMOUNT, "");
