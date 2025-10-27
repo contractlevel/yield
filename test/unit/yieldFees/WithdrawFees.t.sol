@@ -30,22 +30,20 @@ contract WithdrawFeesTest is BaseTest {
         baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
         baseParentPeer.deposit(DEPOSIT_AMOUNT);
 
-        uint256 ownerBalanceBefore = baseUsdc.balanceOf(baseParentPeer.owner());
+        uint256 feeWithdrawerBalanceBefore = baseUsdc.balanceOf(fee_withdrawer);
 
         /// @dev act
-        _changePrank(baseParentPeer.owner());
-        baseParentPeer.grantRole(Roles.FEE_WITHDRAWER_ROLE, baseParentPeer.owner());
+        _changePrank(fee_withdrawer);
         baseParentPeer.withdrawFees(address(baseUsdc));
 
-        uint256 ownerBalanceAfter = baseUsdc.balanceOf(baseParentPeer.owner());
+        uint256 feeWithdrawerBalanceAfter = baseUsdc.balanceOf(fee_withdrawer);
 
         /// @dev assert
-        assertEq(ownerBalanceAfter - ownerBalanceBefore, _getFee(DEPOSIT_AMOUNT));
+        assertEq(feeWithdrawerBalanceAfter - feeWithdrawerBalanceBefore, _getFee(DEPOSIT_AMOUNT));
     }
 
     function test_yield_parent_withdrawFees_revertsWhen_noFeesToWithdraw() public {
-        _changePrank(baseParentPeer.owner());
-        baseParentPeer.grantRole(Roles.FEE_WITHDRAWER_ROLE, baseParentPeer.owner());
+        _changePrank(fee_withdrawer);
         vm.expectRevert(abi.encodeWithSignature("YieldFees__NoFeesToWithdraw()"));
         baseParentPeer.withdrawFees(address(baseUsdc));
     }

@@ -523,6 +523,7 @@ contract HelperConfig is Script {
         rebalancer = new Rebalancer(address(functionsRouter), "", 0);
         parent = new ParentPeer(address(ccipRouter), address(link), 1, address(usdc), address(share));
         child = new ChildPeer(address(ccipRouter), address(link), 2, address(usdc), address(share), 1);
+        /// @dev config admin role granted (then revoked) to deployer/'owner' to set rebalancer in parent
         parent.grantRole(Roles.CONFIG_ADMIN_ROLE, parent.owner());
         parent.setRebalancer(address(rebalancer));
         parent.revokeRole(Roles.CONFIG_ADMIN_ROLE, parent.owner());

@@ -108,11 +108,22 @@ contract BaseTest is Test {
     address[] internal attesters = new address[](4);
     uint256[] internal attesterPks = new uint256[](4);
 
+    /// @dev addresses for custom roles
+    address internal config_admin = makeAddr("config_admin");
+    address internal cross_chain_admin = makeAddr("cross_chain_admin");
+    address internal emergency_pauser = makeAddr("emergency_pauser");
+    address internal emergency_unpauser = makeAddr("emergency_unpauser");
+    address internal fee_withdrawer = makeAddr("fee_withdrawer");
+    address internal fee_rate_setter = makeAddr("fee_rate_setter");
+    /// @dev address with no role assigned
+    address internal no_role_caller = makeAddr("no_role_caller");
+
     /*//////////////////////////////////////////////////////////////
                                  SETUP
     //////////////////////////////////////////////////////////////*/
     function setUp() public virtual {
         _deployInfra();
+        _grantRoles();
         _setPools();
         _setCrossChainPeers();
         _dealLinkToPeers(false, address(0), address(0), address(0), address(0));
@@ -204,6 +215,45 @@ contract BaseTest is Test {
         _registerChains();
     }
 
+    function _grantRoles() internal virtual {
+        // grant roles - rebalancer
+        _selectFork(baseFork);
+        _changePrank(baseRebalancer.owner());
+        baseRebalancer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser);
+        baseRebalancer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser);
+        baseRebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, config_admin);
+
+        // grant roles - parent
+        _changePrank(baseParentPeer.owner());
+        baseParentPeer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser);
+        baseParentPeer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser);
+        baseParentPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, config_admin);
+        baseParentPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin);
+        baseParentPeer.grantRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer);
+        baseParentPeer.grantRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter);
+
+        // grant roles - child 1
+        _selectFork(optFork);
+        _changePrank(optChildPeer.owner());
+        optChildPeer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser);
+        optChildPeer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser);
+        optChildPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, config_admin);
+        optChildPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin);
+        optChildPeer.grantRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer);
+        optChildPeer.grantRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter);
+
+        // grant roles - child 2
+        _selectFork(ethFork);
+        _changePrank(ethChildPeer.owner());
+        ethChildPeer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser);
+        ethChildPeer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser);
+        ethChildPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, config_admin);
+        ethChildPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin);
+        ethChildPeer.grantRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer);
+        ethChildPeer.grantRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter);
+        _stopPrank();
+    }
+
     function _setPools() internal {
         uint64[] memory remoteChains = new uint64[](3);
         address[] memory remotePools = new address[](3);
@@ -272,40 +322,43 @@ contract BaseTest is Test {
 
     function _setCrossChainPeers() internal virtual {
         _selectFork(baseFork);
-        baseParentPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, baseParentPeer.owner()); //@reviewGeorge: grant
+        /// @dev grant temp cross chain role to deployer to set cross chain configs
+        baseParentPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, baseParentPeer.owner());
         baseParentPeer.setCCIPGasLimit(INITIAL_CCIP_GAS_LIMIT);
         baseParentPeer.setAllowedChain(optChainSelector, true);
         baseParentPeer.setAllowedChain(ethChainSelector, true);
         baseParentPeer.setAllowedChain(baseChainSelector, true);
         baseParentPeer.setAllowedPeer(optChainSelector, address(optChildPeer));
         baseParentPeer.setAllowedPeer(ethChainSelector, address(ethChildPeer));
-        baseParentPeer.revokeRole(Roles.CROSS_CHAIN_ADMIN_ROLE, baseParentPeer.owner()); //@reviewGeorge: revoke
+        baseParentPeer.revokeRole(Roles.CROSS_CHAIN_ADMIN_ROLE, baseParentPeer.owner()); /// @dev revoke role
         assertEq(baseParentPeer.getAllowedChain(optChainSelector), true);
         assertEq(baseParentPeer.getAllowedChain(ethChainSelector), true);
         assertEq(baseParentPeer.getAllowedPeer(optChainSelector), address(optChildPeer));
         assertEq(baseParentPeer.getAllowedPeer(ethChainSelector), address(ethChildPeer));
 
         _selectFork(optFork);
-        optChildPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, optChildPeer.owner()); //@reviewGeorge: grant
+        /// @dev grant temp cross chain role to deployer to set cross chain configs
+        optChildPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, optChildPeer.owner());
         optChildPeer.setCCIPGasLimit(INITIAL_CCIP_GAS_LIMIT);
         optChildPeer.setAllowedChain(baseChainSelector, true);
         optChildPeer.setAllowedChain(ethChainSelector, true);
         optChildPeer.setAllowedPeer(baseChainSelector, address(baseParentPeer));
         optChildPeer.setAllowedPeer(ethChainSelector, address(ethChildPeer));
-        optChildPeer.revokeRole(Roles.CROSS_CHAIN_ADMIN_ROLE, optChildPeer.owner()); //@reviewGeorge: revoke
+        optChildPeer.revokeRole(Roles.CROSS_CHAIN_ADMIN_ROLE, optChildPeer.owner()); /// @dev revoke role
         assertEq(optChildPeer.getAllowedChain(baseChainSelector), true);
         assertEq(optChildPeer.getAllowedChain(ethChainSelector), true);
         assertEq(optChildPeer.getAllowedPeer(baseChainSelector), address(baseParentPeer));
         assertEq(optChildPeer.getAllowedPeer(ethChainSelector), address(ethChildPeer));
 
         _selectFork(ethFork);
-        ethChildPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, ethChildPeer.owner()); //@reviewGeorge: grant
+        /// @dev grant temp cross chain role to deployer to set cross chain configs
+        ethChildPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, ethChildPeer.owner());
         ethChildPeer.setCCIPGasLimit(INITIAL_CCIP_GAS_LIMIT);
         ethChildPeer.setAllowedChain(baseChainSelector, true);
         ethChildPeer.setAllowedChain(optChainSelector, true);
         ethChildPeer.setAllowedPeer(baseChainSelector, address(baseParentPeer));
         ethChildPeer.setAllowedPeer(optChainSelector, address(optChildPeer));
-        ethChildPeer.revokeRole(Roles.CROSS_CHAIN_ADMIN_ROLE, ethChildPeer.owner()); //@reviewGeorge: revoke
+        ethChildPeer.revokeRole(Roles.CROSS_CHAIN_ADMIN_ROLE, ethChildPeer.owner()); /// @dev revoke role
         assertEq(ethChildPeer.getAllowedChain(baseChainSelector), true);
         assertEq(ethChildPeer.getAllowedChain(optChainSelector), true);
         assertEq(ethChildPeer.getAllowedPeer(baseChainSelector), address(baseParentPeer));
@@ -481,16 +534,18 @@ contract BaseTest is Test {
 
         /// @dev set forwarder
         _changePrank(baseParentPeer.owner());
-        baseRebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner()); //@reviewGeorge: grant
+        /// @dev grant temp config admin role to deployer/admin to set config
+        baseRebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner());
         baseRebalancer.setForwarder(forwarder);
-        baseRebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner()); //@reviewGeorge: revoke
+        baseRebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner()); /// @dev revoke
 
         /// @dev set upkeepAddress
         address parentPeerOwner = baseParentPeer.owner();
         _changePrank(parentPeerOwner);
-        baseRebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner()); //@reviewGeorge: grant
+        /// @dev grant temp config admin role to deployer/admin to set config
+        baseRebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner());
         baseRebalancer.setUpkeepAddress(upkeepAddress);
-        baseRebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner()); //@reviewGeorge: revoke
+        baseRebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner()); /// @dev revoke
 
         /// @dev add ParentPeer as consumer to Chainlink Functions subscription
         address functionsRouter = baseNetworkConfig.clf.functionsRouter;
@@ -656,21 +711,13 @@ contract BaseTest is Test {
     /// @notice Helper function to set the fee rate across chains
     /// @param feeRate The fee rate to set
     function _setFeeRate(uint256 feeRate) internal {
+        _changePrank(fee_rate_setter);
         _selectFork(baseFork);
-        _changePrank(baseParentPeer.owner());
-        baseParentPeer.grantRole(Roles.FEE_RATE_SETTER_ROLE, baseParentPeer.owner()); // @reviewGeorge: grant
         baseParentPeer.setFeeRate(feeRate);
-        baseParentPeer.revokeRole(Roles.FEE_RATE_SETTER_ROLE, baseParentPeer.owner()); // @reviewGeorge: revoke
         _selectFork(optFork);
-        _changePrank(optChildPeer.owner());
-        optChildPeer.grantRole(Roles.FEE_RATE_SETTER_ROLE, optChildPeer.owner()); // @reviewGeorge: grant
         optChildPeer.setFeeRate(feeRate);
-        optChildPeer.revokeRole(Roles.FEE_RATE_SETTER_ROLE, optChildPeer.owner()); // @reviewGeorge: revoke
         _selectFork(ethFork);
-        _changePrank(ethChildPeer.owner());
-        ethChildPeer.grantRole(Roles.FEE_RATE_SETTER_ROLE, ethChildPeer.owner()); // @reviewGeorge: grant
         ethChildPeer.setFeeRate(feeRate);
-        ethChildPeer.revokeRole(Roles.FEE_RATE_SETTER_ROLE, ethChildPeer.owner()); // @reviewGeorge: revoke
         _stopPrank();
     }
 

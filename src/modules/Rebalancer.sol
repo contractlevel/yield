@@ -99,6 +99,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Pausable
     /// @notice Called by Chainlink Automation to send a Chainlink Functions request
     /// @notice The nature of the request is to fetch the strategy with the highest yield
     /// @dev Revert if the caller is not the Chainlink Automation upkeep address
+    /// @dev Revert if Rebalancer is paused
     // @review:pausable should be pausable?
     // a: yes, but we will want to review using time-based automation vs incentivized public keepers
     // @review - pausable and time-based abstraction are 2 different tasks
@@ -232,7 +233,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Pausable
     //////////////////////////////////////////////////////////////*/
     /// @notice Set the Chainlink Automation upkeep address
     /// @param upkeepAddress The address of the Chainlink Automation upkeep
-    /// @dev Revert if the caller is not the owner
+    /// @dev Revert if the caller is not the config admin
     //slither-disable-next-line missing-zero-check
     function setUpkeepAddress(address upkeepAddress) external onlyRole(Roles.CONFIG_ADMIN_ROLE) {
         s_upkeepAddress = upkeepAddress;
@@ -241,7 +242,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Pausable
 
     /// @notice Sets the Chainlink Automation forwarder
     /// @param forwarder The address of the Chainlink Automation forwarder
-    /// @dev Revert if the caller is not the owner
+    /// @dev Revert if the caller is not the config admin
     // slither-disable-next-line missing-zero-check
     function setForwarder(address forwarder) external onlyRole(Roles.CONFIG_ADMIN_ROLE) {
         s_forwarder = forwarder;
@@ -250,7 +251,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Pausable
 
     /// @notice Sets the ParentPeer contract address
     /// @param parentPeer The address of the ParentPeer contract
-    /// @dev Revert if the caller is not the owner
+    /// @dev Revert if the caller is not the config admin
     // slither-disable-next-line missing-zero-check
     function setParentPeer(address parentPeer) external onlyRole(Roles.CONFIG_ADMIN_ROLE) {
         s_parentPeer = parentPeer;
@@ -259,7 +260,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Pausable
 
     /// @notice Sets the strategy registry
     /// @param strategyRegistry The address of the strategy registry
-    /// @dev Revert if the caller is not the owner
+    /// @dev Revert if the caller is not the config admin
     // slither-disable-next-line missing-zero-check
     function setStrategyRegistry(address strategyRegistry) external onlyRole(Roles.CONFIG_ADMIN_ROLE) {
         s_strategyRegistry = strategyRegistry;

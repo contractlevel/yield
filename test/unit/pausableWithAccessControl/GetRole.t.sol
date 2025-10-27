@@ -1,0 +1,151 @@
+// SPDX-License-Identifier: MIT
+pragma solidity 0.8.26;
+
+import {BaseTest, Roles} from "../../BaseTest.t.sol";
+
+contract GetRoleTest is BaseTest {
+    /// @dev Base test has one of each (config, crosschain, pauser/unpauser role) so we check the 0 index
+    uint256 internal constant ROLE_MEMBER_INDEX = 0;
+
+    uint256 internal constant REBALANCER_CONFIG_ADMINS_NUM = 2; // config_admin (base test), config_admin_2 (here)
+    uint256 internal constant REBALANCER_CROSSCHAIN_ADMINS_NUM = 0; // none set - no role functions in rebalancer for this role
+    uint256 internal constant REBALANCER_EMERGENCY_PAUSERS_NUM = 3; // pauser (base test), pauser 2 & 3 (here)
+    uint256 internal constant REBALANCER_EMERGENCY_UNPAUSERS_NUM = 1; // unpauser (base test)
+
+    uint256 internal constant YIELDPEER_CONFIG_ADMINS_NUM = 2; // config_admin (base test), config_admin_2 (here)
+    uint256 internal constant YIELDPEER_CROSSCHAIN_ADMINS_NUM = 1; // cross_chain_admin (base test)
+    uint256 internal constant YIELDPEER_EMERGENCY_PAUSERS_NUM = 3; // pauser (base test), pauser 2 & 3 (here)
+    uint256 internal constant YIELDPEER_EMERGENCY_UNPAUSERS_NUM = 1; // unpauser (base test)
+
+    /// @dev extra addresses with roles
+    address config_admin_2 = makeAddr("config_admin_2");
+    address emergency_pauser_2 = makeAddr("emergency_pauser_2");
+    address emergency_pauser_3 = makeAddr("emergency_pauser_3");
+
+    function setUp() public virtual override {
+        super.setUp();
+
+        /// @dev give extra addresses some roles
+        _changePrank(baseRebalancer.owner());
+        baseRebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, config_admin_2);
+        baseRebalancer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser_2);
+        baseRebalancer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser_3);
+
+        _changePrank(baseParentPeer.owner());
+        baseParentPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, config_admin_2);
+        baseParentPeer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser_2);
+        baseParentPeer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser_3);
+        _stopPrank();
+    }
+
+    function test_yield_pausableWithAccessControlRebalancer_getRoleMember_returnsRoleMember() public view {
+        address returnedRebalancerConfigAdmin = baseRebalancer.getRoleMember(Roles.CONFIG_ADMIN_ROLE, ROLE_MEMBER_INDEX);
+        address returnedRebalancerEmergencyPauser =
+            baseRebalancer.getRoleMember(Roles.EMERGENCY_PAUSER_ROLE, ROLE_MEMBER_INDEX);
+        address returnedRebalancerEmergencyUnpauser =
+            baseRebalancer.getRoleMember(Roles.EMERGENCY_UNPAUSER_ROLE, ROLE_MEMBER_INDEX);
+
+        assertEq(returnedRebalancerConfigAdmin, config_admin);
+        assertEq(returnedRebalancerEmergencyPauser, emergency_pauser);
+        assertEq(returnedRebalancerEmergencyUnpauser, emergency_unpauser);
+    }
+
+    function test_yield_pausableWithAccessControlYieldPeer_getRoleMember_returnsRoleMember() public view {
+        address returnedYieldPeerConfigAdmin = baseParentPeer.getRoleMember(Roles.CONFIG_ADMIN_ROLE, ROLE_MEMBER_INDEX);
+        address returnedYieldPeerCrossChainAdmin =
+            baseParentPeer.getRoleMember(Roles.CROSS_CHAIN_ADMIN_ROLE, ROLE_MEMBER_INDEX);
+        address returnedYieldPeerEmergencyPauser =
+            baseParentPeer.getRoleMember(Roles.EMERGENCY_PAUSER_ROLE, ROLE_MEMBER_INDEX);
+        address returnedYieldPeerEmergencyUnpauser =
+            baseParentPeer.getRoleMember(Roles.EMERGENCY_UNPAUSER_ROLE, ROLE_MEMBER_INDEX);
+
+        assertEq(returnedYieldPeerConfigAdmin, config_admin);
+        assertEq(returnedYieldPeerCrossChainAdmin, cross_chain_admin);
+        assertEq(returnedYieldPeerEmergencyPauser, emergency_pauser);
+        assertEq(returnedYieldPeerEmergencyUnpauser, emergency_unpauser);
+    }
+
+    function test_yield_pausableWithAccessControlRebalancer_getRoleMemberCount_returnsRoleMemberCount() public view {
+        uint256 returnedRebalancerConfigAdminRoleMemberCount =
+            baseRebalancer.getRoleMemberCount(Roles.CONFIG_ADMIN_ROLE);
+        uint256 returnedRebalancerCrossChainAdminRoleMemberCount =
+            baseRebalancer.getRoleMemberCount(Roles.CROSS_CHAIN_ADMIN_ROLE);
+        uint256 returnedRebalancerEmergencyPauserRoleMemberCount =
+            baseRebalancer.getRoleMemberCount(Roles.EMERGENCY_PAUSER_ROLE);
+        uint256 returnedRebalancerEmergencyUnpauserRoleMemberCount =
+            baseRebalancer.getRoleMemberCount(Roles.EMERGENCY_UNPAUSER_ROLE);
+
+        assertEq(returnedRebalancerConfigAdminRoleMemberCount, REBALANCER_CONFIG_ADMINS_NUM);
+        assertEq(returnedRebalancerCrossChainAdminRoleMemberCount, REBALANCER_CROSSCHAIN_ADMINS_NUM);
+        assertEq(returnedRebalancerEmergencyPauserRoleMemberCount, REBALANCER_EMERGENCY_PAUSERS_NUM);
+        assertEq(returnedRebalancerEmergencyUnpauserRoleMemberCount, REBALANCER_EMERGENCY_UNPAUSERS_NUM);
+    }
+
+    function test_yield_pausableWithAccessControlYieldPeer_getRoleMemberCount_returnsRoleMemberCount() public view {
+        uint256 returnedYieldPeerConfigAdminRoleMemberCount = baseParentPeer.getRoleMemberCount(Roles.CONFIG_ADMIN_ROLE);
+        uint256 returnedYieldPeerCrossChainAdminRoleMemberCount =
+            baseParentPeer.getRoleMemberCount(Roles.CROSS_CHAIN_ADMIN_ROLE);
+        uint256 returnedYieldPeerEmergencyPauserRoleMemberCount =
+            baseParentPeer.getRoleMemberCount(Roles.EMERGENCY_PAUSER_ROLE);
+        uint256 returnedYieldPeerEmergencyUnpauserRoleMemberCount =
+            baseParentPeer.getRoleMemberCount(Roles.EMERGENCY_UNPAUSER_ROLE);
+
+        assertEq(returnedYieldPeerConfigAdminRoleMemberCount, YIELDPEER_CONFIG_ADMINS_NUM);
+        assertEq(returnedYieldPeerCrossChainAdminRoleMemberCount, YIELDPEER_CROSSCHAIN_ADMINS_NUM);
+        assertEq(returnedYieldPeerEmergencyPauserRoleMemberCount, YIELDPEER_EMERGENCY_PAUSERS_NUM);
+        assertEq(returnedYieldPeerEmergencyUnpauserRoleMemberCount, YIELDPEER_EMERGENCY_UNPAUSERS_NUM);
+    }
+
+    function test_yield_pausableWithAccessControlRebalancer_getRoleMembers_returnsRoleMembers() public view {
+        address[] memory returnedRebalancerConfigAdminRoleMembers =
+            baseRebalancer.getRoleMembers(Roles.CONFIG_ADMIN_ROLE);
+        address[] memory expectedRebalancerConfigAdminRoleMembers = new address[](2);
+        expectedRebalancerConfigAdminRoleMembers[0] = config_admin;
+        expectedRebalancerConfigAdminRoleMembers[1] = config_admin_2;
+
+        address[] memory returnedRebalancerPauserRoleMembers =
+            baseRebalancer.getRoleMembers(Roles.EMERGENCY_PAUSER_ROLE);
+        address[] memory expectedRebalancerPauserRoleMembers = new address[](3);
+        expectedRebalancerPauserRoleMembers[0] = emergency_pauser;
+        expectedRebalancerPauserRoleMembers[1] = emergency_pauser_2;
+        expectedRebalancerPauserRoleMembers[2] = emergency_pauser_3;
+
+        address[] memory returnedRebalancerUnpauserRoleMembers =
+            baseRebalancer.getRoleMembers(Roles.EMERGENCY_UNPAUSER_ROLE);
+        address[] memory expectedRebalancerUnpauserRoleMembers = new address[](1);
+        expectedRebalancerUnpauserRoleMembers[0] = emergency_unpauser;
+
+        assertEq(returnedRebalancerConfigAdminRoleMembers, expectedRebalancerConfigAdminRoleMembers);
+        assertEq(returnedRebalancerPauserRoleMembers, expectedRebalancerPauserRoleMembers);
+        assertEq(returnedRebalancerUnpauserRoleMembers, expectedRebalancerUnpauserRoleMembers);
+    }
+
+    function test_yield_pausableWithAccessControlYieldPeer_getRoleMembers_returnsRoleMembers() public view {
+        address[] memory returnedYieldPeerConfigAdminRoleMembers =
+            baseParentPeer.getRoleMembers(Roles.CONFIG_ADMIN_ROLE);
+        address[] memory expectedYieldPeerConfigAdminRoleMembers = new address[](2);
+        expectedYieldPeerConfigAdminRoleMembers[0] = config_admin;
+        expectedYieldPeerConfigAdminRoleMembers[1] = config_admin_2;
+
+        address[] memory returnedYieldPeerCrossChainAdminRoleMembers =
+            baseParentPeer.getRoleMembers(Roles.CROSS_CHAIN_ADMIN_ROLE);
+        address[] memory expectedYieldPeerCrossChainAdminRoleMembers = new address[](1);
+        expectedYieldPeerCrossChainAdminRoleMembers[0] = cross_chain_admin;
+
+        address[] memory returnedYieldPeerPauserRoleMembers = baseParentPeer.getRoleMembers(Roles.EMERGENCY_PAUSER_ROLE);
+        address[] memory expectedYieldPeerPauserRoleMembers = new address[](3);
+        expectedYieldPeerPauserRoleMembers[0] = emergency_pauser;
+        expectedYieldPeerPauserRoleMembers[1] = emergency_pauser_2;
+        expectedYieldPeerPauserRoleMembers[2] = emergency_pauser_3;
+
+        address[] memory returnedYieldPeerUnpauserRoleMembers =
+            baseParentPeer.getRoleMembers(Roles.EMERGENCY_UNPAUSER_ROLE);
+        address[] memory expectedYieldPeerUnpauserRoleMembers = new address[](1);
+        expectedYieldPeerUnpauserRoleMembers[0] = emergency_unpauser;
+
+        assertEq(returnedYieldPeerConfigAdminRoleMembers, expectedYieldPeerConfigAdminRoleMembers);
+        assertEq(returnedYieldPeerCrossChainAdminRoleMembers, expectedYieldPeerCrossChainAdminRoleMembers);
+        assertEq(returnedYieldPeerPauserRoleMembers, expectedYieldPeerPauserRoleMembers);
+        assertEq(returnedYieldPeerUnpauserRoleMembers, expectedYieldPeerUnpauserRoleMembers);
+    }
+}

@@ -61,7 +61,8 @@ abstract contract YieldFees is PausableWithAccessControl, IYieldFees {
     //////////////////////////////////////////////////////////////*/
     /// @notice Withdraws the fees
     /// @param feeToken The token to withdraw the fees in (e.g. USDC, USDT, GHO, etc.)
-    /// @dev Revert if msg.sender is not the owner
+    /// @dev Revert if msg.sender does not have role of "FEE_WITHDRAWER_ROLE" in access control
+    /// @dev Revert if the main inheriting Yield contract is paused (in case of emergency)
     function withdrawFees(address feeToken) external whenNotPaused onlyRole(Roles.FEE_WITHDRAWER_ROLE) {
         uint256 fees = IERC20(feeToken).balanceOf(address(this));
         if (fees != 0) {
@@ -90,9 +91,9 @@ abstract contract YieldFees is PausableWithAccessControl, IYieldFees {
                                  SETTER
     //////////////////////////////////////////////////////////////*/
     /// @notice Sets the fee rate
-    /// @dev Revert if msg.sender is not the owner
-    /// @param newFeeRate The new fee rate
     /// @notice Fee rate should be set on every chain if consistency is desired
+    /// @param newFeeRate The new fee rate
+    /// @dev Revert if msg.sender does not have role of "FEE_RATE_SETTER_ROLE" in access control
     function setFeeRate(uint256 newFeeRate) external onlyRole(Roles.FEE_RATE_SETTER_ROLE) {
         if (newFeeRate > MAX_FEE_RATE) {
             revert YieldFees__FeeRateTooHigh();

@@ -16,15 +16,13 @@ contract SetFeesTest is BaseTest {
     }
 
     function test_yield_parentPeer_setFeeRate_revertsWhen_tooHigh() public {
-        _changePrank(baseParentPeer.owner());
-        baseParentPeer.grantRole(Roles.FEE_RATE_SETTER_ROLE, baseParentPeer.owner());
+        _changePrank(fee_rate_setter);
         vm.expectRevert(abi.encodeWithSignature("YieldFees__FeeRateTooHigh()"));
         baseParentPeer.setFeeRate(1_000_001);
     }
 
     function test_yield_parentPeer_setFeeRate_success() public {
-        _changePrank(baseParentPeer.owner());
-        baseParentPeer.grantRole(Roles.FEE_RATE_SETTER_ROLE, baseParentPeer.owner());
+        _changePrank(fee_rate_setter);
         baseParentPeer.setFeeRate(1);
         assertEq(baseParentPeer.getFeeRate(), 1);
     }

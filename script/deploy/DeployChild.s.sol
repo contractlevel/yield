@@ -51,9 +51,10 @@ contract DeployChild is Script {
         CompoundV3Adapter compoundV3Adapter = new CompoundV3Adapter(address(childPeer), networkConfig.protocols.comet);
         strategyRegistry.setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(aaveV3Adapter));
         strategyRegistry.setStrategyAdapter(keccak256(abi.encodePacked("compound-v3")), address(compoundV3Adapter));
-        childPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, childPeer.owner()); // @reviewGeorge: grant
+        /// @dev config admin role granted (then revoked) to deployer/'owner' to set strategy registry
+        childPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, childPeer.owner());
         childPeer.setStrategyRegistry(address(strategyRegistry));
-        childPeer.revokeRole(Roles.CONFIG_ADMIN_ROLE, childPeer.owner()); // @reviewGeorge: revoke
+        childPeer.revokeRole(Roles.CONFIG_ADMIN_ROLE, childPeer.owner());
 
         vm.stopBroadcast();
 

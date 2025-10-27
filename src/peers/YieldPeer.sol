@@ -22,7 +22,6 @@ import {YieldFees} from "../modules/YieldFees.sol";
 abstract contract YieldPeer is
     IAny2EVMMessageReceiver,
     CCIPReceiver,
-    IAccessControlEnumerable,
     PausableWithAccessControl,
     IERC677Receiver,
     IYieldPeer,
@@ -617,9 +616,11 @@ abstract contract YieldPeer is
         strategyRegistry = s_strategyRegistry;
     }
 
-    // @reviewGeorge - needed to override from ccipreceiver/access control
-    // @reviewGeorge - just check ccip or also pausable access control?
+    /// @dev Used to override/resolve conflict of multiple contracts implementing this.
+    /// @dev Should indicate whether the contract implements IAny2EVMMessageReceiver.
     /// @notice Checks if interface supported
+    /// @param interfaceId The interfaceId to check.
+    /// @return true if the interfaceId is supported.
     function supportsInterface(bytes4 interfaceId)
         public
         view

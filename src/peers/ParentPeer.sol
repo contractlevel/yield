@@ -74,6 +74,7 @@ contract ParentPeer is YieldPeer {
     /// 2. This Parent is not the Strategy
     /// @param amountToDeposit The amount of USDC to deposit into the system
     /// @dev Revert if amountToDeposit is less than 1e6 (1 USDC)
+    /// @dev Revert if peer is paused
     function deposit(uint256 amountToDeposit) external override whenNotPaused {
         /// @dev takes a fee
         amountToDeposit = _initiateDeposit(amountToDeposit);
@@ -118,6 +119,7 @@ contract ParentPeer is YieldPeer {
     /// @dev Revert if encodedWithdrawChainSelector doesn't decode to an allowed chain selector
     /// @dev Revert if msg.sender is not the YieldCoin/share token
     /// @dev Revert if shareBurnAmount is 0
+    /// @dev Revert if peer is paused
     /// @dev Update s_totalShares and burn shares from msg.sender
     /// @dev Handle the case where the parent is the strategy
     /// @dev Handle the case where the parent is not the strategy
@@ -445,7 +447,7 @@ contract ParentPeer is YieldPeer {
     /// @notice Sets the initial active strategy
     /// @notice Can only be called once by the owner
     /// @notice This is needed because the strategy adapters are deployed separately from the parent peer
-    /// @dev Revert if msg.sender is not the owner
+    /// @dev Revert if msg.sender is not the default admin
     /// @dev Revert if already called
     /// @dev Called in deploy script, immediately after deploying initial strategy adapters, and setting them in YieldPeer::setStrategyAdapter
     /// @param protocolId The protocol ID of the initial active strategy
@@ -457,7 +459,7 @@ contract ParentPeer is YieldPeer {
     }
 
     /// @notice Sets the rebalancer
-    /// @dev Revert if msg.sender is not the owner
+    /// @dev Revert if msg.sender is not the config admin
     /// @param rebalancer The address of the rebalancer
     //slither-disable-next-line missing-zero-check
     function setRebalancer(address rebalancer) external onlyRole(Roles.CONFIG_ADMIN_ROLE) {

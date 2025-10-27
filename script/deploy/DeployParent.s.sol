@@ -70,11 +70,10 @@ contract DeployParent is Script {
 
         deploy.share.grantMintAndBurnRoles(address(deploy.sharePool));
         deploy.share.grantMintAndBurnRoles(address(deploy.parentPeer));
-        // @reviewGeorge: grant yourself config admin role to be able to set rebalancer config
+        /// @dev config admin role granted to deployer/'owner' in rebalancer/parent to set necessary configs
         deploy.rebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, deploy.rebalancer.owner());
-        deploy.rebalancer.setParentPeer(address(deploy.parentPeer));
-        // @reviewGeorge: grant yourself config admin role to be able to set parent peer config
         deploy.parentPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, deploy.parentPeer.owner());
+        deploy.rebalancer.setParentPeer(address(deploy.parentPeer));
         deploy.parentPeer.setRebalancer(address(deploy.rebalancer));
 
         deploy.strategyRegistry = new StrategyRegistry();
@@ -89,7 +88,7 @@ contract DeployParent is Script {
         deploy.rebalancer.setStrategyRegistry(address(deploy.strategyRegistry));
         deploy.parentPeer.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")));
 
-        // @reviewGeorge: revoke config role from yourself after setting necessary configs
+        /// @dev revoke config admin role from deployer after necessary configs set
         deploy.rebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, deploy.rebalancer.owner());
         deploy.parentPeer.revokeRole(Roles.CONFIG_ADMIN_ROLE, deploy.parentPeer.owner());
 
