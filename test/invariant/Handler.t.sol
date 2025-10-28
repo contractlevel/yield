@@ -117,8 +117,8 @@ contract Handler is Test {
     /// @dev tracks the current fee rate
     uint256 public ghost_state_feeRate;
 
-    /// @dev tracks if the non-owner withdrew fees
-    bool public ghost_nonFeeWithdrawerRoleAddr_withdrewFees;
+    /// @dev tracks if a non-FeeWithdrawer withdrew fees
+    bool public ghost_nonFeeWithdrawerAddr_withdrewFees;
 
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT TRACKING
@@ -311,7 +311,7 @@ contract Handler is Test {
     }
 
     /// @notice This function handles withdrawing fees
-    function withdrawFees(address nonFeeWithdrawerRoleAddr) public {
+    function withdrawFees(address nonFeeWithdrawerAddr) public {
         /// @dev get the (first/default) fee withdrawer address
         address fee_withdrawer = parent.getRoleMember(Roles.FEE_WITHDRAWER_ROLE, 0);
 
@@ -324,10 +324,10 @@ contract Handler is Test {
         ghost_state_totalFeesWithdrawnInStablecoin += availableFees;
 
         /// @dev try call from non-fee withdrawer to assert it never succeeds
-        vm.assume(nonFeeWithdrawerRoleAddr != fee_withdrawer);
-        _changePrank(nonFeeWithdrawerRoleAddr);
+        vm.assume(nonFeeWithdrawerAddr != fee_withdrawer);
+        _changePrank(nonFeeWithdrawerAddr);
         try parent.withdrawFees(address(usdc)) {
-            ghost_nonFeeWithdrawerRoleAddr_withdrewFees = true;
+            ghost_nonFeeWithdrawerAddr_withdrewFees = true;
         } catch {
             console2.log("nonFeeWithdrawerRoleAddr withdrawFees failed");
         }
