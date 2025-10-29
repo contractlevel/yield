@@ -110,10 +110,14 @@ contract ChildPeer is YieldPeer {
         bytes memory data,
         uint64 /* sourceChainSelector */
     ) internal override {
-        if (txType == CcipTxType.DepositToStrategy) _handleCCIPDepositToStrategy(tokenAmounts, data);
+        if (txType == CcipTxType.DepositToStrategy) {
+            _handleCCIPDepositToStrategy(tokenAmounts, data);
+        }
         //slither-disable-next-line reentrancy-events
         if (txType == CcipTxType.DepositCallbackChild) _handleCCIPDepositCallbackChild(data);
-        if (txType == CcipTxType.WithdrawToStrategy) _handleCCIPWithdrawToStrategy(data);
+        if (txType == CcipTxType.WithdrawToStrategy) {
+            _handleCCIPWithdrawToStrategy(data);
+        }
         if (txType == CcipTxType.WithdrawCallback) _handleCCIPWithdrawCallback(tokenAmounts, data);
         //slither-disable-next-line reentrancy-no-eth
         if (txType == CcipTxType.RebalanceOldStrategy) _handleCCIPRebalanceOldStrategy(data);
@@ -128,11 +132,17 @@ contract ChildPeer is YieldPeer {
     function _handleCCIPDepositToStrategy(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data) internal {
         DepositData memory depositData = _decodeDepositData(data);
         CCIPOperations._validateTokenAmounts(tokenAmounts, address(i_usdc), depositData.amount);
+        address activeStrategyAdapter = _getActiveStrategyAdapter();
+        if (activeStrategyAdapter != address(0)) {
+            depositData.totalValue = _depositToStrategyAndGetTotalValue(activeStrategyAdapter, depositData.amount);
 
-        depositData.totalValue = _depositToStrategyAndGetTotalValue(_getActiveStrategyAdapter(), depositData.amount);
-
-        /// @dev send a message to parent with totalValue to calculate shareMintAmount
-        _ccipSend(i_parentChainSelector, CcipTxType.DepositCallbackParent, abi.encode(depositData), ZERO_BRIDGE_AMOUNT);
+            /// @dev send a message to parent with totalValue to calculate shareMintAmount
+            _ccipSend(
+                i_parentChainSelector, CcipTxType.DepositCallbackParent, abi.encode(depositData), ZERO_BRIDGE_AMOUNT
+            );
+        } else {
+            _ccipSend(i_parentChainSelector, CcipTxType.DepositPingPong, abi.encode(depositData), depositData.amount);
+        }
     }
 
     /// @notice This function handles a deposit callback from the parent chain
@@ -152,19 +162,25 @@ contract ChildPeer is YieldPeer {
     /// @param data The encoded WithdrawData
     function _handleCCIPWithdrawToStrategy(bytes memory data) internal {
         WithdrawData memory withdrawData = _decodeWithdrawData(data);
-        withdrawData.usdcWithdrawAmount = _withdrawFromStrategyAndGetUsdcWithdrawAmount(withdrawData);
 
-        if (i_thisChainSelector == withdrawData.chainSelector) {
-            //slither-disable-next-line reentrancy-events
-            emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
-            _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
+        address activeStrategyAdapter = _getActiveStrategyAdapter();
+        if (activeStrategyAdapter != address(0)) {
+            withdrawData.usdcWithdrawAmount = _withdrawFromStrategyAndGetUsdcWithdrawAmount(withdrawData);
+
+            if (i_thisChainSelector == withdrawData.chainSelector) {
+                //slither-disable-next-line reentrancy-events
+                emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
+                _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
+            } else {
+                _ccipSend(
+                    withdrawData.chainSelector,
+                    CcipTxType.WithdrawCallback,
+                    abi.encode(withdrawData), // @review solady calldata compression for all encoded crosschain data?
+                    withdrawData.usdcWithdrawAmount
+                );
+            }
         } else {
-            _ccipSend(
-                withdrawData.chainSelector,
-                CcipTxType.WithdrawCallback,
-                abi.encode(withdrawData), // @review solady calldata compression for all encoded crosschain data?
-                withdrawData.usdcWithdrawAmount
-            );
+            _ccipSend(i_parentChainSelector, CcipTxType.WithdrawPingPong, abi.encode(withdrawData), ZERO_BRIDGE_AMOUNT);
         }
     }
 

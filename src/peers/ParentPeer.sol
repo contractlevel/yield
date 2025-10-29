@@ -223,13 +223,16 @@ contract ParentPeer is YieldPeer {
         bytes memory data,
         uint64 sourceChainSelector
     ) internal override {
-        if (txType == CcipTxType.DepositToParent) _handleCCIPDepositToParent(tokenAmounts, data);
+        if (txType == CcipTxType.DepositToParent || txType == CcipTxType.DepositPingPong) {
+            _handleCCIPDepositToParent(tokenAmounts, data);
+        }
         //slither-disable-next-line reentrancy-no-eth
         if (txType == CcipTxType.DepositCallbackParent) _handleCCIPDepositCallbackParent(data);
         if (txType == CcipTxType.WithdrawToParent) _handleCCIPWithdrawToParent(data, sourceChainSelector);
         if (txType == CcipTxType.WithdrawCallback) _handleCCIPWithdrawCallback(tokenAmounts, data);
         //slither-disable-next-line reentrancy-events
         if (txType == CcipTxType.RebalanceNewStrategy) _handleCCIPRebalanceNewStrategy(tokenAmounts, data);
+        if (txType == CcipTxType.WithdrawPingPong) _handleCCIPWithdrawPingPong(data);
     }
 
     /// @notice This function handles a deposit from a child to this parent and the 2 strategy cases:
@@ -265,6 +268,7 @@ contract ParentPeer is YieldPeer {
         }
 
         /// @dev If Strategy is on third chain, forward deposit to strategy
+        /// @audit strategy.chainSelector == depositData.chainSelector --> we still want to handle this
         if (strategy.chainSelector != i_thisChainSelector && strategy.chainSelector != depositData.chainSelector) {
             _ccipSend(strategy.chainSelector, CcipTxType.DepositToStrategy, encodedDepositData, depositData.amount);
             emit DepositForwardedToStrategy(depositData.amount, strategy.chainSelector);
@@ -349,6 +353,18 @@ contract ParentPeer is YieldPeer {
                 strategy.chainSelector, CcipTxType.WithdrawToStrategy, abi.encode(withdrawData), ZERO_BRIDGE_AMOUNT
             );
         }
+    }
+
+    /// @notice This function handles a pingpong withdraw from a child to this parent
+    /// @notice Forwards withdraw to active strategy without updating state (already updated in original flow)
+    /// @notice This only happens when parent is NOT the strategy (if parent were strategy, withdraw would complete in _handleCCIPWithdrawToParent)
+    /// @param data The encoded WithdrawData
+    function _handleCCIPWithdrawPingPong(bytes memory data) internal {
+        WithdrawData memory withdrawData = _decodeWithdrawData(data);
+        Strategy memory strategy = s_strategy;
+        // Forward to active strategy without updating s_totalShares (already updated in _handleCCIPWithdrawToParent)
+        emit WithdrawForwardedToStrategy(withdrawData.shareBurnAmount, strategy.chainSelector);
+        _ccipSend(strategy.chainSelector, CcipTxType.WithdrawToStrategy, abi.encode(withdrawData), ZERO_BRIDGE_AMOUNT);
     }
 
     /// @notice This function sets the strategy on the parent
