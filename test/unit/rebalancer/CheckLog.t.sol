@@ -5,12 +5,12 @@ import {BaseTest, Vm, console2, IYieldPeer, Log} from "../../BaseTest.t.sol";
 
 contract CheckLogTest is BaseTest {
     /// @notice This test will have to be commented out along with the cannotExecute modifier in the ParentRebalancer contract, if running the entire test suite
-    // function test_yield_rebalancer_checkLog_revertsWhen_cannotExecute() public {
-    //     Log memory log =
-    //         _createStrategyUpdatedLog(address(baseParentPeer), 1, keccak256(abi.encodePacked("aave-v3")), 3);
-    //     vm.expectRevert(abi.encodeWithSignature("OnlySimulatedBackend()"));
-    //     baseRebalancer.checkLog(log, "");
-    // }
+    function test_yield_rebalancer_checkLog_revertsWhen_cannotExecute() public {
+        Log memory log =
+            _createStrategyUpdatedLog(address(baseParentPeer), 1, keccak256(abi.encodePacked("aave-v3")), 3);
+        vm.expectRevert(abi.encodeWithSignature("OnlySimulatedBackend()"));
+        baseRebalancer.checkLog(log, "");
+    }
 
     /// @notice The cannotExecute modifier will need to be commented out for this test to pass
     function test_yield_rebalancer_checkLog_revertsWhen_wrongEvent() public {

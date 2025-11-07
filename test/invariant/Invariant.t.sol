@@ -478,7 +478,7 @@ contract Invariant is StdInvariant, BaseTest {
     /// @notice Fee withdrawal integrity: Non-owner should not be able to withdraw fees
     function invariant_feeWithdrawal_onlyOwner() public view {
         assertFalse(
-            handler.ghost_nonFeeWithdrawerRoleAddr_withdrewFees(),
+            handler.ghost_nonFeeWithdrawerAddr_withdrewFees(),
             "Invariant violated: Fees should only be withdrawable by fee withdrawer"
         );
     }

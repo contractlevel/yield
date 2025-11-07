@@ -14,6 +14,11 @@ methods {
     function getThisChainSelector() external returns (uint64) envfree;
     function getActiveStrategyAdapter() external returns (address) envfree;
     function getMaxFeeRate() external returns (uint256) envfree;
+    
+    // PausableWithAccessControl methods
+    function owner() external returns (address) envfree;
+    function paused() external returns (bool) envfree;  
+    function hasRole(bytes32, address) external returns (bool) envfree;
 
     // External methods
     function share.totalSupply() external returns (uint256) envfree;
@@ -36,12 +41,47 @@ methods {
 /*//////////////////////////////////////////////////////////////
                           DEFINITIONS
 //////////////////////////////////////////////////////////////*/
-/// @notice functions that can only be called by the owner
-definition onlyOwner(method f) returns bool = 
+/// @notice functions that can only be called by the cross chain admin
+definition onlyRoleCrossChainAdmin(method f) returns bool = 
     f.selector == sig:setAllowedChain(uint64,bool).selector ||
     f.selector == sig:setAllowedPeer(uint64,address).selector ||
-    f.selector == sig:setCCIPGasLimit(uint256).selector ||
+    f.selector == sig:setCCIPGasLimit(uint256).selector;
+
+/// @notice functions that can only be called by the config admin
+definition onlyRoleConfigAdmin(method f) returns bool = 
     f.selector == sig:setStrategyRegistry(address).selector;
+
+definition crossChainAdminRole() returns bytes32 = 
+// keccak256("CROSS_CHAIN_ADMIN_ROLE")
+    to_bytes32(0xb28dc5efd345f3bec5c16749590c736fbb2ba9912d8680cac4da7a59f918a760);
+    
+definition configAdminRole() returns bytes32 = 
+// keccak256("CONFIG_ADMIN_ROLE")
+    to_bytes32(0xb92d52e77ebaa0cae5c23e882d85609efbcb44029214147dd132daf9ef1018af);
+
+definition feeWithdrawerRole() returns bytes32 = 
+// keccak256("FEE_WITHDRAWER_ROLE")
+    to_bytes32(0xcecef922ac6ded813804bed2d5fdf033decf4a090fa3c9b9f529302a0aff6455);
+
+definition feeRateSetterRole() returns bytes32 = 
+// keccak256("FEE_RATE_SETTER_ROLE")
+    to_bytes32(0x658e71518b7b5afc52c60427d525dee00a59b3720f918587414f669096f77bee);
+
+definition emergencyPauserRole() returns bytes32 = 
+// keccak256("EMERGENCY_PAUSER_ROLE")
+    to_bytes32(0x3b72b77b3d95d9b831cca52b36d7a9c3758f77be6c47ebd087c47739c743d369);
+
+definition emergencyUnpauserRole() returns bytes32 = 
+// keccak256("EMERGENCY_UNPAUSER_ROLE")
+    to_bytes32(0x7bd03e5eb4ee9007f85634e07fc4bb1fbe96d33e9f2d1644bc6bda2b6b8a3169);
+
+definition PausedEvent() returns bytes32 =
+// keccak256(abi.encodePacked("Paused(address)"))
+    to_bytes32(0x62e78cea01bee320cd4e420270b5ea74000d11b0c9f74754ebdbfc544b05a258);
+
+definition UnpausedEvent() returns bytes32 =
+// keccak256(abi.encodePacked("Unpaused(address)"))
+    to_bytes32(0x5db9ee0a495bf2e6ff9c91a7834c1ba4fdd244a5e8aa4e537bd38aeae4b073aa);
 
 definition WithdrawInitiatedEvent() returns bytes32 =
 // keccak256(abi.encodePacked("WithdrawInitiated(address,uint256,uint64)"))
@@ -98,6 +138,16 @@ definition StrategyRegistrySetEvent() returns bytes32 =
 /*//////////////////////////////////////////////////////////////
                              GHOSTS
 //////////////////////////////////////////////////////////////*/
+/// @notice EventCount: track amount Paused event is emitted
+ghost mathint ghost_paused_eventCount {
+    init_state axiom ghost_paused_eventCount == 0;
+}
+
+/// @notice EventCount: track amount Unpaused event is emitted
+ghost mathint ghost_unpaused_eventCount {
+    init_state axiom ghost_unpaused_eventCount == 0;
+}
+
 /// @notice EventCount: track amount of WithdrawInitiated event is emitted
 ghost mathint ghost_withdrawInitiated_eventCount {
     init_state axiom ghost_withdrawInitiated_eventCount == 0;
@@ -259,10 +309,128 @@ hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
     }
 }
 
+/// @notice hook onto emitted events and update relevant ghosts
+hook LOG1(uint offset, uint length, bytes32 t0) {
+        if (t0 == PausedEvent()) ghost_paused_eventCount = ghost_paused_eventCount + 1;
+        if (t0 == UnpausedEvent()) ghost_unpaused_eventCount = ghost_unpaused_eventCount + 1;
+}
+
 /*//////////////////////////////////////////////////////////////
                              RULES
 //////////////////////////////////////////////////////////////*/
+// --- emergency pause --- //
+rule emergencyPause_success() {
+    env e;
+
+    require ghost_paused_eventCount == 0;
+    require paused() == false;
+    require hasRole(emergencyPauserRole(), e.msg.sender) == true;
+    require e.msg.value == 0;
+
+    emergencyPause@withrevert(e);
+
+    assert !lastReverted;
+    assert paused() == true;
+    assert ghost_paused_eventCount == 1;
+}
+
+rule emergencyPause_revertsWhen_noPauserRole() {
+    env e;
+
+    require ghost_paused_eventCount == 0;
+    require paused() == false;
+    require hasRole(emergencyPauserRole(), e.msg.sender) == false;
+    require e.msg.value == 0;
+
+    emergencyPause@withrevert(e);
+
+    assert lastReverted;
+    assert paused() == false;
+    assert ghost_paused_eventCount == 0;
+}
+
+rule emergencyPause_revertsWhen_alreadyPaused() {
+    env e;
+
+    require ghost_paused_eventCount == 0;
+    require paused() == false;
+    require hasRole(emergencyPauserRole(), e.msg.sender) == true;
+    require e.msg.value == 0;
+
+    emergencyPause(e); /// @dev pause once, then try again
+    emergencyPause@withrevert(e);
+
+    assert lastReverted;
+    assert paused() == true;
+    assert ghost_paused_eventCount == 1; 
+}
+
+// --- emergency unpause --- //
+rule emergencyUnpause_success() {
+    env e;
+
+    require ghost_unpaused_eventCount == 0;
+    require paused() == true;
+    require hasRole(emergencyUnpauserRole(), e.msg.sender) == true;
+    require e.msg.value == 0;
+
+    emergencyUnpause@withrevert(e);
+
+    assert !lastReverted;
+    assert paused() == false;
+    assert ghost_unpaused_eventCount == 1;
+}
+
+rule emergencyUnpause_revertsWhen_noUnpauserRole() {
+    env e;
+
+    require ghost_unpaused_eventCount == 0;
+    require paused() == true;
+    require hasRole(emergencyUnpauserRole(), e.msg.sender) == false;
+    require e.msg.value == 0;
+
+    emergencyUnpause@withrevert(e);
+
+    assert lastReverted;
+    assert paused() == true;
+    assert ghost_unpaused_eventCount == 0;
+}
+
+rule emergencyUnpause_revertsWhen_notPaused() {
+    env e;
+
+    require ghost_unpaused_eventCount == 0;
+    require paused() == false;
+    require hasRole(emergencyUnpauserRole(), e.msg.sender) == true;
+    require e.msg.value == 0;
+
+    emergencyUnpause@withrevert(e);
+
+    assert lastReverted;
+    assert paused() == false;
+    assert ghost_unpaused_eventCount == 0; 
+}
+
+//@review: need tests on getters
+// --- getRole --- // 
+// rule getRoleMember_returns_roleMember() {}
+// rule getRoleMemberCount_returns_roleMemberCount() {}
+// rule getRoleMembers_returns_roleMembers() {}
+
 // --- deposit --- //
+rule deposit_revertsWhen_paused() {
+    env e;
+    uint256 amountToDeposit;
+
+    require ghost_depositInitiated_eventCount == 0;
+    require paused() == true;
+
+    deposit@withrevert(e, amountToDeposit);
+
+    assert lastReverted;
+    assert ghost_depositInitiated_eventCount == 0;
+}
+
 rule deposit_revertsWhen_zeroAmount() {
     env e;
     uint256 amountToDeposit = 0;
@@ -293,6 +461,21 @@ rule deposit_emits_DepositInitiated() {
 }
 
 // --- onTokenTransfer --- //
+rule onTokenTransfer_revertsWhen_paused() {
+    env e;
+    calldataarg args;
+    
+    require ghost_withdrawInitiated_eventCount == 0;
+    require ghost_sharesBurned_eventCount == 0;
+    require paused() == true;
+
+    onTokenTransfer@withrevert(e, args);
+
+    assert lastReverted;
+    assert ghost_withdrawInitiated_eventCount == 0;
+    assert ghost_sharesBurned_eventCount == 0;
+}
+
 rule onTokenTransfer_revertsWhen_msgSenderIsNotShare() {
     env e;
     calldataarg args;
@@ -358,11 +541,11 @@ rule onTokenTransfer_decreases_share_totalSupply() {
 }
 
 // --- withdrawFees --- //
-rule withdrawFees_revertsWhen_notOwner() {
+rule withdrawFees_revertsWhen_noFeeWithdrawerRole() {
     env e;
     calldataarg args;
 
-    require e.msg.sender != currentContract._owner;
+    require hasRole(feeWithdrawerRole(), e.msg.sender) == false;
 
     withdrawFees@withrevert(e, args);
     assert lastReverted;
@@ -372,6 +555,7 @@ rule withdrawFees_revertsWhen_noFeesToWithdraw() {
     env e;
     address feeToken;
     require feeToken.balanceOf(e, currentContract) == 0;
+    require hasRole(feeWithdrawerRole(), e.msg.sender) == true;
 
     withdrawFees@withrevert(e, feeToken);
     assert lastReverted;
@@ -381,11 +565,13 @@ rule withdrawFees_success() {
     env e;
     address feeToken;
 
-    uint256 ownerBalanceBefore = feeToken.balanceOf(e, currentContract._owner);
+    uint256 feeWithdrawerBalanceBefore = feeToken.balanceOf(e, e.msg.sender);
     uint256 fees = feeToken.balanceOf(e, currentContract);
     require fees > 0;
-    require ownerBalanceBefore + fees <= max_uint256;
-    require currentContract != currentContract._owner;
+    require feeWithdrawerBalanceBefore + fees <= max_uint256;
+    require currentContract != e.msg.sender;
+    /// @dev the msg.sender is acting as the fee withdrawer in this scenario 
+    require hasRole(feeWithdrawerRole(), e.msg.sender) == true;
 
     /// @dev as more stablecoins are added, we will need to update this: feeToken == usdc || feeToken == usdt etc
     require feeToken == usdc;
@@ -398,15 +584,15 @@ rule withdrawFees_success() {
     assert ghost_feesWithdrawn_eventCount == 1;
     assert ghost_feesWithdrawn_feesWithdrawn_emitted == fees;
     assert feeToken.balanceOf(e, currentContract) == 0;
-    assert feeToken.balanceOf(e, currentContract._owner) == ownerBalanceBefore + fees;
+    assert feeToken.balanceOf(e, e.msg.sender) == feeWithdrawerBalanceBefore + fees;
 }
 
 // --- setFeeRate --- //
-rule setFeeRate_revertsWhen_notOwner() {
+rule setFeeRate_revertsWhen_noFeeRateSetterRole() {
     env e;
     calldataarg args;
 
-    require e.msg.sender != currentContract._owner;
+    require hasRole(feeRateSetterRole(), e.msg.sender) == false;
 
     setFeeRate@withrevert(e, args);
     assert lastReverted;
@@ -416,6 +602,7 @@ rule setFeeRate_revertsWhen_maxFeeRateExceeded() {
     env e;
     uint256 newFeeRate;
     require newFeeRate > getMaxFeeRate();
+    require hasRole(feeRateSetterRole(), e.msg.sender) == true;
 
     setFeeRate@withrevert(e, newFeeRate);
     assert lastReverted;
@@ -427,6 +614,7 @@ rule setFeeRate_success() {
 
     require ghost_feeRateSet_eventCount == 0;
     require ghost_feeRateSet_feeRate_emitted == 0;
+    require hasRole(feeRateSetterRole(), e.msg.sender) == true;
 
     setFeeRate(e, newFeeRate);
 
@@ -464,13 +652,13 @@ rule deposit_takesFees_when_feeRate_is_set() {
     assert usdc.balanceOf(currentContract) == contractBalanceBefore + fee;
 }
 
-// --- onlyOwner setters --- //
-rule onlyOwner_setters_revertWhen_notOwner(method f) 
-    filtered {f -> onlyOwner(f)}  {
+// --- onlyRoleCrossChainAdmin setters --- //
+rule onlyRoleCrossChainAdmin_setters_revertWhen_notCrossChainAdmin(method f) 
+    filtered {f -> onlyRoleCrossChainAdmin(f)}  {
     env e;
     calldataarg args;
 
-    require e.msg.sender != currentContract._owner;
+    require hasRole(crossChainAdminRole(), e.msg.sender) == false;
 
     f@withrevert(e, args);
     assert lastReverted;
@@ -484,6 +672,7 @@ rule setAllowedChain_success() {
     require ghost_allowedChainSet_eventCount == 0;
     require ghost_allowedChainSet_allowedChain_emitted[chainSelector] == !isAllowed;
     require currentContract.s_allowedChains[chainSelector] == !isAllowed;
+    require hasRole(crossChainAdminRole(), e.msg.sender) == true;
 
     setAllowedChain(e, chainSelector, isAllowed);
 
@@ -498,7 +687,7 @@ rule setAllowedPeer_revertsWhen_chainNotAllowed() {
     address peer;
 
     require !getAllowedChain(chainSelector);
-    require e.msg.sender == currentContract._owner;
+    require hasRole(crossChainAdminRole(), e.msg.sender) == true;
 
     setAllowedPeer@withrevert(e, chainSelector, peer);
     assert lastReverted;
@@ -513,6 +702,7 @@ rule setAllowedPeer_success() {
     require ghost_allowedPeerSet_allowedPeer_emitted[chainSelector] == 0;
     require currentContract.s_peers[chainSelector] == 0;
     require peer != 0;
+    require hasRole(crossChainAdminRole(), e.msg.sender) == true;
 
     setAllowedPeer(e, chainSelector, peer);
     assert ghost_allowedPeerSet_eventCount == 1;
@@ -528,12 +718,25 @@ rule setCCIPGasLimit_success() {
     require ghost_ccipGasLimitSet_ccipGasLimit_emitted == 0;
     require currentContract.s_ccipGasLimit == 0;
     require gasLimit > 0;
+    require hasRole(crossChainAdminRole(), e.msg.sender) == true;
 
     setCCIPGasLimit(e, gasLimit);
 
     assert ghost_ccipGasLimitSet_eventCount == 1;
     assert ghost_ccipGasLimitSet_ccipGasLimit_emitted == gasLimit;
     assert currentContract.s_ccipGasLimit == gasLimit;
+}
+
+// --- onlyRoleConfigAdmin setters --- //
+rule onlyRoleConfigAdmin_setters_revertWhen_notConfigAdmin(method f) 
+    filtered {f -> onlyRoleConfigAdmin(f)}  {
+    env e;
+    calldataarg args;
+
+    require hasRole(configAdminRole(), e.msg.sender) == false;
+
+    f@withrevert(e, args);
+    assert lastReverted;
 }
 
 rule setStrategyRegistry_success() {
@@ -544,6 +747,7 @@ rule setStrategyRegistry_success() {
     require ghost_strategyRegistrySet_strategyRegistry_emitted == 0;
     require currentContract.s_strategyRegistry == 0;
     require strategyRegistry != 0;
+    require hasRole(configAdminRole(), e.msg.sender) == true;
 
     setStrategyRegistry(e, strategyRegistry);
 

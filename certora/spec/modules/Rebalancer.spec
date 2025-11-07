@@ -11,8 +11,14 @@ using StrategyRegistry as strategyRegistry;
 //////////////////////////////////////////////////////////////*/
 methods {
     // Rebalancer methods
+    function getUpkeepAddress() external returns (address) envfree;
     function getForwarder() external returns (address) envfree;
     function getParentPeer() external returns (address) envfree;
+    function getStrategyRegistry() external returns (address) envfree;
+
+    // PausableWithAccessControl methods
+    function paused() external returns (bool) envfree;  
+    function hasRole(bytes32, address) external returns (bool) envfree;
 
     // External methods
     function usdc.balanceOf(address) external returns (uint256) envfree;
@@ -72,11 +78,36 @@ methods {
 /*//////////////////////////////////////////////////////////////
                           DEFINITIONS
 //////////////////////////////////////////////////////////////*/
-/// @notice functions that can only be called by the owner
-definition onlyOwner(method f) returns bool = 
+/// @notice functions that can only be called by the config admin role
+definition onlyRoleConfigAdmin(method f) returns bool = 
     f.selector == sig:setForwarder(address).selector ||
     f.selector == sig:setParentPeer(address).selector ||
-    f.selector == sig:setUpkeepAddress(address).selector;
+    f.selector == sig:setUpkeepAddress(address).selector ||
+    f.selector == sig:setStrategyRegistry(address).selector;
+
+definition configAdminRole() returns bytes32 = 
+// keccak256("CONFIG_ADMIN_ROLE")
+    to_bytes32(0xb92d52e77ebaa0cae5c23e882d85609efbcb44029214147dd132daf9ef1018af);
+
+definition emergencyPauserRole() returns bytes32 = 
+// keccak256("EMERGENCY_PAUSER_ROLE")
+    to_bytes32(0x3b72b77b3d95d9b831cca52b36d7a9c3758f77be6c47ebd087c47739c743d369);
+
+definition emergencyUnpauserRole() returns bytes32 = 
+// keccak256("EMERGENCY_UNPAUSER_ROLE")
+    to_bytes32(0x7bd03e5eb4ee9007f85634e07fc4bb1fbe96d33e9f2d1644bc6bda2b6b8a3169);
+
+definition PausedEvent() returns bytes32 =
+// keccak256(abi.encodePacked("Paused(address)"))
+    to_bytes32(0x62e78cea01bee320cd4e420270b5ea74000d11b0c9f74754ebdbfc544b05a258);
+
+definition UnpausedEvent() returns bytes32 =
+// keccak256(abi.encodePacked("Unpaused(address)"))
+    to_bytes32(0x5db9ee0a495bf2e6ff9c91a7834c1ba4fdd244a5e8aa4e537bd38aeae4b073aa);
+
+definition UpkeepAddressSetEvent() returns bytes32 = 
+// keccak256(abi.encodePacked("UpkeepAddressSet(address)"))
+to_bytes32(0x1be7b94706c10cf5f370becb942307f13539075d19051fc58795a999c57e8849);
 
 definition ForwarderSetEvent() returns bytes32 =
 // keccak256(abi.encodePacked("ForwarderSet(address)"))
@@ -85,6 +116,10 @@ definition ForwarderSetEvent() returns bytes32 =
 definition ParentPeerSetEvent() returns bytes32 =
 // keccak256(abi.encodePacked("ParentPeerSet(address)"))
     to_bytes32(0x9bd1968cee8e2e99d039a6a765fa06cfa0ddb152eacae28608f4b14390157658);
+
+definition StrategyRegistrySetEvent() returns bytes32 = 
+// keccak256(abi.encodePacked("StrategyRegistrySet(address)"))
+to_bytes32(0xc8f6f976c20221cfca1498913573ed2bc921d8f3c6e4b7d1fcf4d228628bbd10);
 
 definition StrategyUpdatedEvent() returns bytes32 =
 // keccak256(abi.encodePacked("StrategyUpdated(uint64,uint8,uint64)"))
@@ -113,6 +148,21 @@ definition CLFRequestFulfilledEvent() returns bytes32 =
 /*//////////////////////////////////////////////////////////////
                              GHOSTS
 //////////////////////////////////////////////////////////////*/
+/// @notice EventCount: track amount Paused event is emitted
+ghost mathint ghost_paused_eventCount {
+    init_state axiom ghost_paused_eventCount == 0;
+}
+
+/// @notice EventCount: track amount Unpaused event is emitted
+ghost mathint ghost_unpaused_eventCount {
+    init_state axiom ghost_unpaused_eventCount == 0;
+}
+
+/// @notice EventCount: track amount UpkeepAddressSet event is emitted
+ghost mathint ghost_upkeepAddressSet_eventCount {
+    init_state axiom ghost_upkeepAddressSet_eventCount == 0;
+}
+
 /// @notice EventCount: track amount ForwarderSet event is emitted
 ghost mathint ghost_forwarderSet_eventCount {
     init_state axiom ghost_forwarderSet_eventCount == 0;
@@ -123,6 +173,16 @@ ghost mathint ghost_parentPeerSet_eventCount {
     init_state axiom ghost_parentPeerSet_eventCount == 0;
 }
 
+/// @notice EventCount: track amount StrategyRegistrySet event is emitted
+ghost mathint ghost_strategyRegistrySet_eventCount {
+    init_state axiom ghost_strategyRegistrySet_eventCount == 0;
+}
+
+/// @notice EmittedValue: track address emitted in UpkeepAddressSet event
+ghost address ghost_upkeepAddressSet_emittedAddress {
+    init_state axiom ghost_upkeepAddressSet_emittedAddress == 0;
+}
+
 /// @notice EmittedValue: track address emitted in ForwarderSet event
 ghost address ghost_forwarderSet_emittedAddress {
     init_state axiom ghost_forwarderSet_emittedAddress == 0;
@@ -131,6 +191,11 @@ ghost address ghost_forwarderSet_emittedAddress {
 /// @notice EmittedValue: track address emitted in ParentPeerSet event
 ghost address ghost_parentPeerSet_emittedAddress {
     init_state axiom ghost_parentPeerSet_emittedAddress == 0;
+}
+
+/// @notice EmittedValue: track address emitted in StrategyRegistrySet event
+ghost address ghost_strategyRegistrySet_emittedAddress {
+    init_state axiom ghost_strategyRegistrySet_emittedAddress == 0;
 }
 
 /// @notice EventCount: track amount of CCIPMessageSent event is emitted
@@ -189,6 +254,10 @@ hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
 
 /// @notice hook onto emitted events and update relevant ghosts
 hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
+    if (t0 == UpkeepAddressSetEvent()) {
+        ghost_upkeepAddressSet_eventCount = ghost_upkeepAddressSet_eventCount + 1;
+        ghost_upkeepAddressSet_emittedAddress = bytes32ToAddress(t1);
+    }
     if (t0 == ForwarderSetEvent()) {
         ghost_forwarderSet_eventCount = ghost_forwarderSet_eventCount + 1;
         ghost_forwarderSet_emittedAddress = bytes32ToAddress(t1);
@@ -197,7 +266,17 @@ hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
         ghost_parentPeerSet_eventCount = ghost_parentPeerSet_eventCount + 1;
         ghost_parentPeerSet_emittedAddress = bytes32ToAddress(t1);
     }
+    if (t0 == StrategyRegistrySetEvent()) {
+        ghost_strategyRegistrySet_eventCount = ghost_strategyRegistrySet_eventCount + 1;
+        ghost_strategyRegistrySet_emittedAddress = bytes32ToAddress(t1);
+    }
     if (t0 == CLFRequestErrorEvent()) ghost_clfRequestError_eventCount = ghost_clfRequestError_eventCount + 1;
+}
+
+/// @notice hook onto emitted events and update relevant ghosts
+hook LOG1(uint offset, uint length, bytes32 t0) {
+        if (t0 == PausedEvent()) ghost_paused_eventCount = ghost_paused_eventCount + 1;
+        if (t0 == UnpausedEvent()) ghost_unpaused_eventCount = ghost_unpaused_eventCount + 1;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -230,16 +309,132 @@ function createLog(
 /*//////////////////////////////////////////////////////////////
                              RULES
 //////////////////////////////////////////////////////////////*/
-rule onlyOwner_revertsWhen_notOwner(method f) 
-    filtered {f -> onlyOwner(f)} 
+
+// --- onlyRole reverts --- //
+rule onlyRoleConfigAdmin_revertsWhen_notConfigAdmin(method f) 
+    filtered {f -> onlyRoleConfigAdmin(f)} 
 {
     env e;
     calldataarg args;
 
-    require e.msg.sender != currentContract._owner;
+    require currentContract.hasRole(configAdminRole(), e.msg.sender) == false;
+    require e.msg.value == 0;
 
     f@withrevert(e, args);
     assert lastReverted;
+}
+
+// --- emergencyPause --- //
+rule emergencyPause_success() {
+    env e;
+
+    require ghost_paused_eventCount == 0;
+    require paused() == false;
+    require hasRole(emergencyPauserRole(), e.msg.sender) == true;
+    require e.msg.value == 0;
+
+    emergencyPause(e);
+
+    assert paused() == true;
+    assert ghost_paused_eventCount == 1;
+}
+
+rule emergencyPause_revertsWhen_noPauserRole() {
+    env e;
+
+    require ghost_paused_eventCount == 0;
+    require paused() == false;
+    require hasRole(emergencyPauserRole(), e.msg.sender) == false;
+    require e.msg.value == 0;
+
+    emergencyPause@withrevert(e);
+
+    assert lastReverted;
+    assert paused() == false;
+    assert ghost_paused_eventCount == 0;
+}
+
+rule emergencyPause_revertsWhen_alreadyPaused {
+    env e;
+
+    require ghost_paused_eventCount == 0;
+    require paused() == false;
+    require hasRole(emergencyPauserRole(), e.msg.sender) == true;
+    require e.msg.value == 0;
+
+    emergencyPause(e); /// @dev pause once, then try again
+    emergencyPause@withrevert(e);
+
+    assert lastReverted;
+    assert paused() == true;
+    assert ghost_paused_eventCount == 1; 
+}
+
+// --- emergencyUnpase --- //
+rule emergencyUnpause_success() {
+    env e;
+
+    require ghost_unpaused_eventCount == 0;
+    require paused() == true;
+    require hasRole(emergencyUnpauserRole(), e.msg.sender) == true;
+    require e.msg.value == 0;
+
+    emergencyUnpause(e);
+
+    assert paused() == false;
+    assert ghost_unpaused_eventCount == 1;
+}
+
+rule emergencyUnpause_revertsWhen_noUnpauserRole() {
+    env e;
+
+    require ghost_unpaused_eventCount == 0;
+    require paused() == true;
+    require hasRole(emergencyUnpauserRole(), e.msg.sender) == false;
+    require e.msg.value == 0;
+
+    emergencyUnpause@withrevert(e);
+
+    assert lastReverted;
+    assert paused() == true;
+    assert ghost_unpaused_eventCount == 0;
+}
+
+rule emergencyUnpause_revertsWhen_notPaused() {
+    env e;
+
+    require ghost_unpaused_eventCount == 0;
+    require paused() == false;
+    require hasRole(emergencyUnpauserRole(), e.msg.sender) == true;
+    require e.msg.value == 0;
+
+    emergencyUnpause@withrevert(e);
+
+    assert lastReverted;
+    assert paused() == false;
+    assert ghost_unpaused_eventCount == 0; 
+}
+
+//@review: need tests on getters
+// --- getRole --- // 
+// rule getRoleMember_returns_roleMember() {}
+// rule getRoleMemberCount_returns_roleMemberCount() {}
+// rule getRoleMembers_returns_roleMembers() {}
+
+// --- setters --- //
+rule setUpkeepAddress_success() {
+    env e;
+    address upkeep;
+
+    require ghost_upkeepAddressSet_eventCount == 0;
+    require ghost_upkeepAddressSet_emittedAddress == 0;
+
+    setUpkeepAddress(e, upkeep);
+
+    assert ghost_upkeepAddressSet_eventCount == 1;
+    assert ghost_upkeepAddressSet_emittedAddress == upkeep;
+    assert currentContract.s_upkeepAddress == upkeep;
+    assert getUpkeepAddress() == upkeep;
 }
 
 rule setForwarder_success() {
@@ -248,9 +443,12 @@ rule setForwarder_success() {
 
     require ghost_forwarderSet_eventCount == 0;
     require ghost_forwarderSet_emittedAddress == 0;
+
     setForwarder(e, forwarder);
+
     assert ghost_forwarderSet_eventCount == 1;
     assert ghost_forwarderSet_emittedAddress == forwarder;
+    assert currentContract.s_forwarder == forwarder;
     assert getForwarder() == forwarder;
 }
 
@@ -260,10 +458,28 @@ rule setParentPeer_success() {
 
     require ghost_parentPeerSet_eventCount == 0;
     require ghost_parentPeerSet_emittedAddress == 0;
+
     setParentPeer(e, parentPeer);
+
     assert ghost_parentPeerSet_eventCount == 1;
     assert ghost_parentPeerSet_emittedAddress == parentPeer;
+    assert currentContract.s_parentPeer == parentPeer;
     assert getParentPeer() == parentPeer;
+}
+
+rule setStrategyRegistry() {
+    env e;
+    address registry;
+
+    require ghost_strategyRegistrySet_eventCount == 0;
+    require ghost_strategyRegistrySet_emittedAddress == 0;
+
+    setStrategyRegistry(e, registry);
+
+    assert ghost_strategyRegistrySet_eventCount == 1;
+    assert ghost_strategyRegistrySet_emittedAddress == registry;
+    assert currentContract.s_strategyRegistry == registry;
+    assert getStrategyRegistry() == registry;
 }
 
 // --- checkLog --- //
@@ -548,6 +764,19 @@ rule sendCLFRequest_revertsWhen_notUpkeep() {
 
     sendCLFRequest@withrevert(e);
     assert lastReverted;
+}
+
+rule sendCLFRequest_revertsWhen_paused() {
+    env e;
+
+    require ghost_clfRequestFulfilled_eventCount == 0;
+    require paused() == true;
+    require e.msg.sender == currentContract.s_upkeepAddress;
+
+    sendCLFRequest@withrevert(e);
+
+    assert lastReverted;
+    assert ghost_clfRequestFulfilled_eventCount == 0;
 }
 
 // --- fulfillRequest --- //
