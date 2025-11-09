@@ -268,8 +268,9 @@ contract ParentPeer is YieldPeer {
         }
 
         /// @dev If Strategy is on third chain, forward deposit to strategy
-        /// @audit strategy.chainSelector == depositData.chainSelector --> we still want to handle this
-        if (strategy.chainSelector != i_thisChainSelector && strategy.chainSelector != depositData.chainSelector) {
+        /// @audit strategy.chainSelector == depositData.chainSelector --> we still want to handle this for pingpongs
+        // This was flagged in the test aswell, now works
+        if (strategy.chainSelector != i_thisChainSelector || strategy.chainSelector == depositData.chainSelector) {
             _ccipSend(strategy.chainSelector, CcipTxType.DepositToStrategy, encodedDepositData, depositData.amount);
             emit DepositForwardedToStrategy(depositData.amount, strategy.chainSelector);
         }
