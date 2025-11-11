@@ -21,8 +21,9 @@ import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAd
 import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
 import {DataTypes} from "@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol";
 import {USDCTokenPool} from "@chainlink/contracts/src/v0.8/ccip/pools/USDC/USDCTokenPool.sol";
-import {IFunctionsSubscriptions} from
-    "@chainlink/contracts/src/v0.8/functions/v1_0_0/interfaces/IFunctionsSubscriptions.sol";
+import {
+    IFunctionsSubscriptions
+} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/interfaces/IFunctionsSubscriptions.sol";
 import {IFunctionsRouter} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/interfaces/IFunctionsRouter.sol";
 import {FunctionsClient} from "@chainlink/contracts/src/v0.8/functions/v1_3_0/FunctionsClient.sol";
 import {LinkTokenInterface} from "@chainlink/contracts/src/v0.8/shared/interfaces/LinkTokenInterface.sol";
@@ -527,11 +528,7 @@ contract BaseTest is Test {
     /// @param poolAddressesProvider The address of the Aave pool addresses provider
     /// @param underlyingToken The address of the underlying token
     /// @return aTokenAddress The address of the Aave aToken
-    function _getATokenAddress(address poolAddressesProvider, address underlyingToken)
-        internal
-        view
-        returns (address)
-    {
+    function _getATokenAddress(address poolAddressesProvider, address underlyingToken) internal view returns (address) {
         address aavePool = IPoolAddressesProvider(poolAddressesProvider).getPool();
         DataTypes.ReserveData memory reserveData = IPool(aavePool).getReserveData(underlyingToken);
         return reserveData.aTokenAddress;
