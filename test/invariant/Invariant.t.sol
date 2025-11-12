@@ -161,7 +161,8 @@ contract Invariant is StdInvariant, BaseTest {
         strategyRegistryChild1 = new StrategyRegistry();
         aaveV3AdapterChild1 = new AaveV3Adapter(address(child1), networkConfig.protocols.aavePoolAddressesProvider);
         compoundV3AdapterChild1 = new CompoundV3Adapter(address(child1), networkConfig.protocols.comet);
-        child1.grantRole(Roles.CONFIG_ADMIN_ROLE, child1.owner()); /// @dev role granted to set registry
+        child1.grantRole(Roles.CONFIG_ADMIN_ROLE, child1.owner());
+        /// @dev role granted to set registry
         child1.setStrategyRegistry(address(strategyRegistryChild1));
         child1.revokeRole(Roles.CONFIG_ADMIN_ROLE, child1.owner());
         strategyRegistryChild1.setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(aaveV3AdapterChild1));
@@ -180,7 +181,8 @@ contract Invariant is StdInvariant, BaseTest {
         strategyRegistryChild2 = new StrategyRegistry();
         aaveV3AdapterChild2 = new AaveV3Adapter(address(child2), networkConfig.protocols.aavePoolAddressesProvider);
         compoundV3AdapterChild2 = new CompoundV3Adapter(address(child2), networkConfig.protocols.comet);
-        child2.grantRole(Roles.CONFIG_ADMIN_ROLE, child2.owner()); /// @dev role granted to set registry
+        child2.grantRole(Roles.CONFIG_ADMIN_ROLE, child2.owner());
+        /// @dev role granted to set registry
         child2.setStrategyRegistry(address(strategyRegistryChild2));
         child2.revokeRole(Roles.CONFIG_ADMIN_ROLE, child2.owner());
         strategyRegistryChild2.setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(aaveV3AdapterChild2));
@@ -206,9 +208,9 @@ contract Invariant is StdInvariant, BaseTest {
         rebalancer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser);
         rebalancer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser);
         rebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, config_admin);
-        assert(rebalancer.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser));
-        assert(rebalancer.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser));
-        assert(rebalancer.hasRole(Roles.CONFIG_ADMIN_ROLE, config_admin));
+        assertTrue(rebalancer.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser));
+        assertTrue(rebalancer.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser));
+        assertTrue(rebalancer.hasRole(Roles.CONFIG_ADMIN_ROLE, config_admin));
 
         // grant roles - parent
         _changePrank(parent.owner());
@@ -218,12 +220,12 @@ contract Invariant is StdInvariant, BaseTest {
         parent.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin);
         parent.grantRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer);
         parent.grantRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter);
-        assert(parent.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser));
-        assert(parent.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser));
-        assert(parent.hasRole(Roles.CONFIG_ADMIN_ROLE, config_admin));
-        assert(parent.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin));
-        assert(parent.hasRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer));
-        assert(parent.hasRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter));
+        assertTrue(parent.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser));
+        assertTrue(parent.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser));
+        assertTrue(parent.hasRole(Roles.CONFIG_ADMIN_ROLE, config_admin));
+        assertTrue(parent.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin));
+        assertTrue(parent.hasRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer));
+        assertTrue(parent.hasRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter));
 
         // grant roles - child 1
         _changePrank(child1.owner());
@@ -233,12 +235,12 @@ contract Invariant is StdInvariant, BaseTest {
         child1.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin);
         child1.grantRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer);
         child1.grantRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter);
-        assert(child1.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser));
-        assert(child1.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser));
-        assert(child1.hasRole(Roles.CONFIG_ADMIN_ROLE, config_admin));
-        assert(child1.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin));
-        assert(child1.hasRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer));
-        assert(child1.hasRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter));
+        assertTrue(child1.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser));
+        assertTrue(child1.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser));
+        assertTrue(child1.hasRole(Roles.CONFIG_ADMIN_ROLE, config_admin));
+        assertTrue(child1.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin));
+        assertTrue(child1.hasRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer));
+        assertTrue(child1.hasRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter));
 
         // grant roles - child 2
         _changePrank(child2.owner());
@@ -248,12 +250,12 @@ contract Invariant is StdInvariant, BaseTest {
         child2.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin);
         child2.grantRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer);
         child2.grantRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter);
-        assert(child2.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser));
-        assert(child2.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser));
-        assert(child2.hasRole(Roles.CONFIG_ADMIN_ROLE, config_admin));
-        assert(child2.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin));
-        assert(child2.hasRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer));
-        assert(child2.hasRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter));
+        assertTrue(child2.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser));
+        assertTrue(child2.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser));
+        assertTrue(child2.hasRole(Roles.CONFIG_ADMIN_ROLE, config_admin));
+        assertTrue(child2.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin));
+        assertTrue(child2.hasRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer));
+        assertTrue(child2.hasRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter));
 
         _stopPrank();
     }
@@ -423,6 +425,7 @@ contract Invariant is StdInvariant, BaseTest {
 
     /// @notice Fees Consistency: The total withdrawable fees taken should be equal to the total fees taken minus total fees withdrawn
     function invariant_fees_consistency() public view {
+        // @review instead of using .balanceOf, do we want to track fees in YieldFees::s_feesCollected[feeToken] mapping address => uint256?
         uint256 parentFees = usdc.balanceOf(address(parent));
         uint256 child1Fees = usdc.balanceOf(address(child1));
         uint256 child2Fees = usdc.balanceOf(address(child2));

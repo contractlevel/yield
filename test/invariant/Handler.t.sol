@@ -320,6 +320,7 @@ contract Handler is Test {
         uint256 child2Fees = usdc.balanceOf(address(child2));
         uint256 availableFees = parentFees + child1Fees + child2Fees;
         if (availableFees == 0) return; // @review wasted run
+
         /// @dev update the ghost state
         ghost_state_totalFeesWithdrawnInStablecoin += availableFees;
 
@@ -334,15 +335,9 @@ contract Handler is Test {
 
         /// @dev withdraw the fees
         _changePrank(fee_withdrawer);
-        if (parentFees > 0) {
-            parent.withdrawFees(address(usdc));
-        }
-        if (child1Fees > 0) {
-            child1.withdrawFees(address(usdc));
-        }
-        if (child2Fees > 0) {
-            child2.withdrawFees(address(usdc));
-        }
+        if (parentFees > 0) parent.withdrawFees(address(usdc));
+        if (child1Fees > 0) child1.withdrawFees(address(usdc));
+        if (child2Fees > 0) child2.withdrawFees(address(usdc));
     }
 
     /// @notice This function handles setting the fee rate

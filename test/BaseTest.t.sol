@@ -57,6 +57,11 @@ contract BaseTest is Test {
     uint256 internal constant ETHEREUM_MAINNET_CHAIN_ID = 1;
     uint256 internal ethFork;
 
+    /// @dev update these with more recent block numbers
+    uint256 internal constant BASE_MAINNET_BLOCK_NUMBER = 38045674;
+    uint256 internal constant OPTIMISM_MAINNET_BLOCK_NUMBER = 143640972;
+    uint256 internal constant ETHEREUM_MAINNET_BLOCK_NUMBER = 23777365;
+
     uint64 internal clfSubId;
 
     Share internal baseShare;
@@ -147,7 +152,7 @@ contract BaseTest is Test {
 
     function _deployInfra() internal virtual {
         // Deploy on Base
-        baseFork = vm.createSelectFork(vm.envString("BASE_MAINNET_RPC_URL"));
+        baseFork = vm.createSelectFork(vm.envString("BASE_MAINNET_RPC_URL"), BASE_MAINNET_BLOCK_NUMBER);
         assertEq(block.chainid, BASE_MAINNET_CHAIN_ID);
 
         _bypassClfTermsOfService();
@@ -175,7 +180,7 @@ contract BaseTest is Test {
         baseCCTPMessageTransmitter = IMessageTransmitter(baseNetworkConfig.ccip.cctpMessageTransmitter);
 
         // Deploy on Optimism
-        optFork = vm.createSelectFork(vm.envString("OPTIMISM_MAINNET_RPC_URL"));
+        optFork = vm.createSelectFork(vm.envString("OPTIMISM_MAINNET_RPC_URL"), OPTIMISM_MAINNET_BLOCK_NUMBER);
         assertEq(block.chainid, OPTIMISM_MAINNET_CHAIN_ID);
 
         DeployChild optDeployChild = new DeployChild();
@@ -192,7 +197,7 @@ contract BaseTest is Test {
         optCCTPMessageTransmitter = IMessageTransmitter(optNetworkConfig.ccip.cctpMessageTransmitter);
 
         // Deploy on Ethereum
-        ethFork = vm.createSelectFork(vm.envString("ETH_MAINNET_RPC_URL"));
+        ethFork = vm.createSelectFork(vm.envString("ETH_MAINNET_RPC_URL"), ETHEREUM_MAINNET_BLOCK_NUMBER);
         assertEq(block.chainid, ETHEREUM_MAINNET_CHAIN_ID);
 
         DeployChild ethDeployChild = new DeployChild();
@@ -353,7 +358,8 @@ contract BaseTest is Test {
         baseParentPeer.setAllowedChain(baseChainSelector, true);
         baseParentPeer.setAllowedPeer(optChainSelector, address(optChildPeer));
         baseParentPeer.setAllowedPeer(ethChainSelector, address(ethChildPeer));
-        baseParentPeer.revokeRole(Roles.CROSS_CHAIN_ADMIN_ROLE, baseParentPeer.owner()); /// @dev revoke role
+        baseParentPeer.revokeRole(Roles.CROSS_CHAIN_ADMIN_ROLE, baseParentPeer.owner());
+        /// @dev revoke role
         assertEq(baseParentPeer.getAllowedChain(optChainSelector), true);
         assertEq(baseParentPeer.getAllowedChain(ethChainSelector), true);
         assertEq(baseParentPeer.getAllowedPeer(optChainSelector), address(optChildPeer));
@@ -367,7 +373,8 @@ contract BaseTest is Test {
         optChildPeer.setAllowedChain(ethChainSelector, true);
         optChildPeer.setAllowedPeer(baseChainSelector, address(baseParentPeer));
         optChildPeer.setAllowedPeer(ethChainSelector, address(ethChildPeer));
-        optChildPeer.revokeRole(Roles.CROSS_CHAIN_ADMIN_ROLE, optChildPeer.owner()); /// @dev revoke role
+        optChildPeer.revokeRole(Roles.CROSS_CHAIN_ADMIN_ROLE, optChildPeer.owner());
+        /// @dev revoke role
         assertEq(optChildPeer.getAllowedChain(baseChainSelector), true);
         assertEq(optChildPeer.getAllowedChain(ethChainSelector), true);
         assertEq(optChildPeer.getAllowedPeer(baseChainSelector), address(baseParentPeer));
@@ -381,7 +388,8 @@ contract BaseTest is Test {
         ethChildPeer.setAllowedChain(optChainSelector, true);
         ethChildPeer.setAllowedPeer(baseChainSelector, address(baseParentPeer));
         ethChildPeer.setAllowedPeer(optChainSelector, address(optChildPeer));
-        ethChildPeer.revokeRole(Roles.CROSS_CHAIN_ADMIN_ROLE, ethChildPeer.owner()); /// @dev revoke role
+        ethChildPeer.revokeRole(Roles.CROSS_CHAIN_ADMIN_ROLE, ethChildPeer.owner());
+        /// @dev revoke role
         assertEq(ethChildPeer.getAllowedChain(baseChainSelector), true);
         assertEq(ethChildPeer.getAllowedChain(optChainSelector), true);
         assertEq(ethChildPeer.getAllowedPeer(baseChainSelector), address(baseParentPeer));
@@ -560,7 +568,8 @@ contract BaseTest is Test {
         /// @dev grant temp config admin role to deployer/admin to set config
         baseRebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner());
         baseRebalancer.setForwarder(forwarder);
-        baseRebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner()); /// @dev revoke
+        baseRebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner());
+        /// @dev revoke
 
         /// @dev set upkeepAddress
         address parentPeerOwner = baseParentPeer.owner();
@@ -568,7 +577,8 @@ contract BaseTest is Test {
         /// @dev grant temp config admin role to deployer/admin to set config
         baseRebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner());
         baseRebalancer.setUpkeepAddress(upkeepAddress);
-        baseRebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner()); /// @dev revoke
+        baseRebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner());
+        /// @dev revoke
 
         /// @dev add ParentPeer as consumer to Chainlink Functions subscription
         address functionsRouter = baseNetworkConfig.clf.functionsRouter;
