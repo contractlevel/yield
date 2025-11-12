@@ -537,7 +537,10 @@ contract Handler is Test {
         if (seedAddress == admin) seedAddress = _seedToAddress(addressSeed + 1);
         if (seedAddress == address(share)) seedAddress = _seedToAddress(addressSeed + 2);
         if (seedAddress == address(parent)) seedAddress = _seedToAddress(addressSeed + 3);
-        if (seedAddress == parent.owner()) seedAddress = _seedToAddress(addressSeed + 4); // excluding the owner introduces the assumption that the owner will not be interacting with the protocol as a user
+        if (seedAddress == address(child1)) seedAddress = _seedToAddress(addressSeed + 4);
+        if (seedAddress == address(child2)) seedAddress = _seedToAddress(addressSeed + 5);
+        if (seedAddress == parent.owner()) seedAddress = _seedToAddress(addressSeed + 6); // excluding the owner introduces the assumption that the owner will not be interacting with the protocol as a user
+
         users.add(seedAddress);
     }
 
