@@ -63,7 +63,7 @@ abstract contract YieldFees is PausableWithAccessControl, IYieldFees {
     /// @param feeToken The token to withdraw the fees in (e.g. USDC, USDT, GHO, etc.)
     /// @dev Revert if msg.sender does not have role of "FEE_WITHDRAWER_ROLE" in access control
     /// @dev Revert if the main inheriting Yield contract is paused (in case of emergency)
-    function withdrawFees(address feeToken) external whenNotPaused onlyRole(Roles.FEE_WITHDRAWER_ROLE) {
+    function withdrawFees(address feeToken) external onlyRole(Roles.FEE_WITHDRAWER_ROLE) {
         uint256 fees = IERC20(feeToken).balanceOf(address(this));
         if (fees != 0) {
             emit FeesWithdrawn(fees);
