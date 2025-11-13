@@ -127,7 +127,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Pausable
     function checkLog(Log calldata log, bytes memory)
         external
         view
-        // cannotExecute
+        cannotExecute
         returns (bool upkeepNeeded, bytes memory performData)
     {
         bytes32 eventSignature = keccak256("StrategyUpdated(uint64,bytes32,uint64)");

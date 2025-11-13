@@ -459,6 +459,7 @@ rule getRoleMember_returns_roleMember() {
 
 rule getRoleMemberCount_returns_roleMemberCount() {
     env e;
+    /// @dev we are adding a random assortment of role users to test numbers
     address configAdmin;
     address crossChainAdmin1;
     address crossChainAdmin2;
@@ -532,46 +533,42 @@ rule getRoleMemberCount_returns_roleMemberCount() {
 rule getRoleMembers_returns_roleMembers() {
     env e1;
     env e2;
-    // address crossChainAdmin1;
-    // address crossChainAdmin2;
-    // address crossChainAdmin3;
     address pauser1;
     address pauser2;
+    address crossChainAdmin1;
+    address crossChainAdmin2;
 
-    // require crossChainAdmin1 != crossChainAdmin2;
-    // require crossChainAdmin3 != crossChainAdmin1;
-    // require crossChainAdmin2 != crossChainAdmin3;
     require pauser1 != pauser2;
+    require crossChainAdmin1 != crossChainAdmin2;
 
-    // require getRoleMemberCount(crossChainAdminRole()) == 0;
     require getRoleMemberCount(emergencyPauserRole()) == 0;
-
-    // require hasRole(crossChainAdminRole(), crossChainAdmin1) == false;
-    // require hasRole(crossChainAdminRole(), crossChainAdmin2) == false;
-    // require hasRole(crossChainAdminRole(), crossChainAdmin3) == false;
-    // require currentContract.s_roleMembers[crossChainAdminRole()]._inner._positions[addressToBytes32(crossChainAdmin1)] == 0;
-    // require currentContract.s_roleMembers[crossChainAdminRole()]._inner._positions[addressToBytes32(crossChainAdmin2)] == 0;
-    // require currentContract.s_roleMembers[crossChainAdminRole()]._inner._positions[addressToBytes32(crossChainAdmin3)] == 0; 
+    require getRoleMemberCount(crossChainAdminRole()) == 0;
 
     require hasRole(emergencyPauserRole(), pauser1) == false;
     require hasRole(emergencyPauserRole(), pauser2) == false;
+    require hasRole(crossChainAdminRole(), crossChainAdmin1) == false;
+    require hasRole(crossChainAdminRole(), crossChainAdmin2) == false;
+     
     require currentContract.s_roleMembers[emergencyPauserRole()]._inner._positions[addressToBytes32(pauser1)] == 0;
-    require currentContract.s_roleMembers[emergencyPauserRole()]._inner._positions[addressToBytes32(pauser2)] == 0;
-
-    // address[] actualCrossChainMembers = getRoleMembers(crossChainAdminRole());
-    // assert actualCrossChainMembers.length == 3;
-    // assert actualCrossChainMembers[0] == crossChainAdmin1;
-    // assert actualCrossChainMembers[1] == crossChainAdmin2;
-    // assert actualCrossChainMembers[2] == crossChainAdmin3;
+    require currentContract.s_roleMembers[emergencyPauserRole()]._inner._positions[addressToBytes32(pauser2)] == 0;   
+    require currentContract.s_roleMembers[crossChainAdminRole()]._inner._positions[addressToBytes32(crossChainAdmin1)] == 0;
+    require currentContract.s_roleMembers[crossChainAdminRole()]._inner._positions[addressToBytes32(crossChainAdmin2)] == 0;
 
     require e2.block.timestamp > e1.block.timestamp;
+
     grantRole(e1, emergencyPauserRole(), pauser1);
     grantRole(e2, emergencyPauserRole(), pauser2);
+    grantRole(e1, crossChainAdminRole(), crossChainAdmin1);
+    grantRole(e2, crossChainAdminRole(), crossChainAdmin2);
 
     address[] actualPauserMembers = getRoleMembers(emergencyPauserRole());
+    address[] actualCrossChainMembers = getRoleMembers(crossChainAdminRole());
     assert actualPauserMembers.length == 2;
     assert actualPauserMembers[0] == pauser1;
     assert actualPauserMembers[1] == pauser2;
+    assert actualCrossChainMembers.length == 2;
+    assert actualCrossChainMembers[0] == crossChainAdmin1;
+    assert actualCrossChainMembers[1] == crossChainAdmin2;
 }
 
 // --- deposit --- //
