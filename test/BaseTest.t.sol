@@ -56,6 +56,11 @@ contract BaseTest is Test {
     uint256 internal constant ETHEREUM_MAINNET_CHAIN_ID = 1;
     uint256 internal ethFork;
 
+    /// @dev update these with more recent block numbers
+    uint256 internal constant BASE_MAINNET_BLOCK_NUMBER = 38045674;
+    uint256 internal constant OPTIMISM_MAINNET_BLOCK_NUMBER = 143640972;
+    uint256 internal constant ETHEREUM_MAINNET_BLOCK_NUMBER = 23777365;
+
     uint64 internal clfSubId;
 
     Share internal baseShare;
@@ -137,7 +142,7 @@ contract BaseTest is Test {
 
     function _deployInfra() internal virtual {
         // Deploy on Base
-        baseFork = vm.createSelectFork(vm.envString("BASE_MAINNET_RPC_URL"));
+        baseFork = vm.createSelectFork(vm.envString("BASE_MAINNET_RPC_URL"), BASE_MAINNET_BLOCK_NUMBER);
         assertEq(block.chainid, BASE_MAINNET_CHAIN_ID);
 
         _bypassClfTermsOfService();
@@ -165,7 +170,7 @@ contract BaseTest is Test {
         baseCCTPMessageTransmitter = IMessageTransmitter(baseNetworkConfig.ccip.cctpMessageTransmitter);
 
         // Deploy on Optimism
-        optFork = vm.createSelectFork(vm.envString("OPTIMISM_MAINNET_RPC_URL"));
+        optFork = vm.createSelectFork(vm.envString("OPTIMISM_MAINNET_RPC_URL"), OPTIMISM_MAINNET_BLOCK_NUMBER);
         assertEq(block.chainid, OPTIMISM_MAINNET_CHAIN_ID);
 
         DeployChild optDeployChild = new DeployChild();
@@ -182,7 +187,7 @@ contract BaseTest is Test {
         optCCTPMessageTransmitter = IMessageTransmitter(optNetworkConfig.ccip.cctpMessageTransmitter);
 
         // Deploy on Ethereum
-        ethFork = vm.createSelectFork(vm.envString("ETH_MAINNET_RPC_URL"));
+        ethFork = vm.createSelectFork(vm.envString("ETH_MAINNET_RPC_URL"), ETHEREUM_MAINNET_BLOCK_NUMBER);
         assertEq(block.chainid, ETHEREUM_MAINNET_CHAIN_ID);
 
         DeployChild ethDeployChild = new DeployChild();
