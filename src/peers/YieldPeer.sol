@@ -331,6 +331,7 @@ abstract contract YieldPeer is
 
         /// @dev take fee
         uint256 fee = _calculateFee(amountToDeposit);
+        // @review gas optimize here? do calculation inside conditional?
         amountToDepositMinusFee = amountToDeposit - fee;
         if (fee > 0) emit FeeTaken(fee);
 

@@ -357,16 +357,15 @@ rule emergencyPause_revertsWhen_alreadyPaused() {
     env e;
 
     require ghost_paused_eventCount == 0;
-    require paused() == false;
+    require paused() == true;
     require hasRole(emergencyPauserRole(), e.msg.sender) == true;
     require e.msg.value == 0;
 
-    emergencyPause(e); /// @dev pause once, then try again
     emergencyPause@withrevert(e);
 
     assert lastReverted;
     assert paused() == true;
-    assert ghost_paused_eventCount == 1; 
+    assert ghost_paused_eventCount == 0; 
 }
 
 // --- emergency unpause --- //
@@ -579,18 +578,28 @@ rule deposit_revertsWhen_paused() {
     env e;
     uint256 amountToDeposit;
 
-    require ghost_depositInitiated_eventCount == 0;
+    /// @dev revert condition being verified
     require paused() == true;
 
-    deposit@withrevert(e, amountToDeposit);
+    /// @dev revert conditions not being verified
+    require amountToDeposit >= 1000000, "amountToDeposit must be greater than or equal to 1e6";
+    require e.msg.value == 0;
 
+    deposit@withrevert(e, amountToDeposit);
     assert lastReverted;
-    assert ghost_depositInitiated_eventCount == 0;
 }
 
-rule deposit_revertsWhen_zeroAmount() {
+rule deposit_revertsWhen_amountLessThan1e6() {
     env e;
-    uint256 amountToDeposit = 0;
+    uint256 amountToDeposit;
+
+    /// @dev revert condition being verified
+    require amountToDeposit < 1000000, "amountToDeposit must be less than 1e6";
+
+    /// @dev revert conditions not being verified
+    require e.msg.value == 0;
+    require !paused();
+
     deposit@withrevert(e, amountToDeposit);
     assert lastReverted;
 }
@@ -619,55 +628,91 @@ rule deposit_emits_DepositInitiated() {
 
 // --- onTokenTransfer --- //
 rule onTokenTransfer_revertsWhen_paused() {
-    env e;
-    calldataarg args;
-    
-    require ghost_withdrawInitiated_eventCount == 0;
-    require ghost_sharesBurned_eventCount == 0;
-    require paused() == true;
-
-    onTokenTransfer@withrevert(e, args);
-
-    assert lastReverted;
-    assert ghost_withdrawInitiated_eventCount == 0;
-    assert ghost_sharesBurned_eventCount == 0;
-}
-
-rule onTokenTransfer_revertsWhen_msgSenderIsNotShare() {
-    env e;
-    calldataarg args;
-    require e.msg.sender != currentContract.i_share, "msg.sender must be the share token";
-    onTokenTransfer@withrevert(e, args);
-    assert lastReverted;
-}
-
-rule onTokenTransfer_revertsWhen_zeroAmount() {
+    /// @dev variables
     env e;
     address withdrawer;
     uint256 shareBurnAmount;
     uint64 chainSelector;
-    require e.msg.sender == currentContract.i_share,
-        "msg.sender must be the share token";
-    require getAllowedChain(chainSelector) || chainSelector == getThisChainSelector(), 
-        "withdraw chain selector must be allowed";
+    bytes encodedWithdrawChainSelector = encodeUint64(chainSelector);
+    
+    /// @dev revert condition being verified
+    require paused() == true;
+
+    /// @dev revert conditions not being verified
+    require e.msg.sender == currentContract.i_share, "msg.sender must be the share token";
+    require e.msg.value == 0;
+    require shareBurnAmount > 0;
+    require getAllowedChain(chainSelector) || chainSelector == getThisChainSelector();
+
+    /// @dev action
+    onTokenTransfer@withrevert(e, withdrawer, shareBurnAmount, encodedWithdrawChainSelector);
+    /// @dev assertion
+    assert lastReverted;
+}
+
+rule onTokenTransfer_revertsWhen_msgSenderIsNotShare() {
+    /// @dev variables
+    env e;
+    address withdrawer;
+    uint256 shareBurnAmount;
+    uint64 chainSelector;
     bytes encodedWithdrawChainSelector = encodeUint64(chainSelector);
 
-    require shareBurnAmount == 0, "onTokenTransfer should revert when share burn amount is 0";
+    /// @dev revert condition being verified
+    require e.msg.sender != currentContract.i_share, "msg.sender must be the share token";
+
+    /// @dev revert conditions not being verified
+    require e.msg.value == 0;
+    require !paused();
+    require shareBurnAmount > 0;
+    require getAllowedChain(chainSelector) || chainSelector == getThisChainSelector();
+
+    /// @dev action
+    onTokenTransfer@withrevert(e, withdrawer, shareBurnAmount, encodedWithdrawChainSelector);
+    /// @dev assertion
+    assert lastReverted;
+}
+
+rule onTokenTransfer_revertsWhen_zeroAmount() {
+    /// @dev variables
+    env e;
+    address withdrawer;
+    uint256 shareBurnAmount;
+    uint64 chainSelector;
+    bytes encodedWithdrawChainSelector = encodeUint64(chainSelector);
+
+    /// @dev revert condition being verified
+    require shareBurnAmount == 0, "shareBurnAmount must be greater than 0";
+
+    /// @dev revert conditions not being verified
+    require e.msg.sender == currentContract.i_share, "msg.sender must be the share token";
+    require getAllowedChain(chainSelector) || chainSelector == getThisChainSelector();
+    require e.msg.value == 0;
+    require !paused();
+
     onTokenTransfer@withrevert(e, withdrawer, shareBurnAmount, encodedWithdrawChainSelector); 
     assert lastReverted;
 }
 
 rule onTokenTransfer_revertsWhen_chainNotAllowed() {
+    /// @dev variables
     env e;
     address withdrawer;
     uint256 shareBurnAmount;
     uint64 chainSelector;
-    require e.msg.sender == currentContract.i_share,
-        "msg.sender must be the share token";
-    require shareBurnAmount > 0, "shareBurnAmount must be greater than 0";
+    bytes encodedWithdrawChainSelector = encodeUint64(chainSelector);
+
+    /// @dev revert condition being verified
     require !getAllowedChain(chainSelector) && chainSelector != getThisChainSelector(), 
         "onTokenTransfer should revert when chain selector is not allowed";
-    bytes encodedWithdrawChainSelector = encodeUint64(chainSelector);
+
+    /// @dev revert conditions not being verified
+    require e.msg.sender == currentContract.i_share, "msg.sender must be the share token";
+    require shareBurnAmount > 0, "shareBurnAmount must be greater than 0";
+    require e.msg.value == 0;
+    require !paused();
+
+    /// @dev action
     onTokenTransfer@withrevert(e, withdrawer, shareBurnAmount, encodedWithdrawChainSelector); 
     assert lastReverted;
 }
@@ -700,18 +745,28 @@ rule onTokenTransfer_decreases_share_totalSupply() {
 // --- withdrawFees --- //
 rule withdrawFees_revertsWhen_noFeeWithdrawerRole() {
     env e;
-    calldataarg args;
+    address feeToken;
 
+    /// @dev revert condition being verified
     require hasRole(feeWithdrawerRole(), e.msg.sender) == false;
 
-    withdrawFees@withrevert(e, args);
+    /// @dev revert conditions not being verified
+    require e.msg.value == 0;
+    require feeToken.balanceOf(e, currentContract) > 0;
+
+    withdrawFees@withrevert(e, feeToken);
     assert lastReverted;
 }
 
 rule withdrawFees_revertsWhen_noFeesToWithdraw() {
     env e;
     address feeToken;
+
+    /// @dev revert condition being verified
     require feeToken.balanceOf(e, currentContract) == 0;
+
+    /// @dev revert conditions not being verified
+    require e.msg.value == 0;
     require hasRole(feeWithdrawerRole(), e.msg.sender) == true;
 
     withdrawFees@withrevert(e, feeToken);
@@ -727,11 +782,6 @@ rule withdrawFees_success() {
     require fees > 0;
     require feeWithdrawerBalanceBefore + fees <= max_uint256;
     require currentContract != e.msg.sender;
-    /// @dev the msg.sender is acting as the fee withdrawer in this scenario 
-    require hasRole(feeWithdrawerRole(), e.msg.sender) == true;
-
-    /// @dev as more stablecoins are added, we will need to update this: feeToken == usdc || feeToken == usdt etc
-    require feeToken == usdc;
 
     require ghost_feesWithdrawn_eventCount == 0;
     require ghost_feesWithdrawn_feesWithdrawn_emitted == 0;
@@ -747,18 +797,29 @@ rule withdrawFees_success() {
 // --- setFeeRate --- //
 rule setFeeRate_revertsWhen_noFeeRateSetterRole() {
     env e;
-    calldataarg args;
+    uint256 newFeeRate;
 
+    /// @dev revert condition being verified
     require hasRole(feeRateSetterRole(), e.msg.sender) == false;
 
-    setFeeRate@withrevert(e, args);
+    /// @dev revert conditions not being verified
+    require e.msg.value == 0;
+    require newFeeRate <= getMaxFeeRate();
+
+    /// @dev action
+    setFeeRate@withrevert(e, newFeeRate);
     assert lastReverted;
 }
 
 rule setFeeRate_revertsWhen_maxFeeRateExceeded() {
     env e;
     uint256 newFeeRate;
+
+    /// @dev revert condition being verified
     require newFeeRate > getMaxFeeRate();
+
+    /// @dev revert conditions not being verified
+    require e.msg.value == 0;
     require hasRole(feeRateSetterRole(), e.msg.sender) == true;
 
     setFeeRate@withrevert(e, newFeeRate);
@@ -771,7 +832,6 @@ rule setFeeRate_success() {
 
     require ghost_feeRateSet_eventCount == 0;
     require ghost_feeRateSet_feeRate_emitted == 0;
-    require hasRole(feeRateSetterRole(), e.msg.sender) == true;
 
     setFeeRate(e, newFeeRate);
 
