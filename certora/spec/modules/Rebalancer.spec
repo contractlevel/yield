@@ -17,8 +17,12 @@ methods {
     function getStrategyRegistry() external returns (address) envfree;
 
     // PausableWithAccessControl methods
+    function owner() external returns (address) envfree;
     function paused() external returns (bool) envfree;  
     function hasRole(bytes32, address) external returns (bool) envfree;
+    function getRoleMember(bytes32, uint256) external returns (address) envfree;
+    function getRoleMemberCount(bytes32) external returns (uint256) envfree;
+    function getRoleMembers(bytes32) external returns (address[] memory) envfree;
 
     // External methods
     function usdc.balanceOf(address) external returns (uint256) envfree;
@@ -43,6 +47,7 @@ methods {
 
     // Harness helper methods
     function bytes32ToAddress(bytes32) external returns (address) envfree;
+    function addressToBytes32(address value) external returns (bytes32) envfree;
     function uint64ToBytes32(uint64) external returns (bytes32) envfree;
     function uint8ToBytes32(uint8) external returns (bytes32) envfree;
     function getParentChainSelector() external returns (uint64) envfree;
@@ -85,9 +90,21 @@ definition onlyRoleConfigAdmin(method f) returns bool =
     f.selector == sig:setUpkeepAddress(address).selector ||
     f.selector == sig:setStrategyRegistry(address).selector;
 
+definition crossChainAdminRole() returns bytes32 = 
+// keccak256("CROSS_CHAIN_ADMIN_ROLE")
+    to_bytes32(0xb28dc5efd345f3bec5c16749590c736fbb2ba9912d8680cac4da7a59f918a760);
+
 definition configAdminRole() returns bytes32 = 
 // keccak256("CONFIG_ADMIN_ROLE")
     to_bytes32(0xb92d52e77ebaa0cae5c23e882d85609efbcb44029214147dd132daf9ef1018af);
+
+definition feeWithdrawerRole() returns bytes32 = 
+// keccak256("FEE_WITHDRAWER_ROLE")
+    to_bytes32(0xcecef922ac6ded813804bed2d5fdf033decf4a090fa3c9b9f529302a0aff6455);   
+
+definition feeRateSetterRole() returns bytes32 = 
+// keccak256("FEE_RATE_SETTER_ROLE")
+    to_bytes32(0x658e71518b7b5afc52c60427d525dee00a59b3720f918587414f669096f77bee);
 
 definition emergencyPauserRole() returns bytes32 = 
 // keccak256("EMERGENCY_PAUSER_ROLE")
@@ -459,6 +476,7 @@ rule getRoleMember_returns_roleMember() {
 
 rule getRoleMemberCount_returns_roleMemberCount() {
     env e;
+    /// @dev we are adding a random assortment of role users to test numbers
     address configAdmin;
     address crossChainAdmin1;
     address crossChainAdmin2;
@@ -529,45 +547,45 @@ rule getRoleMemberCount_returns_roleMemberCount() {
     assert getRoleMemberCount(feeWithdrawerRole()) == 1;
 }
 
-// @review Rule is vacuous 
 rule getRoleMembers_returns_roleMembers() {
-    env e;
-    address crossChainAdmin1;
-    address crossChainAdmin2;
-    address crossChainAdmin3;
+    env e1;
+    env e2;
     address pauser1;
     address pauser2;
+    address crossChainAdmin1;
+    address crossChainAdmin2;
 
-    require crossChainAdmin1 != crossChainAdmin2;
-    require crossChainAdmin3 != crossChainAdmin1;
-    require crossChainAdmin2 != crossChainAdmin3;
     require pauser1 != pauser2;
+    require crossChainAdmin1 != crossChainAdmin2;
 
-    require getRoleMemberCount(crossChainAdminRole()) == 0;
     require getRoleMemberCount(emergencyPauserRole()) == 0;
-
-    require hasRole(crossChainAdminRole(), crossChainAdmin1) == false;
-    require hasRole(crossChainAdminRole(), crossChainAdmin2) == false;
-    require hasRole(crossChainAdminRole(), crossChainAdmin3) == false;
-    require currentContract.s_roleMembers[crossChainAdminRole()]._inner._positions[addressToBytes32(crossChainAdmin1)] == 0;
-    require currentContract.s_roleMembers[crossChainAdminRole()]._inner._positions[addressToBytes32(crossChainAdmin2)] == 0;
-    require currentContract.s_roleMembers[crossChainAdminRole()]._inner._positions[addressToBytes32(crossChainAdmin3)] == 0; 
+    require getRoleMemberCount(crossChainAdminRole()) == 0;
 
     require hasRole(emergencyPauserRole(), pauser1) == false;
     require hasRole(emergencyPauserRole(), pauser2) == false;
+    require hasRole(crossChainAdminRole(), crossChainAdmin1) == false;
+    require hasRole(crossChainAdminRole(), crossChainAdmin2) == false;
+     
     require currentContract.s_roleMembers[emergencyPauserRole()]._inner._positions[addressToBytes32(pauser1)] == 0;
-    require currentContract.s_roleMembers[emergencyPauserRole()]._inner._positions[addressToBytes32(pauser2)] == 0;
+    require currentContract.s_roleMembers[emergencyPauserRole()]._inner._positions[addressToBytes32(pauser2)] == 0;   
+    require currentContract.s_roleMembers[crossChainAdminRole()]._inner._positions[addressToBytes32(crossChainAdmin1)] == 0;
+    require currentContract.s_roleMembers[crossChainAdminRole()]._inner._positions[addressToBytes32(crossChainAdmin2)] == 0;
 
-    address[] actualCrossChainMembers = getRoleMembers(crossChainAdminRole());
-    assert actualCrossChainMembers.length == 3;
-    assert actualCrossChainMembers[0] == crossChainAdmin1;
-    assert actualCrossChainMembers[1] == crossChainAdmin2;
-    assert actualCrossChainMembers[2] == crossChainAdmin3;
+    require e2.block.timestamp > e1.block.timestamp;
+
+    grantRole(e1, emergencyPauserRole(), pauser1);
+    grantRole(e2, emergencyPauserRole(), pauser2);
+    grantRole(e1, crossChainAdminRole(), crossChainAdmin1);
+    grantRole(e2, crossChainAdminRole(), crossChainAdmin2);
 
     address[] actualPauserMembers = getRoleMembers(emergencyPauserRole());
+    address[] actualCrossChainMembers = getRoleMembers(crossChainAdminRole());
     assert actualPauserMembers.length == 2;
     assert actualPauserMembers[0] == pauser1;
     assert actualPauserMembers[1] == pauser2;
+    assert actualCrossChainMembers.length == 2;
+    assert actualCrossChainMembers[0] == crossChainAdmin1;
+    assert actualCrossChainMembers[1] == crossChainAdmin2;
 }
 
 // --- setters --- //

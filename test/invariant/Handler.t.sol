@@ -163,9 +163,9 @@ contract Handler is Test {
         compoundPool = _compoundPool;
         rebalancer = _rebalancer;
         vm.startPrank(rebalancer.owner());
-        rebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, rebalancer.owner()); // @reviewGeorge: grant
+        rebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, rebalancer.owner());
         rebalancer.setForwarder(forwarder);
-        rebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, rebalancer.owner()); // @reviewGeorge: revoke
+        rebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, rebalancer.owner());
         vm.stopPrank();
 
         parentChainSelector = parent.getThisChainSelector();
