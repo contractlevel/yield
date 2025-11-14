@@ -906,8 +906,12 @@ rule setInitialActiveStrategy_revertsWhen_noDefaultAdminRole() {
     env e;
     bytes32 protocolId;
 
+    /// @dev revert condition being verified
     require currentContract.hasRole(defaultAdminRole(), e.msg.sender) == false;
+
+    /// @dev revert conditions not being verified
     require e.msg.value == 0;
+    require currentContract.s_initialActiveStrategySet == false;
 
     setInitialActiveStrategy@withrevert(e, protocolId);
     assert lastReverted;

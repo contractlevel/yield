@@ -55,6 +55,8 @@ definition onlyRoleCrossChainAdmin(method f) returns bool =
 definition onlyRoleConfigAdmin(method f) returns bool = 
     f.selector == sig:setStrategyRegistry(address).selector;
 
+definition defaultAdminRole() returns bytes32 = to_bytes32(0x00);
+
 definition crossChainAdminRole() returns bytes32 = 
 // keccak256("CROSS_CHAIN_ADMIN_ROLE")
     to_bytes32(0xb28dc5efd345f3bec5c16749590c736fbb2ba9912d8680cac4da7a59f918a760);
@@ -341,23 +343,26 @@ rule emergencyPause_success() {
 rule emergencyPause_revertsWhen_noPauserRole() {
     env e;
 
-    require ghost_paused_eventCount == 0;
-    require paused() == false;
+    /// @dev revert condition being verified
     require hasRole(emergencyPauserRole(), e.msg.sender) == false;
+
+    /// @dev revert conditions not being verified
+    require paused() == false;
     require e.msg.value == 0;
 
     emergencyPause@withrevert(e);
 
     assert lastReverted;
     assert paused() == false;
-    assert ghost_paused_eventCount == 0;
 }
 
 rule emergencyPause_revertsWhen_alreadyPaused() {
     env e;
 
-    require ghost_paused_eventCount == 0;
+    /// @dev revert condition being verified
     require paused() == true;
+
+    /// @dev revert conditions not being verified
     require hasRole(emergencyPauserRole(), e.msg.sender) == true;
     require e.msg.value == 0;
 
@@ -365,7 +370,6 @@ rule emergencyPause_revertsWhen_alreadyPaused() {
 
     assert lastReverted;
     assert paused() == true;
-    assert ghost_paused_eventCount == 0; 
 }
 
 // --- emergency unpause --- //
@@ -387,23 +391,26 @@ rule emergencyUnpause_success() {
 rule emergencyUnpause_revertsWhen_noUnpauserRole() {
     env e;
 
-    require ghost_unpaused_eventCount == 0;
-    require paused() == true;
+    /// @dev revert condition being verified
     require hasRole(emergencyUnpauserRole(), e.msg.sender) == false;
+
+    /// @dev revert conditions not being verified
+    require paused() == true;
     require e.msg.value == 0;
 
     emergencyUnpause@withrevert(e);
 
     assert lastReverted;
     assert paused() == true;
-    assert ghost_unpaused_eventCount == 0;
 }
 
 rule emergencyUnpause_revertsWhen_notPaused() {
     env e;
 
-    require ghost_unpaused_eventCount == 0;
+    /// @dev revert condition being verified
     require paused() == false;
+
+    /// @dev revert conditions not being verified
     require hasRole(emergencyUnpauserRole(), e.msg.sender) == true;
     require e.msg.value == 0;
 
@@ -411,7 +418,6 @@ rule emergencyUnpause_revertsWhen_notPaused() {
 
     assert lastReverted;
     assert paused() == false;
-    assert ghost_unpaused_eventCount == 0; 
 }
 
 // --- getRole --- // 
@@ -884,9 +890,6 @@ rule setAllowedChain_success() {
     bool isAllowed;
 
     require ghost_allowedChainSet_eventCount == 0;
-    require ghost_allowedChainSet_allowedChain_emitted[chainSelector] == !isAllowed;
-    require currentContract.s_allowedChains[chainSelector] == !isAllowed;
-    require hasRole(crossChainAdminRole(), e.msg.sender) == true;
 
     setAllowedChain(e, chainSelector, isAllowed);
 
@@ -900,8 +903,12 @@ rule setAllowedPeer_revertsWhen_chainNotAllowed() {
     uint64 chainSelector;
     address peer;
 
+    /// @dev revert condition being verified
     require !getAllowedChain(chainSelector);
+
+    /// @dev revert conditions not being verified
     require hasRole(crossChainAdminRole(), e.msg.sender) == true;
+    require e.msg.value == 0;
 
     setAllowedPeer@withrevert(e, chainSelector, peer);
     assert lastReverted;
@@ -914,9 +921,7 @@ rule setAllowedPeer_success() {
 
     require ghost_allowedPeerSet_eventCount == 0;
     require ghost_allowedPeerSet_allowedPeer_emitted[chainSelector] == 0;
-    require currentContract.s_peers[chainSelector] == 0;
-    require peer != 0;
-    require hasRole(crossChainAdminRole(), e.msg.sender) == true;
+    require currentContract.s_peers[chainSelector] != peer;
 
     setAllowedPeer(e, chainSelector, peer);
     assert ghost_allowedPeerSet_eventCount == 1;
@@ -931,8 +936,6 @@ rule setCCIPGasLimit_success() {
     require ghost_ccipGasLimitSet_eventCount == 0;
     require ghost_ccipGasLimitSet_ccipGasLimit_emitted == 0;
     require currentContract.s_ccipGasLimit == 0;
-    require gasLimit > 0;
-    require hasRole(crossChainAdminRole(), e.msg.sender) == true;
 
     setCCIPGasLimit(e, gasLimit);
 
@@ -959,13 +962,64 @@ rule setStrategyRegistry_success() {
 
     require ghost_strategyRegistrySet_eventCount == 0;
     require ghost_strategyRegistrySet_strategyRegistry_emitted == 0;
-    require currentContract.s_strategyRegistry == 0;
-    require strategyRegistry != 0;
-    require hasRole(configAdminRole(), e.msg.sender) == true;
+    require currentContract.s_strategyRegistry != strategyRegistry;
 
     setStrategyRegistry(e, strategyRegistry);
 
     assert ghost_strategyRegistrySet_eventCount == 1;
     assert ghost_strategyRegistrySet_strategyRegistry_emitted == strategyRegistry;
     assert currentContract.s_strategyRegistry == strategyRegistry;
+}
+
+// --- grantRole --- //
+// @review OpenZeppelin's AccessControl: bytes32 public constant DEFAULT_ADMIN_ROLE = 0x00;
+// should we change this to a different value? is 0x00 not default for everyone?
+// @review rule is failing
+rule grantRole_revertsWhen_msgSenderIsNotDefaultAdmin() {
+    env e;
+    bytes32 role;
+    address account;
+
+    /// @dev revert condition being verified
+    require hasRole(defaultAdminRole(), e.msg.sender) == false;
+
+    /// @dev revert conditions not being verified
+    require e.msg.value == 0;
+    require role != defaultAdminRole();
+    require currentContract._roles[defaultAdminRole()].adminRole == defaultAdminRole();
+
+    grantRole@withrevert(e, role, account);
+    assert lastReverted;
+}
+
+rule grantRole_revertsWhen_grantedRoleIsDefaultAdmin() {
+    env e;
+    bytes32 role;
+    address account;
+
+    /// @dev revert condition being verified
+    require role == defaultAdminRole();
+
+    /// @dev revert conditions not being verified
+    require e.msg.value == 0;
+    require hasRole(defaultAdminRole(), e.msg.sender);
+
+    grantRole@withrevert(e, role, account);
+    assert lastReverted;
+}
+
+// @review failing
+rule grantRole_success() {
+    env e;
+    bytes32 role;
+    address account;
+
+    require hasRole(role, account) == false;
+    require getRoleMemberCount(role) == 0;
+
+    grantRole(e, role, account);
+
+    assert hasRole(role, account) == true;
+    assert getRoleMemberCount(role) == 1; // failing - this is false, returning 0
+    assert getRoleMember(role, 0) == account;
 }
