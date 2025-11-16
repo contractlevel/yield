@@ -8,7 +8,7 @@ contract ConstructorTest is BaseTest {
         /// @dev deployed admin transfer delay value in constructor is correct
         assertEq(baseRebalancer.defaultAdminDelay(), 3 days); // @reviewGeorge : check delay
 
-        /// @dev deploying 'owner' should be 'default admin' role
+        /// @dev deploying 'owner' should be 'default admin'
         assertEq(baseRebalancer.owner(), baseRebalancer.defaultAdmin());
     }
 
@@ -16,7 +16,7 @@ contract ConstructorTest is BaseTest {
         /// @dev deployed admin transfer delay value in constructor is correct
         assertEq(baseParentPeer.defaultAdminDelay(), 3 days); // @reviewGeorge : check delay
 
-        /// @dev deploying 'owner' should be 'default admin' role
+        /// @dev deploying 'owner' should be 'default admin'
         assertEq(baseParentPeer.owner(), baseParentPeer.defaultAdmin());
     }
 }

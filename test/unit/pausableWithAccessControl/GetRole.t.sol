@@ -146,4 +146,46 @@ contract GetRoleTest is BaseTest {
         assertEq(returnedYieldPeerPauserRoleMembers, expectedYieldPeerPauserRoleMembers);
         assertEq(returnedYieldPeerUnpauserRoleMembers, expectedYieldPeerUnpauserRoleMembers);
     }
+ 
+    // --- 'get role' tests for DEFAULT_ADMIN role (for sanity) --- //
+    uint256 internal constant DEFAULT_ADMIN_ROLE_INDEX = 0;
+    uint256 internal constant DEFAULT_ADMIN_ROLE_COUNT = 1;
+    bytes32 internal constant DEFAULT_ADMIN_ROLE = 0x00;
+
+    function test_yield_pausableWithAccessControlRebalancer_getRoleMemberDefaultAdminRole_returnsDefaultAdmin() public view {
+        address returnedDefaultAdmin = baseRebalancer.getRoleMember(DEFAULT_ADMIN_ROLE, DEFAULT_ADMIN_ROLE_INDEX);
+        assertEq(returnedDefaultAdmin, baseRebalancer.defaultAdmin());
+    }
+
+    function test_yield_pausableWithAccessControlYieldPeer_getRoleMemberDefaultAdminRole_returnsDefaultAdmin() public view {
+        address returnedDefaultAdmin = baseParentPeer.getRoleMember(DEFAULT_ADMIN_ROLE, DEFAULT_ADMIN_ROLE_INDEX);
+        assertEq(returnedDefaultAdmin, baseParentPeer.defaultAdmin());
+    }
+
+    function test_yield_pausableWithAccessControlRebalancer_getRoleMemberCountDefaultAdminRole_returnsOne() public view {
+        uint256 returnedDefaultAdminRoleCount = baseRebalancer.getRoleMemberCount(DEFAULT_ADMIN_ROLE);
+        assertEq(returnedDefaultAdminRoleCount, DEFAULT_ADMIN_ROLE_COUNT);
+    }
+
+    function test_yield_pausableWithAccessControlYieldPeer_getRoleMemberCountDefaultAdminRole_returnsOne() public view {
+        uint256 returnedDefaultAdminRoleCount = baseParentPeer.getRoleMemberCount(DEFAULT_ADMIN_ROLE);
+        assertEq(returnedDefaultAdminRoleCount, DEFAULT_ADMIN_ROLE_COUNT);
+    }
+
+    function test_yield_pausableWithAccessControlRebalancer_getRoleMembersDefaultAdminRole_returnsDefaultAdmin() public view {
+        address[] memory returnedDefaultAdminRoleMembers = baseRebalancer.getRoleMembers(DEFAULT_ADMIN_ROLE);
+        address[] memory expectedDefaultAdminRoleMembers = new address[](1);
+        expectedDefaultAdminRoleMembers[0] = baseRebalancer.defaultAdmin();
+        assertEq(returnedDefaultAdminRoleMembers, expectedDefaultAdminRoleMembers);
+    }
+    
+    function test_yield_pausableWithAccessControlYieldPeer_getRoleMembersDefaultAdminRole_returnsDefaultAdmin()
+        public
+        view
+    {
+        address[] memory returnedDefaultAdminRoleMembers = baseParentPeer.getRoleMembers(DEFAULT_ADMIN_ROLE);
+        address[] memory expectedDefaultAdminRoleMembers = new address[](1);
+        expectedDefaultAdminRoleMembers[0] = baseParentPeer.defaultAdmin();
+        assertEq(returnedDefaultAdminRoleMembers, expectedDefaultAdminRoleMembers);
+    }
 }

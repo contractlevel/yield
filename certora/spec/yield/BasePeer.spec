@@ -972,9 +972,6 @@ rule setStrategyRegistry_success() {
 }
 
 // --- grantRole --- //
-// @review OpenZeppelin's AccessControl: bytes32 public constant DEFAULT_ADMIN_ROLE = 0x00;
-// should we change this to a different value? is 0x00 not default for everyone?
-// @review rule is failing
 rule grantRole_revertsWhen_msgSenderIsNotDefaultAdmin() {
     env e;
     bytes32 role;
@@ -986,7 +983,7 @@ rule grantRole_revertsWhen_msgSenderIsNotDefaultAdmin() {
     /// @dev revert conditions not being verified
     require e.msg.value == 0;
     require role != defaultAdminRole();
-    require currentContract._roles[defaultAdminRole()].adminRole == defaultAdminRole();
+    require currentContract._roles[role].adminRole == defaultAdminRole();
 
     grantRole@withrevert(e, role, account);
     assert lastReverted;
@@ -1008,7 +1005,6 @@ rule grantRole_revertsWhen_grantedRoleIsDefaultAdmin() {
     assert lastReverted;
 }
 
-// @review failing
 rule grantRole_success() {
     env e;
     bytes32 role;
@@ -1016,10 +1012,63 @@ rule grantRole_success() {
 
     require hasRole(role, account) == false;
     require getRoleMemberCount(role) == 0;
+    require currentContract.s_roleMembers[role]._inner._positions[addressToBytes32(account)] == 0;
 
     grantRole(e, role, account);
 
     assert hasRole(role, account) == true;
-    assert getRoleMemberCount(role) == 1; // failing - this is false, returning 0
+    assert getRoleMemberCount(role) == 1;
     assert getRoleMember(role, 0) == account;
+    assert currentContract.s_roleMembers[role]._inner._positions[addressToBytes32(account)] == 1;
+}
+
+// --- revokeRole --- //
+rule revokeRole_revertsWhen_msgSenderIsNotDefaultAdmin() {
+    env e;
+    bytes32 role;
+    address account;
+
+    /// @dev revert condition being verified
+    require hasRole(defaultAdminRole(), e.msg.sender) == false;
+
+    /// @dev revert conditions not being verified
+    require e.msg.value == 0;
+    require role != defaultAdminRole();
+    require hasRole(role, account) == true;
+    require currentContract._roles[role].adminRole == defaultAdminRole();
+
+    revokeRole@withrevert(e, role, account);
+    assert lastReverted;
+}
+
+rule revokeRole_revertsWhen_revokeRoleIsDefaultAdmin() {
+    env e;
+    bytes32 role;
+
+    /// @dev revert condition being verified
+    require role == defaultAdminRole();
+
+    /// @dev revert conditions not being verified
+    require e.msg.value == 0;   
+    require hasRole(defaultAdminRole(), e.msg.sender) == true;  
+
+    revokeRole@withrevert(e, role, e.msg.sender);
+    assert lastReverted;
+}
+
+rule revokeRole_success() {
+    env e;
+    bytes32 role;
+    address account;
+
+    require hasRole(role, account) == true;
+    require getRoleMemberCount(role) == 1;
+    require getRoleMember(role, 0) == account;
+    require currentContract.s_roleMembers[role]._inner._positions[addressToBytes32(account)] == 1;
+
+    revokeRole(e, role, account);
+
+    assert hasRole(role, account) == false;
+    assert getRoleMemberCount(role) == 0;
+    assert currentContract.s_roleMembers[role]._inner._positions[addressToBytes32(account)] == 0;
 }
