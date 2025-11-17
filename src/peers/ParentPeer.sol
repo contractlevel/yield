@@ -52,6 +52,10 @@ contract ParentPeer is YieldPeer {
     event WithdrawForwardedToStrategy(uint256 indexed shareBurnAmount, uint64 indexed strategyChainSelector);
     /// @notice Emitted when the rebalancer is set
     event RebalancerSet(address indexed rebalancer);
+    /// @notice Emitted when a deposit is ping-pong'd to the strategy
+    event DepositPingPongToStrategy(uint256 indexed depositAmount, uint64 indexed destChainSelector);
+    /// @notice Emitted when a withdraw is pingpong'd to the strategy
+    event WithdrawPingPongToStrategy(uint256 indexed shareBurnAmount, uint64 indexed destChainSelector);
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -265,13 +269,12 @@ contract ParentPeer is YieldPeer {
                 depositData.chainSelector, CcipTxType.DepositCallbackChild, abi.encode(depositData), ZERO_BRIDGE_AMOUNT
             );
         }
-
         /// @dev If Strategy is on third chain, forward deposit to strategy
         /// @notice Change operator to `|| strategy.chainSelector == depositData.chainSelector` to handle the case
         /// @notice where the deposit is coming from a ChildPeer that hasn't updated its strategy yet
-        if (strategy.chainSelector != i_thisChainSelector && strategy.chainSelector != depositData.chainSelector) {
-            _ccipSend(strategy.chainSelector, CcipTxType.DepositToStrategy, encodedDepositData, depositData.amount);
+        else {
             emit DepositForwardedToStrategy(depositData.amount, strategy.chainSelector);
+            _ccipSend(strategy.chainSelector, CcipTxType.DepositToStrategy, encodedDepositData, depositData.amount);
         }
     }
 
@@ -359,6 +362,7 @@ contract ParentPeer is YieldPeer {
     /// @notice Forwards deposit to active strategy without updating state (already updated in original flow)
     /// @param tokenAmounts The token amounts
     /// @param encodedDepositData The encoded DepositData
+    // @review consider changing event emission for PingPong
     function _handleCCIPDepositPingPong(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory encodedDepositData)
         internal
     {
@@ -366,19 +370,20 @@ contract ParentPeer is YieldPeer {
         Strategy memory strategy = s_strategy;
 
         CCIPOperations._validateTokenAmounts(tokenAmounts, address(i_usdc), depositData.amount);
+        emit DepositPingPongToStrategy(depositData.amount, strategy.chainSelector);
         _ccipSend(strategy.chainSelector, CcipTxType.DepositToStrategy, encodedDepositData, depositData.amount);
-        emit DepositForwardedToStrategy(depositData.amount, strategy.chainSelector);
     }
 
     /// @notice This function handles a pingpong withdraw from a child to this parent
     /// @notice Forwards withdraw to active strategy without updating state (already updated in original flow)
     /// @notice This only happens when parent is NOT the strategy (if parent were strategy, withdraw would complete in _handleCCIPWithdrawToParent)
     /// @param data The encoded WithdrawData
+    // @review consider changing event emission for PingPong
     function _handleCCIPWithdrawPingPong(bytes memory data) internal {
         WithdrawData memory withdrawData = _decodeWithdrawData(data);
         Strategy memory strategy = s_strategy;
         // Forward to active strategy without updating s_totalShares (already updated in _handleCCIPWithdrawToParent)
-        emit WithdrawForwardedToStrategy(withdrawData.shareBurnAmount, strategy.chainSelector);
+        emit WithdrawPingPongToStrategy(withdrawData.shareBurnAmount, strategy.chainSelector);
         _ccipSend(strategy.chainSelector, CcipTxType.WithdrawToStrategy, abi.encode(withdrawData), ZERO_BRIDGE_AMOUNT);
     }
 

@@ -78,6 +78,14 @@ definition DepositToStrategyEvent() returns bytes32 =
 // keccak256(abi.encodePacked("DepositToStrategy(address,uint256)"))
     to_bytes32(0x8125d05f0839eec6c1f6b1674833e01f11ab362bd9c60eb2e3b274fa3b47e4f4);
 
+definition DepositPingPongEvent() returns bytes32 =
+// keccak256(abi.encodePacked("DepositPingPongToParent(uint256)"))
+    to_bytes32(0x07a8895ad201463447eac3116473614940ca48b2be48a2e0851f29fe6144eb99);
+
+definition WithdrawPingPongEvent() returns bytes32 =
+// keccak256(abi.encodePacked("WithdrawPingPongToParent(uint256)"))
+    to_bytes32(0x92fdcaf7d7e4ba9fb2e6b7aaa33ab45a3464542db1f0f314eb75be8130d37e56);
+
 /*//////////////////////////////////////////////////////////////
                              GHOSTS
 //////////////////////////////////////////////////////////////*/
@@ -136,6 +144,16 @@ ghost mathint ghost_depositToStrategy_eventCount {
     init_state axiom ghost_depositToStrategy_eventCount == 0;
 }
 
+/// @notice EventCount: track amount of DepositPingPong event is emitted
+ghost mathint ghost_depositPingPong_eventCount {
+    init_state axiom ghost_depositPingPong_eventCount == 0;
+}
+
+/// @notice EventCount: track amount of WithdrawPingPong event is emitted
+ghost mathint ghost_withdrawPingPong_eventCount {
+    init_state axiom ghost_withdrawPingPong_eventCount == 0;
+}
+
 /*//////////////////////////////////////////////////////////////
                              HOOKS
 //////////////////////////////////////////////////////////////*/
@@ -161,6 +179,8 @@ hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
 hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
     if (t0 == ActiveStrategyAdapterUpdatedEvent()) 
         ghost_activeStrategyAdapterUpdated_eventCount = ghost_activeStrategyAdapterUpdated_eventCount + 1;
+    if (t0 == DepositPingPongEvent()) ghost_depositPingPong_eventCount = ghost_depositPingPong_eventCount + 1;
+    if (t0 == WithdrawPingPongEvent()) ghost_withdrawPingPong_eventCount = ghost_withdrawPingPong_eventCount + 1;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -225,12 +245,17 @@ rule child_deposit_notStrategy_emits_correct_params() {
 rule handleCCIPDepositToStrategy_emits_CCIPMessageSent() {
     env e;
     calldataarg args;
+    
 
     require ghost_ccipMessageSent_eventCount == 0;
     handleCCIPDepositToStrategy(e, args);
     assert ghost_ccipMessageSent_eventCount == 1;
-    assert ghost_ccipMessageSent_txType_emitted == 2; // CcipTxType.DepositCallbackParent
-    assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;
+
+    assert getActiveStrategyAdapter() != 0 => 
+        ghost_ccipMessageSent_txType_emitted == 2 && // CcipTxType.DepositCallbackParent
+        ghost_ccipMessageSent_bridgeAmount_emitted == 0;
+    assert getActiveStrategyAdapter() == 0 => 
+        ghost_ccipMessageSent_txType_emitted == 9; // CcipTxType.DepositPingPong
 }
 
 rule handleCCIPDepositToStrategy_depositsToStrategy(env e) {
@@ -475,10 +500,18 @@ rule handleCCIPMessage_DepositToStrategy() {
     uint64 sourceChainSelector;
 
     require ghost_ccipMessageSent_eventCount == 0;
+    require ghost_depositPingPong_eventCount == 0;
     handleCCIPMessage(e, txType, tokenAmounts, data, sourceChainSelector);
-    assert ghost_ccipMessageSent_eventCount == 1;
-    assert ghost_ccipMessageSent_txType_emitted == 2; // CcipTxType.DepositCallbackParent
-    assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;
+    assert getActiveStrategyAdapter() != 0 => 
+        ghost_ccipMessageSent_eventCount == 1 &&
+        ghost_ccipMessageSent_txType_emitted == 2 && // CcipTxType.DepositCallbackParent
+        ghost_ccipMessageSent_bridgeAmount_emitted == 0;
+
+    assert getActiveStrategyAdapter() == 0 => 
+        ghost_ccipMessageSent_eventCount == 1 &&
+        ghost_ccipMessageSent_txType_emitted == 9 && // CcipTxType.DepositPingPong
+        ghost_ccipMessageSent_bridgeAmount_emitted == tokenAmounts[0].amount &&
+        ghost_depositPingPong_eventCount == 1;
 }
 
 rule handleCCIPMessage_DepositCallbackChild() {

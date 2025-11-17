@@ -16,6 +16,14 @@ contract ChildPeer is YieldPeer {
     uint64 internal immutable i_parentChainSelector;
 
     /*//////////////////////////////////////////////////////////////
+                                 EVENTS
+    //////////////////////////////////////////////////////////////*/
+    /// @notice Emitted when a DepositToStrategy needs to be pingpong'd with the Parent
+    event DepositPingPongToParent(uint256 indexed depositAmount);
+    /// @notice Emitted when a WithdrawToStrategy needs to be pingpong'd with the Parent
+    event WithdrawPingPongToParent(uint256 indexed shareBurnAmount);
+
+    /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
     /// @param ccipRouter The address of the CCIP router
@@ -46,6 +54,7 @@ contract ChildPeer is YieldPeer {
     /// @notice User must approve this contract to spend their stablecoin
     function deposit(uint256 amountToDeposit) external override {
         /// @dev takes a fee
+        /// same var name ==== confusing!
         amountToDeposit = _initiateDeposit(amountToDeposit);
 
         address activeStrategyAdapter = _getActiveStrategyAdapter();
@@ -141,6 +150,8 @@ contract ChildPeer is YieldPeer {
                 i_parentChainSelector, CcipTxType.DepositCallbackParent, abi.encode(depositData), ZERO_BRIDGE_AMOUNT
             );
         } else {
+            // consider adding event for ping pong, pros/cons of emitting it here
+            emit DepositPingPongToParent(depositData.amount);
             _ccipSend(i_parentChainSelector, CcipTxType.DepositPingPong, abi.encode(depositData), depositData.amount);
         }
     }
@@ -180,6 +191,7 @@ contract ChildPeer is YieldPeer {
                 );
             }
         } else {
+            emit WithdrawPingPongToParent(withdrawData.shareBurnAmount);
             _ccipSend(i_parentChainSelector, CcipTxType.WithdrawPingPong, abi.encode(withdrawData), ZERO_BRIDGE_AMOUNT);
         }
     }
