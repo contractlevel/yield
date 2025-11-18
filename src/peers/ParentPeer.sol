@@ -270,8 +270,6 @@ contract ParentPeer is YieldPeer {
             );
         }
         /// @dev If Strategy is on third chain, forward deposit to strategy
-        /// @notice Change operator to `|| strategy.chainSelector == depositData.chainSelector` to handle the case
-        /// @notice where the deposit is coming from a ChildPeer that hasn't updated its strategy yet
         else {
             emit DepositForwardedToStrategy(depositData.amount, strategy.chainSelector);
             _ccipSend(strategy.chainSelector, CcipTxType.DepositToStrategy, encodedDepositData, depositData.amount);

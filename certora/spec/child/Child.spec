@@ -339,13 +339,16 @@ rule handleCCIPWithdrawToStrategy_withdrawsFromStrategy() {
     require aaveBalanceBefore - expectedUsdcWithdrawAmount >= 0, "should not cause underflow";
     require withdrawer != compoundPool && withdrawer != aavePool && withdrawer != currentContract,
         "withdrawer should not be the compound or aave pool or current contract";
-    
+    require ghost_withdrawPingPong_eventCount == 0;
+
     handleCCIPWithdrawToStrategy(e, encodedWithdrawData);
 
     assert getActiveStrategyAdapter() == compoundV3Adapter => 
         usdc.balanceOf(compoundPool) == compoundBalanceBefore - expectedUsdcWithdrawAmount;
     assert getActiveStrategyAdapter() == aaveV3Adapter => 
         usdc.balanceOf(aavePool) == aaveBalanceBefore - expectedUsdcWithdrawAmount;
+    assert getActiveStrategyAdapter() == 0 =>
+        ghost_withdrawPingPong_eventCount == 1;
 }
 
 rule handleCCIPWithdrawToStrategy_completesWithdrawal_when_sameChain() {
@@ -368,9 +371,17 @@ rule handleCCIPWithdrawToStrategy_completesWithdrawal_when_sameChain() {
         "withdrawer should not be the compound or aave pool or current contract";
 
     require ghost_withdrawCompleted_eventCount == 0;
+    require ghost_withdrawPingPong_eventCount == 0;
     handleCCIPWithdrawToStrategy(e, encodedWithdrawData);
-    assert ghost_withdrawCompleted_eventCount == 1;
-    assert usdc.balanceOf(withdrawer) == usdcBalanceBefore + expectedWithdrawAmount;
+    
+
+    assert getActiveStrategyAdapter() == 0 =>
+        ghost_withdrawPingPong_eventCount == 1;
+
+    assert getActiveStrategyAdapter() != 0 =>
+        ghost_withdrawCompleted_eventCount == 1 &&
+        usdc.balanceOf(withdrawer) == usdcBalanceBefore + expectedWithdrawAmount;
+    
 }
 
 rule handleCCIPWithdrawToStrategy_emits_CCIPMessageSent_when_differentChain() {
@@ -502,6 +513,7 @@ rule handleCCIPMessage_DepositToStrategy() {
     require ghost_ccipMessageSent_eventCount == 0;
     require ghost_depositPingPong_eventCount == 0;
     handleCCIPMessage(e, txType, tokenAmounts, data, sourceChainSelector);
+    
     assert getActiveStrategyAdapter() != 0 => 
         ghost_ccipMessageSent_eventCount == 1 &&
         ghost_ccipMessageSent_txType_emitted == 2 && // CcipTxType.DepositCallbackParent
@@ -537,8 +549,12 @@ rule handleCCIPMessage_WithdrawToStrategy() {
 
     require ghost_ccipMessageSent_eventCount == 0;
     require ghost_withdrawCompleted_eventCount == 0;
+    require ghost_withdrawPingPong_eventCount == 0;
     handleCCIPMessage(e, txType, tokenAmounts, data, sourceChainSelector);
-    assert ghost_withdrawCompleted_eventCount == 1 || ghost_ccipMessageSent_eventCount == 1;
+
+    assert (getActiveStrategyAdapter() == 0 => 
+        ghost_withdrawPingPong_eventCount == 1 &&
+        ghost_ccipMessageSent_eventCount == 1);
 }
 
 rule handleCCIPMessage_WithdrawCallback() {
