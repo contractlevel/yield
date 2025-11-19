@@ -14,7 +14,7 @@ contract GrantRoleTest is BaseTest {
     function setUp() public override {
         super.setUp();
 
-        /// @dev Revoke role from 'config_admin' in BaseTest to have clean slate 
+        /// @dev Revoke role from 'config_admin' in BaseTest to have clean slate
         _changePrank(baseRebalancer.owner());
         baseRebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, config_admin);
         assertEq(baseRebalancer.getRoleMemberCount(Roles.CONFIG_ADMIN_ROLE), ROLE_MEMBER_EMPTY);
@@ -52,7 +52,7 @@ contract GrantRoleTest is BaseTest {
         assertEq(emittedRole, Roles.CONFIG_ADMIN_ROLE);
         assertEq(emittedConfigAdmin, newConfigAdmin);
         assertEq(emittedGranter, baseParentPeer.owner());
-    } 
+    }
 
     function test_yield_pausableWithAccessControlYieldPeer_grantRole_emitsRoleGrantedEvent() public {
         vm.recordLogs();
@@ -133,7 +133,7 @@ contract GrantRoleTest is BaseTest {
         assertEq(baseParentPeer.getRoleMemberCount(Roles.CONFIG_ADMIN_ROLE), ROLE_MEMBER_COUNT); /// ------------ @dev Check s_roleMembers updated
         assertEq(baseParentPeer.getRoleMembers(Roles.CONFIG_ADMIN_ROLE), expectedConfigAdminRoleMembers); /// --- @dev Check s_roleMembers updated
     }
-    
+
     function test_yield_pausableWithAccessControlRebalancer_grantRole_revertsWhen_notDefaultAdmin() public {
         _changePrank(emergency_pauser);
         /// @dev error AccessControlUnauthorizedAccount(address account, bytes32 neededRole);
