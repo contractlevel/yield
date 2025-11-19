@@ -919,6 +919,7 @@ rule setInitialActiveStrategy_revertsWhen_noDefaultAdminRole() {
 
 rule setInitialActiveStrategy_revertsWhen_alreadyCalled() {
     env e;
+    env e2;
     bytes32 protocolId;
     bytes32 protocolId2;
 
@@ -927,7 +928,11 @@ rule setInitialActiveStrategy_revertsWhen_alreadyCalled() {
     require e.msg.value == 0;
 
     setInitialActiveStrategy(e, protocolId); /// @dev set, then try again
-    setInitialActiveStrategy@withrevert(e, protocolId2); 
+
+    require e2.msg.sender == currentContract.owner();
+    require currentContract.hasRole(defaultAdminRole(), e2.msg.sender) == true;
+    require e2.msg.value == 0;
+    setInitialActiveStrategy@withrevert(e2, protocolId2); 
 
     assert lastReverted;
 }
@@ -972,8 +977,6 @@ rule setRebalancer_success () {
     env e;
     address rebalancer;
 
-    require hasRole(configAdminRole(), e.msg.sender) == true;
-    require e.msg.value == 0;
     require ghost_rebalancerSet_eventCount == 0;
     require ghost_rebalancerSet_emittedAddress == 0;
 

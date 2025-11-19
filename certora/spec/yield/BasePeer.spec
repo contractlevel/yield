@@ -888,6 +888,7 @@ rule revokeRole_revertsWhen_msgSenderIsNotDefaultAdmin() {
 rule revokeRole_revertsWhen_revokeRoleIsDefaultAdmin() {
     env e;
     bytes32 role;
+    address account;
 
     /// @dev revert condition being verified
     require role == defaultAdminRole();
@@ -896,7 +897,7 @@ rule revokeRole_revertsWhen_revokeRoleIsDefaultAdmin() {
     require e.msg.value == 0;   
     require hasRole(defaultAdminRole(), e.msg.sender) == true;  
 
-    revokeRole@withrevert(e, role, e.msg.sender); // @review e.msg.sender? not account?
+    revokeRole@withrevert(e, role, account);
     assert lastReverted;
 }
 
