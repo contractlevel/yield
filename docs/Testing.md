@@ -160,6 +160,17 @@ Invariant tests run on Foundry's locally deployed infrastructure, as opposed to 
 
 Invariants are defined as mathematical expressions in `Invariant.t.sol`. When we run each invariant test, we are asserting this expression holds true between fuzz runs.
 
+We use ghost variables in the `Handler.t.sol`.
+
+Naming convention for ghost variables is:
+
+```
+ghost_state_trackedMetric
+ghost_event_trackedMetric
+```
+
+Where `ghost_state` named variables are updated based on state changes, and `ghost_event` named variables are updated based on event emissions.
+
 ## Certora formal verification
 
 `Rebalancer.conf` will have some vacuous output.

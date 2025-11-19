@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {BaseTest} from "../../BaseTest.t.sol";
+import {BaseTest, Roles} from "../../BaseTest.t.sol";
 
 contract WithdrawFeesTest is BaseTest {
     function setUp() public override {
@@ -14,9 +14,13 @@ contract WithdrawFeesTest is BaseTest {
         deal(address(baseUsdc), depositor, DEPOSIT_AMOUNT);
     }
 
-    function test_yield_parent_withdrawFees_revertsWhen_notOwner() public {
+    function test_yield_parent_withdrawFees_revertsWhen_notFeeWithdrawer() public {
         _changePrank(holder);
-        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", holder));
+        vm.expectRevert(
+            abi.encodeWithSignature(
+                "AccessControlUnauthorizedAccount(address,bytes32)", holder, Roles.FEE_WITHDRAWER_ROLE
+            )
+        );
         baseParentPeer.withdrawFees(address(baseUsdc));
     }
 
@@ -26,20 +30,20 @@ contract WithdrawFeesTest is BaseTest {
         baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
         baseParentPeer.deposit(DEPOSIT_AMOUNT);
 
-        uint256 ownerBalanceBefore = baseUsdc.balanceOf(baseParentPeer.owner());
+        uint256 feeWithdrawerBalanceBefore = baseUsdc.balanceOf(feeWithdrawer);
 
         /// @dev act
-        _changePrank(baseParentPeer.owner());
+        _changePrank(feeWithdrawer);
         baseParentPeer.withdrawFees(address(baseUsdc));
 
-        uint256 ownerBalanceAfter = baseUsdc.balanceOf(baseParentPeer.owner());
+        uint256 feeWithdrawerBalanceAfter = baseUsdc.balanceOf(feeWithdrawer);
 
         /// @dev assert
-        assertEq(ownerBalanceAfter - ownerBalanceBefore, _getFee(DEPOSIT_AMOUNT));
+        assertEq(feeWithdrawerBalanceAfter - feeWithdrawerBalanceBefore, _getFee(DEPOSIT_AMOUNT));
     }
 
     function test_yield_parent_withdrawFees_revertsWhen_noFeesToWithdraw() public {
-        _changePrank(baseParentPeer.owner());
+        _changePrank(feeWithdrawer);
         vm.expectRevert(abi.encodeWithSignature("YieldFees__NoFeesToWithdraw()"));
         baseParentPeer.withdrawFees(address(baseUsdc));
     }

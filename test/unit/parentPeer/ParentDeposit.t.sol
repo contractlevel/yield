@@ -8,9 +8,11 @@ import {IComet} from "../../../src/interfaces/IComet.sol";
 import {IYieldPeer} from "../../../src/interfaces/IYieldPeer.sol";
 import {USDCTokenPool} from "@chainlink/contracts/src/v0.8/ccip/pools/USDC/USDCTokenPool.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
-import {CCTPMessageTransmitterProxy} from
-    "@chainlink/contracts/src/v0.8/ccip/pools/USDC/CCTPMessageTransmitterProxy.sol";
+import {
+    CCTPMessageTransmitterProxy
+} from "@chainlink/contracts/src/v0.8/ccip/pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {ParentPeer} from "../../../src/peers/ParentPeer.sol";
+import {Roles} from "../../../src/libraries/Roles.sol";
 
 contract ParentDepositTest is BaseTest {
     function setUp() public override {
@@ -29,6 +31,14 @@ contract ParentDepositTest is BaseTest {
     function test_yield_parent_deposit_revertsWhen_insufficientAmount() public {
         vm.expectRevert(abi.encodeWithSignature("YieldPeer__InsufficientAmount()"));
         baseParentPeer.deposit(1e6 - 1);
+    }
+
+    function test_yield_parent_deposit_revertsWhen_parentPaused() public {
+        _changePrank(emergencyPauser);
+        baseParentPeer.emergencyPause();
+        _changePrank(depositor);
+        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
+        baseParentPeer.deposit(DEPOSIT_AMOUNT);
     }
 
     /// @notice Scenario: Deposit made on Parent chain, where the Strategy is, and the Strategy Protocol is Aave

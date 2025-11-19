@@ -21,8 +21,9 @@ import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAd
 import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
 import {DataTypes} from "@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol";
 import {USDCTokenPool} from "@chainlink/contracts/src/v0.8/ccip/pools/USDC/USDCTokenPool.sol";
-import {IFunctionsSubscriptions} from
-    "@chainlink/contracts/src/v0.8/functions/v1_0_0/interfaces/IFunctionsSubscriptions.sol";
+import {
+    IFunctionsSubscriptions
+} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/interfaces/IFunctionsSubscriptions.sol";
 import {IFunctionsRouter} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/interfaces/IFunctionsRouter.sol";
 import {FunctionsClient} from "@chainlink/contracts/src/v0.8/functions/v1_3_0/FunctionsClient.sol";
 import {LinkTokenInterface} from "@chainlink/contracts/src/v0.8/shared/interfaces/LinkTokenInterface.sol";
@@ -32,6 +33,7 @@ import {IComet} from "../src/interfaces/IComet.sol";
 import {AaveV3Adapter} from "../src/adapters/AaveV3Adapter.sol";
 import {CompoundV3Adapter} from "../src/adapters/CompoundV3Adapter.sol";
 import {StrategyRegistry} from "../src/modules/StrategyRegistry.sol";
+import {Roles} from "../src/libraries/Roles.sol";
 
 contract BaseTest is Test {
     /*//////////////////////////////////////////////////////////////
@@ -54,6 +56,11 @@ contract BaseTest is Test {
 
     uint256 internal constant ETHEREUM_MAINNET_CHAIN_ID = 1;
     uint256 internal ethFork;
+
+    /// @dev update these with more recent block numbers
+    uint256 internal constant BASE_MAINNET_BLOCK_NUMBER = 38045674;
+    uint256 internal constant OPTIMISM_MAINNET_BLOCK_NUMBER = 143640972;
+    uint256 internal constant ETHEREUM_MAINNET_BLOCK_NUMBER = 23777365;
 
     uint64 internal clfSubId;
 
@@ -106,11 +113,20 @@ contract BaseTest is Test {
     address[] internal attesters = new address[](4);
     uint256[] internal attesterPks = new uint256[](4);
 
+    /// @dev addresses for custom roles
+    address internal configAdmin = makeAddr("configAdmin");
+    address internal crossChainAdmin = makeAddr("crossChainAdmin");
+    address internal emergencyPauser = makeAddr("emergencyPauser");
+    address internal emergencyUnpauser = makeAddr("emergencyUnpauser");
+    address internal feeWithdrawer = makeAddr("feeWithdrawer");
+    address internal feeRateSetter = makeAddr("feeRateSetter");
+
     /*//////////////////////////////////////////////////////////////
                                  SETUP
     //////////////////////////////////////////////////////////////*/
     function setUp() public virtual {
         _deployInfra();
+        _grantRoles();
         _setPools();
         _setCrossChainPeers();
         _dealLinkToPeers(false, address(0), address(0), address(0), address(0));
@@ -136,7 +152,7 @@ contract BaseTest is Test {
 
     function _deployInfra() internal virtual {
         // Deploy on Base
-        baseFork = vm.createSelectFork(vm.envString("BASE_MAINNET_RPC_URL"));
+        baseFork = vm.createSelectFork(vm.envString("BASE_MAINNET_RPC_URL"), BASE_MAINNET_BLOCK_NUMBER);
         assertEq(block.chainid, BASE_MAINNET_CHAIN_ID);
 
         _bypassClfTermsOfService();
@@ -164,7 +180,7 @@ contract BaseTest is Test {
         baseCCTPMessageTransmitter = IMessageTransmitter(baseNetworkConfig.ccip.cctpMessageTransmitter);
 
         // Deploy on Optimism
-        optFork = vm.createSelectFork(vm.envString("OPTIMISM_MAINNET_RPC_URL"));
+        optFork = vm.createSelectFork(vm.envString("OPTIMISM_MAINNET_RPC_URL"), OPTIMISM_MAINNET_BLOCK_NUMBER);
         assertEq(block.chainid, OPTIMISM_MAINNET_CHAIN_ID);
 
         DeployChild optDeployChild = new DeployChild();
@@ -181,7 +197,7 @@ contract BaseTest is Test {
         optCCTPMessageTransmitter = IMessageTransmitter(optNetworkConfig.ccip.cctpMessageTransmitter);
 
         // Deploy on Ethereum
-        ethFork = vm.createSelectFork(vm.envString("ETH_MAINNET_RPC_URL"));
+        ethFork = vm.createSelectFork(vm.envString("ETH_MAINNET_RPC_URL"), ETHEREUM_MAINNET_BLOCK_NUMBER);
         assertEq(block.chainid, ETHEREUM_MAINNET_CHAIN_ID);
 
         DeployChild ethDeployChild = new DeployChild();
@@ -200,6 +216,70 @@ contract BaseTest is Test {
         ccipLocalSimulatorFork = new CCIPLocalSimulatorFork();
         vm.makePersistent(address(ccipLocalSimulatorFork));
         _registerChains();
+    }
+
+    function _grantRoles() internal virtual {
+        // grant roles - rebalancer
+        _selectFork(baseFork);
+        _changePrank(baseRebalancer.owner());
+        baseRebalancer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
+        baseRebalancer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
+        baseRebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
+
+        assertTrue(baseRebalancer.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
+        assertTrue(baseRebalancer.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
+        assertTrue(baseRebalancer.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
+
+        // grant roles - parent
+        _changePrank(baseParentPeer.owner());
+        baseParentPeer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
+        baseParentPeer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
+        baseParentPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
+        baseParentPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin);
+        baseParentPeer.grantRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer);
+        baseParentPeer.grantRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter);
+
+        assertTrue(baseParentPeer.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
+        assertTrue(baseParentPeer.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
+        assertTrue(baseParentPeer.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
+        assertTrue(baseParentPeer.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin));
+        assertTrue(baseParentPeer.hasRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer));
+        assertTrue(baseParentPeer.hasRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter));
+
+        // grant roles - child 1
+        _selectFork(optFork);
+        _changePrank(optChildPeer.owner());
+        optChildPeer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
+        optChildPeer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
+        optChildPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
+        optChildPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin);
+        optChildPeer.grantRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer);
+        optChildPeer.grantRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter);
+
+        assertTrue(optChildPeer.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
+        assertTrue(optChildPeer.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
+        assertTrue(optChildPeer.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
+        assertTrue(optChildPeer.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin));
+        assertTrue(optChildPeer.hasRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer));
+        assertTrue(optChildPeer.hasRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter));
+
+        // grant roles - child 2
+        _selectFork(ethFork);
+        _changePrank(ethChildPeer.owner());
+        ethChildPeer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
+        ethChildPeer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
+        ethChildPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
+        ethChildPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin);
+        ethChildPeer.grantRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer);
+        ethChildPeer.grantRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter);
+
+        assertTrue(ethChildPeer.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
+        assertTrue(ethChildPeer.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
+        assertTrue(ethChildPeer.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
+        assertTrue(ethChildPeer.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin));
+        assertTrue(ethChildPeer.hasRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer));
+        assertTrue(ethChildPeer.hasRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter));
+        _stopPrank();
     }
 
     function _setPools() internal {
@@ -270,34 +350,46 @@ contract BaseTest is Test {
 
     function _setCrossChainPeers() internal virtual {
         _selectFork(baseFork);
+        /// @dev grant temp cross chain role to deployer to set cross chain configs
+        baseParentPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, baseParentPeer.owner());
         baseParentPeer.setCCIPGasLimit(INITIAL_CCIP_GAS_LIMIT);
         baseParentPeer.setAllowedChain(optChainSelector, true);
         baseParentPeer.setAllowedChain(ethChainSelector, true);
         baseParentPeer.setAllowedChain(baseChainSelector, true);
         baseParentPeer.setAllowedPeer(optChainSelector, address(optChildPeer));
         baseParentPeer.setAllowedPeer(ethChainSelector, address(ethChildPeer));
+        baseParentPeer.revokeRole(Roles.CROSS_CHAIN_ADMIN_ROLE, baseParentPeer.owner());
+        /// @dev revoke role
         assertEq(baseParentPeer.getAllowedChain(optChainSelector), true);
         assertEq(baseParentPeer.getAllowedChain(ethChainSelector), true);
         assertEq(baseParentPeer.getAllowedPeer(optChainSelector), address(optChildPeer));
         assertEq(baseParentPeer.getAllowedPeer(ethChainSelector), address(ethChildPeer));
 
         _selectFork(optFork);
+        /// @dev grant temp cross chain role to deployer to set cross chain configs
+        optChildPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, optChildPeer.owner());
         optChildPeer.setCCIPGasLimit(INITIAL_CCIP_GAS_LIMIT);
         optChildPeer.setAllowedChain(baseChainSelector, true);
         optChildPeer.setAllowedChain(ethChainSelector, true);
         optChildPeer.setAllowedPeer(baseChainSelector, address(baseParentPeer));
         optChildPeer.setAllowedPeer(ethChainSelector, address(ethChildPeer));
+        optChildPeer.revokeRole(Roles.CROSS_CHAIN_ADMIN_ROLE, optChildPeer.owner());
+        /// @dev revoke role
         assertEq(optChildPeer.getAllowedChain(baseChainSelector), true);
         assertEq(optChildPeer.getAllowedChain(ethChainSelector), true);
         assertEq(optChildPeer.getAllowedPeer(baseChainSelector), address(baseParentPeer));
         assertEq(optChildPeer.getAllowedPeer(ethChainSelector), address(ethChildPeer));
 
         _selectFork(ethFork);
+        /// @dev grant temp cross chain role to deployer to set cross chain configs
+        ethChildPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, ethChildPeer.owner());
         ethChildPeer.setCCIPGasLimit(INITIAL_CCIP_GAS_LIMIT);
         ethChildPeer.setAllowedChain(baseChainSelector, true);
         ethChildPeer.setAllowedChain(optChainSelector, true);
         ethChildPeer.setAllowedPeer(baseChainSelector, address(baseParentPeer));
         ethChildPeer.setAllowedPeer(optChainSelector, address(optChildPeer));
+        ethChildPeer.revokeRole(Roles.CROSS_CHAIN_ADMIN_ROLE, ethChildPeer.owner());
+        /// @dev revoke role
         assertEq(ethChildPeer.getAllowedChain(baseChainSelector), true);
         assertEq(ethChildPeer.getAllowedChain(optChainSelector), true);
         assertEq(ethChildPeer.getAllowedPeer(baseChainSelector), address(baseParentPeer));
@@ -473,12 +565,20 @@ contract BaseTest is Test {
 
         /// @dev set forwarder
         _changePrank(baseParentPeer.owner());
+        /// @dev grant temp config admin role to deployer/admin to set config
+        baseRebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner());
         baseRebalancer.setForwarder(forwarder);
+        baseRebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner());
+        /// @dev revoke
 
         /// @dev set upkeepAddress
         address parentPeerOwner = baseParentPeer.owner();
         _changePrank(parentPeerOwner);
+        /// @dev grant temp config admin role to deployer/admin to set config
+        baseRebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner());
         baseRebalancer.setUpkeepAddress(upkeepAddress);
+        baseRebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner());
+        /// @dev revoke
 
         /// @dev add ParentPeer as consumer to Chainlink Functions subscription
         address functionsRouter = baseNetworkConfig.clf.functionsRouter;
@@ -527,11 +627,7 @@ contract BaseTest is Test {
     /// @param poolAddressesProvider The address of the Aave pool addresses provider
     /// @param underlyingToken The address of the underlying token
     /// @return aTokenAddress The address of the Aave aToken
-    function _getATokenAddress(address poolAddressesProvider, address underlyingToken)
-        internal
-        view
-        returns (address)
-    {
+    function _getATokenAddress(address poolAddressesProvider, address underlyingToken) internal view returns (address) {
         address aavePool = IPoolAddressesProvider(poolAddressesProvider).getPool();
         DataTypes.ReserveData memory reserveData = IPool(aavePool).getReserveData(underlyingToken);
         return reserveData.aTokenAddress;
@@ -648,14 +744,12 @@ contract BaseTest is Test {
     /// @notice Helper function to set the fee rate across chains
     /// @param feeRate The fee rate to set
     function _setFeeRate(uint256 feeRate) internal {
+        _changePrank(feeRateSetter);
         _selectFork(baseFork);
-        _changePrank(baseParentPeer.owner());
         baseParentPeer.setFeeRate(feeRate);
         _selectFork(optFork);
-        _changePrank(optChildPeer.owner());
         optChildPeer.setFeeRate(feeRate);
         _selectFork(ethFork);
-        _changePrank(ethChildPeer.owner());
         ethChildPeer.setFeeRate(feeRate);
         _stopPrank();
     }

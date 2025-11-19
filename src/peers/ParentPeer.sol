@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {YieldPeer, Client, IRouterClient, CCIPOperations, IERC20, SafeERC20} from "./YieldPeer.sol";
+import {YieldPeer, Client, IRouterClient, CCIPOperations, IERC20, SafeERC20, Roles} from "./YieldPeer.sol";
 
 /// @title YieldCoin ParentPeer
 /// @author @contractlevel
@@ -74,7 +74,8 @@ contract ParentPeer is YieldPeer {
     /// 2. This Parent is not the Strategy
     /// @param amountToDeposit The amount of USDC to deposit into the system
     /// @dev Revert if amountToDeposit is less than 1e6 (1 USDC)
-    function deposit(uint256 amountToDeposit) external override {
+    /// @dev Revert if peer is paused
+    function deposit(uint256 amountToDeposit) external override whenNotPaused {
         /// @dev takes a fee
         amountToDeposit = _initiateDeposit(amountToDeposit);
 
@@ -118,12 +119,14 @@ contract ParentPeer is YieldPeer {
     /// @dev Revert if encodedWithdrawChainSelector doesn't decode to an allowed chain selector
     /// @dev Revert if msg.sender is not the YieldCoin/share token
     /// @dev Revert if shareBurnAmount is 0
+    /// @dev Revert if peer is paused
     /// @dev Update s_totalShares and burn shares from msg.sender
     /// @dev Handle the case where the parent is the strategy
     /// @dev Handle the case where the parent is not the strategy
     function onTokenTransfer(address withdrawer, uint256 shareBurnAmount, bytes calldata encodedWithdrawChainSelector)
         external
         override
+        whenNotPaused
     {
         _revertIfMsgSenderIsNotShare();
 
@@ -295,6 +298,7 @@ contract ParentPeer is YieldPeer {
         if (depositData.chainSelector == i_thisChainSelector) {
             // @review DepositCompleted event? we want to emit a DepositCompleted event every where we mint shares at the end of a deposit
             // DepositCompleted(depositData.depositor, depositData.shareMintAmount, depositData.amount);
+            // although, we do emit a shares minted event
             //slither-disable-next-line reentrancy-events
             _mintShares(depositData.depositor, depositData.shareMintAmount);
         }
@@ -444,11 +448,11 @@ contract ParentPeer is YieldPeer {
     /// @notice Sets the initial active strategy
     /// @notice Can only be called once by the owner
     /// @notice This is needed because the strategy adapters are deployed separately from the parent peer
-    /// @dev Revert if msg.sender is not the owner
+    /// @dev Revert if msg.sender is not the default admin
     /// @dev Revert if already called
     /// @dev Called in deploy script, immediately after deploying initial strategy adapters, and setting them in YieldPeer::setStrategyAdapter
     /// @param protocolId The protocol ID of the initial active strategy
-    function setInitialActiveStrategy(bytes32 protocolId) external onlyOwner {
+    function setInitialActiveStrategy(bytes32 protocolId) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (s_initialActiveStrategySet) revert ParentPeer__InitialActiveStrategyAlreadySet();
         s_initialActiveStrategySet = true;
         s_strategy = Strategy({chainSelector: i_thisChainSelector, protocolId: protocolId});
@@ -456,10 +460,10 @@ contract ParentPeer is YieldPeer {
     }
 
     /// @notice Sets the rebalancer
-    /// @dev Revert if msg.sender is not the owner
+    /// @dev Revert if msg.sender is not the config admin
     /// @param rebalancer The address of the rebalancer
     //slither-disable-next-line missing-zero-check
-    function setRebalancer(address rebalancer) external onlyOwner {
+    function setRebalancer(address rebalancer) external onlyRole(Roles.CONFIG_ADMIN_ROLE) {
         s_rebalancer = rebalancer;
         emit RebalancerSet(rebalancer);
     }

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {Ownable2Step} from "@openzeppelin/contracts/access/Ownable2Step.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {FixedPointMathLib} from "solady/utils/FixedPointMathLib.sol";
+import {PausableWithAccessControl, Roles} from "./PausableWithAccessControl.sol";
 import {IYieldFees} from "../interfaces/IYieldFees.sol";
 
 /// @title YieldFees
@@ -14,7 +14,7 @@ import {IYieldFees} from "../interfaces/IYieldFees.sol";
 /// @notice Fees are collected on every chain during deposit if s_feeRate is not 0.
 /// @notice Fees are taken in YieldPeer::_initiateDeposit
 /// @notice FV for this contract is in certora/spec/yield/BasePeer.spec
-abstract contract YieldFees is Ownable2Step, IYieldFees {
+abstract contract YieldFees is PausableWithAccessControl, IYieldFees {
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS
     //////////////////////////////////////////////////////////////*/
@@ -61,8 +61,9 @@ abstract contract YieldFees is Ownable2Step, IYieldFees {
     //////////////////////////////////////////////////////////////*/
     /// @notice Withdraws the fees
     /// @param feeToken The token to withdraw the fees in (e.g. USDC, USDT, GHO, etc.)
-    /// @dev Revert if msg.sender is not the owner
-    function withdrawFees(address feeToken) external onlyOwner {
+    /// @dev Revert if msg.sender does not have role of "FEE_WITHDRAWER_ROLE" in access control
+    /// @dev Revert if the main inheriting Yield contract is paused (in case of emergency)
+    function withdrawFees(address feeToken) external onlyRole(Roles.FEE_WITHDRAWER_ROLE) {
         uint256 fees = IERC20(feeToken).balanceOf(address(this));
         if (fees != 0) {
             emit FeesWithdrawn(fees);
@@ -90,11 +91,13 @@ abstract contract YieldFees is Ownable2Step, IYieldFees {
                                  SETTER
     //////////////////////////////////////////////////////////////*/
     /// @notice Sets the fee rate
-    /// @dev Revert if msg.sender is not the owner
-    /// @param newFeeRate The new fee rate
     /// @notice Fee rate should be set on every chain if consistency is desired
-    function setFeeRate(uint256 newFeeRate) external onlyOwner {
-        if (newFeeRate > MAX_FEE_RATE) revert YieldFees__FeeRateTooHigh();
+    /// @param newFeeRate The new fee rate
+    /// @dev Revert if msg.sender does not have role of "FEE_RATE_SETTER_ROLE" in access control
+    function setFeeRate(uint256 newFeeRate) external onlyRole(Roles.FEE_RATE_SETTER_ROLE) {
+        if (newFeeRate > MAX_FEE_RATE) {
+            revert YieldFees__FeeRateTooHigh();
+        }
         s_feeRate = newFeeRate;
         emit FeeRateSet(newFeeRate);
     }

@@ -43,8 +43,9 @@ contract ChildPeer is YieldPeer {
     /// 2. This Child is not the Strategy
     /// @param amountToDeposit The amount of USDC to deposit into the system
     /// @dev Revert if amountToDeposit is less than 1e6 (1 USDC)
+    /// @dev Revert if peer is paused
     /// @notice User must approve this contract to spend their stablecoin
-    function deposit(uint256 amountToDeposit) external override {
+    function deposit(uint256 amountToDeposit) external override whenNotPaused {
         /// @dev takes a fee
         amountToDeposit = _initiateDeposit(amountToDeposit);
 
@@ -76,10 +77,12 @@ contract ChildPeer is YieldPeer {
     /// @dev Revert if encodedWithdrawChainSelector doesn't decode to an allowed chain selector
     /// @dev Revert if msg.sender is not the YieldCoin/share token
     /// @dev Revert if shareBurnAmount is 0
+    /// @dev Revert if peer is paused
     /// @dev Burn the YieldCoin tokens and send a message to the parent chain to withdraw USDC from the strategy
     function onTokenTransfer(address withdrawer, uint256 shareBurnAmount, bytes calldata encodedWithdrawChainSelector)
         external
         override
+        whenNotPaused
     {
         _revertIfMsgSenderIsNotShare();
         _revertIfZeroAmount(shareBurnAmount);
