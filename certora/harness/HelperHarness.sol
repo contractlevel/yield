@@ -76,6 +76,10 @@ contract HelperHarness {
         return address(uint160(uint256(value)));
     }
 
+    function addressToBytes32(address value) public pure returns (bytes32) {
+        return bytes32(uint256(uint160(value)));
+    }
+
     function uint64ToBytes32(uint64 value) public pure returns (bytes32) {
         return bytes32(uint256(value));
     }

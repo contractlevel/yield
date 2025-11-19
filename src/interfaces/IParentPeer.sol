@@ -9,8 +9,7 @@ interface IParentPeer is IYieldPeer {
         uint256 totalValue,
         IYieldPeer.Strategy calldata newStrategy
     ) external;
-    function rebalanceChildToOther(uint64 oldStrategyChainSelector, IYieldPeer.Strategy calldata newStrategy)
-        external;
+    function rebalanceChildToOther(uint64 oldStrategyChainSelector, IYieldPeer.Strategy calldata newStrategy) external;
     function getThisChainSelector() external view returns (uint64);
     function getActiveStrategyAdapter() external view returns (address);
     function getTotalValue() external view returns (uint256);

@@ -45,7 +45,9 @@ contract TokenTest is BaseTest {
             receiver: abi.encode(address(holder)),
             data: "",
             tokenAmounts: tokenAmounts,
-            extraArgs: Client._argsToBytes(Client.GenericExtraArgsV2({gasLimit: 1000000, allowOutOfOrderExecution: true})),
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({gasLimit: 1000000, allowOutOfOrderExecution: true})
+            ),
             feeToken: link
         });
 

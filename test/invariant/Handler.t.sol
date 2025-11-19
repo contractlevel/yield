@@ -1,7 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {Test, Vm, console2, ParentPeer, ChildPeer, IERC20, Share, IYieldPeer, Rebalancer} from "../BaseTest.t.sol";
+import {
+    Test,
+    Vm,
+    console2,
+    ParentPeer,
+    ChildPeer,
+    IERC20,
+    Share,
+    IYieldPeer,
+    Rebalancer,
+    Roles
+} from "../BaseTest.t.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /// @notice This contract is used to handle fuzzed interactions with the external functions of the system to test invariants.
@@ -106,8 +117,8 @@ contract Handler is Test {
     /// @dev tracks the current fee rate
     uint256 public ghost_state_feeRate;
 
-    /// @dev tracks if the non-owner withdrew fees
-    bool public ghost_nonOwner_withdrewFees;
+    /// @dev tracks if a non-FeeWithdrawer withdrew fees
+    bool public ghost_nonFeeWithdrawerAddr_withdrewFees;
 
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT TRACKING
@@ -151,8 +162,11 @@ contract Handler is Test {
         aavePool = _aavePool;
         compoundPool = _compoundPool;
         rebalancer = _rebalancer;
-        vm.prank(rebalancer.owner());
+        vm.startPrank(rebalancer.owner());
+        rebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, rebalancer.owner());
         rebalancer.setForwarder(forwarder);
+        rebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, rebalancer.owner());
+        vm.stopPrank();
 
         parentChainSelector = parent.getThisChainSelector();
         child1ChainSelector = child1.getThisChainSelector();
@@ -297,26 +311,30 @@ contract Handler is Test {
     }
 
     /// @notice This function handles withdrawing fees
-    function withdrawFees(address nonOwner) public {
+    function withdrawFees(address nonFeeWithdrawerAddr) public {
+        /// @dev get the (first/default) fee withdrawer address
+        address feeWithdrawer = parent.getRoleMember(Roles.FEE_WITHDRAWER_ROLE, 0);
+
         uint256 parentFees = usdc.balanceOf(address(parent));
         uint256 child1Fees = usdc.balanceOf(address(child1));
         uint256 child2Fees = usdc.balanceOf(address(child2));
         uint256 availableFees = parentFees + child1Fees + child2Fees;
         if (availableFees == 0) return; // @review wasted run
+
         /// @dev update the ghost state
         ghost_state_totalFeesWithdrawnInStablecoin += availableFees;
 
-        /// @dev try call from non-owner to assert it never succeeds
-        vm.assume(nonOwner != parent.owner());
-        _changePrank(nonOwner);
+        /// @dev try call from non-fee withdrawer to assert it never succeeds
+        vm.assume(nonFeeWithdrawerAddr != feeWithdrawer);
+        _changePrank(nonFeeWithdrawerAddr);
         try parent.withdrawFees(address(usdc)) {
-            ghost_nonOwner_withdrewFees = true;
+            ghost_nonFeeWithdrawerAddr_withdrewFees = true;
         } catch {
-            console2.log("nonOwner withdrawFees failed");
+            console2.log("nonFeeWithdrawerRoleAddr withdrawFees failed");
         }
 
         /// @dev withdraw the fees
-        _changePrank(parent.owner());
+        _changePrank(feeWithdrawer);
         if (parentFees > 0) parent.withdrawFees(address(usdc));
         if (child1Fees > 0) child1.withdrawFees(address(usdc));
         if (child2Fees > 0) child2.withdrawFees(address(usdc));
@@ -325,12 +343,15 @@ contract Handler is Test {
     /// @notice This function handles setting the fee rate
     /// @param feeRate the fee rate to set
     function setFeeRate(uint256 feeRate) public {
+        /// @dev get the (first/default) fee rate setter address
+        address feeRateSetter = parent.getRoleMember(Roles.FEE_RATE_SETTER_ROLE, 0);
+
         /// @dev bind the fee rate to the range of valid values
         feeRate = bound(feeRate, 0, parent.getMaxFeeRate());
         /// @dev update the ghost state
         ghost_state_feeRate = feeRate;
         /// @dev update the fee rate
-        _changePrank(parent.owner());
+        _changePrank(feeRateSetter);
         parent.setFeeRate(feeRate);
         child1.setFeeRate(feeRate);
         child2.setFeeRate(feeRate);
@@ -511,7 +532,9 @@ contract Handler is Test {
         if (seedAddress == admin) seedAddress = _seedToAddress(addressSeed + 1);
         if (seedAddress == address(share)) seedAddress = _seedToAddress(addressSeed + 2);
         if (seedAddress == address(parent)) seedAddress = _seedToAddress(addressSeed + 3);
-        if (seedAddress == parent.owner()) seedAddress = _seedToAddress(addressSeed + 4); // excluding the owner introduces the assumption that the owner will not be interacting with the protocol as a user
+        if (seedAddress == address(child1)) seedAddress = _seedToAddress(addressSeed + 4);
+        if (seedAddress == address(child2)) seedAddress = _seedToAddress(addressSeed + 5);
+        if (seedAddress == parent.owner()) seedAddress = _seedToAddress(addressSeed + 6); // excluding the owner introduces the assumption that the owner will not be interacting with the protocol as a user
         users.add(seedAddress);
     }
 

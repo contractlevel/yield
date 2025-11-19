@@ -2,7 +2,7 @@
 pragma solidity 0.8.26;
 
 import {StdInvariant} from "forge-std/StdInvariant.sol";
-import {BaseTest, Vm, console2, ParentPeer, ChildPeer, Share, IYieldPeer, Rebalancer} from "../BaseTest.t.sol";
+import {BaseTest, Vm, console2, ParentPeer, ChildPeer, Share, IYieldPeer, Rebalancer, Roles} from "../BaseTest.t.sol";
 import {Handler} from "./Handler.t.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {IRouterClient} from "@chainlink/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
@@ -74,6 +74,7 @@ contract Invariant is StdInvariant, BaseTest {
     function setUp() public override {
         /// @dev deploy infrastructure
         _deployInfra();
+        _grantRoles();
         _dealLinkToPeers(true, address(parent), address(child1), address(child2), networkConfig.tokens.link);
         _setCrossChainPeers();
 
@@ -126,9 +127,13 @@ contract Invariant is StdInvariant, BaseTest {
             networkConfig.tokens.usdc,
             networkConfig.tokens.share
         );
+        /// @dev temp config admin role granted to deployer/owner to set necessary configs
+        parent.grantRole(Roles.CONFIG_ADMIN_ROLE, parent.owner());
         parent.setRebalancer(address(rebalancer));
+        rebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, rebalancer.owner());
         rebalancer.setUpkeepAddress(upkeep);
         rebalancer.setParentPeer(address(parent));
+
         /// @dev deploy parent adapters
         strategyRegistryParent = new StrategyRegistry();
         aaveV3AdapterParent = new AaveV3Adapter(address(parent), networkConfig.protocols.aavePoolAddressesProvider);
@@ -140,6 +145,8 @@ contract Invariant is StdInvariant, BaseTest {
         rebalancer.setStrategyRegistry(address(strategyRegistryParent));
         parent.setStrategyRegistry(address(strategyRegistryParent));
         parent.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")));
+        parent.revokeRole(Roles.CONFIG_ADMIN_ROLE, parent.owner());
+        rebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, rebalancer.owner());
 
         /// @dev deploy at least 2 child peers to cover all CCIP tx types
         child1 = new ChildPeer(
@@ -154,7 +161,10 @@ contract Invariant is StdInvariant, BaseTest {
         strategyRegistryChild1 = new StrategyRegistry();
         aaveV3AdapterChild1 = new AaveV3Adapter(address(child1), networkConfig.protocols.aavePoolAddressesProvider);
         compoundV3AdapterChild1 = new CompoundV3Adapter(address(child1), networkConfig.protocols.comet);
+        child1.grantRole(Roles.CONFIG_ADMIN_ROLE, child1.owner());
+        /// @dev role granted to set registry
         child1.setStrategyRegistry(address(strategyRegistryChild1));
+        child1.revokeRole(Roles.CONFIG_ADMIN_ROLE, child1.owner());
         strategyRegistryChild1.setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(aaveV3AdapterChild1));
         strategyRegistryChild1.setStrategyAdapter(
             keccak256(abi.encodePacked("compound-v3")), address(compoundV3AdapterChild1)
@@ -171,7 +181,10 @@ contract Invariant is StdInvariant, BaseTest {
         strategyRegistryChild2 = new StrategyRegistry();
         aaveV3AdapterChild2 = new AaveV3Adapter(address(child2), networkConfig.protocols.aavePoolAddressesProvider);
         compoundV3AdapterChild2 = new CompoundV3Adapter(address(child2), networkConfig.protocols.comet);
+        child2.grantRole(Roles.CONFIG_ADMIN_ROLE, child2.owner());
+        /// @dev role granted to set registry
         child2.setStrategyRegistry(address(strategyRegistryChild2));
+        child2.revokeRole(Roles.CONFIG_ADMIN_ROLE, child2.owner());
         strategyRegistryChild2.setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(aaveV3AdapterChild2));
         strategyRegistryChild2.setStrategyAdapter(
             keccak256(abi.encodePacked("compound-v3")), address(compoundV3AdapterChild2)
@@ -189,7 +202,70 @@ contract Invariant is StdInvariant, BaseTest {
         deal(networkConfig.tokens.usdc, networkConfig.protocols.comet, STRATEGY_POOL_USDC_STARTING_BALANCE);
     }
 
+    function _grantRoles() internal override {
+        // grant roles - rebalancer
+        _changePrank(rebalancer.owner());
+        rebalancer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
+        rebalancer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
+        rebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
+        assertTrue(rebalancer.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
+        assertTrue(rebalancer.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
+        assertTrue(rebalancer.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
+
+        // grant roles - parent
+        _changePrank(parent.owner());
+        parent.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
+        parent.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
+        parent.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
+        parent.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin);
+        parent.grantRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer);
+        parent.grantRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter);
+        assertTrue(parent.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
+        assertTrue(parent.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
+        assertTrue(parent.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
+        assertTrue(parent.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin));
+        assertTrue(parent.hasRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer));
+        assertTrue(parent.hasRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter));
+
+        // grant roles - child 1
+        _changePrank(child1.owner());
+        child1.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
+        child1.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
+        child1.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
+        child1.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin);
+        child1.grantRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer);
+        child1.grantRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter);
+        assertTrue(child1.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
+        assertTrue(child1.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
+        assertTrue(child1.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
+        assertTrue(child1.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin));
+        assertTrue(child1.hasRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer));
+        assertTrue(child1.hasRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter));
+
+        // grant roles - child 2
+        _changePrank(child2.owner());
+        child2.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
+        child2.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
+        child2.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
+        child2.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin);
+        child2.grantRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer);
+        child2.grantRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter);
+        assertTrue(child2.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
+        assertTrue(child2.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
+        assertTrue(child2.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
+        assertTrue(child2.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin));
+        assertTrue(child2.hasRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer));
+        assertTrue(child2.hasRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter));
+
+        _stopPrank();
+    }
+
     function _setCrossChainPeers() internal override {
+        /// @dev temp cross chain admin roles granted to set cross chain configs
+        parent.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, parent.owner());
+        child1.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, child1.owner());
+        child2.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, child2.owner());
+
         parent.setCCIPGasLimit(CCIP_GAS_LIMIT);
         child1.setCCIPGasLimit(CCIP_GAS_LIMIT);
         child2.setCCIPGasLimit(CCIP_GAS_LIMIT);
@@ -215,6 +291,10 @@ contract Invariant is StdInvariant, BaseTest {
         child2.setAllowedPeer(CHILD1_SELECTOR, address(child1));
         child2.setAllowedPeer(CHILD2_SELECTOR, address(child2));
 
+        parent.revokeRole(Roles.CROSS_CHAIN_ADMIN_ROLE, parent.owner());
+        child1.revokeRole(Roles.CROSS_CHAIN_ADMIN_ROLE, child1.owner());
+        child2.revokeRole(Roles.CROSS_CHAIN_ADMIN_ROLE, child2.owner());
+
         MockCCIPRouter(networkConfig.ccip.ccipRouter).setPeerToChainSelector(address(parent), PARENT_SELECTOR);
         MockCCIPRouter(networkConfig.ccip.ccipRouter).setPeerToChainSelector(address(child1), CHILD1_SELECTOR);
         MockCCIPRouter(networkConfig.ccip.ccipRouter).setPeerToChainSelector(address(child2), CHILD2_SELECTOR);
@@ -231,9 +311,8 @@ contract Invariant is StdInvariant, BaseTest {
     function checkActiveStrategyAdapterPerChainSelector(uint64 chainSelector) external view {
         if (chainSelector == parent.getStrategy().chainSelector) {
             assertEq(
-                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getStrategyAdapter(
-                    parent.getStrategy().protocolId
-                ),
+                IYieldPeer(handler.chainSelectorsToPeers(chainSelector))
+                    .getStrategyAdapter(parent.getStrategy().protocolId),
                 IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter(),
                 "Invariant violated: Active strategy adapter on active strategy chain should match the protocol stored in ParentPeer"
             );
@@ -346,6 +425,7 @@ contract Invariant is StdInvariant, BaseTest {
 
     /// @notice Fees Consistency: The total withdrawable fees taken should be equal to the total fees taken minus total fees withdrawn
     function invariant_fees_consistency() public view {
+        // @review instead of using .balanceOf, do we want to track fees in YieldFees::s_feesCollected[feeToken] mapping address => uint256?
         uint256 parentFees = usdc.balanceOf(address(parent));
         uint256 child1Fees = usdc.balanceOf(address(child1));
         uint256 child2Fees = usdc.balanceOf(address(child2));
@@ -401,7 +481,8 @@ contract Invariant is StdInvariant, BaseTest {
     /// @notice Fee withdrawal integrity: Non-owner should not be able to withdraw fees
     function invariant_feeWithdrawal_onlyOwner() public view {
         assertFalse(
-            handler.ghost_nonOwner_withdrewFees(), "Invariant violated: Fees should only be withdrawable by owner"
+            handler.ghost_nonFeeWithdrawerAddr_withdrewFees(),
+            "Invariant violated: Fees should only be withdrawable by fee withdrawer"
         );
     }
 

@@ -82,8 +82,9 @@ contract CCIPOperationsTest is BaseTest {
         assertEq(baseUsdc.allowance(address(ccipOperationsClient), ccipRouter), 0);
     }
 
-    function test_yield_ccipOperations_prepareTokenAmounts_returnsCorrectTokenAmountsWhen_bridgeAmountIsGreaterThanZero(
-    ) public {
+    function test_yield_ccipOperations_prepareTokenAmounts_returnsCorrectTokenAmountsWhen_bridgeAmountIsGreaterThanZero()
+        public
+    {
         /// @dev arrange
         _selectFork(baseFork);
         address ccipRouter = baseNetworkConfig.ccip.ccipRouter;
