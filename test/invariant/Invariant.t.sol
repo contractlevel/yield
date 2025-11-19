@@ -205,57 +205,57 @@ contract Invariant is StdInvariant, BaseTest {
     function _grantRoles() internal override {
         // grant roles - rebalancer
         _changePrank(rebalancer.owner());
-        rebalancer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser);
-        rebalancer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser);
-        rebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, config_admin);
-        assertTrue(rebalancer.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser));
-        assertTrue(rebalancer.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser));
-        assertTrue(rebalancer.hasRole(Roles.CONFIG_ADMIN_ROLE, config_admin));
+        rebalancer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
+        rebalancer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
+        rebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
+        assertTrue(rebalancer.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
+        assertTrue(rebalancer.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
+        assertTrue(rebalancer.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
 
         // grant roles - parent
         _changePrank(parent.owner());
-        parent.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser);
-        parent.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser);
-        parent.grantRole(Roles.CONFIG_ADMIN_ROLE, config_admin);
-        parent.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin);
-        parent.grantRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer);
-        parent.grantRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter);
-        assertTrue(parent.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser));
-        assertTrue(parent.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser));
-        assertTrue(parent.hasRole(Roles.CONFIG_ADMIN_ROLE, config_admin));
-        assertTrue(parent.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin));
-        assertTrue(parent.hasRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer));
-        assertTrue(parent.hasRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter));
+        parent.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
+        parent.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
+        parent.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
+        parent.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin);
+        parent.grantRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer);
+        parent.grantRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter);
+        assertTrue(parent.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
+        assertTrue(parent.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
+        assertTrue(parent.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
+        assertTrue(parent.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin));
+        assertTrue(parent.hasRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer));
+        assertTrue(parent.hasRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter));
 
         // grant roles - child 1
         _changePrank(child1.owner());
-        child1.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser);
-        child1.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser);
-        child1.grantRole(Roles.CONFIG_ADMIN_ROLE, config_admin);
-        child1.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin);
-        child1.grantRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer);
-        child1.grantRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter);
-        assertTrue(child1.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser));
-        assertTrue(child1.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser));
-        assertTrue(child1.hasRole(Roles.CONFIG_ADMIN_ROLE, config_admin));
-        assertTrue(child1.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin));
-        assertTrue(child1.hasRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer));
-        assertTrue(child1.hasRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter));
+        child1.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
+        child1.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
+        child1.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
+        child1.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin);
+        child1.grantRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer);
+        child1.grantRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter);
+        assertTrue(child1.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
+        assertTrue(child1.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
+        assertTrue(child1.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
+        assertTrue(child1.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin));
+        assertTrue(child1.hasRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer));
+        assertTrue(child1.hasRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter));
 
         // grant roles - child 2
         _changePrank(child2.owner());
-        child2.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser);
-        child2.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser);
-        child2.grantRole(Roles.CONFIG_ADMIN_ROLE, config_admin);
-        child2.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin);
-        child2.grantRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer);
-        child2.grantRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter);
-        assertTrue(child2.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser));
-        assertTrue(child2.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser));
-        assertTrue(child2.hasRole(Roles.CONFIG_ADMIN_ROLE, config_admin));
-        assertTrue(child2.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin));
-        assertTrue(child2.hasRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer));
-        assertTrue(child2.hasRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter));
+        child2.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
+        child2.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
+        child2.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
+        child2.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin);
+        child2.grantRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer);
+        child2.grantRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter);
+        assertTrue(child2.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
+        assertTrue(child2.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
+        assertTrue(child2.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
+        assertTrue(child2.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin));
+        assertTrue(child2.hasRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer));
+        assertTrue(child2.hasRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter));
 
         _stopPrank();
     }

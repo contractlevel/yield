@@ -10,7 +10,7 @@ contract SendCLFRequestTest is BaseTest {
     }
 
     function test_yield_rebalancer_sendCLFRequest_revertsWhen_rebalancerPaused() public {
-        _changePrank(emergency_pauser);
+        _changePrank(emergencyPauser);
         baseRebalancer.emergencyPause();
         /// @dev try to send CLFRequest as upkeepAddress and expect pause revert
         _changePrank(upkeepAddress);

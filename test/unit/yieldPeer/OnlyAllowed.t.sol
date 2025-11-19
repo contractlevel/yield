@@ -17,7 +17,7 @@ contract OnlyAllowedTest is BaseTest {
         });
 
         _selectFork(optFork);
-        _changePrank(cross_chain_admin);
+        _changePrank(crossChainAdmin);
         optChildPeer.setAllowedChain(baseChainSelector, false);
 
         /// @dev act/assert

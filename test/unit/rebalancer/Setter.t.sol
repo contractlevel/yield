@@ -27,7 +27,7 @@ contract SetterTest is BaseTest {
 
     function test_yield_rebalancer_setUpkeepAddress_success() public {
         address newUpkeepAddress = makeAddr("newUpkeepAddress");
-        _changePrank(config_admin);
+        _changePrank(configAdmin);
         baseRebalancer.setUpkeepAddress(newUpkeepAddress);
         assertEq(baseRebalancer.getUpkeepAddress(), newUpkeepAddress);
     }
@@ -45,7 +45,7 @@ contract SetterTest is BaseTest {
 
     function test_yield_rebalancer_setForwarder_success() public {
         address newForwarder = makeAddr("newForwarder");
-        _changePrank(config_admin);
+        _changePrank(configAdmin);
         baseRebalancer.setForwarder(newForwarder);
         assertEq(baseRebalancer.getForwarder(), newForwarder);
     }
@@ -64,7 +64,7 @@ contract SetterTest is BaseTest {
 
     function test_yield_rebalancer_setParentPeer_success() public {
         address newParentPeer = makeAddr("newParentPeer");
-        _changePrank(config_admin);
+        _changePrank(configAdmin);
         baseRebalancer.setParentPeer(newParentPeer);
         assertEq(baseRebalancer.getParentPeer(), newParentPeer);
     }
@@ -83,7 +83,7 @@ contract SetterTest is BaseTest {
 
     function test_yield_rebalancer_setStrategyRegistry_success() public {
         address newStrategyRegistry = makeAddr("newStrategyRegistry");
-        _changePrank(config_admin);
+        _changePrank(configAdmin);
         baseRebalancer.setStrategyRegistry(newStrategyRegistry);
         assertEq(baseRebalancer.getStrategyRegistry(), newStrategyRegistry);
     }

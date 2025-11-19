@@ -14,16 +14,16 @@ contract GrantRoleTest is BaseTest {
     function setUp() public override {
         super.setUp();
 
-        /// @dev Revoke role from 'config_admin' in BaseTest to have clean slate
+        /// @dev Revoke role from 'configAdmin' in BaseTest to have clean slate
         _changePrank(baseRebalancer.owner());
-        baseRebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, config_admin);
+        baseRebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
         assertEq(baseRebalancer.getRoleMemberCount(Roles.CONFIG_ADMIN_ROLE), ROLE_MEMBER_EMPTY);
-        assertEq(baseRebalancer.hasRole(Roles.CONFIG_ADMIN_ROLE, config_admin), false);
+        assertEq(baseRebalancer.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin), false);
 
         _changePrank(baseParentPeer.owner());
-        baseParentPeer.revokeRole(Roles.CONFIG_ADMIN_ROLE, config_admin);
+        baseParentPeer.revokeRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
         assertEq(baseParentPeer.getRoleMemberCount(Roles.CONFIG_ADMIN_ROLE), ROLE_MEMBER_EMPTY);
-        assertEq(baseParentPeer.hasRole(Roles.CONFIG_ADMIN_ROLE, config_admin), false);
+        assertEq(baseParentPeer.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin), false);
     }
 
     function test_yield_pausableWithAccessControlRebalancer_grantRole_emitsRoleGrantedEvent() public {
@@ -135,22 +135,22 @@ contract GrantRoleTest is BaseTest {
     }
 
     function test_yield_pausableWithAccessControlRebalancer_grantRole_revertsWhen_notDefaultAdmin() public {
-        _changePrank(emergency_pauser);
+        _changePrank(emergencyPauser);
         /// @dev error AccessControlUnauthorizedAccount(address account, bytes32 neededRole);
         vm.expectRevert(
             abi.encodeWithSignature(
-                "AccessControlUnauthorizedAccount(address,bytes32)", emergency_pauser, DEFAULT_ADMIN_ROLE
+                "AccessControlUnauthorizedAccount(address,bytes32)", emergencyPauser, DEFAULT_ADMIN_ROLE
             )
         );
         baseRebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, newConfigAdmin);
     }
 
     function test_yield_pausableWithAccessControlYieldPeer_grantRole_revertsWhen_notDefaultAdmin() public {
-        _changePrank(emergency_pauser);
+        _changePrank(emergencyPauser);
         /// @dev error AccessControlUnauthorizedAccount(address account, bytes32 neededRole);
         vm.expectRevert(
             abi.encodeWithSignature(
-                "AccessControlUnauthorizedAccount(address,bytes32)", emergency_pauser, DEFAULT_ADMIN_ROLE
+                "AccessControlUnauthorizedAccount(address,bytes32)", emergencyPauser, DEFAULT_ADMIN_ROLE
             )
         );
         baseParentPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, newConfigAdmin);

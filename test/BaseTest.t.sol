@@ -114,12 +114,12 @@ contract BaseTest is Test {
     uint256[] internal attesterPks = new uint256[](4);
 
     /// @dev addresses for custom roles
-    address internal config_admin = makeAddr("config_admin");
-    address internal cross_chain_admin = makeAddr("cross_chain_admin");
-    address internal emergency_pauser = makeAddr("emergency_pauser");
-    address internal emergency_unpauser = makeAddr("emergency_unpauser");
-    address internal fee_withdrawer = makeAddr("fee_withdrawer");
-    address internal fee_rate_setter = makeAddr("fee_rate_setter");
+    address internal configAdmin = makeAddr("configAdmin");
+    address internal crossChainAdmin = makeAddr("crossChainAdmin");
+    address internal emergencyPauser = makeAddr("emergencyPauser");
+    address internal emergencyUnpauser = makeAddr("emergencyUnpauser");
+    address internal feeWithdrawer = makeAddr("feeWithdrawer");
+    address internal feeRateSetter = makeAddr("feeRateSetter");
 
     /*//////////////////////////////////////////////////////////////
                                  SETUP
@@ -222,63 +222,63 @@ contract BaseTest is Test {
         // grant roles - rebalancer
         _selectFork(baseFork);
         _changePrank(baseRebalancer.owner());
-        baseRebalancer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser);
-        baseRebalancer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser);
-        baseRebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, config_admin);
+        baseRebalancer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
+        baseRebalancer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
+        baseRebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
 
-        assert(baseRebalancer.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser));
-        assert(baseRebalancer.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser));
-        assert(baseRebalancer.hasRole(Roles.CONFIG_ADMIN_ROLE, config_admin));
+        assertTrue(baseRebalancer.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
+        assertTrue(baseRebalancer.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
+        assertTrue(baseRebalancer.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
 
         // grant roles - parent
         _changePrank(baseParentPeer.owner());
-        baseParentPeer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser);
-        baseParentPeer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser);
-        baseParentPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, config_admin);
-        baseParentPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin);
-        baseParentPeer.grantRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer);
-        baseParentPeer.grantRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter);
+        baseParentPeer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
+        baseParentPeer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
+        baseParentPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
+        baseParentPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin);
+        baseParentPeer.grantRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer);
+        baseParentPeer.grantRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter);
 
-        assert(baseParentPeer.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser));
-        assert(baseParentPeer.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser));
-        assert(baseParentPeer.hasRole(Roles.CONFIG_ADMIN_ROLE, config_admin));
-        assert(baseParentPeer.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin));
-        assert(baseParentPeer.hasRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer));
-        assert(baseParentPeer.hasRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter));
+        assertTrue(baseParentPeer.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
+        assertTrue(baseParentPeer.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
+        assertTrue(baseParentPeer.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
+        assertTrue(baseParentPeer.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin));
+        assertTrue(baseParentPeer.hasRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer));
+        assertTrue(baseParentPeer.hasRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter));
 
         // grant roles - child 1
         _selectFork(optFork);
         _changePrank(optChildPeer.owner());
-        optChildPeer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser);
-        optChildPeer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser);
-        optChildPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, config_admin);
-        optChildPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin);
-        optChildPeer.grantRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer);
-        optChildPeer.grantRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter);
+        optChildPeer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
+        optChildPeer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
+        optChildPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
+        optChildPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin);
+        optChildPeer.grantRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer);
+        optChildPeer.grantRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter);
 
-        assert(optChildPeer.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser));
-        assert(optChildPeer.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser));
-        assert(optChildPeer.hasRole(Roles.CONFIG_ADMIN_ROLE, config_admin));
-        assert(optChildPeer.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin));
-        assert(optChildPeer.hasRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer));
-        assert(optChildPeer.hasRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter));
+        assertTrue(optChildPeer.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
+        assertTrue(optChildPeer.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
+        assertTrue(optChildPeer.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
+        assertTrue(optChildPeer.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin));
+        assertTrue(optChildPeer.hasRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer));
+        assertTrue(optChildPeer.hasRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter));
 
         // grant roles - child 2
         _selectFork(ethFork);
         _changePrank(ethChildPeer.owner());
-        ethChildPeer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser);
-        ethChildPeer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser);
-        ethChildPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, config_admin);
-        ethChildPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin);
-        ethChildPeer.grantRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer);
-        ethChildPeer.grantRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter);
+        ethChildPeer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
+        ethChildPeer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
+        ethChildPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
+        ethChildPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin);
+        ethChildPeer.grantRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer);
+        ethChildPeer.grantRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter);
 
-        assert(ethChildPeer.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergency_pauser));
-        assert(ethChildPeer.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergency_unpauser));
-        assert(ethChildPeer.hasRole(Roles.CONFIG_ADMIN_ROLE, config_admin));
-        assert(ethChildPeer.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, cross_chain_admin));
-        assert(ethChildPeer.hasRole(Roles.FEE_WITHDRAWER_ROLE, fee_withdrawer));
-        assert(ethChildPeer.hasRole(Roles.FEE_RATE_SETTER_ROLE, fee_rate_setter));
+        assertTrue(ethChildPeer.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
+        assertTrue(ethChildPeer.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
+        assertTrue(ethChildPeer.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
+        assertTrue(ethChildPeer.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin));
+        assertTrue(ethChildPeer.hasRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer));
+        assertTrue(ethChildPeer.hasRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter));
         _stopPrank();
     }
 
@@ -744,7 +744,7 @@ contract BaseTest is Test {
     /// @notice Helper function to set the fee rate across chains
     /// @param feeRate The fee rate to set
     function _setFeeRate(uint256 feeRate) internal {
-        _changePrank(fee_rate_setter);
+        _changePrank(feeRateSetter);
         _selectFork(baseFork);
         baseParentPeer.setFeeRate(feeRate);
         _selectFork(optFork);

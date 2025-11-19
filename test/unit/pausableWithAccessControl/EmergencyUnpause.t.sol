@@ -7,9 +7,9 @@ contract EmergencyUnpauseTest is BaseTest {
     /// @dev emergency unpausing correctly unpauses rebalancer and emits unpaused log
     function test_yield_pausableWithAccessControlRebalancer_emergencyUnpause_success() public {
         vm.recordLogs();
-        _changePrank(emergency_pauser);
+        _changePrank(emergencyPauser);
         baseRebalancer.emergencyPause();
-        _changePrank(emergency_unpauser);
+        _changePrank(emergencyUnpauser);
         baseRebalancer.emergencyUnpause();
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -26,15 +26,15 @@ contract EmergencyUnpauseTest is BaseTest {
 
         assertEq(baseRebalancer.paused(), false);
         assertEq(unpausedLogFound, true);
-        assertEq(unpauser, emergency_unpauser);
+        assertEq(unpauser, emergencyUnpauser);
     }
 
     /// @dev emergency unpausing correctly unpauses yield peer and emits unpaused log
     function test_yield_pausableWithAccessControlYieldPeer_emergencyUnpause_success() public {
         vm.recordLogs();
-        _changePrank(emergency_pauser);
+        _changePrank(emergencyPauser);
         baseParentPeer.emergencyPause();
-        _changePrank(emergency_unpauser);
+        _changePrank(emergencyUnpauser);
         baseParentPeer.emergencyUnpause();
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -51,12 +51,12 @@ contract EmergencyUnpauseTest is BaseTest {
 
         assertEq(baseParentPeer.paused(), false);
         assertEq(unpausedLogFound, true);
-        assertEq(unpauser, emergency_unpauser);
+        assertEq(unpauser, emergencyUnpauser);
     }
 
     /// @dev emergency unpausing reverts on rebalancer if caller doesn't have correct unpauser role
     function test_yield_pausableWithAccessControlRebalancer_emergencyUnpause_revertsWhen_noUnpauserRole() public {
-        _changePrank(emergency_pauser);
+        _changePrank(emergencyPauser);
         baseRebalancer.emergencyPause();
         _changePrank(holder);
         vm.expectRevert(
@@ -69,7 +69,7 @@ contract EmergencyUnpauseTest is BaseTest {
 
     /// @dev emergency unpausing reverts on yield peer if caller doesn't have correct unpauser role
     function test_yield_pausableWithAccessControlYieldPeer_emergencyUnpause_revertsWhen_noUnpauserRole() public {
-        _changePrank(emergency_pauser);
+        _changePrank(emergencyPauser);
         baseParentPeer.emergencyPause();
         _changePrank(holder);
         vm.expectRevert(
@@ -82,14 +82,14 @@ contract EmergencyUnpauseTest is BaseTest {
 
     /// @dev emergency unpausing correctly reverts on rebalancer if not paused
     function test_yield_pausableWithAccessControlRebalancer_emergencyUnpause_revertWhen_notPaused() public {
-        _changePrank(emergency_unpauser);
+        _changePrank(emergencyUnpauser);
         vm.expectRevert(abi.encode("ExpectedPause()"));
         baseRebalancer.emergencyUnpause();
     }
 
     /// @dev emergency unpausing correctly reverts on yield peer if not paused
     function test_yield_pausableWithAccessControlYieldPeer_emergencyUnpause_revertsWhen_notPaused() public {
-        _changePrank(emergency_unpauser);
+        _changePrank(emergencyUnpauser);
         vm.expectRevert(abi.encode("ExpectedPause()"));
         baseParentPeer.emergencyUnpause();
     }

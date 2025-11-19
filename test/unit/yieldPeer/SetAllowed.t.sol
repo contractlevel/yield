@@ -34,7 +34,7 @@ contract SetAllowedTest is BaseTest {
 
     function test_yield_setAllowedChain_revertsWhen_chainSelectorNotAllowed() public {
         /// @dev arrange
-        _changePrank(cross_chain_admin);
+        _changePrank(crossChainAdmin);
 
         uint64 invalidChainSelector = 100;
         address attemptedPeer = makeAddr("attemptedPeer");

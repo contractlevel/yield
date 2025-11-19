@@ -7,7 +7,7 @@ contract EmergencyPauseTest is BaseTest {
     /// @dev emergency pausing correctly pauses rebalancer and emits paused log
     function test_yield_pausableWithAccessControlRebalancer_emergencyPause_success() public {
         vm.recordLogs();
-        _changePrank(emergency_pauser);
+        _changePrank(emergencyPauser);
         baseRebalancer.emergencyPause();
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bool pausedLogFound;
@@ -23,13 +23,13 @@ contract EmergencyPauseTest is BaseTest {
 
         assertEq(baseRebalancer.paused(), true);
         assertEq(pausedLogFound, true);
-        assertEq(pauser, emergency_pauser);
+        assertEq(pauser, emergencyPauser);
     }
 
     /// @dev emergency pausing correctly pauses yield peer and emits paused log
     function test_yield_pausableWithAccessControlYieldPeer_emergencyPause_success() public {
         vm.recordLogs();
-        _changePrank(emergency_pauser);
+        _changePrank(emergencyPauser);
         baseParentPeer.emergencyPause();
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bool pausedLogFound;
@@ -45,7 +45,7 @@ contract EmergencyPauseTest is BaseTest {
 
         assertEq(baseParentPeer.paused(), true);
         assertEq(pausedLogFound, true);
-        assertEq(pauser, emergency_pauser);
+        assertEq(pauser, emergencyPauser);
     }
 
     /// @dev emergency pausing reverts on rebalancer if caller doesn't have correct pauser role
@@ -72,7 +72,7 @@ contract EmergencyPauseTest is BaseTest {
 
     /// @dev emergency pausing correctly reverts on rebalancer if already paused
     function test_yield_pausableWithAccessControlRebalancer_emergencyPause_revertsWhen_alreadyPaused() public {
-        _changePrank(emergency_pauser);
+        _changePrank(emergencyPauser);
         baseRebalancer.emergencyPause();
         vm.expectRevert(abi.encode("EnforcedPause()"));
         baseRebalancer.emergencyPause();
@@ -80,7 +80,7 @@ contract EmergencyPauseTest is BaseTest {
 
     /// @dev emergency pausing correctly reverts on yield peer if already paused
     function test_yield_pausableWithAccessControlYieldPeer_emergencyPause_revertsWhen_alreadyPaused() public {
-        _changePrank(emergency_pauser);
+        _changePrank(emergencyPauser);
         baseParentPeer.emergencyPause();
         vm.expectRevert(abi.encode("EnforcedPause()"));
         baseParentPeer.emergencyPause();

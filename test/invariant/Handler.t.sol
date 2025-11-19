@@ -313,7 +313,7 @@ contract Handler is Test {
     /// @notice This function handles withdrawing fees
     function withdrawFees(address nonFeeWithdrawerAddr) public {
         /// @dev get the (first/default) fee withdrawer address
-        address fee_withdrawer = parent.getRoleMember(Roles.FEE_WITHDRAWER_ROLE, 0);
+        address feeWithdrawer = parent.getRoleMember(Roles.FEE_WITHDRAWER_ROLE, 0);
 
         uint256 parentFees = usdc.balanceOf(address(parent));
         uint256 child1Fees = usdc.balanceOf(address(child1));
@@ -325,7 +325,7 @@ contract Handler is Test {
         ghost_state_totalFeesWithdrawnInStablecoin += availableFees;
 
         /// @dev try call from non-fee withdrawer to assert it never succeeds
-        vm.assume(nonFeeWithdrawerAddr != fee_withdrawer);
+        vm.assume(nonFeeWithdrawerAddr != feeWithdrawer);
         _changePrank(nonFeeWithdrawerAddr);
         try parent.withdrawFees(address(usdc)) {
             ghost_nonFeeWithdrawerAddr_withdrewFees = true;
@@ -334,7 +334,7 @@ contract Handler is Test {
         }
 
         /// @dev withdraw the fees
-        _changePrank(fee_withdrawer);
+        _changePrank(feeWithdrawer);
         if (parentFees > 0) parent.withdrawFees(address(usdc));
         if (child1Fees > 0) child1.withdrawFees(address(usdc));
         if (child2Fees > 0) child2.withdrawFees(address(usdc));
@@ -344,14 +344,14 @@ contract Handler is Test {
     /// @param feeRate the fee rate to set
     function setFeeRate(uint256 feeRate) public {
         /// @dev get the (first/default) fee rate setter address
-        address fee_rate_setter = parent.getRoleMember(Roles.FEE_RATE_SETTER_ROLE, 0);
+        address feeRateSetter = parent.getRoleMember(Roles.FEE_RATE_SETTER_ROLE, 0);
 
         /// @dev bind the fee rate to the range of valid values
         feeRate = bound(feeRate, 0, parent.getMaxFeeRate());
         /// @dev update the ghost state
         ghost_state_feeRate = feeRate;
         /// @dev update the fee rate
-        _changePrank(fee_rate_setter);
+        _changePrank(feeRateSetter);
         parent.setFeeRate(feeRate);
         child1.setFeeRate(feeRate);
         child2.setFeeRate(feeRate);

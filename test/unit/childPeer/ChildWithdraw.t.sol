@@ -32,7 +32,7 @@ contract ChildWithdrawTest is BaseTest {
     }
 
     function test_yield_child_onTokenTransfer_revertsWhen_childPaused() public {
-        _changePrank(emergency_pauser);
+        _changePrank(emergencyPauser);
         optChildPeer.emergencyPause();
         _changePrank(depositor);
         vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));

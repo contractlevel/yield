@@ -17,7 +17,7 @@ contract SetterTest is BaseTest {
 
     function test_yield_parentPeer_setRebalancer_success() public {
         address newRebalancer = makeAddr("newRebalancer");
-        _changePrank(config_admin);
+        _changePrank(configAdmin);
         baseParentPeer.setRebalancer(newRebalancer);
         assertEq(baseParentPeer.getRebalancer(), newRebalancer);
     }

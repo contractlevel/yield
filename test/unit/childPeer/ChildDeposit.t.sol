@@ -25,7 +25,7 @@ contract ChildDepositTest is BaseTest {
     }
 
     function test_yield_child_deposit_revertsWhen_ChildPaused() public {
-        _changePrank(emergency_pauser);
+        _changePrank(emergencyPauser);
         optChildPeer.emergencyPause();
         _changePrank(depositor);
         vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
