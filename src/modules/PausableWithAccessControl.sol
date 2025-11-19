@@ -25,15 +25,16 @@ abstract contract PausableWithAccessControl is
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
+    /// @notice The initial delay for transferring the admin role
+    uint48 internal constant INITIAL_DEFAULT_ADMIN_ROLE_TRANSFER_DELAY = 259200 seconds; // 3 days
+
     /// @notice The set of members in each role
     mapping(bytes32 role => EnumerableSet.AddressSet) private s_roleMembers;
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
-    constructor(uint48 adminRoleTransferDelay, address admin)
-        AccessControlDefaultAdminRules(adminRoleTransferDelay, admin)
-    {}
+    constructor(address admin) AccessControlDefaultAdminRules(INITIAL_DEFAULT_ADMIN_ROLE_TRANSFER_DELAY, admin) {}
 
     /*//////////////////////////////////////////////////////////////
                                 EXTERNAL

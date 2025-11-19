@@ -139,8 +139,7 @@ abstract contract YieldPeer is
     //slither-disable-next-line missing-zero-check
     constructor(address ccipRouter, address link, uint64 thisChainSelector, address usdc, address share)
         CCIPReceiver(ccipRouter)
-        PausableWithAccessControl(3 days, msg.sender) // @reviewGeorge: check transfer delay
-
+        PausableWithAccessControl(msg.sender)
     {
         i_link = LinkTokenInterface(link);
         i_thisChainSelector = thisChainSelector;

@@ -298,6 +298,7 @@ contract ParentPeer is YieldPeer {
         if (depositData.chainSelector == i_thisChainSelector) {
             // @review DepositCompleted event? we want to emit a DepositCompleted event every where we mint shares at the end of a deposit
             // DepositCompleted(depositData.depositor, depositData.shareMintAmount, depositData.amount);
+            // although, we do emit a shares minted event
             //slither-disable-next-line reentrancy-events
             _mintShares(depositData.depositor, depositData.shareMintAmount);
         }

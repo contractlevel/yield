@@ -87,7 +87,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Pausable
     /// @param clfSubId The Chainlink Functions subscription ID
     // @review transfer delay
     constructor(address functionsRouter, bytes32 donId, uint64 clfSubId)
-        PausableWithAccessControl(3 days, msg.sender) // @reviewGeorge: check transfer delay
+        PausableWithAccessControl(msg.sender)
         FunctionsClient(functionsRouter)
     {
         i_donId = donId;
@@ -101,10 +101,6 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Pausable
     /// @notice The nature of the request is to fetch the strategy with the highest yield
     /// @dev Revert if the caller is not the Chainlink Automation upkeep address
     /// @dev Revert if Rebalancer is paused
-    // @review:pausable should be pausable?
-    // a: yes, but we will want to review using time-based automation vs incentivized public keepers
-    // @review - pausable and time-based abstraction are 2 different tasks
-    // although this may not necessarily need to be pausable because the rebalancer is configurable in parent
     function sendCLFRequest() external whenNotPaused {
         if (msg.sender != s_upkeepAddress) revert Rebalancer__OnlyUpkeep();
 

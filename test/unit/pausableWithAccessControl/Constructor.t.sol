@@ -14,7 +14,8 @@ contract ConstructorTest is BaseTest {
 
     function test_yield_pausableWithAccessControlYieldPeer_constructor() public view {
         /// @dev deployed admin transfer delay value in constructor is correct
-        assertEq(baseParentPeer.defaultAdminDelay(), 3 days); // @reviewGeorge : check delay
+        // @review transfer delay
+        assertEq(baseParentPeer.defaultAdminDelay(), 3 days);
 
         /// @dev deploying 'owner' should be 'default admin'
         assertEq(baseParentPeer.owner(), baseParentPeer.defaultAdmin());
