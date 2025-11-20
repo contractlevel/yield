@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {BaseTest} from "../../BaseTest.t.sol";
+import {BaseTest, Roles} from "../../BaseTest.t.sol";
 import {IRouterClient, Client} from "@chainlink/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
 
 contract OnlyAllowedTest is BaseTest {
@@ -17,7 +17,7 @@ contract OnlyAllowedTest is BaseTest {
         });
 
         _selectFork(optFork);
-        _changePrank(optChildPeer.owner());
+        _changePrank(crossChainAdmin);
         optChildPeer.setAllowedChain(baseChainSelector, false);
 
         /// @dev act/assert

@@ -3,6 +3,7 @@ pragma solidity 0.8.26;
 
 import {BaseTest} from "../../BaseTest.t.sol";
 import {IYieldPeer} from "../../../src/interfaces/IYieldPeer.sol";
+import {Roles} from "../../../src/libraries/Roles.sol";
 import {console2} from "forge-std/Test.sol";
 
 contract ChildWithdrawTest is BaseTest {
@@ -27,6 +28,14 @@ contract ChildWithdrawTest is BaseTest {
 
         /// @dev act and assert
         vm.expectRevert(abi.encodeWithSignature("YieldPeer__OnlyShare()"));
+        optChildPeer.onTokenTransfer(msg.sender, DEPOSIT_AMOUNT, "");
+    }
+
+    function test_yield_child_onTokenTransfer_revertsWhen_childPaused() public {
+        _changePrank(emergencyPauser);
+        optChildPeer.emergencyPause();
+        _changePrank(depositor);
+        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
         optChildPeer.onTokenTransfer(msg.sender, DEPOSIT_AMOUNT, "");
     }
 

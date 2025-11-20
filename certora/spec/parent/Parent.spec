@@ -18,6 +18,11 @@ methods {
     function getThisChainSelector() external returns (uint64) envfree;
     function getActiveStrategyAdapter() external returns (address) envfree;
     function getMaxFeeRate() external returns (uint256) envfree;
+    function getRebalancer() external returns (address) envfree;
+
+    // PausableWithAccessControl methods
+    function owner() external returns (address) envfree;
+    function hasRole(bytes32, address) external returns (bool) envfree;
 
     // External methods
     function share.totalSupply() external returns (uint256) envfree;
@@ -33,6 +38,7 @@ methods {
     function _.transfer(address,uint256) external => DISPATCHER(true);
 
     // Harness helper methods
+    function bytes32ToAddress(bytes32 value) external returns (address) envfree;
     function bytes32ToUint256(bytes32) external returns (uint256) envfree;
     function bytes32ToUint8(bytes32) external returns (uint8) envfree;
     function buildEncodedWithdrawData(address,uint256,uint256,uint256,uint64) external returns (bytes memory) envfree;
@@ -51,6 +57,16 @@ methods {
 /*//////////////////////////////////////////////////////////////
                           DEFINITIONS
 //////////////////////////////////////////////////////////////*/
+definition defaultAdminRole() returns bytes32 = to_bytes32(0x00);
+
+definition configAdminRole() returns bytes32 = 
+// keccak256("CONFIG_ADMIN_ROLE")
+    to_bytes32(0xb92d52e77ebaa0cae5c23e882d85609efbcb44029214147dd132daf9ef1018af);
+
+definition RebalancerSetEvent() returns bytes32 =
+// keccak256(abi.encodePacked("RebalancerSet(address)"))
+    to_bytes32(0xeaa5fe3125389d5a88065ca297da7e3cce7178e00062a28488efbc1550b9c02c);
+
 definition ShareMintUpdateEvent() returns bytes32 =
 // keccak256(abi.encodePacked("ShareMintUpdate(uint256,uint64,uint256)"))
     to_bytes32(0xb72631492a31c565f552fa60e02d84a245e98d5519ff22100b4cae30bb5d8465);
@@ -122,6 +138,16 @@ definition WithdrawPingPongToStrategyEvent() returns bytes32 =
 /*//////////////////////////////////////////////////////////////
                              GHOSTS
 //////////////////////////////////////////////////////////////*/
+/// @notice EventCount: track amount of RebalancerSet event is emitted
+ghost mathint ghost_rebalancerSet_eventCount {
+    init_state axiom ghost_rebalancerSet_eventCount == 0;
+}
+
+/// @notice EmittedValue: track address emitted in RebalancerSet event
+ghost address ghost_rebalancerSet_emittedAddress {
+    init_state axiom ghost_rebalancerSet_emittedAddress == 0;
+}
+
 /// @notice Emitted Value Count: track the total amount of shares minted based on param emitted by ShareMintUpdate event
 ghost mathint ghost_shareMintUpdate_totalAmount_emitted {
     init_state axiom ghost_shareMintUpdate_totalAmount_emitted == 0;
@@ -278,6 +304,10 @@ hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
         ghost_strategyPoolUpdated_eventCount = ghost_strategyPoolUpdated_eventCount + 1;
     if (t0 == ActiveStrategyAdapterUpdatedEvent()) 
         ghost_activeStrategyAdapterUpdated_eventCount = ghost_activeStrategyAdapterUpdated_eventCount + 1;
+    if (t0 == RebalancerSetEvent()) {
+        ghost_rebalancerSet_eventCount = ghost_rebalancerSet_eventCount + 1;
+        ghost_rebalancerSet_emittedAddress = bytes32ToAddress(t1);
+    } 
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -864,7 +894,6 @@ rule rebalanceParentToChild_revertsWhen_notRebalancer() {
 }
 
 // @review:certora vacuous rule
-// @review-George: rule/functions renamed to correspondent to new rebalancing functions
 rule rebalanceParentToChild_movesStrategyToNewChain() {
     env e;
     uint64 chainSelector;
@@ -940,11 +969,16 @@ rule calculateMintAmount_calculation() {
 }
 
 // --- setInitialActiveStrategy --- //
-rule setInitialActiveStrategy_revertsWhen_notOwner() {
+rule setInitialActiveStrategy_revertsWhen_noDefaultAdminRole() {
     env e;
     bytes32 protocolId;
 
-    require e.msg.sender != currentContract._owner;
+    /// @dev revert condition being verified
+    require currentContract.hasRole(defaultAdminRole(), e.msg.sender) == false;
+
+    /// @dev revert conditions not being verified
+    require e.msg.value == 0;
+    require currentContract.s_initialActiveStrategySet == false;
 
     setInitialActiveStrategy@withrevert(e, protocolId);
     assert lastReverted;
@@ -952,13 +986,21 @@ rule setInitialActiveStrategy_revertsWhen_notOwner() {
 
 rule setInitialActiveStrategy_revertsWhen_alreadyCalled() {
     env e;
-    bytes32 protocolId;
-    setInitialActiveStrategy(e, protocolId);
-
     env e2;
+    bytes32 protocolId;
     bytes32 protocolId2;
-    require e2.msg.sender == e.msg.sender; // owner
-    setInitialActiveStrategy@withrevert(e2, protocolId2);
+
+    require e.msg.sender == currentContract.owner();
+    require currentContract.hasRole(defaultAdminRole(), e.msg.sender) == true;
+    require e.msg.value == 0;
+
+    setInitialActiveStrategy(e, protocolId); /// @dev set, then try again
+
+    require e2.msg.sender == currentContract.owner();
+    require currentContract.hasRole(defaultAdminRole(), e2.msg.sender) == true;
+    require e2.msg.value == 0;
+    setInitialActiveStrategy@withrevert(e2, protocolId2); 
+
     assert lastReverted;
 }
 
@@ -985,4 +1027,30 @@ rule setInitialActiveStrategy_updatesStorage() {
     assert currentContract.s_strategy.protocolId == protocolId;
 }
 
-// @review:certora set rebalancer needs to be verified
+// --- setRebalancer --- //
+rule setRebalancer_revertsWhen_noConfigAdminRole {
+    env e;
+    address rebalancer;
+
+    require hasRole(configAdminRole(), e.msg.sender) == false; 
+    require e.msg.value == 0;
+
+    setRebalancer@withrevert(e, rebalancer);
+
+    assert lastReverted;
+}
+
+rule setRebalancer_success () {
+    env e;
+    address rebalancer;
+
+    require ghost_rebalancerSet_eventCount == 0;
+    require ghost_rebalancerSet_emittedAddress == 0;
+
+    setRebalancer(e, rebalancer);
+    
+    assert ghost_rebalancerSet_eventCount == 1; /// @dev check rebalancer set event
+    assert ghost_rebalancerSet_emittedAddress == rebalancer; /// @dev check rebalancer set event emitted address
+    assert currentContract.s_rebalancer == rebalancer; /// @dev check storage variable was updated
+    assert getRebalancer() == rebalancer;
+}

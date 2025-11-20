@@ -1,11 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {BaseTest, Vm} from "../../BaseTest.t.sol";
+import {BaseTest, Vm, Roles} from "../../BaseTest.t.sol";
 
 contract SendCLFRequestTest is BaseTest {
     function test_yield_rebalancer_sendCLFRequest_revertsWhen_notUpkeep() public {
         vm.expectRevert(abi.encodeWithSignature("Rebalancer__OnlyUpkeep()"));
+        baseRebalancer.sendCLFRequest();
+    }
+
+    function test_yield_rebalancer_sendCLFRequest_revertsWhen_rebalancerPaused() public {
+        _changePrank(emergencyPauser);
+        baseRebalancer.emergencyPause();
+        /// @dev try to send CLFRequest as upkeepAddress and expect pause revert
+        _changePrank(upkeepAddress);
+        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
         baseRebalancer.sendCLFRequest();
     }
 

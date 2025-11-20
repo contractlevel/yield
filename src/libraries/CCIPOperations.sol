@@ -42,7 +42,9 @@ library CCIPOperations {
             receiver: abi.encode(receiver),
             data: abi.encode(txType, data),
             tokenAmounts: tokenAmounts,
-            extraArgs: Client._argsToBytes(Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: true})),
+            extraArgs: Client._argsToBytes(
+                Client.GenericExtraArgsV2({gasLimit: gasLimit, allowOutOfOrderExecution: true})
+            ),
             feeToken: link
         });
     }

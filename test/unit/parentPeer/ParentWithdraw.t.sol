@@ -5,6 +5,7 @@ import {BaseTest, console2} from "../../BaseTest.t.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IComet} from "../../../src/interfaces/IComet.sol";
 import {IYieldPeer} from "../../../src/interfaces/IYieldPeer.sol";
+import {Roles} from "../../../src/libraries/Roles.sol";
 
 contract ParentWithdrawTest is BaseTest {
     function setUp() public override {
@@ -25,6 +26,14 @@ contract ParentWithdrawTest is BaseTest {
         baseParentPeer.deposit(DEPOSIT_AMOUNT);
         /// @dev act and assert
         vm.expectRevert(abi.encodeWithSignature("YieldPeer__OnlyShare()"));
+        baseParentPeer.onTokenTransfer(msg.sender, DEPOSIT_AMOUNT, "");
+    }
+
+    function test_yield_parent_onTokenTransfer_revertsWhen_parentPaused() public {
+        _changePrank(emergencyPauser);
+        baseParentPeer.emergencyPause();
+        _changePrank(depositor);
+        vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
         baseParentPeer.onTokenTransfer(msg.sender, DEPOSIT_AMOUNT, "");
     }
 
