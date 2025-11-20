@@ -122,7 +122,7 @@ contract ChildPeer is YieldPeer {
         bytes memory data,
         uint64 /* sourceChainSelector */
     ) internal override {
-        if (txType == CcipTxType.DepositToStrategy) {
+        if (txType == CcipTxType.DepositToStrategy || txType == CcipTxType.DepositPingPong) {
             _handleCCIPDepositToStrategy(tokenAmounts, data);
         }
         //slither-disable-next-line reentrancy-events
@@ -179,7 +179,8 @@ contract ChildPeer is YieldPeer {
 
         address activeStrategyAdapter = _getActiveStrategyAdapter();
         if (activeStrategyAdapter != address(0)) {
-            withdrawData.usdcWithdrawAmount = _withdrawFromStrategyAndGetUsdcWithdrawAmount(withdrawData);
+            withdrawData.usdcWithdrawAmount =
+                _withdrawFromStrategyAndGetUsdcWithdrawAmount(activeStrategyAdapter, withdrawData);
 
             if (i_thisChainSelector == withdrawData.chainSelector) {
                 //slither-disable-next-line reentrancy-events
