@@ -19,3 +19,9 @@
 [submodule "lib/solady"]
 	path = lib/solady
 	url = https://github.com/vectorized/solady
+[submodule "lib/messaging-contracts-v2"]
+	path = lib/messaging-contracts-v2
+	url = https://github.com/concero/messaging-contracts-v2
+[submodule "lib/lbf-contracts"]
+	path = lib/lbf-contracts
+	url = https://github.com/lanca-io/lbf-contracts

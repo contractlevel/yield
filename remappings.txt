@@ -3,3 +3,5 @@
 @aave/core-v3/contracts=lib/aave-v3-core/contracts
 @chainlink-local=lib/chainlink-local
 solady/=lib/solady/src/
+@concero/v2-messaging=lib/messaging-contracts-v2
+@lanca/bridging=lib/lbf-contracts

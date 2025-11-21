@@ -628,6 +628,7 @@ abstract contract YieldPeer is
         override(CCIPReceiver, PausableWithAccessControl)
         returns (bool)
     {
+        // @review should this be accounting for an interfaceId from PausableWithAccessControl?
         return interfaceId == type(IAny2EVMMessageReceiver).interfaceId || super.supportsInterface(interfaceId);
     }
 }
