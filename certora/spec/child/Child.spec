@@ -245,7 +245,6 @@ rule child_deposit_notStrategy_emits_correct_params() {
 rule handleCCIPDepositToStrategy_emits_CCIPMessageSent() {
     env e;
     calldataarg args;
-    
 
     require ghost_ccipMessageSent_eventCount == 0;
     handleCCIPDepositToStrategy(e, args);
@@ -256,6 +255,7 @@ rule handleCCIPDepositToStrategy_emits_CCIPMessageSent() {
         ghost_ccipMessageSent_bridgeAmount_emitted == 0;
     assert getActiveStrategyAdapter() == 0 => 
         ghost_ccipMessageSent_txType_emitted == 9; // CcipTxType.DepositPingPong
+    // @review check the amount emitted by the ghost_ccipMessageSent_bridgeAmount_emitted
 }
 
 rule handleCCIPDepositToStrategy_depositsToStrategy(env e) {
@@ -374,14 +374,12 @@ rule handleCCIPWithdrawToStrategy_completesWithdrawal_when_sameChain() {
     require ghost_withdrawPingPong_eventCount == 0;
     handleCCIPWithdrawToStrategy(e, encodedWithdrawData);
     
-
     assert getActiveStrategyAdapter() == 0 =>
         ghost_withdrawPingPong_eventCount == 1;
 
     assert getActiveStrategyAdapter() != 0 =>
         ghost_withdrawCompleted_eventCount == 1 &&
-        usdc.balanceOf(withdrawer) == usdcBalanceBefore + expectedWithdrawAmount;
-    
+        usdc.balanceOf(withdrawer) == usdcBalanceBefore + expectedWithdrawAmount; 
 }
 
 rule handleCCIPWithdrawToStrategy_emits_CCIPMessageSent_when_differentChain() {
@@ -512,9 +510,12 @@ rule handleCCIPMessage_DepositToStrategy() {
 
     require ghost_ccipMessageSent_eventCount == 0;
     require ghost_depositPingPong_eventCount == 0;
+
+    require getActiveStrategyAdapter() != 0;
+
     handleCCIPMessage(e, txType, tokenAmounts, data, sourceChainSelector);
     
-    assert getActiveStrategyAdapter() != 0 => 
+    assert 
         ghost_ccipMessageSent_eventCount == 1 &&
         ghost_ccipMessageSent_txType_emitted == 2 && // CcipTxType.DepositCallbackParent
         ghost_ccipMessageSent_bridgeAmount_emitted == 0;
@@ -529,9 +530,9 @@ rule handleCCIPMessage_DepositToStrategyPingPongs() {
 
     require ghost_ccipMessageSent_eventCount == 0;
     require ghost_depositPingPong_eventCount == 0;
-    handleCCIPMessage(e, txType, tokenAmounts, data, sourceChainSelector);
     require getActiveStrategyAdapter() == 0;
-    assert getActiveStrategyAdapter() == 0 => 
+    handleCCIPMessage(e, txType, tokenAmounts, data, sourceChainSelector);
+    assert 
         ghost_ccipMessageSent_eventCount == 1 &&
         ghost_ccipMessageSent_txType_emitted == 9 && // CcipTxType.DepositPingPong
         ghost_ccipMessageSent_bridgeAmount_emitted == tokenAmounts[0].amount &&

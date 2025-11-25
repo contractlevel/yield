@@ -19,6 +19,8 @@ methods {
     function getActiveStrategyAdapter() external returns (address) envfree;
     function getMaxFeeRate() external returns (uint256) envfree;
     function getRebalancer() external returns (address) envfree;
+    function paused() external returns (bool) envfree;
+    function getAllowedChain(uint64) external returns (bool) envfree;
 
     // PausableWithAccessControl methods
     function owner() external returns (address) envfree;
@@ -396,11 +398,19 @@ rule deposit_emits_CCIPMessageSent_when_strategy_is_differentChain() {
     assert ghost_ccipMessageSent_txType_emitted == 1; // DepositToStrategy
     assert ghost_ccipMessageSent_bridgeAmount_emitted == amountToDeposit - fee;
 }
+
 rule deposit_reverts_when_parent_is_strategy_and_activeStrategyAdapter_is_zero() {
     env e;
     uint256 amountToDeposit;
+
+    /// @dev revert conditions being verified
     require getStrategy().chainSelector == getThisChainSelector();
     require getActiveStrategyAdapter() == 0;
+
+    /// @dev revert conditions not being verified
+    require e.msg.value == 0;
+    require amountToDeposit >= 1000000; // 1e6
+    require !paused();
 
     deposit@withrevert(e, amountToDeposit);
     assert lastReverted;
@@ -505,14 +515,22 @@ rule onTokenTransfer_reverts_when_parent_is_strategy_and_activeStrategyAdapter_i
     env e;
     address withdrawer;
     uint256 shareBurnAmount;
-    bytes encodedWithdrawChainSelector = encodeUint64(getThisChainSelector());
+    uint64 withdrawChainSelector;
+    bytes encodedWithdrawChainSelector = encodeUint64(withdrawChainSelector);
+
+    /// @dev revert conditions being verified
     require getStrategy().chainSelector == getThisChainSelector();
     require getActiveStrategyAdapter() == 0;
-    require ghost_withdrawInitiated_eventCount == 0;
+
+    /// @dev revert conditions not being verified
+    require e.msg.value == 0;
+    require e.msg.sender == currentContract.i_share;
+    require shareBurnAmount > 0;
+    require !paused();
+    require getAllowedChain(withdrawChainSelector);
 
     onTokenTransfer@withrevert(e, withdrawer, shareBurnAmount, encodedWithdrawChainSelector);
     assert lastReverted;
-    assert ghost_withdrawInitiated_eventCount == 0;
 }
 
 // --- handleCCIPDepositToParent --- //
