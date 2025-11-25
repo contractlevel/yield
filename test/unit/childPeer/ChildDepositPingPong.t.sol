@@ -24,10 +24,7 @@ contract ChildDepositPingPongTest is BaseTest {
     // - Set OPT adapter, Parent forwards again (attempt 2), deposit succeeds
     function test_yield_child_deposit_pingpong_twoChains_aave() public {
         // Arrange: Set Parent strategy to OPT (Aave)
-        // /// SETUP
-        // _setStrategy(optChainSelector, keccak256(abi.encodePacked("aave-v3")));
-        // we forgo _setStrategy and manually fulfill the request
-        // this is because we want to test the ping-pong scenario, so we dont want the strategyAdapter on OPT to be set yet
+    
         {
             _selectFork(baseFork);
             bytes32 requestId = keccak256("requestId");
@@ -59,12 +56,9 @@ contract ChildDepositPingPongTest is BaseTest {
         // Note: Parent should have emitted a CCTP MessageSent event when processing OPT -> Parent
         _selectFork(baseFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
-        // Note: switchChainAndRouteMessageWithUSDC (line: 157, src/ccip/CCIPLocalSimulatorFork.sol) switches to target fork (OPT), so we're now on OPT fork (?)
-
+      
         // OPT ping-pongs back to Parent since adapter == 0 (with USDC)
         // OPT should now have the USDC from Parent
-        // Note: switchChainAndRouteMessageWithUSDC switches to target fork (OPT), so we're on OPT fork (?), select anyway, been getting errors
-        // Verify OPT received USDC before trying to ping-pong
         _selectFork(optFork);
         uint256 optUsdcBalanceAfterReceive = optUsdc.balanceOf(address(optChildPeer));
         assertGt(optUsdcBalanceAfterReceive, 0, "OPT should have received USDC from Parent");

@@ -127,7 +127,7 @@ contract ChildPeer is YieldPeer {
         }
         //slither-disable-next-line reentrancy-events
         if (txType == CcipTxType.DepositCallbackChild) _handleCCIPDepositCallbackChild(data);
-        if (txType == CcipTxType.WithdrawToStrategy) {
+        if (txType == CcipTxType.WithdrawToStrategy || txType == CcipTxType.WithdrawPingPong) {
             _handleCCIPWithdrawToStrategy(data);
         }
         if (txType == CcipTxType.WithdrawCallback) _handleCCIPWithdrawCallback(tokenAmounts, data);

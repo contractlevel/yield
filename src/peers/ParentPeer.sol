@@ -355,19 +355,14 @@ contract ParentPeer is YieldPeer {
             withdrawData.shareBurnAmount, sourceChainSelector, withdrawData.totalShares - withdrawData.shareBurnAmount
         );
 
-        _handleCCIPWithdraw(s_strategy, withdrawData, data);
+        _handleCCIPWithdraw(s_strategy, withdrawData);
     }
 
     /// @notice This function handles the withdraw flow logic that is used by both _handleCCIPWithdrawToParent and _handleCCIPWithdrawPingPong
     /// @notice We need this so that we aren't repeating ourselves in both functions and so we are not updating state again in _handleCCIPWithdrawPingPong (because it would have been updated during the _handleCCIPWithdrawToParent stage of the flow)
     /// @param strategy The active strategy state
     /// @param withdrawData The withdraw data for the tx
-    /// @param encodedWithdrawData The encoded withdraw data (if we need to send it without modifying it)
-    function _handleCCIPWithdraw(
-        Strategy memory strategy,
-        WithdrawData memory withdrawData,
-        bytes memory encodedWithdrawData
-    ) internal {
+    function _handleCCIPWithdraw(Strategy memory strategy, WithdrawData memory withdrawData) internal {
         // 1. If the parent is the strategy, we want to use the totalShares and shareBurnAmount to calculate the usdcWithdrawAmount then withdraw it and ccipSend it back to the withdrawer
         if (strategy.chainSelector == i_thisChainSelector) {
             address activeStrategyAdapter = _getActiveStrategyAdapter();
@@ -389,8 +384,12 @@ contract ParentPeer is YieldPeer {
                 }
             } else {
                 emit WithdrawPingPongToChild(withdrawData.shareBurnAmount, withdrawData.chainSelector);
+                /// @dev Encode the updated withdrawData (with correct totalShares) instead of using stale encodedWithdrawData
                 _ccipSend(
-                    withdrawData.chainSelector, CcipTxType.WithdrawPingPong, encodedWithdrawData, ZERO_BRIDGE_AMOUNT
+                    withdrawData.chainSelector,
+                    CcipTxType.WithdrawPingPong,
+                    abi.encode(withdrawData),
+                    ZERO_BRIDGE_AMOUNT
                 );
             }
         }
@@ -406,11 +405,9 @@ contract ParentPeer is YieldPeer {
     /// @notice This function handles a pingpong withdraw from a child to this parent
     /// @notice Forwards withdraw to active strategy without updating state (already updated in original flow)
     /// @notice This only happens when parent is NOT the strategy (if parent were strategy, withdraw would complete in _handleCCIPWithdrawToParent)
-    /// @param data The encoded WithdrawData
-    // @review consider changing event emission for PingPong
     function _handleCCIPWithdrawPingPong(bytes memory data) internal {
         WithdrawData memory withdrawData = _decodeWithdrawData(data);
-        _handleCCIPWithdraw(s_strategy, withdrawData, data);
+        _handleCCIPWithdraw(s_strategy, withdrawData);
     }
 
     /// @notice This function sets the strategy on the parent
