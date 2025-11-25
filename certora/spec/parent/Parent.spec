@@ -588,8 +588,8 @@ rule handleCCIPDepositToParent_ping_pongs_to_child_when_activeStrategyAdapter_is
     uint64 chainSelector;
     bytes encodedDepositData = buildEncodedDepositData(depositor, usdcDepositAmount, totalValue, shareMintAmount, chainSelector);
     Client.EVMTokenAmount[] tokenAmounts;
+
     require getStrategy().chainSelector == getThisChainSelector();
-    require getStrategy().chainSelector != chainSelector;
     require getActiveStrategyAdapter() == 0;
 
     require ghost_depositPingPongToChild_eventCount == 0;
@@ -802,8 +802,8 @@ rule handleCCIPWithdraw_forwardsToStrategy_and_emits_WithdrawPingPongToChild_whe
     uint256 usdcWithdrawAmount;
     uint64 chainSelector;
     bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
+    
     require getStrategy().chainSelector == getThisChainSelector();
-    require getStrategy().chainSelector != chainSelector;
     require getActiveStrategyAdapter() == 0;
 
     require ghost_withdrawPingPongToChild_eventCount == 0;
@@ -814,10 +814,6 @@ rule handleCCIPWithdraw_forwardsToStrategy_and_emits_WithdrawPingPongToChild_whe
     assert ghost_ccipMessageSent_txType_emitted == 10; // WithdrawPingPong
     assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;
 }
-
-
-
-
 
 // --- setStrategy --- //
 rule setStrategy_emits_CurrentStrategyOptimal_when_currentStrategy_is_optimal() {
