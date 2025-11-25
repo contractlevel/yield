@@ -518,7 +518,19 @@ rule handleCCIPMessage_DepositToStrategy() {
         ghost_ccipMessageSent_eventCount == 1 &&
         ghost_ccipMessageSent_txType_emitted == 2 && // CcipTxType.DepositCallbackParent
         ghost_ccipMessageSent_bridgeAmount_emitted == 0;
+}
 
+rule handleCCIPMessage_DepositToStrategyPingPongs() {
+    env e;
+    IYieldPeer.CcipTxType txType = IYieldPeer.CcipTxType.DepositToStrategy;
+    Client.EVMTokenAmount[] tokenAmounts;
+    bytes data;
+    uint64 sourceChainSelector;
+
+    require ghost_ccipMessageSent_eventCount == 0;
+    require ghost_depositPingPong_eventCount == 0;
+    handleCCIPMessage(e, txType, tokenAmounts, data, sourceChainSelector);
+    require getActiveStrategyAdapter() == 0;
     assert getActiveStrategyAdapter() == 0 => 
         ghost_ccipMessageSent_eventCount == 1 &&
         ghost_ccipMessageSent_txType_emitted == 9 && // CcipTxType.DepositPingPong
@@ -549,12 +561,27 @@ rule handleCCIPMessage_WithdrawToStrategy() {
 
     require ghost_ccipMessageSent_eventCount == 0;
     require ghost_withdrawCompleted_eventCount == 0;
+    handleCCIPMessage(e, txType, tokenAmounts, data, sourceChainSelector);
+    assert ghost_withdrawCompleted_eventCount == 1 || ghost_ccipMessageSent_eventCount == 1;
+}
+
+rule handleCCIPMessage_WithdrawToStrategyPingPongs() {
+    env e;
+    IYieldPeer.CcipTxType txType = IYieldPeer.CcipTxType.WithdrawToStrategy;
+    Client.EVMTokenAmount[] tokenAmounts;
+    bytes data;
+    uint64 sourceChainSelector;
+
+    require ghost_ccipMessageSent_eventCount == 0;
+    require ghost_withdrawCompleted_eventCount == 0;
     require ghost_withdrawPingPong_eventCount == 0;
     handleCCIPMessage(e, txType, tokenAmounts, data, sourceChainSelector);
-
-    assert (getActiveStrategyAdapter() == 0 => 
+    require getActiveStrategyAdapter() == 0;
+    assert getActiveStrategyAdapter() == 0 => 
         ghost_withdrawPingPong_eventCount == 1 &&
-        ghost_ccipMessageSent_eventCount == 1);
+        ghost_ccipMessageSent_eventCount == 1 &&
+        ghost_withdrawCompleted_eventCount == 0 &&
+        ghost_ccipMessageSent_txType_emitted == 10;
 }
 
 rule handleCCIPMessage_WithdrawCallback() {

@@ -1,8 +1,5 @@
 # Testing
 
-// run existing commands & check failing commands and source reason
-// handleCCIPDepositToParent change
-
 The testing process looks like this:
 
 1. unit tests
