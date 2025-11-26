@@ -24,7 +24,7 @@ contract ChildDepositPingPongTest is BaseTest {
     // - Set OPT adapter, Parent forwards again (attempt 2), deposit succeeds
     function test_yield_child_deposit_pingpong_twoChains_aave() public {
         // Arrange: Set Parent strategy to OPT (Aave)
-    
+
         {
             _selectFork(baseFork);
             bytes32 requestId = keccak256("requestId");
@@ -56,7 +56,7 @@ contract ChildDepositPingPongTest is BaseTest {
         // Note: Parent should have emitted a CCTP MessageSent event when processing OPT -> Parent
         _selectFork(baseFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
-      
+
         // OPT ping-pongs back to Parent since adapter == 0 (with USDC)
         // OPT should now have the USDC from Parent
         _selectFork(optFork);

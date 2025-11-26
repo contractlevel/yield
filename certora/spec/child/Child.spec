@@ -244,18 +244,19 @@ rule child_deposit_notStrategy_emits_correct_params() {
 // --- handleCCIPDepositToStrategy --- //
 rule handleCCIPDepositToStrategy_emits_CCIPMessageSent() {
     env e;
-    calldataarg args;
+    Client.EVMTokenAmount[] tokenAmounts;
+    bytes data;
 
     require ghost_ccipMessageSent_eventCount == 0;
-    handleCCIPDepositToStrategy(e, args);
+    handleCCIPDepositToStrategy(e, tokenAmounts, data);
     assert ghost_ccipMessageSent_eventCount == 1;
 
     assert getActiveStrategyAdapter() != 0 => 
         ghost_ccipMessageSent_txType_emitted == 2 && // CcipTxType.DepositCallbackParent
         ghost_ccipMessageSent_bridgeAmount_emitted == 0;
     assert getActiveStrategyAdapter() == 0 => 
-        ghost_ccipMessageSent_txType_emitted == 9; // CcipTxType.DepositPingPong
-    // @review check the amount emitted by the ghost_ccipMessageSent_bridgeAmount_emitted
+        ghost_ccipMessageSent_txType_emitted == 9 && // CcipTxType.DepositPingPong
+        ghost_ccipMessageSent_bridgeAmount_emitted == tokenAmounts[0].amount;
 }
 
 rule handleCCIPDepositToStrategy_depositsToStrategy(env e) {

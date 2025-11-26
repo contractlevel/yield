@@ -373,7 +373,6 @@ contract ParentDepositTest is BaseTest {
         );
     }
 
-
     /// @notice Test: Deposit ping-pong when adapter is 0
     /// @notice Flow: Child deposit -> Parent (strategy but adapter=0) -> Ping-pong back
     /// @notice The key is that when strategy is on parent and adapter is 0, parent ping-pongs
