@@ -6,8 +6,11 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IComet} from "../../../src/interfaces/IComet.sol";
 import {IYieldPeer} from "../../../src/interfaces/IYieldPeer.sol";
 import {Roles} from "../../../src/libraries/Roles.sol";
+import {stdStorage, StdStorage} from "forge-std/StdStorage.sol";
 
 contract ParentWithdrawTest is BaseTest {
+    using stdStorage for StdStorage;
+
     function setUp() public override {
         super.setUp();
 
@@ -265,6 +268,33 @@ contract ParentWithdrawTest is BaseTest {
         baseUsdc.approve(address(baseParentPeer), user4Deposit);
         baseParentPeer.deposit(user4Deposit);
         console2.log("user4 share balance", baseShare.balanceOf(user4));
+    }
+
+    /// @notice Withdraw Scenario: Withdraw on Parent, TVL in transit
+    function test_yield_parent_withdraw_revertsWhen_strategyPointsToParent_butActiveAdapterIsZero() public {
+        /// @dev Arrange: Set strategy to parent with Aave and make a deposit first
+        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
+        _selectFork(baseFork);
+        _changePrank(withdrawer);
+        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+
+        /// @dev Get shares
+        uint256 shareBalance = baseShare.balanceOf(withdrawer);
+        assertGt(shareBalance, 0, "Shares should be minted");
+
+        /// @dev Simulate the rebalance window: manually set activeStrategyAdapter to 0
+        stdstore.target(address(baseParentPeer)).sig("getActiveStrategyAdapter()").checked_write(address(0));
+
+        /// @dev Verify activeStrategyAdapter is now 0
+        assertEq(baseParentPeer.getActiveStrategyAdapter(), address(0), "ActiveStrategyAdapter should be 0");
+
+        /// @dev Act: Attempt to withdraw
+        /// @dev This should revert with ParentPeer__InactiveStrategyAdapter()
+        vm.expectRevert(abi.encodeWithSignature("ParentPeer__InactiveStrategyAdapter()"));
+        baseShare.transferAndCall(address(baseParentPeer), shareBalance, "");
+
+        /// @dev Assert: Shares should not be burned (withdraw should revert)
+        assertEq(baseShare.balanceOf(withdrawer), shareBalance, "Shares should not be burned");
     }
 
     // ----------------------------------------------------------//
