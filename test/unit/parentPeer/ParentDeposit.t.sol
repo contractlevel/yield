@@ -13,8 +13,11 @@ import {
 } from "@chainlink/contracts/src/v0.8/ccip/pools/USDC/CCTPMessageTransmitterProxy.sol";
 import {ParentPeer} from "../../../src/peers/ParentPeer.sol";
 import {Roles} from "../../../src/libraries/Roles.sol";
+import {stdStorage, StdStorage} from "forge-std/StdStorage.sol";
 
 contract ParentDepositTest is BaseTest {
+    using stdStorage for StdStorage;
+
     function setUp() public override {
         super.setUp();
         /// @dev set the fee rate
@@ -243,6 +246,50 @@ contract ParentDepositTest is BaseTest {
         uint256 amount = 1e6;
         parentWrapper.setTotalShares(totalShares);
         assertEq(parentWrapper.calculateMintAmount_(totalValue, amount), 1);
+    }
+
+    /// @notice Tests for deposit/withdraw when s_strategy points to parent but activeStrategyAdapter is 0
+    /// @notice Deposit Scenario:
+    /// 1. s_strategy is correctly set to point to parent chain
+    /// 2. But activeStrategyAdapter is 0 (simulating the rebalance window)
+    /// 3. User tries to deposit on parent
+    function test_yield_parent_deposit_revertsWhen_strategyPointsToParent_butActiveAdapterIsZero() public {
+        /// @dev Arrange: Set strategy to parent with Aave (this sets both s_strategy and activeStrategyAdapter)
+        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
+        _selectFork(baseFork);
+        _changePrank(depositor);
+
+        /// @dev Verify s_strategy points to parent
+        IYieldPeer.Strategy memory strategy = baseParentPeer.getStrategy();
+        assertEq(strategy.chainSelector, baseChainSelector, "Strategy should point to parent");
+        assertEq(strategy.protocolId, keccak256(abi.encodePacked("aave-v3")), "Strategy protocol should be aave-v3");
+
+        /// @dev Verify activeStrategyAdapter is set correctly initially
+        address activeStrategyAdapter = baseParentPeer.getActiveStrategyAdapter();
+        assertTrue(activeStrategyAdapter != address(0), "ActiveStrategyAdapter should be set initially");
+        assertEq(activeStrategyAdapter, address(baseAaveV3Adapter), "ActiveStrategyAdapter should be Aave adapter");
+
+        /// @dev Simulate the rebalance window: manually set activeStrategyAdapter to 0
+        /// @dev This simulates the state where s_strategy was updated but _handleCCIPRebalanceNewStrategy hasn't been called yet
+        stdstore.target(address(baseParentPeer)).sig("getActiveStrategyAdapter()").checked_write(address(0));
+
+        /// @dev Verify activeStrategyAdapter is now 0
+        assertEq(baseParentPeer.getActiveStrategyAdapter(), address(0), "ActiveStrategyAdapter should be 0");
+
+        /// @dev Verify s_strategy still points to parent
+        strategy = baseParentPeer.getStrategy();
+        assertEq(strategy.chainSelector, baseChainSelector, "Strategy should still point to parent");
+
+        /// @dev Record initial state
+        uint256 initialShareBalance = baseShare.balanceOf(depositor);
+        uint256 initialTotalShares = baseParentPeer.getTotalShares();
+
+        vm.expectRevert(abi.encodeWithSelector(ParentPeer.ParentPeer__InactiveStrategyAdapter.selector));
+        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+
+        /// @dev Assert: No shares should be minted (deposit should revert)
+        assertEq(baseShare.balanceOf(depositor), initialShareBalance, "No shares should be minted");
+        assertEq(baseParentPeer.getTotalShares(), initialTotalShares, "Total shares should not change");
     }
 }
 

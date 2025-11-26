@@ -78,6 +78,14 @@ definition DepositToStrategyEvent() returns bytes32 =
 // keccak256(abi.encodePacked("DepositToStrategy(address,uint256)"))
     to_bytes32(0x8125d05f0839eec6c1f6b1674833e01f11ab362bd9c60eb2e3b274fa3b47e4f4);
 
+definition DepositPingPongEvent() returns bytes32 =
+// keccak256(abi.encodePacked("DepositPingPongToParent(uint256)"))
+    to_bytes32(0x07a8895ad201463447eac3116473614940ca48b2be48a2e0851f29fe6144eb99);
+
+definition WithdrawPingPongEvent() returns bytes32 =
+// keccak256(abi.encodePacked("WithdrawPingPongToParent(uint256)"))
+    to_bytes32(0x92fdcaf7d7e4ba9fb2e6b7aaa33ab45a3464542db1f0f314eb75be8130d37e56);
+
 /*//////////////////////////////////////////////////////////////
                              GHOSTS
 //////////////////////////////////////////////////////////////*/
@@ -136,6 +144,16 @@ ghost mathint ghost_depositToStrategy_eventCount {
     init_state axiom ghost_depositToStrategy_eventCount == 0;
 }
 
+/// @notice EventCount: track amount of DepositPingPong event is emitted
+ghost mathint ghost_depositPingPong_eventCount {
+    init_state axiom ghost_depositPingPong_eventCount == 0;
+}
+
+/// @notice EventCount: track amount of WithdrawPingPong event is emitted
+ghost mathint ghost_withdrawPingPong_eventCount {
+    init_state axiom ghost_withdrawPingPong_eventCount == 0;
+}
+
 /*//////////////////////////////////////////////////////////////
                              HOOKS
 //////////////////////////////////////////////////////////////*/
@@ -161,6 +179,8 @@ hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
 hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
     if (t0 == ActiveStrategyAdapterUpdatedEvent()) 
         ghost_activeStrategyAdapterUpdated_eventCount = ghost_activeStrategyAdapterUpdated_eventCount + 1;
+    if (t0 == DepositPingPongEvent()) ghost_depositPingPong_eventCount = ghost_depositPingPong_eventCount + 1;
+    if (t0 == WithdrawPingPongEvent()) ghost_withdrawPingPong_eventCount = ghost_withdrawPingPong_eventCount + 1;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -224,13 +244,19 @@ rule child_deposit_notStrategy_emits_correct_params() {
 // --- handleCCIPDepositToStrategy --- //
 rule handleCCIPDepositToStrategy_emits_CCIPMessageSent() {
     env e;
-    calldataarg args;
+    Client.EVMTokenAmount[] tokenAmounts;
+    bytes data;
 
     require ghost_ccipMessageSent_eventCount == 0;
-    handleCCIPDepositToStrategy(e, args);
+    handleCCIPDepositToStrategy(e, tokenAmounts, data);
     assert ghost_ccipMessageSent_eventCount == 1;
-    assert ghost_ccipMessageSent_txType_emitted == 2; // CcipTxType.DepositCallbackParent
-    assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;
+
+    assert getActiveStrategyAdapter() != 0 => 
+        ghost_ccipMessageSent_txType_emitted == 2 && // CcipTxType.DepositCallbackParent
+        ghost_ccipMessageSent_bridgeAmount_emitted == 0;
+    assert getActiveStrategyAdapter() == 0 => 
+        ghost_ccipMessageSent_txType_emitted == 9 && // CcipTxType.DepositPingPong
+        ghost_ccipMessageSent_bridgeAmount_emitted == tokenAmounts[0].amount;
 }
 
 rule handleCCIPDepositToStrategy_depositsToStrategy(env e) {
@@ -314,13 +340,16 @@ rule handleCCIPWithdrawToStrategy_withdrawsFromStrategy() {
     require aaveBalanceBefore - expectedUsdcWithdrawAmount >= 0, "should not cause underflow";
     require withdrawer != compoundPool && withdrawer != aavePool && withdrawer != currentContract,
         "withdrawer should not be the compound or aave pool or current contract";
-    
+    require ghost_withdrawPingPong_eventCount == 0;
+
     handleCCIPWithdrawToStrategy(e, encodedWithdrawData);
 
     assert getActiveStrategyAdapter() == compoundV3Adapter => 
         usdc.balanceOf(compoundPool) == compoundBalanceBefore - expectedUsdcWithdrawAmount;
     assert getActiveStrategyAdapter() == aaveV3Adapter => 
         usdc.balanceOf(aavePool) == aaveBalanceBefore - expectedUsdcWithdrawAmount;
+    assert getActiveStrategyAdapter() == 0 =>
+        ghost_withdrawPingPong_eventCount == 1;
 }
 
 rule handleCCIPWithdrawToStrategy_completesWithdrawal_when_sameChain() {
@@ -343,9 +372,15 @@ rule handleCCIPWithdrawToStrategy_completesWithdrawal_when_sameChain() {
         "withdrawer should not be the compound or aave pool or current contract";
 
     require ghost_withdrawCompleted_eventCount == 0;
+    require ghost_withdrawPingPong_eventCount == 0;
     handleCCIPWithdrawToStrategy(e, encodedWithdrawData);
-    assert ghost_withdrawCompleted_eventCount == 1;
-    assert usdc.balanceOf(withdrawer) == usdcBalanceBefore + expectedWithdrawAmount;
+    
+    assert getActiveStrategyAdapter() == 0 =>
+        ghost_withdrawPingPong_eventCount == 1;
+
+    assert getActiveStrategyAdapter() != 0 =>
+        ghost_withdrawCompleted_eventCount == 1 &&
+        usdc.balanceOf(withdrawer) == usdcBalanceBefore + expectedWithdrawAmount; 
 }
 
 rule handleCCIPWithdrawToStrategy_emits_CCIPMessageSent_when_differentChain() {
@@ -475,10 +510,34 @@ rule handleCCIPMessage_DepositToStrategy() {
     uint64 sourceChainSelector;
 
     require ghost_ccipMessageSent_eventCount == 0;
+    require ghost_depositPingPong_eventCount == 0;
+
+    require getActiveStrategyAdapter() != 0;
+
     handleCCIPMessage(e, txType, tokenAmounts, data, sourceChainSelector);
-    assert ghost_ccipMessageSent_eventCount == 1;
-    assert ghost_ccipMessageSent_txType_emitted == 2; // CcipTxType.DepositCallbackParent
-    assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;
+    
+    assert 
+        ghost_ccipMessageSent_eventCount == 1 &&
+        ghost_ccipMessageSent_txType_emitted == 2 && // CcipTxType.DepositCallbackParent
+        ghost_ccipMessageSent_bridgeAmount_emitted == 0;
+}
+
+rule handleCCIPMessage_DepositToStrategyPingPongs() {
+    env e;
+    IYieldPeer.CcipTxType txType = IYieldPeer.CcipTxType.DepositToStrategy;
+    Client.EVMTokenAmount[] tokenAmounts;
+    bytes data;
+    uint64 sourceChainSelector;
+
+    require ghost_ccipMessageSent_eventCount == 0;
+    require ghost_depositPingPong_eventCount == 0;
+    require getActiveStrategyAdapter() == 0;
+    handleCCIPMessage(e, txType, tokenAmounts, data, sourceChainSelector);
+    assert 
+        ghost_ccipMessageSent_eventCount == 1 &&
+        ghost_ccipMessageSent_txType_emitted == 9 && // CcipTxType.DepositPingPong
+        ghost_ccipMessageSent_bridgeAmount_emitted == tokenAmounts[0].amount &&
+        ghost_depositPingPong_eventCount == 1;
 }
 
 rule handleCCIPMessage_DepositCallbackChild() {
@@ -506,6 +565,25 @@ rule handleCCIPMessage_WithdrawToStrategy() {
     require ghost_withdrawCompleted_eventCount == 0;
     handleCCIPMessage(e, txType, tokenAmounts, data, sourceChainSelector);
     assert ghost_withdrawCompleted_eventCount == 1 || ghost_ccipMessageSent_eventCount == 1;
+}
+
+rule handleCCIPMessage_WithdrawToStrategyPingPongs() {
+    env e;
+    IYieldPeer.CcipTxType txType = IYieldPeer.CcipTxType.WithdrawToStrategy;
+    Client.EVMTokenAmount[] tokenAmounts;
+    bytes data;
+    uint64 sourceChainSelector;
+
+    require ghost_ccipMessageSent_eventCount == 0;
+    require ghost_withdrawCompleted_eventCount == 0;
+    require ghost_withdrawPingPong_eventCount == 0;
+    handleCCIPMessage(e, txType, tokenAmounts, data, sourceChainSelector);
+    require getActiveStrategyAdapter() == 0;
+    assert getActiveStrategyAdapter() == 0 => 
+        ghost_withdrawPingPong_eventCount == 1 &&
+        ghost_ccipMessageSent_eventCount == 1 &&
+        ghost_withdrawCompleted_eventCount == 0 &&
+        ghost_ccipMessageSent_txType_emitted == 10;
 }
 
 rule handleCCIPMessage_WithdrawCallback() {

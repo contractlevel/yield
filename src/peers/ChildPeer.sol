@@ -16,6 +16,14 @@ contract ChildPeer is YieldPeer {
     uint64 internal immutable i_parentChainSelector;
 
     /*//////////////////////////////////////////////////////////////
+                                 EVENTS
+    //////////////////////////////////////////////////////////////*/
+    /// @notice Emitted when a DepositToStrategy needs to be pingpong'd with the Parent
+    event DepositPingPongToParent(uint256 indexed depositAmount);
+    /// @notice Emitted when a WithdrawToStrategy needs to be pingpong'd with the Parent
+    event WithdrawPingPongToParent(uint256 indexed shareBurnAmount);
+
+    /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
     /// @param ccipRouter The address of the CCIP router
@@ -47,6 +55,7 @@ contract ChildPeer is YieldPeer {
     /// @notice User must approve this contract to spend their stablecoin
     function deposit(uint256 amountToDeposit) external override whenNotPaused {
         /// @dev takes a fee
+        /// same var name ==== confusing!
         amountToDeposit = _initiateDeposit(amountToDeposit);
 
         address activeStrategyAdapter = _getActiveStrategyAdapter();
@@ -113,10 +122,14 @@ contract ChildPeer is YieldPeer {
         bytes memory data,
         uint64 /* sourceChainSelector */
     ) internal override {
-        if (txType == CcipTxType.DepositToStrategy) _handleCCIPDepositToStrategy(tokenAmounts, data);
+        if (txType == CcipTxType.DepositToStrategy || txType == CcipTxType.DepositPingPong) {
+            _handleCCIPDepositToStrategy(tokenAmounts, data);
+        }
         //slither-disable-next-line reentrancy-events
         if (txType == CcipTxType.DepositCallbackChild) _handleCCIPDepositCallbackChild(data);
-        if (txType == CcipTxType.WithdrawToStrategy) _handleCCIPWithdrawToStrategy(data);
+        if (txType == CcipTxType.WithdrawToStrategy || txType == CcipTxType.WithdrawPingPong) {
+            _handleCCIPWithdrawToStrategy(data);
+        }
         if (txType == CcipTxType.WithdrawCallback) _handleCCIPWithdrawCallback(tokenAmounts, data);
         //slither-disable-next-line reentrancy-no-eth
         if (txType == CcipTxType.RebalanceOldStrategy) _handleCCIPRebalanceOldStrategy(data);
@@ -131,11 +144,19 @@ contract ChildPeer is YieldPeer {
     function _handleCCIPDepositToStrategy(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data) internal {
         DepositData memory depositData = _decodeDepositData(data);
         CCIPOperations._validateTokenAmounts(tokenAmounts, address(i_usdc), depositData.amount);
+        address activeStrategyAdapter = _getActiveStrategyAdapter();
+        if (activeStrategyAdapter != address(0)) {
+            depositData.totalValue = _depositToStrategyAndGetTotalValue(activeStrategyAdapter, depositData.amount);
 
-        depositData.totalValue = _depositToStrategyAndGetTotalValue(_getActiveStrategyAdapter(), depositData.amount);
-
-        /// @dev send a message to parent with totalValue to calculate shareMintAmount
-        _ccipSend(i_parentChainSelector, CcipTxType.DepositCallbackParent, abi.encode(depositData), ZERO_BRIDGE_AMOUNT);
+            /// @dev send a message to parent with totalValue to calculate shareMintAmount
+            _ccipSend(
+                i_parentChainSelector, CcipTxType.DepositCallbackParent, abi.encode(depositData), ZERO_BRIDGE_AMOUNT
+            );
+        } else {
+            // consider adding event for ping pong, pros/cons of emitting it here
+            emit DepositPingPongToParent(depositData.amount);
+            _ccipSend(i_parentChainSelector, CcipTxType.DepositPingPong, abi.encode(depositData), depositData.amount);
+        }
     }
 
     /// @notice This function handles a deposit callback from the parent chain
@@ -155,19 +176,27 @@ contract ChildPeer is YieldPeer {
     /// @param data The encoded WithdrawData
     function _handleCCIPWithdrawToStrategy(bytes memory data) internal {
         WithdrawData memory withdrawData = _decodeWithdrawData(data);
-        withdrawData.usdcWithdrawAmount = _withdrawFromStrategyAndGetUsdcWithdrawAmount(withdrawData);
 
-        if (i_thisChainSelector == withdrawData.chainSelector) {
-            //slither-disable-next-line reentrancy-events
-            emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
-            _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
+        address activeStrategyAdapter = _getActiveStrategyAdapter();
+        if (activeStrategyAdapter != address(0)) {
+            withdrawData.usdcWithdrawAmount =
+                _withdrawFromStrategyAndGetUsdcWithdrawAmount(activeStrategyAdapter, withdrawData);
+
+            if (i_thisChainSelector == withdrawData.chainSelector) {
+                //slither-disable-next-line reentrancy-events
+                emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
+                _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
+            } else {
+                _ccipSend(
+                    withdrawData.chainSelector,
+                    CcipTxType.WithdrawCallback,
+                    abi.encode(withdrawData), // @review solady calldata compression for all encoded crosschain data?
+                    withdrawData.usdcWithdrawAmount
+                );
+            }
         } else {
-            _ccipSend(
-                withdrawData.chainSelector,
-                CcipTxType.WithdrawCallback,
-                abi.encode(withdrawData), // @review solady calldata compression for all encoded crosschain data?
-                withdrawData.usdcWithdrawAmount
-            );
+            emit WithdrawPingPongToParent(withdrawData.shareBurnAmount);
+            _ccipSend(i_parentChainSelector, CcipTxType.WithdrawPingPong, abi.encode(withdrawData), ZERO_BRIDGE_AMOUNT);
         }
     }
 

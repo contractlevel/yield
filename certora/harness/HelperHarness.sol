@@ -42,8 +42,12 @@ contract HelperHarness {
         });
         return abi.encode(depositData);
     }
-    
-    function prepareTokenAmounts(address usdc,uint256 bridgeAmount) public pure returns (Client.EVMTokenAmount[] memory tokenAmounts) {
+
+    function prepareTokenAmounts(address usdc, uint256 bridgeAmount)
+        public
+        pure
+        returns (Client.EVMTokenAmount[] memory tokenAmounts)
+    {
         if (bridgeAmount > 0) {
             tokenAmounts = new Client.EVMTokenAmount[](1);
             tokenAmounts[0] = Client.EVMTokenAmount({token: usdc, amount: bridgeAmount});
@@ -92,11 +96,11 @@ contract HelperHarness {
         return uint256(value) != 0;
     }
 
-    function calculateWithdrawAmount(
-        uint256 totalValue,
-        uint256 totalShares,
-        uint256 shareBurnAmount
-    ) public pure returns (uint256) {
+    function calculateWithdrawAmount(uint256 totalValue, uint256 totalShares, uint256 shareBurnAmount)
+        public
+        pure
+        returns (uint256)
+    {
         return (shareBurnAmount * totalValue) / totalShares;
     }
 

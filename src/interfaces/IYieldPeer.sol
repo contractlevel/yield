@@ -18,7 +18,9 @@ interface IYieldPeer is IYieldFees {
         WithdrawToStrategy, // 5 - withdraw from parent to strategy (to withdraw from strategy and get usdcWithdrawAmount)
         WithdrawCallback, // 6 - withdraw callback from strategy to withdraw chain (to send USDC to withdrawer)
         RebalanceOldStrategy, // 7 - message from parent to old strategy (to move funds to new strategy)
-        RebalanceNewStrategy // 8 - reallocate funds from old strategy to new strategy
+        RebalanceNewStrategy, // 8 - reallocate funds from old strategy to new strategy
+        DepositPingPong, // 9 - pingpong deposit Tx from child to parent (to allow TVL to reach strategy chain)
+        WithdrawPingPong // 10 - pingpong withdraw Tx from parent to child (to allow TVL to reach strategy chain)
     }
 
     struct DepositData {

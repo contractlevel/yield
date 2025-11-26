@@ -20,6 +20,9 @@ contract ParentPeer is YieldPeer {
     //////////////////////////////////////////////////////////////*/
     error ParentPeer__OnlyRebalancer();
     error ParentPeer__InitialActiveStrategyAlreadySet();
+    /// @dev indicates activeStrategyAdapter not set when parent state shows s_strategy.chainSelector == thisChainSelector
+    /// activeStrategyAdapter is updated when rebalance TVL transit concludes
+    error ParentPeer__InactiveStrategyAdapter();
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
@@ -52,6 +55,10 @@ contract ParentPeer is YieldPeer {
     event WithdrawForwardedToStrategy(uint256 indexed shareBurnAmount, uint64 indexed strategyChainSelector);
     /// @notice Emitted when the rebalancer is set
     event RebalancerSet(address indexed rebalancer);
+    /// @notice Emitted when a deposit is ping-pong'd to a child
+    event DepositPingPongToChild(uint256 indexed depositAmount, uint64 indexed destChainSelector);
+    /// @notice Emitted when a withdraw is pingpong'd to a child
+    event WithdrawPingPongToChild(uint256 indexed shareBurnAmount, uint64 indexed destChainSelector);
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -85,6 +92,9 @@ contract ParentPeer is YieldPeer {
         if (strategy.chainSelector == i_thisChainSelector) {
             /// @dev cache active strategy adapter
             address activeStrategyAdapter = _getActiveStrategyAdapter();
+            /// @dev this is for the edgecase activeStrategyAdapter hasn't been updated yet, even though Parent state says it is strategy,
+            /// TVL rebalance is still in transit
+            if (activeStrategyAdapter == address(0)) revert ParentPeer__InactiveStrategyAdapter();
 
             /// @dev get total value from strategy
             uint256 totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, address(i_usdc));
@@ -148,6 +158,10 @@ contract ParentPeer is YieldPeer {
         // 1. This Parent is the Strategy. Therefore the usdcWithdrawAmount is calculated and withdrawal is handled here.
         if (strategy.chainSelector == i_thisChainSelector) {
             address activeStrategyAdapter = _getActiveStrategyAdapter();
+            /// @dev this is for the edgecase activeStrategyAdapter hasn't been updated yet, even though Parent state says it is strategy,
+            /// TVL rebalance is still in transit
+            if (activeStrategyAdapter == address(0)) revert ParentPeer__InactiveStrategyAdapter();
+
             uint256 totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, address(i_usdc));
 
             uint256 usdcWithdrawAmount = _calculateWithdrawAmount(totalValue, totalShares, shareBurnAmount);
@@ -226,10 +240,13 @@ contract ParentPeer is YieldPeer {
         bytes memory data,
         uint64 sourceChainSelector
     ) internal override {
-        if (txType == CcipTxType.DepositToParent) _handleCCIPDepositToParent(tokenAmounts, data);
+        if (txType == CcipTxType.DepositToParent || txType == CcipTxType.DepositPingPong) {
+            _handleCCIPDepositToParent(tokenAmounts, data);
+        }
         //slither-disable-next-line reentrancy-no-eth
         if (txType == CcipTxType.DepositCallbackParent) _handleCCIPDepositCallbackParent(data);
         if (txType == CcipTxType.WithdrawToParent) _handleCCIPWithdrawToParent(data, sourceChainSelector);
+        if (txType == CcipTxType.WithdrawPingPong) _handleCCIPWithdrawPingPong(data);
         if (txType == CcipTxType.WithdrawCallback) _handleCCIPWithdrawCallback(tokenAmounts, data);
         //slither-disable-next-line reentrancy-events
         if (txType == CcipTxType.RebalanceNewStrategy) _handleCCIPRebalanceNewStrategy(tokenAmounts, data);
@@ -253,24 +270,35 @@ contract ParentPeer is YieldPeer {
         if (strategy.chainSelector == i_thisChainSelector) {
             /// @dev cache active strategy adapter
             address activeStrategyAdapter = _getActiveStrategyAdapter();
-            /// @dev get total value from strategy and calculate share mint amount
-            depositData.totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, address(i_usdc));
-            depositData.shareMintAmount = _calculateMintAmount(depositData.totalValue, depositData.amount);
-            /// @dev update s_totalShares
-            s_totalShares += depositData.shareMintAmount;
-            emit ShareMintUpdate(depositData.shareMintAmount, depositData.chainSelector, s_totalShares);
-            /// @dev deposit to strategy
-            _depositToStrategy(activeStrategyAdapter, depositData.amount);
 
-            _ccipSend(
-                depositData.chainSelector, CcipTxType.DepositCallbackChild, abi.encode(depositData), ZERO_BRIDGE_AMOUNT
-            );
+            if (activeStrategyAdapter != address(0)) {
+                /// @dev get total value from strategy and calculate share mint amount
+                depositData.totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, address(i_usdc));
+                depositData.shareMintAmount = _calculateMintAmount(depositData.totalValue, depositData.amount);
+                /// @dev update s_totalShares
+                s_totalShares += depositData.shareMintAmount;
+                emit ShareMintUpdate(depositData.shareMintAmount, depositData.chainSelector, s_totalShares);
+                /// @dev deposit to strategy
+                _depositToStrategy(activeStrategyAdapter, depositData.amount);
+
+                _ccipSend(
+                    depositData.chainSelector,
+                    CcipTxType.DepositCallbackChild,
+                    abi.encode(depositData),
+                    ZERO_BRIDGE_AMOUNT
+                );
+            }
+            /// @dev handling edgecase where activeStrategyAdapter hasn't been updated, even though parent state has, because tvl in transit
+            else {
+                /// @dev ping pong back to deposit chain
+                emit DepositPingPongToChild(depositData.amount, depositData.chainSelector);
+                _ccipSend(depositData.chainSelector, CcipTxType.DepositPingPong, encodedDepositData, depositData.amount);
+            }
         }
-
         /// @dev If Strategy is on third chain, forward deposit to strategy
-        if (strategy.chainSelector != i_thisChainSelector && strategy.chainSelector != depositData.chainSelector) {
-            _ccipSend(strategy.chainSelector, CcipTxType.DepositToStrategy, encodedDepositData, depositData.amount);
+        else {
             emit DepositForwardedToStrategy(depositData.amount, strategy.chainSelector);
+            _ccipSend(strategy.chainSelector, CcipTxType.DepositToStrategy, encodedDepositData, depositData.amount);
         }
     }
 
@@ -327,22 +355,41 @@ contract ParentPeer is YieldPeer {
             withdrawData.shareBurnAmount, sourceChainSelector, withdrawData.totalShares - withdrawData.shareBurnAmount
         );
 
-        Strategy memory strategy = s_strategy;
+        _handleCCIPWithdraw(s_strategy, withdrawData);
+    }
 
+    /// @notice This function handles the withdraw flow logic that is used by both _handleCCIPWithdrawToParent and _handleCCIPWithdrawPingPong
+    /// @notice We need this so that we aren't repeating ourselves in both functions and so we are not updating state again in _handleCCIPWithdrawPingPong (because it would have been updated during the _handleCCIPWithdrawToParent stage of the flow)
+    /// @param strategy The active strategy state
+    /// @param withdrawData The withdraw data for the tx
+    function _handleCCIPWithdraw(Strategy memory strategy, WithdrawData memory withdrawData) internal {
         // 1. If the parent is the strategy, we want to use the totalShares and shareBurnAmount to calculate the usdcWithdrawAmount then withdraw it and ccipSend it back to the withdrawer
         if (strategy.chainSelector == i_thisChainSelector) {
-            withdrawData.usdcWithdrawAmount = _withdrawFromStrategyAndGetUsdcWithdrawAmount(withdrawData);
+            address activeStrategyAdapter = _getActiveStrategyAdapter();
+            if (activeStrategyAdapter != address(0)) {
+                withdrawData.usdcWithdrawAmount =
+                    _withdrawFromStrategyAndGetUsdcWithdrawAmount(activeStrategyAdapter, withdrawData);
 
-            if (withdrawData.chainSelector == i_thisChainSelector) {
-                //slither-disable-next-line reentrancy-events
-                emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
-                _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
+                if (withdrawData.chainSelector == i_thisChainSelector) {
+                    //slither-disable-next-line reentrancy-events
+                    emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
+                    _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
+                } else {
+                    _ccipSend(
+                        withdrawData.chainSelector,
+                        CcipTxType.WithdrawCallback,
+                        abi.encode(withdrawData),
+                        withdrawData.usdcWithdrawAmount
+                    );
+                }
             } else {
+                emit WithdrawPingPongToChild(withdrawData.shareBurnAmount, withdrawData.chainSelector);
+                /// @dev Encode the updated withdrawData (with correct totalShares) instead of using stale encodedWithdrawData
                 _ccipSend(
                     withdrawData.chainSelector,
-                    CcipTxType.WithdrawCallback,
+                    CcipTxType.WithdrawPingPong,
                     abi.encode(withdrawData),
-                    withdrawData.usdcWithdrawAmount
+                    ZERO_BRIDGE_AMOUNT
                 );
             }
         }
@@ -353,6 +400,14 @@ contract ParentPeer is YieldPeer {
                 strategy.chainSelector, CcipTxType.WithdrawToStrategy, abi.encode(withdrawData), ZERO_BRIDGE_AMOUNT
             );
         }
+    }
+
+    /// @notice This function handles a pingpong withdraw from a child to this parent
+    /// @notice Forwards withdraw to active strategy without updating state (already updated in original flow)
+    /// @notice This only happens when parent is NOT the strategy (if parent were strategy, withdraw would complete in _handleCCIPWithdrawToParent)
+    function _handleCCIPWithdrawPingPong(bytes memory data) internal {
+        WithdrawData memory withdrawData = _decodeWithdrawData(data);
+        _handleCCIPWithdraw(s_strategy, withdrawData);
     }
 
     /// @notice This function sets the strategy on the parent
