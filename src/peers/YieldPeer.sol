@@ -304,13 +304,13 @@ abstract contract YieldPeer is
     }
 
     /// @notice Withdraws from the strategy and returns the USDC withdraw amount
+    /// @param activeStrategyAdapter The active strategy adapter
     /// @param withdrawData The withdraw data
     /// @return usdcWithdrawAmount The USDC withdraw amount
-    function _withdrawFromStrategyAndGetUsdcWithdrawAmount(WithdrawData memory withdrawData)
-        internal
-        returns (uint256 usdcWithdrawAmount)
-    {
-        address activeStrategyAdapter = _getActiveStrategyAdapter();
+    function _withdrawFromStrategyAndGetUsdcWithdrawAmount(
+        address activeStrategyAdapter,
+        WithdrawData memory withdrawData
+    ) internal returns (uint256 usdcWithdrawAmount) {
         uint256 totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, address(i_usdc));
         usdcWithdrawAmount =
             _calculateWithdrawAmount(totalValue, withdrawData.totalShares, withdrawData.shareBurnAmount);

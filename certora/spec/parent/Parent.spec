@@ -19,6 +19,8 @@ methods {
     function getActiveStrategyAdapter() external returns (address) envfree;
     function getMaxFeeRate() external returns (uint256) envfree;
     function getRebalancer() external returns (address) envfree;
+    function paused() external returns (bool) envfree;
+    function getAllowedChain(uint64) external returns (bool) envfree;
 
     // PausableWithAccessControl methods
     function owner() external returns (address) envfree;
@@ -126,6 +128,14 @@ definition DepositToStrategyEvent() returns bytes32 =
 definition ActiveStrategyAdapterUpdatedEvent() returns bytes32 =
 // keccak256(abi.encodePacked("ActiveStrategyAdapterUpdated(address)"))
     to_bytes32(0xebe96b449bfdb3f1ed534cb774b9a9b0954447b489e45e828c81a03fec492cc7);
+
+definition DepositPingPongToChildEvent() returns bytes32 =
+// keccak256(abi.encodePacked("DepositPingPongToChild(uint256,uint64)"))
+    to_bytes32(0xd226c55624acdf7dc487bf2d322d07feef128f29f6bb7793e03ba147d84b5c98);
+
+definition WithdrawPingPongToChildEvent() returns bytes32 =
+// keccak256(abi.encodePacked("WithdrawPingPongToChild(uint256,uint64)"))
+    to_bytes32(0xc75e77a40c4dc3a53d5deb9d8fb9d32536847fcc2c9d2d88f1f6f1aed0f71de5);
 
 /*//////////////////////////////////////////////////////////////
                              GHOSTS
@@ -235,6 +245,15 @@ ghost mathint ghost_activeStrategyAdapterUpdated_eventCount {
     init_state axiom ghost_activeStrategyAdapterUpdated_eventCount == 0;
 }
 
+/// @notice EventCount: track amount of DepositPingPongToStrategy event is emitted
+ghost mathint ghost_depositPingPongToChild_eventCount {
+    init_state axiom ghost_depositPingPongToChild_eventCount == 0;
+}
+
+/// @notice EventCount: track amount of WithdrawPingPongToStrategy event is emitted
+ghost mathint ghost_withdrawPingPongToChild_eventCount {
+    init_state axiom ghost_withdrawPingPongToChild_eventCount == 0;
+}
 /*//////////////////////////////////////////////////////////////
                              HOOKS
 //////////////////////////////////////////////////////////////*/
@@ -276,6 +295,10 @@ hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
         ghost_withdrawFromStrategy_eventCount = ghost_withdrawFromStrategy_eventCount + 1;
     if (t0 == DepositToStrategyEvent()) 
         ghost_depositToStrategy_eventCount = ghost_depositToStrategy_eventCount + 1;
+    if (t0 == DepositPingPongToChildEvent())
+        ghost_depositPingPongToChild_eventCount = ghost_depositPingPongToChild_eventCount + 1;
+    if (t0 == WithdrawPingPongToChildEvent())
+        ghost_withdrawPingPongToChild_eventCount = ghost_withdrawPingPongToChild_eventCount + 1;
 }
 
 hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
@@ -376,6 +399,23 @@ rule deposit_emits_CCIPMessageSent_when_strategy_is_differentChain() {
     assert ghost_ccipMessageSent_bridgeAmount_emitted == amountToDeposit - fee;
 }
 
+rule deposit_reverts_when_parent_is_strategy_and_activeStrategyAdapter_is_zero() {
+    env e;
+    uint256 amountToDeposit;
+
+    /// @dev revert conditions being verified
+    require getStrategy().chainSelector == getThisChainSelector();
+    require getActiveStrategyAdapter() == 0;
+
+    /// @dev revert conditions not being verified
+    require e.msg.value == 0;
+    require amountToDeposit >= 1000000; // 1e6
+    require !paused();
+
+    deposit@withrevert(e, amountToDeposit);
+    assert lastReverted;
+}
+
 // --- onTokenTransfer --- //
 rule onTokenTransfer_decreases_totalShares() {
     env e;
@@ -471,6 +511,28 @@ rule onTokenTransfer_emits_CCIPMessageSent_when_strategyChain_is_differentChain(
     assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;
 }
 
+rule onTokenTransfer_reverts_when_parent_is_strategy_and_activeStrategyAdapter_is_zero() {
+    env e;
+    address withdrawer;
+    uint256 shareBurnAmount;
+    uint64 withdrawChainSelector;
+    bytes encodedWithdrawChainSelector = encodeUint64(withdrawChainSelector);
+
+    /// @dev revert conditions being verified
+    require getStrategy().chainSelector == getThisChainSelector();
+    require getActiveStrategyAdapter() == 0;
+
+    /// @dev revert conditions not being verified
+    require e.msg.value == 0;
+    require e.msg.sender == currentContract.i_share;
+    require shareBurnAmount > 0;
+    require !paused();
+    require getAllowedChain(withdrawChainSelector);
+
+    onTokenTransfer@withrevert(e, withdrawer, shareBurnAmount, encodedWithdrawChainSelector);
+    assert lastReverted;
+}
+
 // --- handleCCIPDepositToParent --- //
 rule handleCCIPDepositToParent_depositsToStrategy_when_parent_is_strategy() {
     env e;
@@ -515,6 +577,29 @@ rule handleCCIPDepositToParent_updatesTotalShares_when_depositChain_is_strategyC
     handleCCIPDepositToParent(e, tokenAmounts, encodedDepositData);
 
     assert getTotalShares() >= totalSharesBefore;
+}
+
+rule handleCCIPDepositToParent_ping_pongs_to_child_when_activeStrategyAdapter_is_zero() {
+    env e;
+    address depositor;
+    uint256 usdcDepositAmount;
+    uint256 totalValue;
+    uint256 shareMintAmount;
+    uint64 chainSelector;
+    bytes encodedDepositData = buildEncodedDepositData(depositor, usdcDepositAmount, totalValue, shareMintAmount, chainSelector);
+    Client.EVMTokenAmount[] tokenAmounts;
+
+    require getStrategy().chainSelector == getThisChainSelector();
+    require getActiveStrategyAdapter() == 0;
+
+    require ghost_depositPingPongToChild_eventCount == 0;
+    require ghost_ccipMessageSent_eventCount == 0;
+    
+    handleCCIPDepositToParent(e, tokenAmounts, encodedDepositData);
+    assert ghost_depositPingPongToChild_eventCount == 1;
+    assert ghost_ccipMessageSent_eventCount == 1;
+    assert ghost_ccipMessageSent_txType_emitted == 9; // DepositPingPong
+    assert ghost_ccipMessageSent_bridgeAmount_emitted == usdcDepositAmount;
 }
 
 rule handleCCIPDepositToParent_forwardsToStrategy() {
@@ -705,6 +790,28 @@ rule handleCCIPWithdrawToParent_forwardsToStrategy() {
     assert ghost_withdrawForwardedToStrategy_eventCount == 1;
     assert ghost_ccipMessageSent_eventCount == 1;
     assert ghost_ccipMessageSent_txType_emitted == 5; // WithdrawToStrategy
+    assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;
+}
+
+// --- handleCCIPWithdraw & handleCCIPWithdrawPingPong --- //
+rule handleCCIPWithdraw_forwardsToStrategy_and_emits_WithdrawPingPongToChild_when_Adapter_is_zero() {
+    env e;
+    address withdrawer;
+    uint256 shareBurnAmount;
+    uint256 totalShares;
+    uint256 usdcWithdrawAmount;
+    uint64 chainSelector;
+    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
+    
+    require getStrategy().chainSelector == getThisChainSelector();
+    require getActiveStrategyAdapter() == 0;
+
+    require ghost_withdrawPingPongToChild_eventCount == 0;
+    require ghost_ccipMessageSent_eventCount == 0;
+    handleCCIPWithdraw(e, encodedWithdrawData);
+    assert ghost_withdrawPingPongToChild_eventCount == 1;
+    assert ghost_ccipMessageSent_eventCount == 1;
+    assert ghost_ccipMessageSent_txType_emitted == 10; // WithdrawPingPong
     assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;
 }
 

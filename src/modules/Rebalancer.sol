@@ -85,7 +85,6 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Pausable
     /// @param functionsRouter The address of the Chainlink Functions router
     /// @param donId The Chainlink Functions DON ID
     /// @param clfSubId The Chainlink Functions subscription ID
-    // @review transfer delay
     constructor(address functionsRouter, bytes32 donId, uint64 clfSubId)
         PausableWithAccessControl(msg.sender)
         FunctionsClient(functionsRouter)
@@ -123,7 +122,7 @@ contract Rebalancer is FunctionsClient, AutomationBase, ILogAutomation, Pausable
     function checkLog(Log calldata log, bytes memory)
         external
         view
-        cannotExecute
+        // cannotExecute
         returns (bool upkeepNeeded, bytes memory performData)
     {
         bytes32 eventSignature = keccak256("StrategyUpdated(uint64,bytes32,uint64)");

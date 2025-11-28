@@ -8,30 +8,17 @@ import {CCIPOperations} from "../../src/libraries/CCIPOperations.sol";
 import {HelperHarness} from "./HelperHarness.sol";
 
 contract ParentHarness is ParentPeer, HelperHarness {
-    constructor(
-        address ccipRouter,
-        address link,
-        uint64 thisChainSelector,
-        address usdc,
-        address share
-    ) ParentPeer(ccipRouter, link, thisChainSelector, usdc, share) {}
+    constructor(address ccipRouter, address link, uint64 thisChainSelector, address usdc, address share)
+        ParentPeer(ccipRouter, link, thisChainSelector, usdc, share)
+    {}
 
     function buildCCIPMessage(
         address receiver,
         IYieldPeer.CcipTxType txType,
         bytes memory data,
         Client.EVMTokenAmount[] memory tokenAmounts
-    )
-        public view returns (Client.EVM2AnyMessage memory) 
-    {
-        return CCIPOperations._buildCCIPMessage(
-            receiver, 
-            txType, 
-            data, 
-            tokenAmounts, 
-            s_ccipGasLimit, 
-            address(i_link)
-        );
+    ) public view returns (Client.EVM2AnyMessage memory) {
+        return CCIPOperations._buildCCIPMessage(receiver, txType, data, tokenAmounts, s_ccipGasLimit, address(i_link));
     }
 
     function calculateTotalValue(uint256 usdcDepositAmount) public view returns (uint256) {
@@ -51,6 +38,17 @@ contract ParentHarness is ParentPeer, HelperHarness {
 
     function handleCCIPWithdrawToParent(bytes memory data, uint64 sourceChainSelector) public {
         _handleCCIPWithdrawToParent(data, sourceChainSelector);
+    }
+
+    function handleCCIPWithdraw(bytes memory encodedWithdrawData) public {
+        WithdrawData memory withdrawData = _decodeWithdrawData(encodedWithdrawData);
+        _handleCCIPWithdraw(s_strategy, withdrawData);
+    }
+
+    // handlePinpong public
+
+    function handleCCIPWithdrawPingPong(bytes memory data) public {
+        _handleCCIPWithdrawPingPong(data);
     }
 
     function calculateMintAmount(uint256 totalValue, uint256 amount) public view returns (uint256) {

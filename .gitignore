@@ -10,6 +10,9 @@ out/
 # Docs
 docs/
 
+# Test helpers
+test/helpers/
+
 # Dotenv file
 .env
 
