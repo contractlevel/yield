@@ -48,7 +48,7 @@ contract SimpleParent is IReceiver {
         /// @dev metadata ignored, no safety checks here - for simple testing!
 
         Strategy memory strategy = abi.decode(report, (Strategy));
-        setStrategy(strategy.chainSelector, strategy.protocolId);
+        _setStrategy(strategy.chainSelector, strategy.protocolId);
     }
 
     function supportsInterface(bytes4 interfaceId) external pure virtual override returns (bool) {
@@ -58,7 +58,7 @@ contract SimpleParent is IReceiver {
     /*//////////////////////////////////////////////////////////////
                             INTERNAL / SETTER
     //////////////////////////////////////////////////////////////*/
-    function setStrategy(uint64 chainSelector, bytes32 protocolId) internal {
+    function _setStrategy(uint64 chainSelector, bytes32 protocolId) internal {
         s_strategy = Strategy({chainSelector: chainSelector, protocolId: protocolId});
         emit StrategyUpdated(chainSelector, protocolId);
     }
