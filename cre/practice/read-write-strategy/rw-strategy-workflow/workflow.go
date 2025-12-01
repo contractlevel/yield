@@ -117,6 +117,7 @@ func onCronTrigger(config *Config, runtime cre.Runtime, trigger *cron.Payload) (
 	logger.Info("View transaction at", "url", fmt.Sprintf("https://sepolia.etherscan.io/tx/%s", txHash))
 
 	// Read + show Strategy again to see that it's the new one
+	// @review George: I'm not sure this read again works because the tx above is sent as report
 	logger.Info("Getting current strategy...")
 	curStra, err := simpleParentContract.GetStrategy(runtime, big.NewInt(-3)).Await()
 	logger.Info("Strategy read.", "ProtocolId", common.Bytes2Hex(curStra.ProtocolId[:]), "ChainSelector", curStra.ChainSelector)

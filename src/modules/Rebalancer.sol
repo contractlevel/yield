@@ -11,6 +11,7 @@ contract Rebalancer is CREReceiver {
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
+    error Rebalancer__NotZeroAddress();
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
@@ -35,7 +36,8 @@ contract Rebalancer is CREReceiver {
                                 INTERNAL
     //////////////////////////////////////////////////////////////*/
     function _processReport(bytes calldata report) internal override {
-        // DO STUFF! :)
+        IYieldPeer.Strategy memory strategy = abi.decode(report, (IYieldPeer.Strategy));
+        IParentPeer(s_parentPeer).setStrategy(strategy.chainSelector, strategy.protocolId);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -45,6 +47,7 @@ contract Rebalancer is CREReceiver {
     /// @param parentPeer The address of the ParentPeer contract
     /// @dev Revert if the caller is not the config admin
     function setParentPeer(address parentPeer) external onlyOwner {
+        if (parentPeer == address(0)) revert Rebalancer__NotZeroAddress();
         s_parentPeer = parentPeer;
         emit ParentPeerSet(parentPeer);
     }
