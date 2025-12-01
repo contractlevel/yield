@@ -6,26 +6,31 @@ import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step
 
 /// @title CREReceiver
 /// @author George Gorzhiyev - Judge Finance
-/// @notice A modified 'IReceiverTemplate' with mandatory security checks
+/// @dev Modified 'IReceiverTemplate' with security checks made mandatory
+/// @dev From: https://docs.chain.link/cre/guides/workflow/using-evm-client/onchain-write/building-consumer-contracts#3-using-ireceivertemplate
+/// @notice Abstract contract to get/verify/implement CRE reports from a Chainlink Keystone Forwarder
 abstract contract CREReceiver is IReceiver, Ownable2Step {
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
-    error CREReceiver__InvalidKeystoneForwarder(address sender, address expected);
-    error CREReceiver__InvalidWorkflowAuthor(address received, address expected);
-    error CREReceiver__InvalidWorkflowName(bytes10 received, bytes10 expected);
-    error CREReceiver__InvalidWorkflowId(bytes32 received, bytes32 expected);
+    error CREReceiver__InvalidKeystoneForwarder(address sender, address expectedForwarder);
+    error CREReceiver__InvalidWorkflowDeployer(address receivedDeployer, address expectedDeployer);
+    error CREReceiver__InvalidWorkflowName(bytes10 receivedName, bytes10 expectedName);
+    error CREReceiver__InvalidWorkflowId(bytes32 receivedId, bytes32 expectedId);
+    error CREReceiver__NotZeroAddress();
+    error CREReceiver__NotEmptyName();
+    error CREReceiver__NotZeroId();
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
     /// @dev The Chainlink Keystone Forwarder contract address to receive CRE reports from
     address internal s_keystoneForwarder;
-    /// @dev The expected CRE workflow author address
-    address internal s_expectedWorkflowAuthor;
+    /// @dev The expected CRE workflow deployer address
+    address internal s_expectedWorkflowDeployer;
     /// @dev The expected CRE workflow name
     bytes10 internal s_expectedWorkflowName;
-    /// @dev The expected CRE workflow id
+    /// @dev The expected CRE workflow Id
     bytes32 internal s_expectedWorkflowId;
 
     /*//////////////////////////////////////////////////////////////
@@ -33,15 +38,15 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
     //////////////////////////////////////////////////////////////*/
     /// @notice Emitted when a Keystone Forwarder address is set
     event KeystoneForwarderSet(address indexed);
-    /// @notice Emitted when an expected workflow author address is set
-    event ExpectedWorkflowAuthorSet(address indexed);
+    /// @notice Emitted when an expected workflow deployer address is set
+    event ExpectedWorkflowDeployerSet(address indexed);
     /// @notice Emitted when an expected workflow name is set
-    event ExpectedWorkflowNameSet(string indexed); // @review Might need to change string to bytes10?
-    /// @notice Emitted when an expected workflow id is set
+    event ExpectedWorkflowNameSet(bytes10 indexed);
+    /// @notice Emitted when an expected workflow Id is set
     event ExpectedWorkflowIdSet(bytes32 indexed);
-    // @review Would we want this?
-    /// @notice Emitted when all security checks pass on an 'onReport'
-    event CREReceiverSecurityChecksPassed(address indexed, address indexed, bytes32 indexed, bytes10);
+    /// @notice Emitted when all security checks pass on 'onReport'
+    /// @dev (Keystone Forwarder, Workflow Author, Workflow Id, Workflow Name)
+    event OnReportSecurityChecksPassed(address indexed, address indexed, bytes32 indexed, bytes10);
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -54,31 +59,37 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
     //////////////////////////////////////////////////////////////*/
     /// @inheritdoc IReceiver
     /// @dev Performs all 4 validation checks
+    /// @notice Called by a Chainlink Keystone Forwarder
+    /// @param metadata Metadata about the report
+    /// @param report The CRE report
     function onReport(bytes calldata metadata, bytes calldata report) external override {
-        // Security Check 1: Verify caller is the trusted Chainlink Forwarder
+        // Security Check 1: Verify caller is the trusted Chainlink Keystone Forwarder
         if (msg.sender != s_keystoneForwarder) {
             revert CREReceiver__InvalidKeystoneForwarder(msg.sender, s_keystoneForwarder);
         }
 
         // Security Checks 2-4: Verify workflow identity - ID, owner and name
-        (bytes32 workflowId, bytes10 workflowName, address workflowOwner) = _decodeMetadata(metadata);
+        (bytes32 workflowId, bytes10 workflowName, address workflowDeployer) = _decodeMetadata(metadata);
         if (workflowId != s_expectedWorkflowId) {
             revert CREReceiver__InvalidWorkflowId(workflowId, s_expectedWorkflowId);
         }
-        if (workflowOwner != s_expectedWorkflowAuthor) {
-            revert CREReceiver__InvalidWorkflowAuthor(workflowOwner, s_expectedWorkflowAuthor);
+        if (workflowDeployer != s_expectedWorkflowDeployer) {
+            revert CREReceiver__InvalidWorkflowDeployer(workflowDeployer, s_expectedWorkflowDeployer);
         }
         if (workflowName != s_expectedWorkflowName) {
             revert CREReceiver__InvalidWorkflowName(workflowName, s_expectedWorkflowName);
         }
 
-        // @review Would we want this? To emit all of the decoded data, could be useful for testing...
-        emit CREReceiverSecurityChecksPassed(msg.sender, workflowOwner, workflowId, workflowName);
+        /// @dev Emitted to assist in testing and verification of decoding workflow metadata
+        emit OnReportSecurityChecksPassed(msg.sender, workflowDeployer, workflowId, workflowName);
 
         _processReport(report);
     }
 
     /// @inheritdoc IERC165
+    /// @dev Implemented in order to receive CRE reports from Keystone Forwarder
+    /// @param interfaceId The interface Id in bytes4
+    /// @return If interface Id is supported
     function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
         return interfaceId == type(IReceiver).interfaceId || interfaceId == type(IERC165).interfaceId;
     }
@@ -130,29 +141,27 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
     /*//////////////////////////////////////////////////////////////
                                  SETTER
     //////////////////////////////////////////////////////////////*/
-    /// @notice Updates the forwarder address that is allowed to call onReport
-    /// @param keystoneForwarder The new forwarder address
-    function setForwarderAddress(address keystoneForwarder) external onlyOwner {
+    /// @notice Updates the Chainlink Keystone Forwarder address that is allowed to call onReport
+    /// @param keystoneForwarder The new forwader address
+    function setKeystoneForwarderAddress(address keystoneForwarder) external onlyOwner {
+        if (keystoneForwarder == address(0)) revert CREReceiver__NotZeroAddress();
         s_keystoneForwarder = keystoneForwarder;
         emit KeystoneForwarderSet(keystoneForwarder);
     }
 
-    /// @notice Updates the expected workflow owner address
-    /// @param workflowAuthor The new expected author address
-    function setExpectedWorkflowAuthor(address workflowAuthor) external onlyOwner {
-        s_expectedWorkflowAuthor = workflowAuthor;
-        emit ExpectedWorkflowAuthorSet(workflowAuthor);
+    /// @notice Updates the expected workflow deployer address
+    /// @param workflowDeployer The new expected workflow deployer address
+    function setExpectedWorkflowDeployer(address workflowDeployer) external onlyOwner {
+        if (workflowDeployer == address(0)) revert CREReceiver__NotZeroAddress();
+        s_expectedWorkflowDeployer = workflowDeployer;
+        emit ExpectedWorkflowDeployerSet(workflowDeployer);
     }
 
     /// @notice Updates the expected workflow name from a plaintext string
     /// @param workflowName The workflow name as a string
     /// @dev The name is hashed using SHA256 and truncated
-    // @review Is this encoding needed? Are you able to just do that off chain and pass that in here?
     function setExpectedWorkflowName(string calldata workflowName) external onlyOwner {
-        if (bytes(workflowName).length == 0) {
-            s_expectedWorkflowName = bytes10(0);
-            return;
-        }
+        if (bytes(workflowName).length == 0) revert CREReceiver__NotEmptyName();
 
         // Convert workflow name to bytes10:
         // SHA256 hash → hex encode → take first 10 chars → hex encode those chars
@@ -163,13 +172,13 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
             first10[i] = hexString[i];
         }
         s_expectedWorkflowName = bytes10(first10);
-        // @review String workflowName is being converted to bytes10, what do we want it to emit?
-        emit ExpectedWorkflowNameSet(workflowName);
+        emit ExpectedWorkflowNameSet(bytes10(first10));
     }
 
-    /// @notice Updates the expected workflow ID
-    /// @param id The new expected workflow ID
+    /// @notice Updates the expected workflow Id
+    /// @param id The new expected workflow Id
     function setExpectedWorkflowId(bytes32 id) external onlyOwner {
+        if (id == bytes32(0)) revert CREReceiver__NotZeroId();
         s_expectedWorkflowId = id;
         emit ExpectedWorkflowIdSet(id);
     }
@@ -182,9 +191,9 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
         keystoneForwarder = s_keystoneForwarder;
     }
 
-    /// @return workflowAuthor The expected CRE workflow author address
-    function getExpectedWorkflowAuthor() external view returns (address workflowAuthor) {
-        workflowAuthor = s_expectedWorkflowAuthor;
+    /// @return workflowDeployer The expected CRE workflow deployer address
+    function getExpectedWorkflowAuthor() external view returns (address workflowDeployer) {
+        workflowDeployer = s_expectedWorkflowDeployer;
     }
 
     /// @return workflowName The expected CRE workflow name
