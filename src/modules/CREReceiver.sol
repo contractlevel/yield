@@ -8,7 +8,7 @@ import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step
 /// @author George Gorzhiyev - Judge Finance
 /// @dev Modified 'IReceiverTemplate' with security checks made mandatory
 /// @dev From: https://docs.chain.link/cre/guides/workflow/using-evm-client/onchain-write/building-consumer-contracts#3-using-ireceivertemplate
-/// @notice Abstract contract to get/verify/implement CRE reports from a Chainlink Keystone Forwarder
+/// @notice Abstract contract to get/verify/consume CRE reports from a Chainlink Keystone Forwarder
 abstract contract CREReceiver is IReceiver, Ownable2Step {
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -46,6 +46,7 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
     event ExpectedWorkflowIdSet(bytes32 indexed);
     /// @notice Emitted when all security checks pass on 'onReport'
     /// @dev (Keystone Forwarder, Workflow Author, Workflow Id, Workflow Name)
+    // @review What would we want indexed?
     event OnReportSecurityChecksPassed(address indexed, address indexed, bytes32 indexed, bytes10);
 
     /*//////////////////////////////////////////////////////////////
@@ -81,9 +82,10 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
         }
 
         /// @dev Emitted to assist in testing and verification of decoding workflow metadata
+        // @review What do we want indexed?
         emit OnReportSecurityChecksPassed(msg.sender, workflowDeployer, workflowId, workflowName);
 
-        _processReport(report);
+        _onReport(report);
     }
 
     /// @inheritdoc IERC165
@@ -136,7 +138,7 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
 
     /// @param report The report calldata containing your workflow's encoded data
     /// @dev Implement this function with your contract's business logic
-    function _processReport(bytes calldata report) internal virtual;
+    function _onReport(bytes calldata report) internal virtual;
 
     /*//////////////////////////////////////////////////////////////
                                  SETTER

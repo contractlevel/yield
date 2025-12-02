@@ -23,6 +23,7 @@ contract ParentPeer is YieldPeer {
     /// @dev indicates activeStrategyAdapter not set when parent state shows s_strategy.chainSelector == thisChainSelector
     /// activeStrategyAdapter is updated when rebalance TVL transit concludes
     error ParentPeer__InactiveStrategyAdapter();
+    error ParentPeer__NoStrategyChangeFound();
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
@@ -191,33 +192,6 @@ contract ParentPeer is YieldPeer {
                 strategy.chainSelector, CcipTxType.WithdrawToStrategy, abi.encode(withdrawData), ZERO_BRIDGE_AMOUNT
             );
         }
-    }
-
-    /// @dev Revert if msg.sender is not the Rebalancer
-    /// @dev Handle moving strategy (both funds & new strategy info) from this parent chain to a child chain
-    /// @notice This function is called by the Rebalancer's Log-trigger Automation performUpkeep
-    /// @notice Called when the strategy is on this chain and is being moved to a child chain
-    /// @param oldStrategyAdapter The address of the old strategy adapter
-    /// @param totalValue The total value of the system
-    /// @param newStrategy The new strategy
-    function rebalanceParentToChild(address oldStrategyAdapter, uint256 totalValue, Strategy memory newStrategy)
-        external
-    {
-        _revertIfMsgSenderIsNotRebalancer();
-        _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
-        if (totalValue != 0) _withdrawFromStrategy(oldStrategyAdapter, totalValue);
-        _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, abi.encode(newStrategy), totalValue);
-    }
-
-    /// @dev Revert if msg.sender is not the Rebalancer
-    /// @dev Handle rebalancing on a child chain by sending it new Strategy info
-    /// @notice This function is called by the Rebalancer's Log-trigger Automation performUpkeep
-    /// @notice This is called when the old strategy is on a child chain and needs to be rebalanaced (either to another local protocol or chain)
-    /// @param oldChainSelector The chain selector of the old strategy
-    /// @param newStrategy The new strategy
-    function rebalanceChildToOther(uint64 oldChainSelector, Strategy memory newStrategy) external {
-        _revertIfMsgSenderIsNotRebalancer();
-        _ccipSend(oldChainSelector, CcipTxType.RebalanceOldStrategy, abi.encode(newStrategy), ZERO_BRIDGE_AMOUNT);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -410,41 +384,43 @@ contract ParentPeer is YieldPeer {
         _handleCCIPWithdraw(s_strategy, withdrawData);
     }
 
-    /// @notice This function sets the strategy on the parent
-    /// @notice Called by Chainlink Functions callback - see ParentCLF.sol
-    /// @notice Rebalances funds from the old strategy to the new strategy if both are on this chain
-    /// @notice Handles the case where both the old and new strategy are on this chain
+    /// @notice This function sets the strategy on the parent and triggers appropriate strategy change
+    /// @notice Called by Rebalancer::_onReport after getting CRE report from Keystone Forwarder
+    /// @notice Triggers appropriate strategy rebalance (local, parent to child, child to other)
     /// @param chainSelector The chain selector of the new strategy
     /// @param protocolId The protocol ID of the new strategy
-    /// @dev StrategyUpdated event emitted in _updateStrategy will trigger ParentRebalancer::performUpkeep ccip rebalances
-    /// @notice performUpkeep handles the case where the old or new strategies are on different chains with ccipSend
-    function _setStrategy(uint64 chainSelector, bytes32 protocolId) internal {
+    function _setAndHandleStrategyChange(uint64 chainSelector, bytes32 protocolId) internal {
         Strategy memory oldStrategy = s_strategy;
         Strategy memory newStrategy = Strategy({chainSelector: chainSelector, protocolId: protocolId});
 
-        // Early return if strategy hasn't changed
-        if (!_updateStrategy(newStrategy, oldStrategy)) {
-            return;
-        }
-        // Handle strategy changes on the this parent chain
-        if (chainSelector == i_thisChainSelector && oldStrategy.chainSelector == i_thisChainSelector) {
-            _handleLocalStrategyChange(newStrategy);
-        }
-    }
-
-    /// @notice Internal helper to handle strategy updates
-    /// @param newStrategy The new strategy to set
-    /// @param oldStrategy The current strategy
-    /// @return bool Whether the strategy was actually changed
-    function _updateStrategy(Strategy memory newStrategy, Strategy memory oldStrategy) internal returns (bool) {
+        /// @dev Early return if strategy hasn't changed
         if (oldStrategy.chainSelector == newStrategy.chainSelector && oldStrategy.protocolId == newStrategy.protocolId)
         {
             emit CurrentStrategyOptimal(newStrategy.chainSelector, newStrategy.protocolId);
-            return false;
+            return;
         }
+
+        /// @dev Update Strategy and emit StrategyUpdated event
         s_strategy = newStrategy;
         emit StrategyUpdated(newStrategy.chainSelector, newStrategy.protocolId, oldStrategy.chainSelector);
-        return true;
+
+        /// @dev Handle local strategy change on the this parent chain
+        if (newStrategy.chainSelector == i_thisChainSelector && oldStrategy.chainSelector == i_thisChainSelector) {
+            _handleLocalStrategyChange(newStrategy);
+        }
+        /// @dev Handle strategy change from parent to child
+        else if (newStrategy.chainSelector != i_thisChainSelector && oldStrategy.chainSelector == i_thisChainSelector) {
+            _rebalanceParentToChild(newStrategy);
+        }
+        /// @dev Handle strategy change from a child to other peer
+        else if (oldStrategy.chainSelector != i_thisChainSelector) {
+            _rebalanceChildToOther(oldStrategy.chainSelector, newStrategy);
+        }
+        /// @dev Fallback to revert if by some edge case no strategy change condition met
+        // @review Will this ever trigger?
+        else {
+            revert ParentPeer__NoStrategyChangeFound();
+        }
     }
 
     /// @notice Handles strategy change when both old and new strategies are on this chain
@@ -460,6 +436,28 @@ contract ParentPeer is YieldPeer {
 
         //slither-disable-next-line reentrancy-events
         _depositToStrategy(newActiveStrategyAdapter, totalValue);
+    }
+
+    /// @dev Handle moving strategy (both funds & new strategy info) from this parent chain to a child chain
+    /// @notice Called when the strategy is on this chain and is being moved to a child chain
+    /// @param newStrategy The new strategy
+    function _rebalanceParentToChild(Strategy memory newStrategy) internal {
+        address oldActiveStrategyAdapter = _getActiveStrategyAdapter();
+        uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, address(i_usdc));
+
+        _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
+
+        if (totalValue != 0) _withdrawFromStrategy(oldActiveStrategyAdapter, totalValue);
+
+        _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, abi.encode(newStrategy), totalValue);
+    }
+
+    /// @dev Handle rebalancing on a child chain by sending it new Strategy info
+    /// @notice This is called when the old strategy is on a child chain and needs to be rebalanaced (either to another local protocol or chain)
+    /// @param oldChainSelector The chain selector of the old strategy
+    /// @param newStrategy The new strategy
+    function _rebalanceChildToOther(uint64 oldChainSelector, Strategy memory newStrategy) internal {
+        _ccipSend(oldChainSelector, CcipTxType.RebalanceOldStrategy, abi.encode(newStrategy), ZERO_BRIDGE_AMOUNT);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -481,23 +479,21 @@ contract ParentPeer is YieldPeer {
         if (shareMintAmount == 0) shareMintAmount = 1;
     }
 
-    /// @dev Revert if msg.sender is not the Rebalancer
-    function _revertIfMsgSenderIsNotRebalancer() internal view {
-        if (msg.sender != s_rebalancer) revert ParentPeer__OnlyRebalancer();
-    }
-
     /*//////////////////////////////////////////////////////////////
                                  SETTER
     //////////////////////////////////////////////////////////////*/
-    /// @notice This is called by Rebalancer::_fulfillRequest during a CLF callback
-    /// @notice _setStrategy will emit StrategyUpdated() event which CLA Log trigger uses in Rebalancer
+    /// @notice Called by Rebalancer::_onReport when it gets a CRE report from a Keystone Forwarder
+    /// @notice _setAndHandleStrategyChange() will do the following:
+    /// @notice 1. Update the active s_strategy and emit StrategyUpdated() event
+    /// @notice 2. Trigger appropriate strategy change (local, parent to child, child to other)
     /// @dev Revert if msg.sender is not the Rebalancer
     /// @dev Set the strategy
     /// @param chainSelector The chain selector of the new strategy
     /// @param protocolId The protocol ID of the new strategy
+    // @review Do we want to make this Pausable?
     function setStrategy(uint64 chainSelector, bytes32 protocolId) external {
-        _revertIfMsgSenderIsNotRebalancer();
-        _setStrategy(chainSelector, protocolId);
+        if (msg.sender != s_rebalancer) revert ParentPeer__OnlyRebalancer();
+        _setAndHandleStrategyChange(chainSelector, protocolId);
     }
 
     /// @notice Sets the initial active strategy

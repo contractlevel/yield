@@ -3,6 +3,7 @@ pragma solidity 0.8.26;
 
 import {CREReceiver} from "./CREReceiver.sol";
 import {IParentPeer, IYieldPeer} from "../interfaces/IParentPeer.sol";
+import {IStrategyRegistry} from "../interfaces/IStrategyRegistry.sol";
 
 /// @title Rebalancer
 /// @author George Gorzhiyev - Judge Finance
@@ -19,27 +20,48 @@ contract Rebalancer is CREReceiver {
     //////////////////////////////////////////////////////////////*/
     /// @dev ParentPeer contract address
     address internal s_parentPeer;
+    /// @dev Strategy registry
+    address internal s_strategyRegistry;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
-    /// @notice Emitted when the CRE report is decoded
-    event ReportProcessed(uint64 indexed chainSelector, bytes32 indexed protocolId);
+    /// @notice Emitted when a CRE report returns an invalid chain selector
+    event InvalidChainSelectorInReport(uint64 indexed chainSelector);
+    /// @notice Emitted when a CRE report returns an invalid protocol ID
+    event InvalidProtocolIdInReport(bytes32 indexed protocolId);
+    /// @notice Emitted when the CRE report is successfully decoded/processed
+    event ReportDecoded(uint64 indexed chainSelector, bytes32 indexed protocolId);
     /// @notice Emitted when the ParentPeer contract address is set
     event ParentPeerSet(address indexed parentPeer);
+    /// @notice Emitted when the strategy registry is set
+    event StrategyRegistrySet(address indexed strategyRegistry);
 
     /*//////////////////////////////////////////////////////////////
                                 INTERNAL
     //////////////////////////////////////////////////////////////*/
     /// @inheritdoc CREReceiver
-    /// @notice Gets CRE report from CREReceiver after verification
+    /// @notice After security checks, gets CRE report from CREReceiver for consumption
     /// @param report The CRE report
-    function _processReport(bytes calldata report) internal override {
+    function _onReport(bytes calldata report) internal override {
         IYieldPeer.Strategy memory newStrategy = abi.decode(report, (IYieldPeer.Strategy));
+        uint64 chainSelector = newStrategy.chainSelector;
+        bytes32 protocolId = newStrategy.protocolId;
 
-        emit ReportProcessed(newStrategy.chainSelector, newStrategy.protocolId);
+        // @review Would it be better to revert on this one?
+        if (!IParentPeer(s_parentPeer).getAllowedChain(chainSelector)) {
+            emit InvalidChainSelectorInReport(chainSelector);
+            return;
+        }
+        // @review Better name for this? The protocol may be on a child chain while not on parent.
+        if (IStrategyRegistry(s_strategyRegistry).getStrategyAdapter(protocolId) == address(0)) {
+            emit InvalidProtocolIdInReport(protocolId);
+            return;
+        }
 
-        IParentPeer(s_parentPeer).setStrategy(newStrategy.chainSelector, newStrategy.protocolId);
+        emit ReportDecoded(newStrategy.chainSelector, newStrategy.protocolId);
+
+        IParentPeer(s_parentPeer).setStrategy(chainSelector, protocolId);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -55,6 +77,16 @@ contract Rebalancer is CREReceiver {
         emit ParentPeerSet(parentPeer);
     }
 
+    /// @notice Sets the strategy registry
+    /// @param strategyRegistry The address of the strategy registry
+    /// @dev Revert if the caller is not the owner
+    /// @dev Revert if setting to 0 address
+    function setStrategyRegistry(address strategyRegistry) external onlyOwner {
+        if (strategyRegistry == address(0)) revert Rebalancer__NotZeroAddress();
+        s_strategyRegistry = strategyRegistry;
+        emit StrategyRegistrySet(strategyRegistry);
+    }
+
     /*//////////////////////////////////////////////////////////////
                                  GETTER
     //////////////////////////////////////////////////////////////*/
@@ -63,10 +95,14 @@ contract Rebalancer is CREReceiver {
         parentPeer = s_parentPeer;
     }
 
+    /// @return strategyRegistry The strategy registry address
+    function getStrategyRegistry() external view returns (address strategyRegistry) {
+        strategyRegistry = s_strategyRegistry;
+    }
+
     /// @dev Helper function to expose the Strategy struct for CRE to create Go bindings for encoding
     /// @return currentStrategy The current Strategy (from the Parent peer)
     function getCurrentStrategy() external view returns (IYieldPeer.Strategy memory currentStrategy) {
         currentStrategy = IParentPeer(s_parentPeer).getStrategy();
-        return currentStrategy;
     }
 }
