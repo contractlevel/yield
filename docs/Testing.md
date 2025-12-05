@@ -42,6 +42,7 @@ forge test
   - [Certora formal verification](#certora-formal-verification-2)
   - [Mutation tests](#mutation-tests-2)
 - [Go the extra mile](#go-the-extra-mile)
+- [Golang](#golang)
 
 # Commands
 
@@ -264,3 +265,31 @@ chimera, olympix, 4nlyzer, slither mutate
 https://www.youtube.com/watch?v=DRZogmD647U owen thurm advanced security course part 1
 
 https://www.youtube.com/watch?v=zLnxRvf6IMA owen thurm advanced security course part 2
+
+# Golang
+
+Run tests:
+
+`go test -v .`
+
+See coverage:
+
+`go test -cover .`
+
+`go test -coverprofile=coverage.out`
+
+`go tool cover -html=coverage.out`
+
+Run single test:
+
+`go test -run Test_funcName`
+
+`go test -v -run Test_funcName`
+
+Running groups of tests:
+
+We name our tests like so `Test_group_funcName`
+
+`go test -run Test_group`
+
+`go test -v -run Test_group`
