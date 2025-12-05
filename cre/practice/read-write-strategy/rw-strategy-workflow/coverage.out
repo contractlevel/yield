@@ -1,0 +1,21 @@
+mode: set
+read-write-strategy/rw-strategy-workflow/workflow.go:42.124,50.2 2 0
+read-write-strategy/rw-strategy-workflow/workflow.go:52.106,58.16 4 1
+read-write-strategy/rw-strategy-workflow/workflow.go:58.16,60.3 1 1
+read-write-strategy/rw-strategy-workflow/workflow.go:61.2,64.57 2 1
+read-write-strategy/rw-strategy-workflow/workflow.go:64.57,66.3 1 1
+read-write-strategy/rw-strategy-workflow/workflow.go:67.2,67.61 1 1
+read-write-strategy/rw-strategy-workflow/workflow.go:67.61,69.3 1 1
+read-write-strategy/rw-strategy-workflow/workflow.go:71.2,73.16 3 0
+read-write-strategy/rw-strategy-workflow/workflow.go:73.16,75.3 1 0
+read-write-strategy/rw-strategy-workflow/workflow.go:78.2,98.64 10 0
+read-write-strategy/rw-strategy-workflow/workflow.go:98.64,100.3 1 0
+read-write-strategy/rw-strategy-workflow/workflow.go:100.8,100.71 1 0
+read-write-strategy/rw-strategy-workflow/workflow.go:100.71,102.3 1 0
+read-write-strategy/rw-strategy-workflow/workflow.go:104.2,104.58 1 0
+read-write-strategy/rw-strategy-workflow/workflow.go:104.58,106.3 1 0
+read-write-strategy/rw-strategy-workflow/workflow.go:106.8,106.65 1 0
+read-write-strategy/rw-strategy-workflow/workflow.go:106.65,108.3 1 0
+read-write-strategy/rw-strategy-workflow/workflow.go:111.2,115.16 3 0
+read-write-strategy/rw-strategy-workflow/workflow.go:115.16,117.3 1 0
+read-write-strategy/rw-strategy-workflow/workflow.go:120.2,134.8 7 0

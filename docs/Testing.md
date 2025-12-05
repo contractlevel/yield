@@ -293,3 +293,7 @@ We name our tests like so `Test_group_funcName`
 `go test -run Test_group`
 
 `go test -v -run Test_group`
+
+Clean cache:
+
+`go clean -testcache`
