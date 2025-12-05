@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math/big"
+	"strings"
 
 	"read-write-strategy/contracts/evm/src/generated/simple_parent"
 
@@ -59,10 +60,14 @@ func onCronTrigger(config *Config, runtime cre.Runtime, trigger *cron.Payload) (
 	}
 	evmClient := &evm.Client{ChainSelector: chainSelector}
 
-	// Create instance of Simple Parent contract
+	// Validate Simple Parent Address
 	if !common.IsHexAddress(evmConfig.SimpleParentAddress) {
 		return nil, fmt.Errorf("Failed to create contract instance: invalid address format: %s", evmConfig.SimpleParentAddress)
 	}
+	if !strings.HasPrefix(evmConfig.SimpleParentAddress, "0x") {
+		return nil, fmt.Errorf("Failed to create contract instance: address must start with 0x: %s", evmConfig.SimpleParentAddress)
+	}
+	// Create instance of Simple Parent contract
 	parentAddress := common.HexToAddress(evmConfig.SimpleParentAddress)
 	simpleParentContract, err := simple_parent.NewSimpleParent(evmClient, parentAddress, nil)
 	if err != nil {
