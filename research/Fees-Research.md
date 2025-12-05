@@ -340,6 +340,110 @@ Note: Both Protocols have revenue sharing incentives for their "community" imple
 
 
 
+What works for YieldCoin:
+
+## Implementation Plan (When Ready)
+
+### Approach: Beefy-Style Harvest on Deposit + CRE Cron
+
+**Harvest Triggers:**
+
+1. **On Deposit** (inexpensive chains):
+
+   - Call harvest when user deposits
+   - Collect fees on accumulated yield
+   - Reinvest remaining yield
+
+2. **CRE Cron Jobs** (all chains):
+   - Regular harvest intervals via CRE
+   - Use CRE for gas rule enforcement
+
+**Fee Collection:**
+
+- Performance fee: 10-20% of harvest profits (TBD)
+- Collected during harvest operations
+- No withdrawal fees
+
+**Yield Calculation:**
+
+- **Primary Approach** (if verified): Use Aave liquidity index formula
+  - Formula: `(scaledBalance * liquidityIndex * tokenDecimals) / 1e27`
+  - Track `scaledBalance` and `liquidityIndex` at deposit
+  - Calculate yield: `currentBalance - originalDeposit`
+- **Fallback Approach**: Track principal separately
+  - Calculate yield: `currentBalance - principal`
+- Apply fee to yield portion only
+
+
+
+### Implementation Requirements
+
+**Definite Requirements:**
+
+1. **Harvest Function**: Implement `harvest()` that:
+
+   - Claims rewards from strategy
+   - Calculates yield using liquidity index
+   - Applies performance fee
+   - Reinvests remaining yield
+
+2. **Harvest on Deposit**: Modify deposit flow to trigger harvest (on inexpensive chains)
+
+3. **CRE Integration**: Set up CRE cron jobs for regular harvesting
+
+   - TVL-based intervals
+   - Gas rule enforcement via CRE
+
+4. **Liquidity Index Tracking** (If Verified):
+
+   - Verify exact formula from Aave aToken contract code first
+   - Store `scaledBalance` and `liquidityIndex` at deposit time
+   - Query current `liquidityIndex`/`normalizedIncome` from Aave when calculating yield
+   - Calculate yield using verified formula
+   - **Alternative**: If verification fails, use principal tracking method (simpler fallback)
+
+5. **Fee Collection**:
+   - Collect performance fee during harvest
+   - Store fees in contract (withdrawable by authorized role)
+
+
+**State Variables Needed:**
+
+
+
+**Functions Needed:**
+
+```javascript
+function harvest() external; // Main harvest function
+
+function _calculateYield(address asset) internal view returns (uint256);
+
+function _collectPerformanceFee(uint256 yield) internal returns (uint256);
+
+```
+
+
+### Key Design Decisions Needed
+
+1. Performance fee rate (10%? 20%? Variable by TVL?)
+2. Harvest on deposit: Which chains? (gas cost threshold?)
+3. CRE cron intervals: TVL thresholds and frequencies
+4. Fee withdrawal: Per stablecoin or aggregated?
+
+
+
+## References
+
+- Beefy Harvest on Deposit: https://docs.beefy.finance/beefy-products/vaults#what-is-harvesting-on-deposit
+- Beefy Harvest Documentation: https://docs.beefy.finance/developer-documentation/strategy-contract#harvest
+
+
+
+
+
+Notes during research:
+
+
 - Beefy uses harvest(), additional functionality: reaps rewards, applies fees, reinvests (compounds) rewards to strategy immediately.
   we can use this as an additional approach to tackle the "strategy rarely changes" issue
   For the rare vaults which do not Harvest on Deposit, they assign a withdrawal fee of up to 0.1% to each vault to protect bad actors from abusing the vaults with too much flipping.
