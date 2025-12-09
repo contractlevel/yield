@@ -44,13 +44,15 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
     /// @notice Emitted when a Keystone Forwarder address is set
-    event KeystoneForwarderSet(address indexed);
+    event KeystoneForwarderSet(address indexed keystoneForwarder);
     /// @notice Emitted when a workflow is set
-    event WorkflowSet(bytes32 indexed, address indexed, bytes10 indexed); /// @dev (id, owner, name)
+    event WorkflowSet(bytes32 indexed workflowId, address indexed workflowOwner, bytes10 indexed workflowName);
     /// @notice Emitted when a workflow is removed
-    event WorkflowRemoved(bytes32 indexed, address indexed, bytes10 indexed); /// @dev (id, owner, name)
+    event WorkflowRemoved(bytes32 indexed workflowId, address indexed workflowOwner, bytes10 indexed workflowName);
     /// @notice Emitted when all security checks pass on 'onReport'
-    event OnReportSecurityChecksPassed(bytes32 indexed, address indexed, bytes10 indexed); /// @dev (id, owner, name)
+    event OnReportSecurityChecksPassed(
+        bytes32 indexed workflowId, address indexed workflowOwner, bytes10 indexed workflowName
+    );
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
