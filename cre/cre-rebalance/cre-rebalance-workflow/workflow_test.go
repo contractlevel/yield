@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/scheduler/cron"
-	"github.com/smartcontractkit/cre-sdk-go/cre"
+	"github.com/smartcontractkit/cre-sdk-go/cre/testutils"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 

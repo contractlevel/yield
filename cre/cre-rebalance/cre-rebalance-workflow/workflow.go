@@ -178,13 +178,13 @@ func onCronTrigger(config *Config, runtime cre.Runtime, trigger *cron.Payload) (
 		}
 
 		// @review this Strategy
-		rebalancerStrategy := rebalancer.Strategy{
+		rebalancerStrategy := rebalancer.IYieldPeerStrategy{
 			ProtocolId:    optimal.ProtocolId,
 			ChainSelector: optimal.ChainSelector,
 		}
 
 		resp, err := parentRebalancer.
-			WriteReportFromStrategy(runtime, rebalancerStrategy, gasConfig).
+			WriteReportFromIYieldPeerStrategy(runtime, rebalancerStrategy, gasConfig).
 			Await()
 		if err != nil {
 			return fmt.Errorf("failed to update strategy on Rebalancer: %w", err)
