@@ -81,7 +81,7 @@ func onCronTrigger(config *Config, runtime cre.Runtime, trigger *cron.Payload) (
 	// Show Strategy
 	logger.Info("Strategy read.", "ProtocolId", common.Bytes2Hex(currentStrategy.ProtocolId[:]), "ChainSelector", currentStrategy.ChainSelector)
 
-	// Create new Strategy - simulating getting new one from API
+	// Create new Strategy - simulating calculating one based on onchain data
 	protocol := "compound-v3"
 	hashedProtocolId := crypto.Keccak256([]byte(protocol))
 	var newChainSel uint64 = 10344971235874465080 // base sepolia
@@ -95,16 +95,27 @@ func onCronTrigger(config *Config, runtime cre.Runtime, trigger *cron.Payload) (
 
 	// Compare Strategies
 	logger.Info("Comparing strategies")
-	if currentStrategy.ChainSelector == newStrategy.ChainSelector {
+	sameChainSelector := currentStrategy.ChainSelector == newStrategy.ChainSelector
+	sameProtocolID := currentStrategy.ProtocolId == newStrategy.ProtocolId
+
+	if sameChainSelector {
 		logger.Info("Chain selectors match")
-	} else if currentStrategy.ChainSelector != newStrategy.ChainSelector {
-		logger.Info("Chain selectors dont match")
+	} else {
+		logger.Info("Chain selectors don't match")
 	}
 
-	if currentStrategy.ProtocolId == newStrategy.ProtocolId {
+	if sameProtocolID {
 		logger.Info("ProtocolIds match")
-	} else if currentStrategy.ProtocolId != newStrategy.ProtocolId {
+	} else {
 		logger.Info("ProtocolIds don't match")
+	}
+
+	// Only write if strategy actually changed
+	if sameChainSelector && sameProtocolID {
+		logger.Info("Strategy unchanged, skipping WriteReportFromStrategy")
+
+		cs := CurrentStrategy(currentStrategy)
+		return &cs, nil
 	}
 
 	// Write report
@@ -127,9 +138,11 @@ func onCronTrigger(config *Config, runtime cre.Runtime, trigger *cron.Payload) (
 	curStra, err := simpleParentContract.GetStrategy(runtime, big.NewInt(-3)).Await()
 	logger.Info("Strategy read.", "ProtocolId", common.Bytes2Hex(curStra.ProtocolId[:]), "ChainSelector", curStra.ChainSelector)
 
-	// The Protocolid in this return will be displayed as a base64 encoding in terminal
-	return &CurrentStrategy{
-		ChainSelector: curStra.ChainSelector,
-		ProtocolId:    curStra.ProtocolId,
-	}, nil
+	// // The Protocolid in this return will be displayed as a base64 encoding in terminal
+	// return &CurrentStrategy{
+	// 	ChainSelector: curStra.ChainSelector,
+	// 	ProtocolId:    curStra.ProtocolId,
+	// }, nil
+
+	return &newStrategy, nil
 }

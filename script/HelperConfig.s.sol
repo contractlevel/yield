@@ -44,7 +44,7 @@ contract HelperConfig is Script {
     }
 
     // @review Do we need this?
-    struct KeystoneConfig {
+    struct CREConfig {
         address keystoneForwarder;
     }
 
@@ -52,7 +52,7 @@ contract HelperConfig is Script {
         CCIPConfig ccip;
         TokensConfig tokens;
         ProtocolsConfig protocols;
-        KeystoneConfig keystone;
+        CREConfig cre;
         PeersConfig peers;
     }
 
@@ -144,7 +144,7 @@ contract HelperConfig is Script {
                 aavePoolAddressesProvider: 0x2f39d218133AFaB8F2B819B1066c7E434Ad94E9e,
                 comet: 0xc3d688B66703497DAA19211EEdff47f25384cdc3
             }),
-            keystone: KeystoneConfig({keystoneForwarder: 0x0b93082D9b3C7C97fAcd250082899BAcf3af3885}),
+            cre: CREConfig({keystoneForwarder: 0x0b93082D9b3C7C97fAcd250082899BAcf3af3885}),
             peers: PeersConfig({
                 localPeer: 0x0000000000000000000000000000000000000000,
                 localChainSelector: 0,
@@ -179,7 +179,7 @@ contract HelperConfig is Script {
                 aavePoolAddressesProvider: 0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb,
                 comet: 0x2e44e174f7D53F0212823acC11C01A11d58c5bCB
             }),
-            keystone: KeystoneConfig({keystoneForwarder: 0xF8344CFd5c43616a4366C34E3EEE75af79a74482}),
+            cre: CREConfig({keystoneForwarder: 0xF8344CFd5c43616a4366C34E3EEE75af79a74482}),
             peers: PeersConfig({
                 localPeer: 0x0000000000000000000000000000000000000000,
                 localChainSelector: 0,
@@ -214,7 +214,7 @@ contract HelperConfig is Script {
                 aavePoolAddressesProvider: 0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb,
                 comet: 0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf
             }),
-            keystone: KeystoneConfig({keystoneForwarder: 0xF8344CFd5c43616a4366C34E3EEE75af79a74482}),
+            cre: CREConfig({keystoneForwarder: 0xF8344CFd5c43616a4366C34E3EEE75af79a74482}),
             peers: PeersConfig({
                 localPeer: 0x0000000000000000000000000000000000000000,
                 localChainSelector: 0,
@@ -249,7 +249,7 @@ contract HelperConfig is Script {
                 aavePoolAddressesProvider: 0xe20fCBdBfFC4Dd138cE8b2E6FBb6CB49777ad64D,
                 comet: 0xb125E6687d4313864e53df431d5425969c15Eb2F
             }),
-            keystone: KeystoneConfig({keystoneForwarder: 0xF8344CFd5c43616a4366C34E3EEE75af79a74482}),
+            cre: CREConfig({keystoneForwarder: 0xF8344CFd5c43616a4366C34E3EEE75af79a74482}),
             peers: PeersConfig({
                 localPeer: 0x0000000000000000000000000000000000000000,
                 localChainSelector: 0,
@@ -299,7 +299,7 @@ contract HelperConfig is Script {
                 aavePoolAddressesProvider: 0xf7869E9D4227c53AbCD5b4964fC7f502C2FC7A58,
                 comet: 0xAec1F48e02Cfb822Be958B68C7957156EB3F0b6e
             }),
-            keystone: KeystoneConfig({keystoneForwarder: 0xF8344CFd5c43616a4366C34E3EEE75af79a74482}),
+            cre: CREConfig({keystoneForwarder: 0xF8344CFd5c43616a4366C34E3EEE75af79a74482}),
             peers: PeersConfig({
                 localPeer: ETH_SEPOLIA_PEER,
                 localChainSelector: ETH_SEPOLIA_CHAIN_SELECTOR,
@@ -347,7 +347,7 @@ contract HelperConfig is Script {
                 aavePoolAddressesProvider: 0x9bf12E915461A48bc61ddca5f295A0E20BBBa5D7,
                 comet: 0x571621Ce60Cebb0c1D442B5afb38B1663C6Bf017
             }),
-            keystone: KeystoneConfig({keystoneForwarder: 0xF8344CFd5c43616a4366C34E3EEE75af79a74482}),
+            cre: CREConfig({keystoneForwarder: 0xF8344CFd5c43616a4366C34E3EEE75af79a74482}),
             peers: PeersConfig({
                 localPeer: BASE_SEPOLIA_PEER,
                 localChainSelector: BASE_SEPOLIA_CHAIN_SELECTOR,
@@ -394,7 +394,7 @@ contract HelperConfig is Script {
                 aavePoolAddressesProvider: 0xc314344EA3676CD43EAc7c9B02B00e6cfE1Af774,
                 comet: 0x43a5Ddb9561762D835B6c0f15Cb8a7ed02F6D958
             }),
-            keystone: KeystoneConfig({keystoneForwarder: 0x76c9cf548b4179F8901cda1f8623568b58215E62}),
+            cre: CREConfig({keystoneForwarder: 0x76c9cf548b4179F8901cda1f8623568b58215E62}),
             peers: PeersConfig({
                 localPeer: AVALANCHE_FUJI_PEER,
                 localChainSelector: AVALANCHE_FUJI_CHAIN_SELECTOR,
@@ -438,7 +438,7 @@ contract HelperConfig is Script {
             protocols: ProtocolsConfig({
                 aavePoolAddressesProvider: address(poolAddressesProvider), comet: address(comet)
             }),
-            keystone: KeystoneConfig({keystoneForwarder: address(keystoneForwarder)}),
+            cre: CREConfig({keystoneForwarder: address(keystoneForwarder)}),
             peers: PeersConfig({
                 localPeer: address(parent),
                 localChainSelector: 1,

@@ -162,11 +162,8 @@ contract Handler is Test {
         aavePool = _aavePool;
         compoundPool = _compoundPool;
         rebalancer = _rebalancer;
-        vm.startPrank(rebalancer.owner());
-        rebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, rebalancer.owner());
-        rebalancer.setForwarder(forwarder);
-        rebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, rebalancer.owner());
-        vm.stopPrank();
+        vm.prank(rebalancer.owner());
+        rebalancer.setKeystoneForwarder(forwarder);
 
         parentChainSelector = parent.getThisChainSelector();
         child1ChainSelector = child1.getThisChainSelector();
