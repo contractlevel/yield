@@ -1,7 +1,13 @@
 package main
 
 import (
+	"strings"
 	"testing"
+	"time"
+
+	"github.com/smartcontractkit/cre-sdk-go/capabilities/scheduler/cron"
+	"github.com/smartcontractkit/cre-sdk-go/cre"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func Test_onCronTrigger_errorWhen_noEvmConfigsProvided(t *testing.T) {

@@ -106,13 +106,13 @@ func onCronTrigger(config *Config, runtime cre.Runtime, trigger *cron.Payload) (
 	parentYieldPeerAddr := common.HexToAddress(parentCfg.YieldPeerAddress)
 
 	// Instantiate ParentPeer contract
-	parentYieldPeer, err := yield_peer.NewYieldPeer(parentEvmClient, parentYieldPeerAddr, nil)
+	parentYieldPeer, err := parent_peer.NewParentPeer(parentEvmClient, parentYieldPeerAddr, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create parent YieldPeer binding: %w", err)
 	}
 
 	// Read current strategy from parent YieldPeer.
-	current, err := parentYieldPeer.GetStrategy(runtime).Await()
+	current, err := parentYieldPeer.GetStrategy(runtime, big.NewInt(-3)).Await()
 	if err != nil {
 		return nil, fmt.Errorf("failed to read strategy from parent YieldPeer: %w", err)
 	}
@@ -141,13 +141,14 @@ func onCronTrigger(config *Config, runtime cre.Runtime, trigger *cron.Payload) (
 	strategyYieldPeerAddr := common.HexToAddress(strategyChainCfg.YieldPeerAddress)
 	
 	// Instantiate Strategy YieldPeer contract
-	strategyYieldPeer, err := yield_peer.NewYieldPeer(strategyEvmClient, strategyYieldPeerAddr, nil)
+	// @review this is using parent_peer contract, but could be a child.
+	strategyYieldPeer, err := parent_peer.NewParentPeer(strategyEvmClient, strategyYieldPeerAddr, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create strategy YieldPeer binding: %w", err)
 	}
 
 	// Read the TVL from the current Strategy YieldPeer.
-	tvl, err := strategyYieldPeer.GetTotalValue(runtime).Await()
+	tvl, err := strategyYieldPeer.GetTotalValue(runtime, big.NewInt(-3)).Await()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get total value from strategy YieldPeer: %w", err)
 	}
@@ -162,20 +163,21 @@ func onCronTrigger(config *Config, runtime cre.Runtime, trigger *cron.Payload) (
 	writeFn := func(optimal Strategy) error {
 		// Validate + parse Rebalancer address
 		if !common.IsHexAddress(parentCfg.RebalancerAddress) {
-			return nil, fmt.Errorf("invalid Rebalancer address: %s", parentCfg.RebalancerAddress)
+			return fmt.Errorf("invalid Rebalancer address: %s", parentCfg.RebalancerAddress)
 		}
 		parentRebalancerAddr := common.HexToAddress(parentCfg.RebalancerAddress)
 
 		// Instantiate Rebalancer contract
 		parentRebalancer, err := rebalancer.NewRebalancer(parentEvmClient, parentRebalancerAddr, nil)
 		if err != nil {
-			return nil, fmt.Errorf("failed to create parent Rebalancer binding: %w", err)
+			return fmt.Errorf("failed to create parent Rebalancer binding: %w", err)
 		}
 
 		gasConfig := &evm.GasConfig{
 			GasLimit: parentCfg.GasLimit,
 		}
 
+		// @review this Strategy
 		rebalancerStrategy := rebalancer.Strategy{
 			ProtocolId:    optimal.ProtocolId,
 			ChainSelector: optimal.ChainSelector,
