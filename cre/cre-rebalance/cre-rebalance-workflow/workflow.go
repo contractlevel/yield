@@ -177,7 +177,6 @@ func onCronTrigger(config *Config, runtime cre.Runtime, trigger *cron.Payload) (
 			GasLimit: parentCfg.GasLimit,
 		}
 
-		// @review this Strategy
 		rebalancerStrategy := rebalancer.IYieldPeerStrategy{
 			ProtocolId:    optimal.ProtocolId,
 			ChainSelector: optimal.ChainSelector,
