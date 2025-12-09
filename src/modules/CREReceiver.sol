@@ -70,8 +70,9 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
     /// @param report The CRE report
     function onReport(bytes calldata metadata, bytes calldata report) external override {
         // Security Check 1: Verify caller is the trusted Chainlink Keystone Forwarder
-        if (msg.sender != s_keystoneForwarder) {
-            revert CREReceiver__InvalidKeystoneForwarder(msg.sender, s_keystoneForwarder);
+        address keystoneForwarder = s_keystoneForwarder;
+        if (msg.sender != keystoneForwarder) {
+            revert CREReceiver__InvalidKeystoneForwarder(msg.sender, keystoneForwarder);
         }
 
         // Security Checks 2-4: Verify workflow identity - ID, owner and name
@@ -81,13 +82,13 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
         address workflowOwner = s_workflows[decodedId].owner;
         bytes10 workflowName = s_workflows[decodedId].name;
 
-        if (workflowOwner == decodedOwner && workflowName == decodedName) {
-            /// @dev Emitted to assist in testing and verification of decoding workflow metadata
-            emit OnReportSecurityChecksPassed(decodedId, decodedOwner, decodedName);
-            _onReport(report);
-        } else {
+        if (workflowOwner != decodedOwner || workflowName != decodedName) {
             revert CREReceiver__InvalidWorkflow(decodedId, decodedOwner, decodedName);
         }
+
+        /// @dev Emitted to assist in testing and verification of decoding workflow metadata
+        emit OnReportSecurityChecksPassed(decodedId, decodedOwner, decodedName);
+        _onReport(report);
     }
 
     /// @inheritdoc IERC165
