@@ -30,7 +30,6 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
 
     /// @dev Mapping workflow ids to owner/name
     mapping(bytes32 workflowId => Workflow) internal s_workflows;
-
     /// @dev The Chainlink Keystone Forwarder contract address to receive CRE reports from
     address internal s_keystoneForwarder;
 
