@@ -175,16 +175,9 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
     /// @notice Removes a workflow from the allowed workflows mapping
     /// @param workflowId The id of the workflow to remove
     function removeWorkflow(bytes32 workflowId) external onlyOwner {
-        address workflowOwner = s_workflows[workflowId].owner;
-        bytes10 workflowName = s_workflows[workflowId].name;
-        // @review Better to use &&? || in the edge chance one field is
-        // set and the other is not but not sure that will happen
-        if (workflowOwner != address(0) || workflowName != bytes10(0)) {
-            delete s_workflows[workflowId];
-            emit WorkflowRemoved(workflowId, workflowOwner, workflowName);
-        } else {
-            revert CREReceiver__InvalidWorkflow(workflowId, workflowOwner, workflowName);
-        }
+        Workflow memory workflow = s_workflows[workflowId];
+        delete s_workflows[workflowId];
+        emit WorkflowRemoved(workflowId, workflow.owner, workflow.name);
     }
 
     /*//////////////////////////////////////////////////////////////

@@ -56,16 +56,4 @@ contract RemoveWorkflowTest is BaseTest {
         assertEq(workflow.owner, address(0));
         assertEq(workflow.name, bytes10(0));
     }
-
-    function test_yield_creReceiver_removeWorkflow_revertsWhen_workflowDoesNotExist() public {
-        bytes32 newWorkflowId = keccak256("newWorkflow");
-
-        _changePrank(baseRebalancer.owner());
-        vm.expectRevert(
-            abi.encodeWithSignature(
-                "CREReceiver__InvalidWorkflow(bytes32,address,bytes10)", newWorkflowId, address(0), bytes10(0)
-            )
-        );
-        baseRebalancer.removeWorkflow(newWorkflowId);
-    }
 }
