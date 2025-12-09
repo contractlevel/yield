@@ -9,7 +9,6 @@ import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {CCIPLocalSimulatorFork, Register} from "@chainlink-local/src/ccip/CCIPLocalSimulatorFork.sol";
-import {Log} from "@chainlink/contracts/src/v0.8/automation/interfaces/ILogAutomation.sol";
 
 import {DeployParent, HelperConfig, ParentPeer, Rebalancer} from "../script/deploy/DeployParent.s.sol";
 import {DeployChild, ChildPeer} from "../script/deploy/DeployChild.s.sol";
@@ -21,11 +20,7 @@ import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAd
 import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
 import {DataTypes} from "@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol";
 import {USDCTokenPool} from "@chainlink/contracts/src/v0.8/ccip/pools/USDC/USDCTokenPool.sol";
-import {
-    IFunctionsSubscriptions
-} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/interfaces/IFunctionsSubscriptions.sol";
-import {IFunctionsRouter} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/interfaces/IFunctionsRouter.sol";
-import {FunctionsClient} from "@chainlink/contracts/src/v0.8/functions/v1_3_0/FunctionsClient.sol";
+
 import {LinkTokenInterface} from "@chainlink/contracts/src/v0.8/shared/interfaces/LinkTokenInterface.sol";
 import {IMessageTransmitter} from "../src/interfaces/IMessageTransmitter.sol";
 import {IYieldPeer} from "../src/interfaces/IYieldPeer.sol";
@@ -61,8 +56,6 @@ contract BaseTest is Test {
     uint256 internal constant BASE_MAINNET_BLOCK_NUMBER = 38045674;
     uint256 internal constant OPTIMISM_MAINNET_BLOCK_NUMBER = 143640972;
     uint256 internal constant ETHEREUM_MAINNET_BLOCK_NUMBER = 23777365;
-
-    uint64 internal clfSubId;
 
     Share internal baseShare;
     SharePool internal baseSharePool;
@@ -108,8 +101,7 @@ contract BaseTest is Test {
     address internal depositor = makeAddr("depositor");
     address internal withdrawer = makeAddr("withdrawer");
     address internal holder = makeAddr("holder");
-    address internal upkeepAddress = makeAddr("upkeepAddress");
-    address internal forwarder = makeAddr("forwarder");
+    address internal keystoneForwarder = makeAddr("keystoneForwarder");
     address[] internal attesters = new address[](4);
     uint256[] internal attesterPks = new uint256[](4);
 
@@ -120,6 +112,15 @@ contract BaseTest is Test {
     address internal emergencyUnpauser = makeAddr("emergencyUnpauser");
     address internal feeWithdrawer = makeAddr("feeWithdrawer");
     address internal feeRateSetter = makeAddr("feeRateSetter");
+
+    /// @dev workflow params
+    address internal workflowOwner = makeAddr("workflowOwner");
+    bytes32 internal workflowId = bytes32("rebalanceWorkflowId");
+    string internal workflowNameRaw = "judge-rebalance-workflow";
+
+    /// @dev '_setStrategy' flag to control message routing
+    bool internal constant SET_CROSS_CHAIN = true;
+    bool internal constant NO_CROSS_CHAIN = false;
 
     /*//////////////////////////////////////////////////////////////
                                  SETUP
@@ -134,19 +135,10 @@ contract BaseTest is Test {
         _setCCTPAttesters();
         _setDomains();
 
-        _setUpAutomationAndFunctions();
+        _setForwarderAndWorkflow();
 
         /// @dev sanity check that we're ending BaseTest.setUp() on the Parent chain
         assertEq(block.chainid, BASE_MAINNET_CHAIN_ID);
-        _stopPrank();
-    }
-
-    /// @notice Chainlink Functions requires signing Terms of Service - we can bypass this in our fork tests by pranking the FunctionsRouter contract owner and setting the allowListId for the TermsOfServiceAllowList contract to map to address(0)
-    function _bypassClfTermsOfService() internal {
-        HelperConfig config = new HelperConfig();
-        address functionsRouter = config.getActiveNetworkConfig().clf.functionsRouter;
-        _changePrank(Ownable(functionsRouter).owner());
-        IFunctionsRouter(functionsRouter).setAllowListId("");
         _stopPrank();
     }
 
@@ -155,8 +147,6 @@ contract BaseTest is Test {
         baseFork = vm.createSelectFork(vm.envString("BASE_MAINNET_RPC_URL"), BASE_MAINNET_BLOCK_NUMBER);
         assertEq(block.chainid, BASE_MAINNET_CHAIN_ID);
 
-        _bypassClfTermsOfService();
-
         DeployParent baseDeployParent = new DeployParent();
         DeployParent.DeploymentConfig memory baseDeploy = baseDeployParent.run();
         baseShare = baseDeploy.share;
@@ -164,7 +154,6 @@ contract BaseTest is Test {
         baseParentPeer = baseDeploy.parentPeer;
         baseRebalancer = baseDeploy.rebalancer;
         baseConfig = baseDeploy.config;
-        clfSubId = baseDeploy.clfSubId;
         baseStrategyRegistry = baseDeploy.strategyRegistry;
         baseAaveV3Adapter = baseDeploy.aaveV3Adapter;
         baseCompoundV3Adapter = baseDeploy.compoundV3Adapter;
@@ -219,18 +208,8 @@ contract BaseTest is Test {
     }
 
     function _grantRoles() internal virtual {
-        // grant roles - rebalancer
-        _selectFork(baseFork);
-        _changePrank(baseRebalancer.owner());
-        baseRebalancer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
-        baseRebalancer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
-        baseRebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
-
-        assertTrue(baseRebalancer.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
-        assertTrue(baseRebalancer.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
-        assertTrue(baseRebalancer.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
-
         // grant roles - parent
+        _selectFork(baseFork);
         _changePrank(baseParentPeer.owner());
         baseParentPeer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
         baseParentPeer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
@@ -560,33 +539,14 @@ contract BaseTest is Test {
         _stopPrank();
     }
 
-    function _setUpAutomationAndFunctions() internal {
+    // @review Is this the right setup?
+    function _setForwarderAndWorkflow() internal {
         _selectFork(baseFork);
+        _changePrank(baseRebalancer.owner());
 
-        /// @dev set forwarder
-        _changePrank(baseParentPeer.owner());
-        /// @dev grant temp config admin role to deployer/admin to set config
-        baseRebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner());
-        baseRebalancer.setForwarder(forwarder);
-        baseRebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner());
-        /// @dev revoke
-
-        /// @dev set upkeepAddress
-        address parentPeerOwner = baseParentPeer.owner();
-        _changePrank(parentPeerOwner);
-        /// @dev grant temp config admin role to deployer/admin to set config
-        baseRebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner());
-        baseRebalancer.setUpkeepAddress(upkeepAddress);
-        baseRebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, baseRebalancer.owner());
-        /// @dev revoke
-
-        /// @dev add ParentPeer as consumer to Chainlink Functions subscription
-        address functionsRouter = baseNetworkConfig.clf.functionsRouter;
-        IFunctionsSubscriptions(functionsRouter).addConsumer(clfSubId, address(baseRebalancer));
-
-        /// @dev fund Chainlink Functions subscription
-        deal(baseParentPeer.getLink(), parentPeerOwner, LINK_AMOUNT);
-        LinkTokenInterface(baseParentPeer.getLink()).transferAndCall(functionsRouter, LINK_AMOUNT, abi.encode(clfSubId));
+        /// @dev set keystone forwarder
+        baseRebalancer.setKeystoneForwarder(keystoneForwarder);
+        baseRebalancer.setWorkflow(workflowId, workflowOwner, workflowNameRaw);
     }
 
     /// @notice empty test to skip file in coverage
@@ -633,51 +593,6 @@ contract BaseTest is Test {
         return reserveData.aTokenAddress;
     }
 
-    /// @notice Helper function to fulfill a Chainlink Functions request
-    /// @param requestId The ID of the request to fulfill
-    /// @param response The response to the request
-    /// @param err The error message to return if the request fails
-    function _fulfillRequest(bytes32 requestId, bytes memory response, bytes memory err) internal {
-        _changePrank(baseNetworkConfig.clf.functionsRouter);
-        FunctionsClient(address(baseRebalancer)).handleOracleFulfillment(requestId, response, err);
-        _stopPrank();
-    }
-
-    /// @notice Helper function to set the strategy across chains
-    /// @param chainSelector The chain selector of the strategy
-    /// @param protocolId The protocol ID of the strategy
-    function _setStrategy(uint64 chainSelector, bytes32 protocolId) internal {
-        _selectFork(baseFork);
-
-        address activeStrategyAdapter = baseParentPeer.getActiveStrategyAdapter();
-        uint256 totalValue = baseParentPeer.getTotalValue();
-
-        /// @dev set the strategy on the parent chain by pranking Chainlink Functions fulfillRequest
-        bytes32 requestId = bytes32("requestId");
-        bytes memory response = abi.encode(uint256(chainSelector), protocolId);
-        _fulfillRequest(requestId, response, "");
-
-        if (chainSelector != baseChainSelector) {
-            bytes memory performData = _createPerformData(
-                chainSelector,
-                protocolId,
-                IYieldPeer.CcipTxType.RebalanceNewStrategy,
-                baseChainSelector,
-                activeStrategyAdapter,
-                totalValue
-            );
-            _changePrank(forwarder);
-            baseRebalancer.performUpkeep(performData);
-            _stopPrank();
-        }
-
-        if (chainSelector == optChainSelector) {
-            ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
-        } else if (chainSelector == ethChainSelector) {
-            ccipLocalSimulatorFork.switchChainAndRouteMessage(ethFork);
-        }
-    }
-
     /// @notice Helper function to deal and approve USDC
     /// @param forkId The ID of the fork to select
     /// @param approver The address to deal USDC to
@@ -688,43 +603,6 @@ contract BaseTest is Test {
         deal(address(baseUsdc), approver, amount);
         _changePrank(approver);
         baseUsdc.approve(approvee, amount);
-    }
-
-    /// @notice Helper function to create a log for Chainlink Automation checkLog
-    /// @param source The source of the log
-    /// @param topics The topics of the log
-    /// @return log The log
-    function _createLog(address source, bytes32[] memory topics) internal view returns (Log memory) {
-        return Log({
-            index: 0,
-            timestamp: block.timestamp,
-            txHash: bytes32(0),
-            blockNumber: block.number,
-            blockHash: bytes32(0),
-            source: source,
-            topics: topics,
-            data: ""
-        });
-    }
-
-    /// @notice Helper function to create perform data for Chainlink Automation performUpkeep
-    /// @param chainSelector The chain selector of the new strategy
-    /// @param protocolId The protocol ID of the strategy
-    /// @param txType The type of CCIP message to send
-    /// @param oldChainSelector The chain selector of the old strategy
-    /// @param oldStrategyAdapter The address of the old strategy adapter
-    function _createPerformData(
-        uint64 chainSelector,
-        bytes32 protocolId,
-        IYieldPeer.CcipTxType txType,
-        uint64 oldChainSelector,
-        address oldStrategyAdapter,
-        uint256 totalValue
-    ) internal view returns (bytes memory) {
-        address parentPeer = address(baseRebalancer.getParentPeer());
-        IYieldPeer.Strategy memory newStrategy =
-            IYieldPeer.Strategy({chainSelector: chainSelector, protocolId: protocolId});
-        return abi.encode(parentPeer, newStrategy, txType, oldChainSelector, oldStrategyAdapter, totalValue);
     }
 
     /// @notice Helper function to convert USDC to Share
@@ -768,5 +646,91 @@ contract BaseTest is Test {
             feeRate = ethChildPeer.getFeeRate();
         }
         fee = (stablecoinDepositAmount * feeRate) / baseParentPeer.getFeeRateDivisor();
+    }
+
+    /// @notice Helper function to create a Keystone workflow report
+    /// @param chainSelector The chain selector of the strategy
+    /// @param protocolId The protocol ID of the strategy
+    /// @return workflowReport The Keystone workflow report
+    function _createWorkflowReport(uint64 chainSelector, bytes32 protocolId)
+        internal
+        pure
+        returns (bytes memory workflowReport)
+    {
+        IYieldPeer.Strategy memory strategy =
+            IYieldPeer.Strategy({chainSelector: chainSelector, protocolId: protocolId});
+
+        workflowReport = abi.encode(strategy);
+    }
+
+    /// @notice Helper function create Keystone workflow metadata
+    /// @param wfId The ID of the workflow
+    /// @param wfName The name of the workflow
+    /// @param wfOwner The owner of the workflow
+    /// @return workflowMetadata The Keystone workflow metadata
+    function _createWorkflowMetadata(bytes32 wfId, bytes10 wfName, address wfOwner)
+        internal
+        pure
+        returns (bytes memory workflowMetadata)
+    {
+        workflowMetadata = abi.encodePacked(wfId, wfName, wfOwner);
+    }
+
+    /// @notice Helper function to create CRE encoded workflow name
+    /// @dev SEE URL
+    /// URL: https://docs.chain.link/cre/guides/workflow/using-evm-client/onchain-write/building-consumer-contracts#how-workflow-names-are-encoded
+    /// @param rawName The raw string name of the workflow
+    function _createWorkflowName(string memory rawName) internal pure returns (bytes10 encodedName) {
+        // Convert workflow name to bytes10:
+        // SHA256 hash → hex encode → take first 10 chars → hex encode those chars
+        bytes32 hash = sha256(bytes(rawName));
+        bytes memory hexString = _bytesToHexString(abi.encodePacked(hash));
+        bytes memory first10 = new bytes(10);
+        for (uint256 i = 0; i < 10; i++) {
+            first10[i] = hexString[i];
+        }
+        encodedName = bytes10(first10);
+    }
+
+    /// @dev Helper function for '_createWorkflowName'
+    /// @param data The bytes data to convert to a hex string
+    function _bytesToHexString(bytes memory data) private pure returns (bytes memory) {
+        bytes memory hexChars = "0123456789abcdef";
+        bytes memory hexString = new bytes(data.length * 2);
+
+        for (uint256 i = 0; i < data.length; i++) {
+            hexString[i * 2] = hexChars[uint8(data[i] >> 4)];
+            hexString[i * 2 + 1] = hexChars[uint8(data[i] & 0x0f)];
+        }
+
+        return hexString;
+    }
+
+    /// @notice Helper function to set the strategy across chains
+    /// @dev The "delay" parameter is used to set the strategy on the Parent
+    /// @dev but not route the CCIP message, allowing for any testing that
+    /// @dev requires just a Strategy change with a manual message routing later.
+    /// @param chainSelector The chain selector of the strategy
+    /// @param protocolId The protocol ID of the strategy
+    /// @param isSetAcrossChains Whether to artificially 'delay' message delivery
+    function _setStrategy(uint64 chainSelector, bytes32 protocolId, bool isSetAcrossChains) internal {
+        _selectFork(baseFork);
+
+        bytes10 workflowName = _createWorkflowName(workflowNameRaw);
+
+        bytes memory metadata = _createWorkflowMetadata(workflowId, workflowName, workflowOwner);
+        bytes memory report = _createWorkflowReport(chainSelector, protocolId);
+
+        _changePrank(keystoneForwarder);
+        baseRebalancer.onReport(metadata, report);
+        _stopPrank();
+
+        if (isSetAcrossChains == true) {
+            if (chainSelector == optChainSelector) {
+                ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
+            } else if (chainSelector == ethChainSelector) {
+                ccipLocalSimulatorFork.switchChainAndRouteMessage(ethFork);
+            }
+        }
     }
 }

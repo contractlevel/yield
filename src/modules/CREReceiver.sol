@@ -14,9 +14,7 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
     error CREReceiver__InvalidKeystoneForwarder(address sender, address expectedForwarder);
-    error CREReceiver__InvalidWorkflowDeployer(address receivedDeployer, address expectedDeployer);
-    error CREReceiver__InvalidWorkflowName(bytes10 receivedName, bytes10 expectedName);
-    error CREReceiver__InvalidWorkflowId(bytes32 receivedId, bytes32 expectedId);
+    error CREReceiver__InvalidWorkflow(bytes32 receivedId, address receivedOwner, bytes10 receivedName);
     error CREReceiver__NotZeroAddress();
     error CREReceiver__NotEmptyName();
     error CREReceiver__NotZeroId();
@@ -24,10 +22,19 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
+    /// @dev Holds a workflow owner/name and mapped to a workflow id
+    struct Workflow {
+        address owner;
+        bytes10 name;
+    }
+
+    /// @dev Mapping workflow ids to owner/name
+    mapping(bytes32 workflowId => Workflow) internal s_workflows;
+
     /// @dev The Chainlink Keystone Forwarder contract address to receive CRE reports from
     address internal s_keystoneForwarder;
-    /// @dev The expected CRE workflow deployer address
-    address internal s_expectedWorkflowDeployer;
+    /// @dev The expected CRE workflow owner address
+    address internal s_expectedWorkflowOwner;
     /// @dev The expected CRE workflow name
     bytes10 internal s_expectedWorkflowName;
     /// @dev The expected CRE workflow Id
@@ -38,16 +45,12 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
     //////////////////////////////////////////////////////////////*/
     /// @notice Emitted when a Keystone Forwarder address is set
     event KeystoneForwarderSet(address indexed);
-    /// @notice Emitted when an expected workflow deployer address is set
-    event ExpectedWorkflowDeployerSet(address indexed);
-    /// @notice Emitted when an expected workflow name is set
-    event ExpectedWorkflowNameSet(bytes10 indexed);
-    /// @notice Emitted when an expected workflow Id is set
-    event ExpectedWorkflowIdSet(bytes32 indexed);
+    /// @notice Emitted when a workflow is set
+    event WorkflowSet(bytes32 indexed, address indexed, bytes10 indexed); /// @dev (id, owner, name)
+    /// @notice Emitted when a workflow is removed
+    event WorkflowRemoved(bytes32 indexed, address indexed, bytes10 indexed); /// @dev (id, owner, name)
     /// @notice Emitted when all security checks pass on 'onReport'
-    /// @dev (Keystone Forwarder, Workflow Author, Workflow Id, Workflow Name)
-    // @review What would we want indexed?
-    event OnReportSecurityChecksPassed(address indexed, address indexed, bytes32 indexed, bytes10);
+    event OnReportSecurityChecksPassed(bytes32 indexed, address indexed, bytes10 indexed); /// @dev (id, owner, name)
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -70,22 +73,19 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
         }
 
         // Security Checks 2-4: Verify workflow identity - ID, owner and name
-        (bytes32 workflowId, bytes10 workflowName, address workflowDeployer) = _decodeMetadata(metadata);
-        if (workflowId != s_expectedWorkflowId) {
-            revert CREReceiver__InvalidWorkflowId(workflowId, s_expectedWorkflowId);
-        }
-        if (workflowDeployer != s_expectedWorkflowDeployer) {
-            revert CREReceiver__InvalidWorkflowDeployer(workflowDeployer, s_expectedWorkflowDeployer);
-        }
-        if (workflowName != s_expectedWorkflowName) {
-            revert CREReceiver__InvalidWorkflowName(workflowName, s_expectedWorkflowName);
-        }
+        /// @dev workflow id is checked by inference with owner/name existing for an id
+        (bytes32 decodedId, bytes10 decodedName, address decodedOwner) = _decodeMetadata(metadata);
 
-        /// @dev Emitted to assist in testing and verification of decoding workflow metadata
-        // @review What do we want indexed?
-        emit OnReportSecurityChecksPassed(msg.sender, workflowDeployer, workflowId, workflowName);
+        address workflowOwner = s_workflows[decodedId].owner;
+        bytes10 workflowName = s_workflows[decodedId].name;
 
-        _onReport(report);
+        if (workflowOwner == decodedOwner && workflowName == decodedName) {
+            /// @dev Emitted to assist in testing and verification of decoding workflow metadata
+            emit OnReportSecurityChecksPassed(decodedId, decodedOwner, decodedName);
+            _onReport(report);
+        } else {
+            revert CREReceiver__InvalidWorkflow(decodedId, decodedOwner, decodedName);
+        }
     }
 
     /// @inheritdoc IERC165
@@ -94,6 +94,21 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
     /// @return If interface Id is supported
     function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
         return interfaceId == type(IReceiver).interfaceId || interfaceId == type(IERC165).interfaceId;
+    }
+
+    /// @notice Removes a workflow from the allowed workflows mapping
+    /// @param workflowId The id of the workflow to remove
+    function removeWorkflow(bytes32 workflowId) external onlyOwner {
+        address workflowOwner = s_workflows[workflowId].owner;
+        bytes10 workflowName = s_workflows[workflowId].name;
+        // @review Better to use &&? || in the edge chance one field is
+        // set and the other is not but not sure that will happen
+        if (workflowOwner != address(0) || workflowName != bytes10(0)) {
+            delete s_workflows[workflowId];
+            emit WorkflowRemoved(workflowId, workflowOwner, workflowName);
+        } else {
+            revert CREReceiver__InvalidWorkflow(workflowId, workflowOwner, workflowName);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -145,44 +160,34 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
     //////////////////////////////////////////////////////////////*/
     /// @notice Updates the Chainlink Keystone Forwarder address that is allowed to call onReport
     /// @param keystoneForwarder The new forwader address
-    function setKeystoneForwarderAddress(address keystoneForwarder) external onlyOwner {
+    function setKeystoneForwarder(address keystoneForwarder) external onlyOwner {
         if (keystoneForwarder == address(0)) revert CREReceiver__NotZeroAddress();
         s_keystoneForwarder = keystoneForwarder;
         emit KeystoneForwarderSet(keystoneForwarder);
     }
 
-    /// @notice Updates the expected workflow deployer address
-    /// @param workflowDeployer The new expected workflow deployer address
-    function setExpectedWorkflowDeployer(address workflowDeployer) external onlyOwner {
-        if (workflowDeployer == address(0)) revert CREReceiver__NotZeroAddress();
-        s_expectedWorkflowDeployer = workflowDeployer;
-        emit ExpectedWorkflowDeployerSet(workflowDeployer);
-    }
-
-    /// @notice Updates the expected workflow name from a plaintext string
-    /// @param workflowName The workflow name as a string
-    /// @dev The name is hashed using SHA256 and truncated
-    function setExpectedWorkflowName(string calldata workflowName) external onlyOwner {
+    /// @notice Sets a workflow in the allowed workflows mapping
+    /// @param workflowId The id of the workflow
+    /// @param workflowOwner The owner address of the workflow
+    /// @param workflowName The name of the workflow
+    function setWorkflow(bytes32 workflowId, address workflowOwner, string calldata workflowName) external onlyOwner {
+        if (workflowId == bytes32(0)) revert CREReceiver__NotZeroId();
+        if (workflowOwner == address(0)) revert CREReceiver__NotZeroAddress();
         if (bytes(workflowName).length == 0) revert CREReceiver__NotEmptyName();
 
+        /// @dev Following method from IReceiverTemplate to encode name for CRE guidelines
+        /// URL: https://docs.chain.link/cre/guides/workflow/using-evm-client/onchain-write/building-consumer-contracts#how-workflow-names-are-encoded
         // Convert workflow name to bytes10:
         // SHA256 hash → hex encode → take first 10 chars → hex encode those chars
         bytes32 hash = sha256(bytes(workflowName));
         bytes memory hexString = _bytesToHexString(abi.encodePacked(hash));
-        bytes memory first10 = new bytes(10);
+        bytes memory encodedName = new bytes(10);
         for (uint256 i = 0; i < 10; i++) {
-            first10[i] = hexString[i];
+            encodedName[i] = hexString[i];
         }
-        s_expectedWorkflowName = bytes10(first10);
-        emit ExpectedWorkflowNameSet(bytes10(first10));
-    }
 
-    /// @notice Updates the expected workflow Id
-    /// @param id The new expected workflow Id
-    function setExpectedWorkflowId(bytes32 id) external onlyOwner {
-        if (id == bytes32(0)) revert CREReceiver__NotZeroId();
-        s_expectedWorkflowId = id;
-        emit ExpectedWorkflowIdSet(id);
+        s_workflows[workflowId] = Workflow({owner: workflowOwner, name: bytes10(encodedName)});
+        emit WorkflowSet(workflowId, workflowOwner, bytes10(encodedName));
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -193,18 +198,22 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
         keystoneForwarder = s_keystoneForwarder;
     }
 
-    /// @return workflowDeployer The expected CRE workflow deployer address
-    function getExpectedWorkflowAuthor() external view returns (address workflowDeployer) {
-        workflowDeployer = s_expectedWorkflowDeployer;
+    /// @return wfId The workflow Id
+    /// @return wfOwner The CRE workflow owner address
+    /// @return wfName The CRE workflow name
+    function getWorkflow(bytes32 workflowId) external view returns (bytes32 wfId, address wfOwner, bytes10 wfName) {
+        wfId = workflowId;
+        wfOwner = s_workflows[workflowId].owner;
+        wfName = s_workflows[workflowId].name;
     }
 
-    /// @return workflowName The expected CRE workflow name
-    function getExpectedWorkflowName() external view returns (bytes10 workflowName) {
-        workflowName = s_expectedWorkflowName;
+    /// @return workflowOwner The CRE workflow owner address
+    function getWorkflowOwner(bytes32 workflowId) external view returns (address workflowOwner) {
+        workflowOwner = s_workflows[workflowId].owner;
     }
 
-    /// @return workflowId The expected CRE workflow Id
-    function getExpectedWorkflowId() external view returns (bytes32 workflowId) {
-        workflowId = s_expectedWorkflowId;
+    /// @return workflowName The CRE workflow name
+    function getWorkflowName(bytes32 workflowId) external view returns (bytes10 workflowName) {
+        workflowName = s_workflows[workflowId].name;
     }
 }

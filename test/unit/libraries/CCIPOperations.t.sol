@@ -14,7 +14,7 @@ contract CCIPOperationsTest is BaseTest {
     function setUp() public override {
         super.setUp();
         ccipOperationsClient = new CCIPOperationsClient();
-        _setStrategy(optChainSelector, keccak256(abi.encodePacked("aave-v3")));
+        _setStrategy(optChainSelector, keccak256(abi.encodePacked("aave-v3")), SET_CROSS_CHAIN);
         _dealAndApproveUsdc(baseFork, depositor, address(baseParentPeer), DEPOSIT_AMOUNT);
     }
 

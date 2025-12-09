@@ -14,9 +14,7 @@ contract ConstructorTest is BaseTest {
         assertEq(baseParentPeer.getStrategy().protocolId, keccak256(abi.encodePacked("aave-v3")));
         assertEq(baseParentPeer.getStrategy().chainSelector, baseNetworkConfig.ccip.thisChainSelector);
 
-        assertEq(baseRebalancer.getFunctionsRouter(), baseNetworkConfig.clf.functionsRouter);
-        assertEq(baseRebalancer.getDonId(), baseNetworkConfig.clf.donId);
-        assertEq(baseRebalancer.getClfSubId(), clfSubId);
+        assertEq(baseRebalancer.getKeystoneForwarder(), keystoneForwarder);
     }
 
     function test_yield_child_constructor() public view {

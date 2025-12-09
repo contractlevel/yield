@@ -42,6 +42,7 @@ contract Rebalancer is CREReceiver {
     //////////////////////////////////////////////////////////////*/
     /// @inheritdoc CREReceiver
     /// @notice After security checks, gets CRE report from CREReceiver for consumption
+    /// @notice This implementation of _onReport expects to receive new strategy, checks strategy, and then forwards to parent to update
     /// @param report The CRE report
     function _onReport(bytes calldata report) internal override {
         IYieldPeer.Strategy memory newStrategy = abi.decode(report, (IYieldPeer.Strategy));
@@ -53,7 +54,8 @@ contract Rebalancer is CREReceiver {
             emit InvalidChainSelectorInReport(chainSelector);
             return;
         }
-        // @review Better name for this? The protocol may be on a child chain while not on parent.
+
+        // Verify protocol Id from report
         if (IStrategyRegistry(s_strategyRegistry).getStrategyAdapter(protocolId) == address(0)) {
             emit InvalidProtocolIdInReport(protocolId);
             return;

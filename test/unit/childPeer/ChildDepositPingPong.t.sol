@@ -27,9 +27,7 @@ contract ChildDepositPingPongTest is BaseTest {
 
         {
             _selectFork(baseFork);
-            bytes32 requestId = keccak256("requestId");
-            bytes memory response = abi.encode(uint256(optChainSelector), keccak256(abi.encodePacked("aave-v3")));
-            _fulfillRequest(requestId, response, "");
+            _setStrategy(optChainSelector, keccak256("aave-v3"), NO_CROSS_CHAIN);
         }
 
         // First sanity check for opt adapter == 0

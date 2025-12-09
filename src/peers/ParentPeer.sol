@@ -406,7 +406,7 @@ contract ParentPeer is YieldPeer {
 
         /// @dev Handle local strategy change on the this parent chain
         if (newStrategy.chainSelector == i_thisChainSelector && oldStrategy.chainSelector == i_thisChainSelector) {
-            _handleLocalStrategyChange(newStrategy);
+            _rebalanceParentToParent(newStrategy);
         }
         /// @dev Handle strategy change from parent to child
         else if (newStrategy.chainSelector != i_thisChainSelector && oldStrategy.chainSelector == i_thisChainSelector) {
@@ -425,7 +425,7 @@ contract ParentPeer is YieldPeer {
 
     /// @notice Handles strategy change when both old and new strategies are on this chain
     /// @param newStrategy The new strategy
-    function _handleLocalStrategyChange(Strategy memory newStrategy) internal {
+    function _rebalanceParentToParent(Strategy memory newStrategy) internal {
         address oldActiveStrategyAdapter = _getActiveStrategyAdapter();
 
         address newActiveStrategyAdapter =
