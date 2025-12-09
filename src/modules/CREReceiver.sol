@@ -33,12 +33,6 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
 
     /// @dev The Chainlink Keystone Forwarder contract address to receive CRE reports from
     address internal s_keystoneForwarder;
-    /// @dev The expected CRE workflow owner address
-    address internal s_expectedWorkflowOwner;
-    /// @dev The expected CRE workflow name
-    bytes10 internal s_expectedWorkflowName;
-    /// @dev The expected CRE workflow Id
-    bytes32 internal s_expectedWorkflowId;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -68,7 +62,7 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
     /// @notice Called by a Chainlink Keystone Forwarder
     /// @param metadata Metadata about the report
     /// @param report The CRE report
-    function onReport(bytes calldata metadata, bytes calldata report) external override {
+    function onReport(bytes calldata metadata, bytes calldata report) external {
         // Security Check 1: Verify caller is the trusted Chainlink Keystone Forwarder
         address keystoneForwarder = s_keystoneForwarder;
         if (msg.sender != keystoneForwarder) {
@@ -97,21 +91,6 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
     /// @return If interface Id is supported
     function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
         return interfaceId == type(IReceiver).interfaceId || interfaceId == type(IERC165).interfaceId;
-    }
-
-    /// @notice Removes a workflow from the allowed workflows mapping
-    /// @param workflowId The id of the workflow to remove
-    function removeWorkflow(bytes32 workflowId) external onlyOwner {
-        address workflowOwner = s_workflows[workflowId].owner;
-        bytes10 workflowName = s_workflows[workflowId].name;
-        // @review Better to use &&? || in the edge chance one field is
-        // set and the other is not but not sure that will happen
-        if (workflowOwner != address(0) || workflowName != bytes10(0)) {
-            delete s_workflows[workflowId];
-            emit WorkflowRemoved(workflowId, workflowOwner, workflowName);
-        } else {
-            revert CREReceiver__InvalidWorkflow(workflowId, workflowOwner, workflowName);
-        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -193,6 +172,21 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
         emit WorkflowSet(workflowId, workflowOwner, bytes10(encodedName));
     }
 
+    /// @notice Removes a workflow from the allowed workflows mapping
+    /// @param workflowId The id of the workflow to remove
+    function removeWorkflow(bytes32 workflowId) external onlyOwner {
+        address workflowOwner = s_workflows[workflowId].owner;
+        bytes10 workflowName = s_workflows[workflowId].name;
+        // @review Better to use &&? || in the edge chance one field is
+        // set and the other is not but not sure that will happen
+        if (workflowOwner != address(0) || workflowName != bytes10(0)) {
+            delete s_workflows[workflowId];
+            emit WorkflowRemoved(workflowId, workflowOwner, workflowName);
+        } else {
+            revert CREReceiver__InvalidWorkflow(workflowId, workflowOwner, workflowName);
+        }
+    }
+
     /*//////////////////////////////////////////////////////////////
                                  GETTER
     //////////////////////////////////////////////////////////////*/
@@ -201,22 +195,9 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
         keystoneForwarder = s_keystoneForwarder;
     }
 
-    /// @return wfId The workflow Id
-    /// @return wfOwner The CRE workflow owner address
-    /// @return wfName The CRE workflow name
-    function getWorkflow(bytes32 workflowId) external view returns (bytes32 wfId, address wfOwner, bytes10 wfName) {
-        wfId = workflowId;
-        wfOwner = s_workflows[workflowId].owner;
-        wfName = s_workflows[workflowId].name;
-    }
-
-    /// @return workflowOwner The CRE workflow owner address
-    function getWorkflowOwner(bytes32 workflowId) external view returns (address workflowOwner) {
-        workflowOwner = s_workflows[workflowId].owner;
-    }
-
-    /// @return workflowName The CRE workflow name
-    function getWorkflowName(bytes32 workflowId) external view returns (bytes10 workflowName) {
-        workflowName = s_workflows[workflowId].name;
+    /// @param workflowId The workflow Id
+    /// @return workflow The workflow - contains address owner and bytes10 name
+    function getWorkflow(bytes32 workflowId) external view returns (Workflow memory workflow) {
+        workflow = s_workflows[workflowId];
     }
 }

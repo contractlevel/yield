@@ -2,6 +2,7 @@
 pragma solidity 0.8.26;
 
 import {BaseTest, Vm} from "../../BaseTest.t.sol";
+import {CREReceiver} from "../../../src/modules/CREReceiver.sol";
 
 /// @dev CREReceiver inherited by Rebalancer
 contract SetterTest is BaseTest {
@@ -90,11 +91,10 @@ contract SetterTest is BaseTest {
         _changePrank(baseRebalancer.owner());
         baseRebalancer.setWorkflow(newWorkflowId, workflowOwner, newWorkflowNameRaw);
 
-        (bytes32 storedId, address storedOwner, bytes10 storedName) = baseRebalancer.getWorkflow(newWorkflowId);
+        CREReceiver.Workflow memory storedWorkflow = baseRebalancer.getWorkflow(newWorkflowId);
 
-        assertEq(storedId, newWorkflowId);
-        assertEq(storedName, newWorkflowName);
-        assertEq(storedOwner, workflowOwner);
+        assertEq(storedWorkflow.name, newWorkflowName);
+        assertEq(storedWorkflow.owner, workflowOwner);
     }
 
     function test_yield_creReceiver_setWorkflow_revertsWhen_workflowIdZero() public {

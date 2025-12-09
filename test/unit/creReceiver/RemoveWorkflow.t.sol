@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {BaseTest, Vm} from "../../BaseTest.t.sol";
+import {BaseTest, Vm, CREReceiver} from "../../BaseTest.t.sol";
 
 /// @dev CREReceiver inherited by Rebalancer
 contract RemoveWorkflowTest is BaseTest {
@@ -42,19 +42,19 @@ contract RemoveWorkflowTest is BaseTest {
     function test_yield_creReceiver_removeWorkflow_updatesStorage() public {
         bytes10 workflowName = _createWorkflowName(workflowNameRaw);
 
-        (bytes32 returnedWfId, address returnedWfOwner, bytes10 returnedWfName) = baseRebalancer.getWorkflow(workflowId);
+        CREReceiver.Workflow memory workflow = baseRebalancer.getWorkflow(workflowId);
         /// @dev confirm workflow exists before removal
-        assertEq(returnedWfId, workflowId);
-        assertEq(returnedWfOwner, workflowOwner);
-        assertEq(returnedWfName, workflowName);
+        assertEq(workflow.owner, workflowOwner);
+        assertEq(workflow.name, workflowName);
 
         _changePrank(baseRebalancer.owner());
         baseRebalancer.removeWorkflow(workflowId);
-        (returnedWfId, returnedWfOwner, returnedWfName) = baseRebalancer.getWorkflow(workflowId);
+
+        workflow = baseRebalancer.getWorkflow(workflowId);
         /// @dev we are not checking the workflow id itself because it is stored as a mapping
         /// @dev we are confirming, by inference, that the workflow has been removed
-        assertEq(returnedWfOwner, address(0));
-        assertEq(returnedWfName, bytes10(0));
+        assertEq(workflow.owner, address(0));
+        assertEq(workflow.name, bytes10(0));
     }
 
     function test_yield_creReceiver_removeWorkflow_revertsWhen_workflowDoesNotExist() public {

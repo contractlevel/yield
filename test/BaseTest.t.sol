@@ -30,6 +30,8 @@ import {CompoundV3Adapter} from "../src/adapters/CompoundV3Adapter.sol";
 import {StrategyRegistry} from "../src/modules/StrategyRegistry.sol";
 import {Roles} from "../src/libraries/Roles.sol";
 
+import {CREReceiver} from "../src/modules/CREReceiver.sol";
+
 contract BaseTest is Test {
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
