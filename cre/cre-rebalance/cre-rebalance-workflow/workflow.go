@@ -320,7 +320,7 @@ func decideAndMaybeRebalance(
 		"optimalChainSelector", optimal.ChainSelector,
 	)
 
-	// 8. Execute onchain rebalance tx via injected function
+	// Execute onchain rebalance tx via injected function
 	if err := writeFn(optimal); err != nil {
 		return nil, err
 	}
