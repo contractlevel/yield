@@ -714,7 +714,7 @@ contract BaseTest is Test {
     /// @dev requires just a Strategy change with a manual message routing later.
     /// @param chainSelector The chain selector of the strategy
     /// @param protocolId The protocol ID of the strategy
-    /// @param isSetAcrossChains Whether to artificially 'delay' message delivery
+    /// @param isSetAcrossChains Whether to set strategy across chains - this is used for testing ping pong scenarios
     function _setStrategy(uint64 chainSelector, bytes32 protocolId, bool isSetAcrossChains) internal {
         _selectFork(baseFork);
 
