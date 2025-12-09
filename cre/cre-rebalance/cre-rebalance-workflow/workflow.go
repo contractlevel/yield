@@ -6,7 +6,7 @@ import (
 	"math/big"
 
 	"cre-rebalance/contracts/evm/src/generated/rebalancer"
-	"cre-rebalance/contracts/evm/src/generated/yield_peer"
+	"cre-rebalance/contracts/evm/src/generated/parent_peer"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -155,7 +155,7 @@ func onCronTrigger(config *Config, runtime cre.Runtime, trigger *cron.Payload) (
 	// Calculate optimal strategy based on TVL and lending pool state (pseudocode inside).
 	optimalStrategy := calculateOptimalStrategy(logger, currentStrategy, tvl)
 
-	// 6–8. Decide whether to rebalance and, if so, execute onchain tx via parentRebalancer.
+	// Decide whether to rebalance and, if so, execute onchain tx via parentRebalancer.
 
 	// Inject write function that performs the actual onchain rebalance on the parent chain.
 	// @review why would we want to inject this function?
@@ -204,14 +204,15 @@ func onCronTrigger(config *Config, runtime cre.Runtime, trigger *cron.Payload) (
                     CALCULATE OPTIMAL STRATEGY
 //////////////////////////////////////////////////////////////*/
 // calculateOptimalStrategy is where the "brains" of the strategy selection live.
-// For now, steps 4 and 5 are pseudocode / comments.
+// For now it's just pseudocode / comments.
+// This will need to factor in the ProtocolId as to how APY is calculated. ie we will perform different logic for aave v3 and v4
 func calculateOptimalStrategy(
 	logger *slog.Logger,
 	current Strategy,
 	tvl *big.Int,
 	// later you can pass additional pre-fetched pool state here if you want
 ) Strategy {
-	// 4. reads onchain state of lending pools and calculates APY
+	// Read onchain state of lending pools and calculates APY
 	//
 	//    PSEUDOCODE EXAMPLE:
 	//
@@ -228,7 +229,7 @@ func calculateOptimalStrategy(
 	//            bestApy = effectiveApy
 	//            bestPool = pool
 	//
-	// 5. calculates APY decrease based on tvl and other pool factors like slippage
+	// Calculate APY decrease based on tvl and other pool factors like slippage
 	//
 	//    PSEUDOCODE EXAMPLE:
 	//
