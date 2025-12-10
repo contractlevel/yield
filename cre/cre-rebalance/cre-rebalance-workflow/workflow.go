@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"math/big"
 
-	"cre-rebalance/contracts/evm/src/generated/rebalancer"
 	"cre-rebalance/contracts/evm/src/generated/parent_peer"
+	"cre-rebalance/contracts/evm/src/generated/rebalancer"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -17,14 +17,34 @@ import (
 )
 
 /*//////////////////////////////////////////////////////////////
+                             CONSTS
+//////////////////////////////////////////////////////////////*/
+
+const LatestBlock = int64(-3)
+
+/*//////////////////////////////////////////////////////////////
+                           INTERFACES
+//////////////////////////////////////////////////////////////*/
+
+// ParentPeerInterface defines the subset of methods used to read the current strategy.
+type ParentPeerInterface interface {
+	GetStrategy(runtime cre.Runtime, blockNumber *big.Int) cre.Promise[parent_peer.IYieldPeerStrategy]
+}
+
+// YieldPeerInterface defines the subset of methods used to read TVL.
+type YieldPeerInterface interface {
+	GetTotalValue(runtime cre.Runtime, blockNumber *big.Int) cre.Promise[*big.Int]
+}
+
+// RebalancerInterface defines the subset of methods used to write the rebalance report.
+type RebalancerInterface interface {
+	WriteReportFromIYieldPeerStrategy(runtime cre.Runtime, input rebalancer.IYieldPeerStrategy, gasConfig *evm.GasConfig) cre.Promise[*evm.WriteReportReply]
+}
+
+/*//////////////////////////////////////////////////////////////
                              TYPES
 //////////////////////////////////////////////////////////////*/
-// Strategy mirrors the Solidity struct:
-//
-// struct Strategy {
-//   bytes32 protocolId;
-//   uint64  chainSelector;
-// }
+
 type Strategy struct {
 	ProtocolId    [32]byte
 	ChainSelector uint64
@@ -59,7 +79,7 @@ type EvmConfig struct {
 	ChainSelector     uint64 `json:"chainSelector"`
 	YieldPeerAddress  string `json:"yieldPeerAddress"`
 	RebalancerAddress string `json:"rebalancerAddress"`
-	GasLimit          uint64 `json:"gasLimit"` // @review should this be uint64???
+	GasLimit          uint64 `json:"gasLimit"`
 }
 
 // StrategyResult is primarily for debugging / testing.
@@ -72,6 +92,7 @@ type StrategyResult struct {
 /*//////////////////////////////////////////////////////////////
                          INIT WORKFLOW
 //////////////////////////////////////////////////////////////*/
+
 // InitWorkflow registers the cron handler.
 func InitWorkflow(config *Config, logger *slog.Logger, secretsProvider cre.SecretsProvider) (cre.Workflow[*Config], error) {
 	return cre.Workflow[*Config]{
@@ -83,9 +104,31 @@ func InitWorkflow(config *Config, logger *slog.Logger, secretsProvider cre.Secre
 }
 
 /*//////////////////////////////////////////////////////////////
+                  DEPS FOR ON-CRON (INJECTION POINT)
+//////////////////////////////////////////////////////////////*/
+
+type onCronDeps struct {
+	ReadCurrentStrategy func(peer ParentPeerInterface, runtime cre.Runtime) (Strategy, error)
+	ReadTVL             func(peer YieldPeerInterface, runtime cre.Runtime) (*big.Int, error)
+	WriteRebalance      func(rb RebalancerInterface, runtime cre.Runtime, logger *slog.Logger, gasLimit uint64, optimal Strategy) error
+}
+
+// defaultOnCronDeps are the real chain-backed implementations.
+var defaultOnCronDeps = onCronDeps{
+	ReadCurrentStrategy: chainReadCurrentStrategy,
+	ReadTVL:             chainReadTVL,
+	WriteRebalance:      chainWriteRebalance,
+}
+
+/*//////////////////////////////////////////////////////////////
                         ON CRON TRIGGER
 //////////////////////////////////////////////////////////////*/
+
 func onCronTrigger(config *Config, runtime cre.Runtime, trigger *cron.Payload) (*StrategyResult, error) {
+	return onCronTriggerWithDeps(config, runtime, trigger, defaultOnCronDeps)
+}
+
+func onCronTriggerWithDeps(config *Config, runtime cre.Runtime, trigger *cron.Payload, deps onCronDeps) (*StrategyResult, error) {
 	logger := runtime.Logger()
 
 	// Ensure we have at least one EVM config and treat evms[0] as parent chain.
@@ -94,32 +137,27 @@ func onCronTrigger(config *Config, runtime cre.Runtime, trigger *cron.Payload) (
 	}
 	parentCfg := config.Evms[0]
 
-	// Create EVM client for parent chain.
+	// Create EVM client for parent chain once.
 	parentEvmClient := &evm.Client{
 		ChainSelector: parentCfg.ChainSelector,
 	}
 
-	// Validate + parse ParentPeer address
+	// Validate + parse ParentPeer address once.
 	if !common.IsHexAddress(parentCfg.YieldPeerAddress) {
 		return nil, fmt.Errorf("invalid YieldPeer address: %s", parentCfg.YieldPeerAddress)
 	}
 	parentYieldPeerAddr := common.HexToAddress(parentCfg.YieldPeerAddress)
 
-	// Instantiate ParentPeer contract
+	// Instantiate ParentPeer contract once.
 	parentYieldPeer, err := parent_peer.NewParentPeer(parentEvmClient, parentYieldPeerAddr, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create parent YieldPeer binding: %w", err)
 	}
 
-	// Read current strategy from parent YieldPeer.
-	current, err := parentYieldPeer.GetStrategy(runtime, big.NewInt(-3)).Await()
+	// Read current strategy from parent YieldPeer via deps.
+	currentStrategy, err := deps.ReadCurrentStrategy(parentYieldPeer, runtime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read strategy from parent YieldPeer: %w", err)
-	}
-
-	currentStrategy := Strategy{
-		ProtocolId:    current.ProtocolId,
-		ChainSelector: current.ChainSelector,
 	}
 	logger.Info(
 		"Read current strategy from parent YieldPeer",
@@ -127,28 +165,41 @@ func onCronTrigger(config *Config, runtime cre.Runtime, trigger *cron.Payload) (
 		"chainSelector", currentStrategy.ChainSelector,
 	)
 
-	// Find EVM config whose chainSelector is currentStrategy.ChainSelector.
-	strategyChainCfg, err := findEvmConfigByChainSelector(config.Evms, currentStrategy.ChainSelector)
-	if err != nil {
-		return nil, fmt.Errorf("no EVM config found for strategy chainSelector %d: %w", currentStrategy.ChainSelector, err)
-	}
-	strategyEvmClient := &evm.Client{ChainSelector: strategyChainCfg.ChainSelector}
+	// Decide which YieldPeer to use for TVL:
+	// - If the strategy lives on the parent chain, reuse parentYieldPeer.
+	// - Otherwise, instantiate a YieldPeer on the strategy chain.
+	var strategyYieldPeer YieldPeerInterface
 
-	// Validate + parse Strategy YieldPeer address
-	if !common.IsHexAddress(strategyChainCfg.YieldPeerAddress) {
-		return nil, fmt.Errorf("invalid YieldPeer address: %s", strategyChainCfg.YieldPeerAddress)
-	}
-	strategyYieldPeerAddr := common.HexToAddress(strategyChainCfg.YieldPeerAddress)
-	
-	// Instantiate Strategy YieldPeer contract
-	// @review this is using parent_peer contract, but could be a child.
-	strategyYieldPeer, err := parent_peer.NewParentPeer(strategyEvmClient, strategyYieldPeerAddr, nil)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create strategy YieldPeer binding: %w", err)
+	if currentStrategy.ChainSelector == parentCfg.ChainSelector {
+		// Same chain: no extra client or contract instantiation.
+		strategyYieldPeer = parentYieldPeer
+	} else {
+		// Different chain: find config and instantiate strategy peer.
+		strategyChainCfg, err := findEvmConfigByChainSelector(config.Evms, currentStrategy.ChainSelector)
+		if err != nil {
+			return nil, fmt.Errorf("no EVM config found for strategy chainSelector %d: %w", currentStrategy.ChainSelector, err)
+		}
+
+		// Create EVM client for strategy chain once.
+		strategyEvmClient := &evm.Client{ChainSelector: strategyChainCfg.ChainSelector}
+
+		// Validate + parse Strategy YieldPeer address once.
+		if !common.IsHexAddress(strategyChainCfg.YieldPeerAddress) {
+			return nil, fmt.Errorf("invalid YieldPeer address: %s", strategyChainCfg.YieldPeerAddress)
+		}
+		strategyYieldPeerAddr := common.HexToAddress(strategyChainCfg.YieldPeerAddress)
+
+		// Instantiate Strategy YieldPeer contract once.
+		// Note: still using parent_peer binding; underlying contract could be a child.
+		strategyPeer, err := parent_peer.NewParentPeer(strategyEvmClient, strategyYieldPeerAddr, nil)
+		if err != nil {
+			return nil, fmt.Errorf("failed to create strategy YieldPeer binding: %w", err)
+		}
+		strategyYieldPeer = strategyPeer
 	}
 
-	// Read the TVL from the current Strategy YieldPeer.
-	tvl, err := strategyYieldPeer.GetTotalValue(runtime, big.NewInt(-3)).Await()
+	// Read the TVL from the selected YieldPeer via deps.
+	tvl, err := deps.ReadTVL(strategyYieldPeer, runtime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get total value from strategy YieldPeer: %w", err)
 	}
@@ -156,45 +207,21 @@ func onCronTrigger(config *Config, runtime cre.Runtime, trigger *cron.Payload) (
 	// Calculate optimal strategy based on TVL and lending pool state (pseudocode inside).
 	optimalStrategy := calculateOptimalStrategy(logger, currentStrategy, tvl)
 
-	// Decide whether to rebalance and, if so, execute onchain tx via parentRebalancer.
-
 	// Inject write function that performs the actual onchain rebalance on the parent chain.
-	// @review why would we want to inject this function?
 	writeFn := func(optimal Strategy) error {
-		// Validate + parse Rebalancer address
+		// Lazily validate + parse Rebalancer address only if we actually rebalance.
 		if !common.IsHexAddress(parentCfg.RebalancerAddress) {
 			return fmt.Errorf("invalid Rebalancer address: %s", parentCfg.RebalancerAddress)
 		}
 		parentRebalancerAddr := common.HexToAddress(parentCfg.RebalancerAddress)
 
-		// Instantiate Rebalancer contract
+		// Instantiate Rebalancer contract once per rebalance attempt.
 		parentRebalancer, err := rebalancer.NewRebalancer(parentEvmClient, parentRebalancerAddr, nil)
 		if err != nil {
 			return fmt.Errorf("failed to create parent Rebalancer binding: %w", err)
 		}
 
-		gasConfig := &evm.GasConfig{
-			GasLimit: parentCfg.GasLimit,
-		}
-
-		rebalancerStrategy := rebalancer.IYieldPeerStrategy{
-			ProtocolId:    optimal.ProtocolId,
-			ChainSelector: optimal.ChainSelector,
-		}
-
-		resp, err := parentRebalancer.
-			WriteReportFromIYieldPeerStrategy(runtime, rebalancerStrategy, gasConfig).
-			Await()
-		if err != nil {
-			return fmt.Errorf("failed to update strategy on Rebalancer: %w", err)
-		}
-
-		logger.Info(
-			"Rebalancer update transaction submitted",
-			"txHash", fmt.Sprintf("0x%x", resp.TxHash),
-		)
-
-		return nil
+		return deps.WriteRebalance(parentRebalancer, runtime, logger, parentCfg.GasLimit, optimal)
 	}
 
 	// Delegate comparison + APY-threshold logic + optional write to the pure function.
@@ -202,61 +229,79 @@ func onCronTrigger(config *Config, runtime cre.Runtime, trigger *cron.Payload) (
 }
 
 /*//////////////////////////////////////////////////////////////
+                 ONCHAIN DEPENDENCY IMPLEMENTATIONS
+//////////////////////////////////////////////////////////////*/
+
+func chainReadCurrentStrategy(
+	peer ParentPeerInterface,
+	runtime cre.Runtime,
+) (Strategy, error) {
+	current, err := peer.GetStrategy(runtime, big.NewInt(LatestBlock)).Await()
+	if err != nil {
+		return Strategy{}, err
+	}
+
+	return Strategy{
+		ProtocolId:    current.ProtocolId,
+		ChainSelector: current.ChainSelector,
+	}, nil
+}
+
+func chainReadTVL(
+	peer YieldPeerInterface,
+	runtime cre.Runtime,
+) (*big.Int, error) {
+	return peer.GetTotalValue(runtime, big.NewInt(LatestBlock)).Await()
+}
+
+func chainWriteRebalance(
+	rb RebalancerInterface,
+	runtime cre.Runtime,
+	logger *slog.Logger,
+	gasLimit uint64,
+	optimal Strategy,
+) error {
+	gasConfig := &evm.GasConfig{GasLimit: gasLimit}
+
+	rebalancerStrategy := rebalancer.IYieldPeerStrategy{
+		ProtocolId:    optimal.ProtocolId,
+		ChainSelector: optimal.ChainSelector,
+	}
+
+	resp, err := rb.WriteReportFromIYieldPeerStrategy(runtime, rebalancerStrategy, gasConfig).Await()
+	if err != nil {
+		return fmt.Errorf("failed to update strategy on Rebalancer: %w", err)
+	}
+
+	logger.Info(
+		"Rebalancer update transaction submitted",
+		"txHash", fmt.Sprintf("0x%x", resp.TxHash),
+	)
+	return nil
+}
+
+/*//////////////////////////////////////////////////////////////
                     CALCULATE OPTIMAL STRATEGY
 //////////////////////////////////////////////////////////////*/
+
 // calculateOptimalStrategy is where the "brains" of the strategy selection live.
 // For now it's just pseudocode / comments.
-// This will need to factor in the ProtocolId as to how APY is calculated. ie we will perform different logic for aave v3 and v4
 func calculateOptimalStrategy(
 	logger *slog.Logger,
 	current Strategy,
 	tvl *big.Int,
-	// later you can pass additional pre-fetched pool state here if you want
 ) Strategy {
-	// Read onchain state of lending pools and calculates APY
-	//
-	//    PSEUDOCODE EXAMPLE:
-	//
-	//    pools := fetchLendingPoolsState(current.ChainSelector)
-	//
-	//    for each pool in pools:
-	//        baseApy := pool.SupplyRate
-	//        utilization := pool.Utilization
-	//        incentives := pool.RewardRate
-	//        riskAdjustments := f(pool.Ltv, pool.LiquidationThreshold, pool.ReserveFactor)
-	//
-	//        effectiveApy := baseApy + incentives - riskAdjustments
-	//        if effectiveApy > bestApy:
-	//            bestApy = effectiveApy
-	//            bestPool = pool
-	//
-	// Calculate APY decrease based on tvl and other pool factors like slippage
-	//
-	//    PSEUDOCODE EXAMPLE:
-	//
-	//    // model APY vs TVL degradation:
-	//    // effectiveApy(tvl) = baseApy - k * log(1 + tvl / capacity)
-	//    // where k > 0 encodes how quickly APY decays with size
-	//    for candidatePool in candidatePools:
-	//        projectedApy := modelProjectedApy(candidatePool, tvl)
-	//        if projectedApy > bestProjectedApy:
-	//            bestProjectedApy = projectedApy
-	//            bestStrategy = Strategy{
-	//                ProtocolId:    candidatePool.ProtocolId,
-	//                ChainSelector: candidatePool.ChainSelector,
-	//            }
-
 	// Placeholder / dummy logic for now:
 	// Use a fixed protocol ID as the "optimal" target, to keep the workflow
 	// behavior deterministic while you iterate on the real APY model.
 	protocol := "dummy-protocol-v1"
 	hashedProtocolId := crypto.Keccak256([]byte(protocol))
 
-	var optimalProtocolId [32]byte
-	copy(optimalProtocolId[:], hashedProtocolId)
+	var optimalId [32]byte
+	copy(optimalId[:], hashedProtocolId)
 
 	optimal := Strategy{
-		ProtocolId:    optimalProtocolId,
+		ProtocolId:    optimalId,
 		ChainSelector: current.ChainSelector,
 	}
 
@@ -270,16 +315,15 @@ func calculateOptimalStrategy(
 	return optimal
 }
 
-// decideAndMaybeRebalance implements steps 6–8:
-//
-// 6. compare optimal strategy to current strategy (if same, return)
-// 7. (else) calculate APY for current strategy (if negligible difference, return)
-// 8. execute onchain rebalance tx (via writeFn)
+/*//////////////////////////////////////////////////////////////
+                  DECIDE AND MAYBE REBALANCE
+//////////////////////////////////////////////////////////////*/
+
 func decideAndMaybeRebalance(
 	logger *slog.Logger,
 	current Strategy,
 	optimal Strategy,
-	writeFn func(optimal Strategy) error,
+	writeFn func(Strategy) error,
 ) (*StrategyResult, error) {
 	// 6. Compare optimal vs current
 	if current == optimal {
@@ -291,26 +335,7 @@ func decideAndMaybeRebalance(
 		}, nil
 	}
 
-	// 7. (else) calculate APY for current strategy and only rebalance if difference is meaningful.
-	//
-	//    PSEUDOCODE EXAMPLE:
-	//
-	//    currentApy := computeCurrentStrategyApy(current)
-	//    optimalApy := computeOptimalStrategyApy(optimal)
-	//
-	//    apyDiff := optimalApy - currentApy
-	//    if apyDiff < minRebalanceThreshold {
-	//        logger.Info("APY improvement negligible; skipping rebalance",
-	//            "currentApy", currentApy,
-	//            "optimalApy", optimalApy,
-	//            "apyDiff", apyDiff,
-	//        )
-	//        return &StrategyResult{
-	//            Current: current,
-	//            Optimal: optimal,
-	//            Updated: false,
-	//        }, nil
-	//    }
+	// 7. (else) APY logic placeholder – only rebalance when difference is meaningful.
 
 	logger.Info(
 		"Strategy changed and APY improvement deemed worthwhile; rebalancing",
@@ -320,7 +345,7 @@ func decideAndMaybeRebalance(
 		"optimalChainSelector", optimal.ChainSelector,
 	)
 
-	// Execute onchain rebalance tx via injected function
+	// 8. Execute onchain rebalance tx via injected function.
 	if err := writeFn(optimal); err != nil {
 		return nil, err
 	}
@@ -332,12 +357,15 @@ func decideAndMaybeRebalance(
 	}, nil
 }
 
+/*//////////////////////////////////////////////////////////////
+                       HELPER FUNCTIONS
+//////////////////////////////////////////////////////////////*/
+
 func findEvmConfigByChainSelector(evms []EvmConfig, target uint64) (*EvmConfig, error) {
-    for i := range evms {
-        selector := evms[i].ChainSelector
-        if selector == target {
-            return &evms[i], nil
-        }
-    }
-    return nil, fmt.Errorf("no evm config found for chainSelector %d", target)
+	for i := range evms {
+		if evms[i].ChainSelector == target {
+			return &evms[i], nil
+		}
+	}
+	return nil, fmt.Errorf("no evm config found for chainSelector %d", target)
 }
