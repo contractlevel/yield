@@ -101,6 +101,53 @@ contract OnReportTest is BaseTest {
         assertEq(emittedProtocolId, newStrategy.protocolId);
     }
 
+    function test_yield_rebalancer_onReport_rebalanceParentToParent() public {
+        /// @dev Arrange: Strategy on Parent, deposit to have TVL
+        _selectFork(baseFork);
+        deal(address(baseUsdc), depositor, DEPOSIT_AMOUNT);
+
+        _changePrank(depositor);
+        baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+
+        // Store TVL to verify in event
+        uint256 totalValue = baseParentPeer.getTotalValue();
+
+        // Create workflow metadata and report
+        bytes10 workflowName = _createWorkflowName(workflowNameRaw);
+        bytes memory metadata = _createWorkflowMetadata(workflowId, workflowName, workflowOwner);
+        IYieldPeer.Strategy memory newStrategy = IYieldPeer.Strategy({
+            chainSelector: baseChainSelector, protocolId: keccak256(abi.encodePacked("compound-v3"))
+        });
+        bytes memory encodedReport = _createWorkflowReport(newStrategy.chainSelector, newStrategy.protocolId);
+
+        // Get Strategy Adapter for new Strategy for event assertion
+        address newStrategyAdapter = baseParentPeer.getStrategyAdapter(newStrategy.protocolId);
+
+        /// @dev Act
+        _changePrank(keystoneForwarder);
+        vm.recordLogs();
+        baseRebalancer.onReport(metadata, encodedReport);
+
+        // Get Strategy state after onReport
+        IYieldPeer.Strategy memory currentStrategy = baseParentPeer.getStrategy();
+
+        /// @dev Assert
+        bytes32 depositToStrategyEvent = keccak256("DepositToStrategy(address,uint256)");
+        bool depositToStrategyEventFound = false;
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == depositToStrategyEvent) {
+                depositToStrategyEventFound = true;
+                assertEq(address(uint160(uint256(logs[i].topics[1]))), newStrategyAdapter);
+                assertEq(uint256(logs[i].topics[2]), totalValue);
+            }
+        }
+        assertTrue(depositToStrategyEventFound, "DepositToStrategy log not found");
+        assertEq(currentStrategy.chainSelector, newStrategy.chainSelector);
+        assertEq(currentStrategy.protocolId, newStrategy.protocolId);
+    }
+
     function test_yield_rebalancer_onReport_rebalanceParentToChild() public {
         /// @dev Arrange: Strategy on parent, deposit on parent to have TVL
         _selectFork(baseFork);
@@ -125,6 +172,9 @@ contract OnReportTest is BaseTest {
         vm.recordLogs();
         baseRebalancer.onReport(metadata, encodedReport);
 
+        // Get Strategy state after onReport
+        IYieldPeer.Strategy memory currentStrategy = baseParentPeer.getStrategy();
+
         /// @dev Assert: Check for CCIPMessageSent event with correct tx type and value
         /// @dev Tx type should be RebalanceNewStrategy as strategy is moving
         /// @dev from Parent > Child and handled by ParentPeer::_rebalanceParentToChild
@@ -139,6 +189,8 @@ contract OnReportTest is BaseTest {
             }
         }
         assertTrue(ccipMessageSentEventFound, "CCIPMessageSent log not found");
+        assertEq(currentStrategy.chainSelector, newStrategy.chainSelector);
+        assertEq(currentStrategy.protocolId, newStrategy.protocolId);
     }
 
     function test_yield_rebalancer_onReport_rebalanceChildToOther() public {
@@ -158,6 +210,9 @@ contract OnReportTest is BaseTest {
         vm.recordLogs();
         baseRebalancer.onReport(metadata, encodedReport);
 
+        // Get Strategy state after onReport
+        IYieldPeer.Strategy memory currentStrategy = baseParentPeer.getStrategy();
+
         /// @dev Assert: Check for CCIPMessageSent event with correct tx type
         /// @dev Tx type should be RebalanceOldStrategy as strategy is moving
         /// @dev from Child > Other (Child) and handled by ParentPeer::_rebalanceChildToOther
@@ -172,5 +227,7 @@ contract OnReportTest is BaseTest {
             }
         }
         assertTrue(ccipMessageSentEventFound, "CCIPMessageSent log not found");
+        assertEq(currentStrategy.chainSelector, newStrategy.chainSelector);
+        assertEq(currentStrategy.protocolId, newStrategy.protocolId);
     }
 }
