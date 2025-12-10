@@ -177,7 +177,6 @@ func onCronTrigger(config *Config, runtime cre.Runtime, trigger *cron.Payload) (
 			GasLimit: parentCfg.GasLimit,
 		}
 
-		// @review this Strategy
 		rebalancerStrategy := rebalancer.IYieldPeerStrategy{
 			ProtocolId:    optimal.ProtocolId,
 			ChainSelector: optimal.ChainSelector,
@@ -321,7 +320,7 @@ func decideAndMaybeRebalance(
 		"optimalChainSelector", optimal.ChainSelector,
 	)
 
-	// 8. Execute onchain rebalance tx via injected function
+	// Execute onchain rebalance tx via injected function
 	if err := writeFn(optimal); err != nil {
 		return nil, err
 	}
