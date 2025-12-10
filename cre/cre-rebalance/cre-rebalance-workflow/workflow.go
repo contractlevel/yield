@@ -113,7 +113,7 @@ type onCronDeps struct {
 	WriteRebalance      func(rb RebalancerInterface, runtime cre.Runtime, logger *slog.Logger, gasLimit uint64, optimal Strategy) error
 }
 
-// defaultOnCronDeps are the real chain-backed implementations.
+// defaultOnCronDeps are the onchain implementations.
 var defaultOnCronDeps = onCronDeps{
 	ReadCurrentStrategy: chainReadCurrentStrategy,
 	ReadTVL:             chainReadTVL,

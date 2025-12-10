@@ -593,3 +593,24 @@ func Test_findEvmConfigByChainSelector_notFound(t *testing.T) {
 		t.Fatalf("unexpected error message: %v", err)
 	}
 }
+
+/*//////////////////////////////////////////////////////////////
+                    TESTS FOR INIT WORKFLOW
+//////////////////////////////////////////////////////////////*/
+
+func Test_InitWorkflow_setsUpCronHandler(t *testing.T) {
+	config := &Config{
+		Schedule: "0 */1 * * * *",
+	}
+	logger := testutils.NewRuntime(t, nil).Logger()
+
+	wf, err := InitWorkflow(config, logger, nil)
+	if err != nil {
+		t.Fatalf("InitWorkflow returned error: %v", err)
+	}
+
+	// Sanity: workflow should have at least one handler
+	if len(wf) != 1 {
+		t.Fatalf("expected 1 handler, got %d", len(wf))
+	}
+}
