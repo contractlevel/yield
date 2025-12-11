@@ -31,7 +31,7 @@ import {StrategyRegistry} from "../src/modules/StrategyRegistry.sol";
 import {Roles} from "../src/libraries/Roles.sol";
 
 import {CREReceiver} from "../src/modules/CREReceiver.sol";
-import {WorkflowHelpers} from "./helpers/WorkflowHelpers.sol";
+import {WorkflowHelpers} from "./libraries/WorkflowHelpers.sol";
 
 contract BaseTest is Test {
     /*//////////////////////////////////////////////////////////////
