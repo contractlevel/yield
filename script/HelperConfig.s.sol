@@ -8,7 +8,7 @@ import {MockAToken} from "../test/mocks/MockAToken.sol";
 import {MockPoolAddressesProvider} from "../test/mocks/MockPoolAddressesProvider.sol";
 import {MockAToken} from "../test/mocks/MockAToken.sol";
 import {MockUsdc} from "../test/mocks/MockUsdc.sol";
-import {MockLocalKeystoneForwarder} from "../test/mocks/MockLocalKeystoneForwarder.sol";
+import {MockKeystoneForwarder} from "../test/mocks/MockKeystoneForwarder.sol";
 import {CCIPLocalSimulator, LinkToken, IRouterClient} from "@chainlink-local/src/ccip/CCIPLocalSimulator.sol";
 import {Share} from "../src/token/Share.sol";
 import {ParentPeer} from "../src/peers/ParentPeer.sol";
@@ -460,7 +460,7 @@ contract HelperConfig is Script {
     MockAToken internal aToken;
     MockPoolAddressesProvider internal poolAddressesProvider;
     MockComet internal comet;
-    MockLocalKeystoneForwarder internal keystoneForwarder;
+    MockKeystoneForwarder internal keystoneForwarder;
     CCIPLocalSimulator internal ccipLocalSimulator;
     Share internal share;
     SharePool internal sharePool;
@@ -477,6 +477,7 @@ contract HelperConfig is Script {
         poolAddressesProvider = new MockPoolAddressesProvider(address(aavePool));
         aavePool.setATokenAddress(address(aToken));
         comet = new MockComet();
+        keystoneForwarder = new MockKeystoneForwarder();
 
         ccipLocalSimulator = new CCIPLocalSimulator();
         (, ccipRouter,,, link,,) = ccipLocalSimulator.configuration();

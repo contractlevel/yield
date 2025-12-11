@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {BaseTest, Vm} from "../../BaseTest.t.sol";
+import {BaseTest, Vm, WorkflowHelpers} from "../../BaseTest.t.sol";
 
 /// @dev CREReceiver inherited by Rebalancer
 contract OnReportTest is BaseTest {
     function test_yield_creReceiver_onReport_revertsWhen_notKeystoneForwarder() public {
-        bytes10 workflowName = _createWorkflowName(workflowNameRaw);
+        bytes10 workflowName = WorkflowHelpers._createWorkflowName(workflowNameRaw);
 
-        bytes memory metadata = _createWorkflowMetadata(workflowId, workflowName, workflowOwner);
-        bytes memory report = _createWorkflowReport(optChainSelector, keccak256(abi.encodePacked("aave-v3")));
+        bytes memory metadata = WorkflowHelpers._createWorkflowMetadata(workflowId, workflowName, workflowOwner);
+        bytes memory report =
+            WorkflowHelpers._createWorkflowReport(optChainSelector, keccak256(abi.encodePacked("aave-v3")));
 
         vm.prank(configAdmin);
         vm.expectRevert(
@@ -21,11 +22,12 @@ contract OnReportTest is BaseTest {
     }
 
     function test_yield_creReceiver_onReport_revertsWhen_wrongWorkflowId() public {
-        bytes10 workflowName = _createWorkflowName(workflowNameRaw);
+        bytes10 workflowName = WorkflowHelpers._createWorkflowName(workflowNameRaw);
         bytes32 wrongWorkflowId = keccak256(abi.encodePacked("WRONG_ID"));
 
-        bytes memory metadata = _createWorkflowMetadata(wrongWorkflowId, workflowName, workflowOwner);
-        bytes memory report = _createWorkflowReport(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
+        bytes memory metadata = WorkflowHelpers._createWorkflowMetadata(wrongWorkflowId, workflowName, workflowOwner);
+        bytes memory report =
+            WorkflowHelpers._createWorkflowReport(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
 
         vm.prank(keystoneForwarder);
         vm.expectRevert(
@@ -37,10 +39,11 @@ contract OnReportTest is BaseTest {
     }
 
     function test_yield_creReceiver_onReport_revertsWhen_wrongWorkflowOwner() public {
-        bytes10 workflowName = _createWorkflowName(workflowNameRaw);
+        bytes10 workflowName = WorkflowHelpers._createWorkflowName(workflowNameRaw);
 
-        bytes memory metadata = _createWorkflowMetadata(workflowId, workflowName, depositor);
-        bytes memory report = _createWorkflowReport(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
+        bytes memory metadata = WorkflowHelpers._createWorkflowMetadata(workflowId, workflowName, depositor);
+        bytes memory report =
+            WorkflowHelpers._createWorkflowReport(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
 
         vm.prank(keystoneForwarder);
         vm.expectRevert(
@@ -52,10 +55,11 @@ contract OnReportTest is BaseTest {
     }
 
     function test_yield_creReceiver_onReport_revertsWhen_wrongWorkflowName() public {
-        bytes10 wrongWorkflowName = _createWorkflowName("WRONGNAME");
+        bytes10 wrongWorkflowName = WorkflowHelpers._createWorkflowName("WRONGNAME");
 
-        bytes memory metadata = _createWorkflowMetadata(workflowId, wrongWorkflowName, workflowOwner);
-        bytes memory report = _createWorkflowReport(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
+        bytes memory metadata = WorkflowHelpers._createWorkflowMetadata(workflowId, wrongWorkflowName, workflowOwner);
+        bytes memory report =
+            WorkflowHelpers._createWorkflowReport(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
 
         vm.prank(keystoneForwarder);
         vm.expectRevert(
@@ -67,10 +71,11 @@ contract OnReportTest is BaseTest {
     }
 
     function test_yield_creReceiver_onReport_success_emitsSecurityChecksPassed() public {
-        bytes10 workflowName = _createWorkflowName(workflowNameRaw);
+        bytes10 workflowName = WorkflowHelpers._createWorkflowName(workflowNameRaw);
 
-        bytes memory metadata = _createWorkflowMetadata(workflowId, workflowName, workflowOwner);
-        bytes memory report = _createWorkflowReport(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
+        bytes memory metadata = WorkflowHelpers._createWorkflowMetadata(workflowId, workflowName, workflowOwner);
+        bytes memory report =
+            WorkflowHelpers._createWorkflowReport(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
 
         vm.prank(keystoneForwarder);
         vm.recordLogs();

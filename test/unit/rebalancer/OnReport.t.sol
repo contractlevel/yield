@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {BaseTest, Vm, IYieldPeer} from "../../BaseTest.t.sol";
+import {BaseTest, Vm, IYieldPeer, WorkflowHelpers} from "../../BaseTest.t.sol";
 
 /// @dev The "_onReport" internal implementation in Rebalancer
 contract OnReportTest is BaseTest {
@@ -9,13 +9,14 @@ contract OnReportTest is BaseTest {
     /// @dev when the report is valid and decoded successfully
     function test_yield_rebalancer_onReport_decodesReport() public {
         /// @dev Arrange
-        bytes10 workflowName = _createWorkflowName(workflowNameRaw);
-        bytes memory metadata = _createWorkflowMetadata(workflowId, workflowName, workflowOwner);
+        bytes10 workflowName = WorkflowHelpers._createWorkflowName(workflowNameRaw);
+        bytes memory metadata = WorkflowHelpers._createWorkflowMetadata(workflowId, workflowName, workflowOwner);
 
         IYieldPeer.Strategy memory newStrategy = IYieldPeer.Strategy({
             chainSelector: baseChainSelector, protocolId: keccak256(abi.encodePacked("compound-v3"))
         });
-        bytes memory encodedReport = _createWorkflowReport(newStrategy.chainSelector, newStrategy.protocolId);
+        bytes memory encodedReport =
+            WorkflowHelpers._createWorkflowReport(newStrategy.chainSelector, newStrategy.protocolId);
 
         /// @dev Act
         vm.recordLogs();
@@ -43,13 +44,14 @@ contract OnReportTest is BaseTest {
     function test_yield_rebalancer_onReport_emitsEventWhen_invalidChainSelector() public {
         /// @dev Arrange
         uint64 invalidChainSelector = 9999;
-        bytes10 workflowName = _createWorkflowName(workflowNameRaw);
-        bytes memory metadata = _createWorkflowMetadata(workflowId, workflowName, workflowOwner);
+        bytes10 workflowName = WorkflowHelpers._createWorkflowName(workflowNameRaw);
+        bytes memory metadata = WorkflowHelpers._createWorkflowMetadata(workflowId, workflowName, workflowOwner);
 
         IYieldPeer.Strategy memory newStrategy = IYieldPeer.Strategy({
             chainSelector: invalidChainSelector, protocolId: keccak256(abi.encodePacked("compound-v3"))
         });
-        bytes memory encodedReport = _createWorkflowReport(newStrategy.chainSelector, newStrategy.protocolId);
+        bytes memory encodedReport =
+            WorkflowHelpers._createWorkflowReport(newStrategy.chainSelector, newStrategy.protocolId);
 
         /// @dev Act
         vm.recordLogs();
@@ -74,12 +76,13 @@ contract OnReportTest is BaseTest {
     function test_yield_rebalancer_onReport_emitsEventWhen_invalidProtocolId() public {
         /// @dev Arrange
         bytes32 invalidProtocolId = keccak256(abi.encodePacked("invalid"));
-        bytes10 workflowName = _createWorkflowName(workflowNameRaw);
-        bytes memory metadata = _createWorkflowMetadata(workflowId, workflowName, workflowOwner);
+        bytes10 workflowName = WorkflowHelpers._createWorkflowName(workflowNameRaw);
+        bytes memory metadata = WorkflowHelpers._createWorkflowMetadata(workflowId, workflowName, workflowOwner);
 
         IYieldPeer.Strategy memory newStrategy =
             IYieldPeer.Strategy({chainSelector: baseChainSelector, protocolId: invalidProtocolId});
-        bytes memory encodedReport = _createWorkflowReport(newStrategy.chainSelector, newStrategy.protocolId);
+        bytes memory encodedReport =
+            WorkflowHelpers._createWorkflowReport(newStrategy.chainSelector, newStrategy.protocolId);
 
         /// @dev Act
         vm.recordLogs();
@@ -114,12 +117,13 @@ contract OnReportTest is BaseTest {
         uint256 totalValue = baseParentPeer.getTotalValue();
 
         // Create workflow metadata and report
-        bytes10 workflowName = _createWorkflowName(workflowNameRaw);
-        bytes memory metadata = _createWorkflowMetadata(workflowId, workflowName, workflowOwner);
+        bytes10 workflowName = WorkflowHelpers._createWorkflowName(workflowNameRaw);
+        bytes memory metadata = WorkflowHelpers._createWorkflowMetadata(workflowId, workflowName, workflowOwner);
         IYieldPeer.Strategy memory newStrategy = IYieldPeer.Strategy({
             chainSelector: baseChainSelector, protocolId: keccak256(abi.encodePacked("compound-v3"))
         });
-        bytes memory encodedReport = _createWorkflowReport(newStrategy.chainSelector, newStrategy.protocolId);
+        bytes memory encodedReport =
+            WorkflowHelpers._createWorkflowReport(newStrategy.chainSelector, newStrategy.protocolId);
 
         // Get Strategy Adapter for new Strategy for event assertion
         address newStrategyAdapter = baseParentPeer.getStrategyAdapter(newStrategy.protocolId);
@@ -161,12 +165,12 @@ contract OnReportTest is BaseTest {
         uint256 totalValue = baseParentPeer.getTotalValue();
 
         // Create workflow metadata and report
-        bytes10 workflowName = _createWorkflowName(workflowNameRaw);
-        bytes memory metadata = _createWorkflowMetadata(workflowId, workflowName, workflowOwner);
+        bytes10 workflowName = WorkflowHelpers._createWorkflowName(workflowNameRaw);
+        bytes memory metadata = WorkflowHelpers._createWorkflowMetadata(workflowId, workflowName, workflowOwner);
         IYieldPeer.Strategy memory newStrategy =
             IYieldPeer.Strategy({chainSelector: optChainSelector, protocolId: keccak256(abi.encodePacked("aave-v3"))});
-        bytes memory encodedReport = _createWorkflowReport(newStrategy.chainSelector, newStrategy.protocolId);
-
+        bytes memory encodedReport =
+            WorkflowHelpers._createWorkflowReport(newStrategy.chainSelector, newStrategy.protocolId);
         /// @dev Act
         _changePrank(keystoneForwarder);
         vm.recordLogs();
@@ -198,11 +202,12 @@ contract OnReportTest is BaseTest {
         _setStrategy(ethChainSelector, keccak256(abi.encodePacked("aave-v3")), SET_CROSS_CHAIN);
 
         // Create workflow metadata and report
-        bytes10 workflowName = _createWorkflowName(workflowNameRaw);
-        bytes memory metadata = _createWorkflowMetadata(workflowId, workflowName, workflowOwner);
+        bytes10 workflowName = WorkflowHelpers._createWorkflowName(workflowNameRaw);
+        bytes memory metadata = WorkflowHelpers._createWorkflowMetadata(workflowId, workflowName, workflowOwner);
         IYieldPeer.Strategy memory newStrategy =
             IYieldPeer.Strategy({chainSelector: optChainSelector, protocolId: keccak256(abi.encodePacked("aave-v3"))});
-        bytes memory encodedReport = _createWorkflowReport(newStrategy.chainSelector, newStrategy.protocolId);
+        bytes memory encodedReport =
+            WorkflowHelpers._createWorkflowReport(newStrategy.chainSelector, newStrategy.protocolId);
 
         /// @dev Act
         _selectFork(baseFork);

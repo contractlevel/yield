@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {BaseTest, Vm, CREReceiver} from "../../BaseTest.t.sol";
+import {BaseTest, Vm, CREReceiver, WorkflowHelpers} from "../../BaseTest.t.sol";
 
 /// @dev CREReceiver inherited by Rebalancer
 contract RemoveWorkflowTest is BaseTest {
@@ -12,7 +12,7 @@ contract RemoveWorkflowTest is BaseTest {
     }
 
     function test_yield_creReceiver_removeWorkflow_emitsEvent() public {
-        bytes10 workflowName = _createWorkflowName(workflowNameRaw);
+        bytes10 workflowName = WorkflowHelpers._createWorkflowName(workflowNameRaw);
 
         _changePrank(baseRebalancer.owner());
         vm.recordLogs();
@@ -40,7 +40,7 @@ contract RemoveWorkflowTest is BaseTest {
     }
 
     function test_yield_creReceiver_removeWorkflow_updatesStorage() public {
-        bytes10 workflowName = _createWorkflowName(workflowNameRaw);
+        bytes10 workflowName = WorkflowHelpers._createWorkflowName(workflowNameRaw);
 
         CREReceiver.Workflow memory workflow = baseRebalancer.getWorkflow(workflowId);
         /// @dev confirm workflow exists before removal

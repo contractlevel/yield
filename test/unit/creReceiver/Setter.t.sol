@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {BaseTest, Vm} from "../../BaseTest.t.sol";
+import {BaseTest, Vm, WorkflowHelpers} from "../../BaseTest.t.sol";
 import {CREReceiver} from "../../../src/modules/CREReceiver.sol";
 
 /// @dev CREReceiver inherited by Rebalancer
@@ -55,7 +55,7 @@ contract SetterTest is BaseTest {
     //////////////////////////////////////////////////////////////*/
     function test_yield_creReceiver_setWorkflow_emitstEvent() public {
         string memory newWorkflowNameRaw = "NEWWORKFLOW";
-        bytes10 newWorkflowName = _createWorkflowName(newWorkflowNameRaw);
+        bytes10 newWorkflowName = WorkflowHelpers._createWorkflowName(newWorkflowNameRaw);
         bytes32 newWorkflowId = keccak256(abi.encodePacked("NEWWORKFLOWID"));
 
         vm.recordLogs();
@@ -85,7 +85,7 @@ contract SetterTest is BaseTest {
 
     function test_yield_creReceiver_setWorkflow_updatesStorage() public {
         string memory newWorkflowNameRaw = "ANOTHERWORKFLOW";
-        bytes10 newWorkflowName = _createWorkflowName(newWorkflowNameRaw);
+        bytes10 newWorkflowName = WorkflowHelpers._createWorkflowName(newWorkflowNameRaw);
         bytes32 newWorkflowId = keccak256(abi.encodePacked("ANOTHERWORKFLOWID"));
 
         _changePrank(baseRebalancer.owner());

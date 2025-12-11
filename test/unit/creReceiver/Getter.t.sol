@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {BaseTest, Vm} from "../../BaseTest.t.sol";
+import {BaseTest, Vm, WorkflowHelpers} from "../../BaseTest.t.sol";
 import {CREReceiver} from "../../../src/modules/CREReceiver.sol";
 
 /// @dev CREReceiver inherited by Rebalancer
@@ -12,7 +12,7 @@ contract GetterTest is BaseTest {
     }
 
     function test_yield_creReceiver_getWorkflow_returnsWorkflowInfo() public view {
-        bytes10 workflowName = _createWorkflowName(workflowNameRaw);
+        bytes10 workflowName = WorkflowHelpers._createWorkflowName(workflowNameRaw);
 
         CREReceiver.Workflow memory retrievedWorkflow = baseRebalancer.getWorkflow(workflowId);
 

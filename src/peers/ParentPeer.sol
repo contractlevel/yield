@@ -23,7 +23,7 @@ contract ParentPeer is YieldPeer {
     /// @dev indicates activeStrategyAdapter not set when parent state shows s_strategy.chainSelector == thisChainSelector
     /// activeStrategyAdapter is updated when rebalance TVL transit concludes
     error ParentPeer__InactiveStrategyAdapter();
-    error ParentPeer__NoStrategyChangeFound();
+    error ParentPeer__NoStrategyChange();
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
@@ -415,11 +415,6 @@ contract ParentPeer is YieldPeer {
         /// @dev Handle strategy change from a child to other peer
         else if (oldStrategy.chainSelector != i_thisChainSelector) {
             _rebalanceChildToOther(oldStrategy.chainSelector, newStrategy);
-        }
-        /// @dev Fallback to revert if by some edge case no strategy change condition met
-        // @review Will this ever trigger?
-        else {
-            revert ParentPeer__NoStrategyChangeFound();
         }
     }
 
