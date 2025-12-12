@@ -315,3 +315,7 @@ Static analysis:
 `go vet .`
 
 `golangci-lint run .`
+
+`gosec .`
+
+`govulncheck .`
