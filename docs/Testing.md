@@ -305,3 +305,13 @@ Integration tests:
 Fuzz tests:
 
 `go test -fuzz FuzzTest_name`
+
+Formatting:
+
+`gofmt -w .`
+
+Static analysis:
+
+`go vet .`
+
+`golangci-lint run .`
