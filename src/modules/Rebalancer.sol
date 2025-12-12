@@ -49,8 +49,11 @@ contract Rebalancer is CREReceiver {
         uint64 chainSelector = newStrategy.chainSelector;
         bytes32 protocolId = newStrategy.protocolId;
 
+        /// @dev Cache the parent peer address to avoid multiple SLOADs
+        address parentPeer = s_parentPeer;
+
         // @review Would it be better to revert on this one?
-        if (!IParentPeer(s_parentPeer).getAllowedChain(chainSelector)) {
+        if (!IParentPeer(parentPeer).getAllowedChain(chainSelector)) {
             emit InvalidChainSelectorInReport(chainSelector);
             return;
         }
@@ -63,7 +66,7 @@ contract Rebalancer is CREReceiver {
 
         emit ReportDecoded(newStrategy.chainSelector, newStrategy.protocolId);
 
-        IParentPeer(s_parentPeer).setStrategy(chainSelector, protocolId);
+        IParentPeer(parentPeer).setStrategy(chainSelector, protocolId);
     }
 
     /*//////////////////////////////////////////////////////////////

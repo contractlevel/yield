@@ -264,6 +264,11 @@ ghost address ghost_strategyRegistrySet_strategyRegistry_emitted {
     init_state axiom ghost_strategyRegistrySet_strategyRegistry_emitted == 0;
 }
 
+/// @notice Ghost: track amount of SLOADs
+ghost mapping(uint => mathint) ghost_sload_countPerSlot {
+    init_state axiom forall uint slot. ghost_sload_countPerSlot[slot] == 0;
+}
+
 /*//////////////////////////////////////////////////////////////
                              HOOKS
 //////////////////////////////////////////////////////////////*/
@@ -321,9 +326,24 @@ hook LOG1(uint offset, uint length, bytes32 t0) {
         if (t0 == UnpausedEvent()) ghost_unpaused_eventCount = ghost_unpaused_eventCount + 1;
 }
 
+/// @notice hook onto all SLOADs and increment a slot everytime it is read
+hook ALL_SLOAD(uint slot) uint val { 
+    ghost_sload_countPerSlot[slot] = ghost_sload_countPerSlot[slot] + 1;
+}
+
 /*//////////////////////////////////////////////////////////////
                              RULES
 //////////////////////////////////////////////////////////////*/
+// certoraRun ./certora/conf/parent/BaseParent.conf --rule SLOADs_once_per_slot --prover_args '-enableStorageSplitting false'
+// rule SLOADs_once_per_slot(method f) {
+//     env e;
+//     calldataarg args;
+//     uint storageSlot;
+//     require ghost_sload_countPerSlot[storageSlot] == 0;
+//     f(e, args);
+//     assert ghost_sload_countPerSlot[storageSlot] <= 1;
+// }
+
 // --- emergency pause --- //
 rule emergencyPause_success() {
     env e;

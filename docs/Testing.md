@@ -297,3 +297,11 @@ We name our tests like so `Test_group_funcName`
 Clean cache:
 
 `go clean -testcache`
+
+Integration tests:
+
+`go test -tags=integration .`
+
+Fuzz tests:
+
+`go test -fuzz FuzzTest_name`

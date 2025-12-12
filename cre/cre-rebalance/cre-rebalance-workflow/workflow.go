@@ -288,7 +288,7 @@ func chainWriteRebalance(
 // For now it's just pseudocode / comments.
 func calculateOptimalStrategy(
 	logger *slog.Logger,
-	current Strategy,
+	current Strategy, // @review not doing anything with currentStrategy here
 	tvl *big.Int,
 ) Strategy {
 	// Placeholder / dummy logic for now:
@@ -335,7 +335,7 @@ func decideAndMaybeRebalance(
 		}, nil
 	}
 
-	// 7. (else) APY logic placeholder – only rebalance when difference is meaningful.
+	// 7. (else) APY logic placeholder – only rebalance when difference is meaningful. ie higher than neglible threshold
 
 	logger.Info(
 		"Strategy changed and APY improvement deemed worthwhile; rebalancing",
