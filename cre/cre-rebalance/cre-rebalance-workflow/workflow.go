@@ -52,28 +52,28 @@ type Strategy struct {
 
 // Config is loaded from config.json
 //
-// {
-//   "schedule": "0 */1 * * * *",
-//   "evms": [
-//     {
-//       "chainName": "ethereum-testnet-sepolia",
-//       "chainSelector": 16015286601757825753,
-//       "yieldPeerAddress": "0x...",
-//       "rebalancerAddress": "0x...",
-//       "gasLimit": 500000
-//     }
-//   ]
-// }
+//	{
+//	  "schedule": "0 */1 * * * *",
+//	  "evms": [
+//	    {
+//	      "chainName": "ethereum-testnet-sepolia",
+//	      "chainSelector": 16015286601757825753,
+//	      "yieldPeerAddress": "0x...",
+//	      "rebalancerAddress": "0x...",
+//	      "gasLimit": 500000
+//	    }
+//	  ]
+//	}
 type Config struct {
 	Schedule string      `json:"schedule"`
 	Evms     []EvmConfig `json:"evms"`
 }
 
 // EvmConfig:
-// - evms[0] is the parent chain: where the Parent YieldPeer is
-//   and where we read the currentStrategy from.
-// - currentStrategy.ChainSelector tells us which chain the active strategy
-//   adapter lives on.
+//   - evms[0] is the parent chain: where the Parent YieldPeer is
+//     and where we read the currentStrategy from.
+//   - currentStrategy.ChainSelector tells us which chain the active strategy
+//     adapter lives on.
 type EvmConfig struct {
 	ChainName         string `json:"chainName"`
 	ChainSelector     uint64 `json:"chainSelector"`

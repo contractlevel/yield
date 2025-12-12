@@ -136,7 +136,7 @@ func Test_onCronTriggerWithDeps_errorWhen_NoConfigForStrategyChain(t *testing.T)
 			return Strategy{
 				ProtocolId:    [32]byte{1},
 				ChainSelector: 999, // no matching EvmConfig
-			 }, nil
+			}, nil
 		},
 		ReadTVL: func(_ YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
 			t.Fatalf("ReadTVL should not be called when no strategy-chain config exists")

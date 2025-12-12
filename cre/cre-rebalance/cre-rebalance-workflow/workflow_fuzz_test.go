@@ -1,11 +1,11 @@
 package main
 
 import (
-	"testing"
-	"math/big"
 	"fmt"
 	"log/slog"
+	"math/big"
 	"strings"
+	"testing"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/scheduler/cron"
@@ -180,8 +180,8 @@ func Fuzz_onCronTriggerWithDeps(f *testing.F) {
 	// readStrategyErr, readTVLErr,
 	// currentEqualsOptimal,
 	// invalidRebalancerAddr, writeErr
-	f.Add(uint64(1), uint64(1), true, false, false, false, false, true, false, false)  // unchanged => no write
-	f.Add(uint64(1), uint64(1), true, false, false, false, false, false, false, false) // changed => write success
+	f.Add(uint64(1), uint64(1), true, false, false, false, false, true, false, false)   // unchanged => no write
+	f.Add(uint64(1), uint64(1), true, false, false, false, false, false, false, false)  // changed => write success
 	f.Add(uint64(1), uint64(2), false, false, false, false, false, false, false, false) // missing strategy cfg
 	f.Add(uint64(1), uint64(2), true, false, true, false, false, false, false, false)   // invalid strategy addr
 	f.Add(uint64(1), uint64(1), true, true, false, false, false, false, false, false)   // invalid parent addr
