@@ -169,10 +169,12 @@ func onCronTriggerWithDeps(config *Config, runtime cre.Runtime, trigger *cron.Pa
 	// - If the strategy lives on the parent chain, reuse parentYieldPeer.
 	// - Otherwise, instantiate a YieldPeer on the strategy chain.
 	var strategyYieldPeer YieldPeerInterface
+	var rebalanceGasLimit uint64
 
 	if currentStrategy.ChainSelector == parentCfg.ChainSelector {
 		// Same chain: no extra client or contract instantiation.
 		strategyYieldPeer = parentYieldPeer
+		rebalanceGasLimit = parentCfg.GasLimit
 	} else {
 		// Different chain: find config and instantiate strategy peer.
 		strategyChainCfg, err := findEvmConfigByChainSelector(config.Evms, currentStrategy.ChainSelector)
@@ -196,6 +198,7 @@ func onCronTriggerWithDeps(config *Config, runtime cre.Runtime, trigger *cron.Pa
 			return nil, fmt.Errorf("failed to create strategy YieldPeer binding: %w", err)
 		}
 		strategyYieldPeer = strategyPeer
+		rebalanceGasLimit = strategyChainCfg.GasLimit
 	}
 
 	// Read the TVL from the selected YieldPeer via deps.
@@ -221,7 +224,7 @@ func onCronTriggerWithDeps(config *Config, runtime cre.Runtime, trigger *cron.Pa
 			return fmt.Errorf("failed to create parent Rebalancer binding: %w", err)
 		}
 
-		return deps.WriteRebalance(parentRebalancer, runtime, logger, parentCfg.GasLimit, optimal)
+		return deps.WriteRebalance(parentRebalancer, runtime, logger, rebalanceGasLimit, optimal)
 	}
 
 	// Delegate comparison + APY-threshold logic + optional write to the pure function.
