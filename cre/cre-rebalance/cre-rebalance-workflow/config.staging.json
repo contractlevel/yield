@@ -4,7 +4,7 @@
     {
       "chainName": "ethereum-testnet-sepolia",
       "chainSelector": 16015286601757825753,
-      "yieldPeerAddress": "0x660f8ab44263347c7704aDa8C016951ecf906A80",
+      "yieldPeerAddress": "0xad024a165c3c973ad74f8b038d386686ec534006",
       "rebalancerAddress": "0x660f8ab44263347c7704aDa8C016951ecf906A80",
       "gasLimit": 500000
     }

@@ -7,6 +7,7 @@ import (
 
 	"cre-rebalance/contracts/evm/src/generated/parent_peer"
 	"cre-rebalance/contracts/evm/src/generated/rebalancer"
+	"cre-rebalance/cre-rebalance-workflow/internal/onchain"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -16,39 +17,10 @@ import (
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 )
 
-/*//////////////////////////////////////////////////////////////
-                             CONSTS
-//////////////////////////////////////////////////////////////*/
-
-const LatestBlock = int64(-3)
-
-/*//////////////////////////////////////////////////////////////
-                           INTERFACES
-//////////////////////////////////////////////////////////////*/
-
-// ParentPeerInterface defines the subset of methods used to read the current strategy.
-type ParentPeerInterface interface {
-	GetStrategy(runtime cre.Runtime, blockNumber *big.Int) cre.Promise[parent_peer.IYieldPeerStrategy]
-}
-
-// YieldPeerInterface defines the subset of methods used to read TVL.
-type YieldPeerInterface interface {
-	GetTotalValue(runtime cre.Runtime, blockNumber *big.Int) cre.Promise[*big.Int]
-}
-
-// RebalancerInterface defines the subset of methods used to write the rebalance report.
-type RebalancerInterface interface {
-	WriteReportFromIYieldPeerStrategy(runtime cre.Runtime, input rebalancer.IYieldPeerStrategy, gasConfig *evm.GasConfig) cre.Promise[*evm.WriteReportReply]
-}
 
 /*//////////////////////////////////////////////////////////////
                              TYPES
 //////////////////////////////////////////////////////////////*/
-
-type Strategy struct {
-	ProtocolId    [32]byte
-	ChainSelector uint64
-}
 
 // Config is loaded from config.json
 //
@@ -84,9 +56,9 @@ type EvmConfig struct {
 
 // StrategyResult is primarily for debugging / testing.
 type StrategyResult struct {
-	Current Strategy `json:"current"`
-	Optimal Strategy `json:"optimal"`
-	Updated bool     `json:"updated"`
+	Current onchain.Strategy `json:"current"`
+	Optimal onchain.Strategy `json:"optimal"`
+	Updated bool             `json:"updated"`
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -108,16 +80,16 @@ func InitWorkflow(config *Config, logger *slog.Logger, secretsProvider cre.Secre
 //////////////////////////////////////////////////////////////*/
 
 type onCronDeps struct {
-	ReadCurrentStrategy func(peer ParentPeerInterface, runtime cre.Runtime) (Strategy, error)
-	ReadTVL             func(peer YieldPeerInterface, runtime cre.Runtime) (*big.Int, error)
-	WriteRebalance      func(rb RebalancerInterface, runtime cre.Runtime, logger *slog.Logger, gasLimit uint64, optimal Strategy) error
+	ReadCurrentStrategy func(peer onchain.ParentPeerInterface, runtime cre.Runtime) (onchain.Strategy, error)
+	ReadTVL             func(peer onchain.YieldPeerInterface, runtime cre.Runtime) (*big.Int, error)
+	WriteRebalance      func(rb onchain.RebalancerInterface, runtime cre.Runtime, logger *slog.Logger, gasLimit uint64, optimal onchain.Strategy) error
 }
 
 // defaultOnCronDeps are the onchain implementations.
 var defaultOnCronDeps = onCronDeps{
-	ReadCurrentStrategy: chainReadCurrentStrategy,
-	ReadTVL:             chainReadTVL,
-	WriteRebalance:      chainWriteRebalance,
+	ReadCurrentStrategy: onchain.ReadCurrentStrategy,
+	ReadTVL:             onchain.ReadTVL,
+	WriteRebalance:      onchain.WriteRebalance,
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -168,7 +140,7 @@ func onCronTriggerWithDeps(config *Config, runtime cre.Runtime, trigger *cron.Pa
 	// Decide which YieldPeer to use for TVL:
 	// - If the strategy lives on the parent chain, reuse parentYieldPeer.
 	// - Otherwise, instantiate a YieldPeer on the strategy chain.
-	var strategyYieldPeer YieldPeerInterface
+	var strategyYieldPeer onchain.YieldPeerInterface
 	var rebalanceGasLimit uint64
 
 	if currentStrategy.ChainSelector == parentCfg.ChainSelector {
@@ -211,7 +183,7 @@ func onCronTriggerWithDeps(config *Config, runtime cre.Runtime, trigger *cron.Pa
 	optimalStrategy := calculateOptimalStrategy(logger, currentStrategy, tvl)
 
 	// Inject write function that performs the actual onchain rebalance on the parent chain.
-	writeFn := func(optimal Strategy) error {
+	writeFn := func(optimal onchain.Strategy) error {
 		// Lazily validate + parse Rebalancer address only if we actually rebalance.
 		if !common.IsHexAddress(parentCfg.RebalancerAddress) {
 			return fmt.Errorf("invalid Rebalancer address: %s", parentCfg.RebalancerAddress)
@@ -235,53 +207,9 @@ func onCronTriggerWithDeps(config *Config, runtime cre.Runtime, trigger *cron.Pa
                  ONCHAIN DEPENDENCY IMPLEMENTATIONS
 //////////////////////////////////////////////////////////////*/
 
-func chainReadCurrentStrategy(
-	peer ParentPeerInterface,
-	runtime cre.Runtime,
-) (Strategy, error) {
-	current, err := peer.GetStrategy(runtime, big.NewInt(LatestBlock)).Await()
-	if err != nil {
-		return Strategy{}, err
-	}
-
-	return Strategy{
-		ProtocolId:    current.ProtocolId,
-		ChainSelector: current.ChainSelector,
-	}, nil
-}
-
-func chainReadTVL(
-	peer YieldPeerInterface,
-	runtime cre.Runtime,
-) (*big.Int, error) {
-	return peer.GetTotalValue(runtime, big.NewInt(LatestBlock)).Await()
-}
-
-func chainWriteRebalance(
-	rb RebalancerInterface,
-	runtime cre.Runtime,
-	logger *slog.Logger,
-	gasLimit uint64,
-	optimal Strategy,
-) error {
-	gasConfig := &evm.GasConfig{GasLimit: gasLimit}
-
-	rebalancerStrategy := rebalancer.IYieldPeerStrategy{
-		ProtocolId:    optimal.ProtocolId,
-		ChainSelector: optimal.ChainSelector,
-	}
-
-	resp, err := rb.WriteReportFromIYieldPeerStrategy(runtime, rebalancerStrategy, gasConfig).Await()
-	if err != nil {
-		return fmt.Errorf("failed to update strategy on Rebalancer: %w", err)
-	}
-
-	logger.Info(
-		"Rebalancer update transaction submitted",
-		"txHash", fmt.Sprintf("0x%x", resp.TxHash),
-	)
-	return nil
-}
+// Note: The onchain package functions are now used directly via defaultOnCronDeps.
+// The local implementations (chainReadCurrentStrategy, chainReadTVL, chainWriteRebalance)
+// have been removed in favor of the onchain package implementations.
 
 /*//////////////////////////////////////////////////////////////
                     CALCULATE OPTIMAL STRATEGY
@@ -291,9 +219,9 @@ func chainWriteRebalance(
 // For now it's just pseudocode / comments.
 func calculateOptimalStrategy(
 	logger *slog.Logger,
-	current Strategy, // @review not doing anything with currentStrategy here
+	current onchain.Strategy, // @review not doing anything with currentStrategy here
 	tvl *big.Int,
-) Strategy {
+) onchain.Strategy {
 	// Placeholder / dummy logic for now:
 	// Use a fixed protocol ID as the "optimal" target, to keep the workflow
 	// behavior deterministic while you iterate on the real APY model.
@@ -303,7 +231,7 @@ func calculateOptimalStrategy(
 	var optimalId [32]byte
 	copy(optimalId[:], hashedProtocolId)
 
-	optimal := Strategy{
+	optimal := onchain.Strategy{
 		ProtocolId:    optimalId,
 		ChainSelector: current.ChainSelector,
 	}
@@ -324,9 +252,9 @@ func calculateOptimalStrategy(
 
 func decideAndMaybeRebalance(
 	logger *slog.Logger,
-	current Strategy,
-	optimal Strategy,
-	writeFn func(Strategy) error,
+	current onchain.Strategy,
+	optimal onchain.Strategy,
+	writeFn func(onchain.Strategy) error,
 ) (*StrategyResult, error) {
 	// 6. Compare optimal vs current
 	if current == optimal {

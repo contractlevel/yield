@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"cre-rebalance/cre-rebalance-workflow/internal/onchain"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/scheduler/cron"
 	"github.com/smartcontractkit/cre-sdk-go/cre"
@@ -92,14 +94,14 @@ func Test_onCronTriggerWithDeps_errorWhen_ReadCurrentStrategyFails(t *testing.T)
 	}
 	runtime := testutils.NewRuntime(t, nil)
 	deps := onCronDeps{
-		ReadCurrentStrategy: func(_ ParentPeerInterface, _ cre.Runtime) (Strategy, error) {
-			return Strategy{}, fmt.Errorf("read-strategy-failed")
+		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
+			return onchain.Strategy{}, fmt.Errorf("read-strategy-failed")
 		},
-		ReadTVL: func(_ YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
+		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
 			t.Fatalf("ReadTVL should not be called when ReadCurrentStrategy fails")
 			return nil, nil
 		},
-		WriteRebalance: func(_ RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ Strategy) error {
+		WriteRebalance: func(_ onchain.RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ onchain.Strategy) error {
 			t.Fatalf("WriteRebalance should not be called when ReadCurrentStrategy fails")
 			return nil
 		},
@@ -132,17 +134,17 @@ func Test_onCronTriggerWithDeps_errorWhen_NoConfigForStrategyChain(t *testing.T)
 	runtime := testutils.NewRuntime(t, nil)
 
 	deps := onCronDeps{
-		ReadCurrentStrategy: func(_ ParentPeerInterface, _ cre.Runtime) (Strategy, error) {
-			return Strategy{
+		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
+			return onchain.Strategy{
 				ProtocolId:    [32]byte{1},
 				ChainSelector: 999, // no matching EvmConfig
 			}, nil
 		},
-		ReadTVL: func(_ YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
+		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
 			t.Fatalf("ReadTVL should not be called when no strategy-chain config exists")
 			return nil, nil
 		},
-		WriteRebalance: func(_ RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ Strategy) error {
+		WriteRebalance: func(_ onchain.RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ onchain.Strategy) error {
 			t.Fatalf("WriteRebalance should not be called when no strategy-chain config exists")
 			return nil
 		},
@@ -180,17 +182,17 @@ func Test_onCronTriggerWithDeps_errorWhen_invalidStrategyYieldPeerAddress(t *tes
 	runtime := testutils.NewRuntime(t, nil)
 
 	deps := onCronDeps{
-		ReadCurrentStrategy: func(_ ParentPeerInterface, _ cre.Runtime) (Strategy, error) {
-			return Strategy{
+		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
+			return onchain.Strategy{
 				ProtocolId:    [32]byte{1},
 				ChainSelector: 2,
 			}, nil
 		},
-		ReadTVL: func(_ YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
+		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
 			t.Fatalf("ReadTVL should not be called when strategy YieldPeer address is invalid")
 			return nil, nil
 		},
-		WriteRebalance: func(_ RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ Strategy) error {
+		WriteRebalance: func(_ onchain.RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ onchain.Strategy) error {
 			t.Fatalf("WriteRebalance should not be called when strategy YieldPeer address is invalid")
 			return nil
 		},
@@ -223,16 +225,16 @@ func Test_onCronTriggerWithDeps_errorWhen_ReadTVLFails(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
 
 	deps := onCronDeps{
-		ReadCurrentStrategy: func(_ ParentPeerInterface, _ cre.Runtime) (Strategy, error) {
-			return Strategy{
+		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
+			return onchain.Strategy{
 				ProtocolId:    [32]byte{1},
 				ChainSelector: 1, // same chain as parent
 			}, nil
 		},
-		ReadTVL: func(_ YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
+		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
 			return nil, fmt.Errorf("tvl-failed")
 		},
-		WriteRebalance: func(_ RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ Strategy) error {
+		WriteRebalance: func(_ onchain.RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ onchain.Strategy) error {
 			t.Fatalf("WriteRebalance should not be called when ReadTVL fails")
 			return nil
 		},
@@ -254,6 +256,7 @@ func Test_onCronTriggerWithDeps_errorWhen_ReadTVLFails(t *testing.T) {
 // Success path: current strategy already optimal → no rebalance
 func Test_onCronTriggerWithDeps_success_noRebalanceWhenStrategyUnchanged(t *testing.T) {
 	// Make current == optimal by matching calculateOptimalStrategy's protocolId.
+	// @review this needs to be revisited when we have a real APY model
 	protocol := "dummy-protocol-v1"
 	hashed := crypto.Keccak256([]byte(protocol))
 	var protocolId [32]byte
@@ -275,16 +278,16 @@ func Test_onCronTriggerWithDeps_success_noRebalanceWhenStrategyUnchanged(t *test
 	writeCalled := false
 
 	deps := onCronDeps{
-		ReadCurrentStrategy: func(_ ParentPeerInterface, _ cre.Runtime) (Strategy, error) {
-			return Strategy{
+		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
+			return onchain.Strategy{
 				ProtocolId:    protocolId,
 				ChainSelector: 1,
 			}, nil
 		},
-		ReadTVL: func(_ YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
+		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
 			return big.NewInt(123), nil
 		},
-		WriteRebalance: func(_ RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ Strategy) error {
+		WriteRebalance: func(_ onchain.RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ onchain.Strategy) error {
 			writeCalled = true
 			return nil
 		},
@@ -321,20 +324,21 @@ func Test_onCronTriggerWithDeps_success_rebalanceWhenStrategyChanges(t *testing.
 	runtime := testutils.NewRuntime(t, nil)
 
 	writeCalls := 0
-	var lastOptimal Strategy
+	var lastOptimal onchain.Strategy
 
 	deps := onCronDeps{
-		ReadCurrentStrategy: func(_ ParentPeerInterface, _ cre.Runtime) (Strategy, error) {
+		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
 			// Choose any protocolId that does NOT match the dummy-protocol-v1 hash.
-			return Strategy{
+			// @review this needs to be revisited when we have a real APY model
+			return onchain.Strategy{
 				ProtocolId:    [32]byte{1},
 				ChainSelector: 1,
 			}, nil
 		},
-		ReadTVL: func(_ YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
+		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
 			return big.NewInt(456), nil
 		},
-		WriteRebalance: func(_ RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, opt Strategy) error {
+		WriteRebalance: func(_ onchain.RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, opt onchain.Strategy) error {
 			writeCalls++
 			lastOptimal = opt
 			return nil
@@ -375,16 +379,16 @@ func Test_onCronTriggerWithDeps_errorWhen_WriteRebalanceFails(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
 
 	deps := onCronDeps{
-		ReadCurrentStrategy: func(_ ParentPeerInterface, _ cre.Runtime) (Strategy, error) {
-			return Strategy{
+		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
+			return onchain.Strategy{
 				ProtocolId:    [32]byte{1},
 				ChainSelector: 1,
 			}, nil
 		},
-		ReadTVL: func(_ YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
+		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
 			return big.NewInt(789), nil
 		},
-		WriteRebalance: func(_ RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ Strategy) error {
+		WriteRebalance: func(_ onchain.RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ onchain.Strategy) error {
 			return fmt.Errorf("rebalance-failed")
 		},
 	}
@@ -417,16 +421,16 @@ func Test_onCronTriggerWithDeps_errorWhen_invalidRebalancerAddress(t *testing.T)
 	runtime := testutils.NewRuntime(t, nil)
 
 	deps := onCronDeps{
-		ReadCurrentStrategy: func(_ ParentPeerInterface, _ cre.Runtime) (Strategy, error) {
-			return Strategy{
+		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
+			return onchain.Strategy{
 				ProtocolId:    [32]byte{1},
 				ChainSelector: 1,
 			}, nil
 		},
-		ReadTVL: func(_ YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
+		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
 			return big.NewInt(111), nil
 		},
-		WriteRebalance: func(_ RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ Strategy) error {
+		WriteRebalance: func(_ onchain.RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ onchain.Strategy) error {
 			t.Fatalf("WriteRebalance should not be called when RebalancerAddress is invalid")
 			return nil
 		},
@@ -452,14 +456,14 @@ func Test_decideAndMaybeRebalance_writeFn_notCalledWhen_currentStrategyIsOptimal
 	runtime := testutils.NewRuntime(t, nil)
 	logger := runtime.Logger()
 
-	current := Strategy{
+	current := onchain.Strategy{
 		ProtocolId:    [32]byte{1},
 		ChainSelector: 10,
 	}
 	optimal := current
 
 	called := false
-	writeFn := func(opt Strategy) error {
+	writeFn := func(opt onchain.Strategy) error {
 		called = true
 		return nil
 	}
@@ -486,19 +490,19 @@ func Test_decideAndMaybeRebalance_writeFn_calledWhen_currentStrategyIsDifferentF
 	runtime := testutils.NewRuntime(t, nil)
 	logger := runtime.Logger()
 
-	current := Strategy{
+	current := onchain.Strategy{
 		ProtocolId:    [32]byte{1},
 		ChainSelector: 10,
 	}
-	optimal := Strategy{
+	optimal := onchain.Strategy{
 		ProtocolId:    [32]byte{2},
 		ChainSelector: 10,
 	}
 
 	callCount := 0
-	var received Strategy
+	var received onchain.Strategy
 
-	writeFn := func(opt Strategy) error {
+	writeFn := func(opt onchain.Strategy) error {
 		callCount++
 		received = opt
 		return nil
@@ -529,17 +533,17 @@ func Test_decideAndMaybeRebalance_writeFn_errorIsPropagated(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
 	logger := runtime.Logger()
 
-	current := Strategy{
+	current := onchain.Strategy{
 		ProtocolId:    [32]byte{1},
 		ChainSelector: 10,
 	}
-	optimal := Strategy{
+	optimal := onchain.Strategy{
 		ProtocolId:    [32]byte{2},
 		ChainSelector: 10,
 	}
 
 	expectedErr := fmt.Errorf("boom")
-	writeFn := func(opt Strategy) error {
+	writeFn := func(opt onchain.Strategy) error {
 		return expectedErr
 	}
 

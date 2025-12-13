@@ -280,6 +280,8 @@ See coverage:
 
 `go tool cover -html=coverage.out`
 
+`go test -coverprofile=coverage.out ./internal/onchain` - for a specific package
+
 Run single test:
 
 `go test -run Test_funcName`

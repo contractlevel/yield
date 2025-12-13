@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"cre-rebalance/cre-rebalance-workflow/internal/onchain"
+
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/scheduler/cron"
 	"github.com/smartcontractkit/cre-sdk-go/cre"
@@ -28,17 +30,17 @@ func Fuzz_decideAndMaybeRebalance(f *testing.F) {
 		idA[0] = protocolA
 		idB[0] = protocolB
 
-		current := Strategy{
+		current := onchain.Strategy{
 			ProtocolId:    idA,
 			ChainSelector: chainSelectorA,
 		}
-		optimal := Strategy{
+		optimal := onchain.Strategy{
 			ProtocolId:    idB,
 			ChainSelector: chainSelectorB,
 		}
 
 		callCount := 0
-		writeFn := func(opt Strategy) error {
+		writeFn := func(opt onchain.Strategy) error {
 			callCount++
 			return nil
 		}
@@ -134,7 +136,7 @@ func Fuzz_calculateOptimalStrategy(f *testing.F) {
 		var id [32]byte
 		id[0] = protoByte
 
-		current := Strategy{
+		current := onchain.Strategy{
 			ProtocolId:    id,
 			ChainSelector: chainSel,
 		}
@@ -253,9 +255,9 @@ func Fuzz_onCronTriggerWithDeps(f *testing.F) {
 		writeCalls := 0
 
 		deps := onCronDeps{
-			ReadCurrentStrategy: func(_ ParentPeerInterface, _ cre.Runtime) (Strategy, error) {
+			ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
 				if readStrategyErr {
-					return Strategy{}, fmt.Errorf("read-strategy-failed")
+					return onchain.Strategy{}, fmt.Errorf("read-strategy-failed")
 				}
 
 				// Choose protocolId so that current == optimal if requested.
@@ -266,18 +268,18 @@ func Fuzz_onCronTriggerWithDeps(f *testing.F) {
 					pid = [32]byte{1} // definitely not equal to keccak("dummy-protocol-v1")
 				}
 
-				return Strategy{
+				return onchain.Strategy{
 					ProtocolId:    pid,
 					ChainSelector: strategyChain, // drives whether we go cross-chain
 				}, nil
 			},
-			ReadTVL: func(_ YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
+			ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
 				if readTVLErr {
 					return nil, fmt.Errorf("read-tvl-failed")
 				}
 				return big.NewInt(123), nil
 			},
-			WriteRebalance: func(_ RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ Strategy) error {
+			WriteRebalance: func(_ onchain.RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ onchain.Strategy) error {
 				writeCalls++
 				if writeErr {
 					return fmt.Errorf("write-failed")
