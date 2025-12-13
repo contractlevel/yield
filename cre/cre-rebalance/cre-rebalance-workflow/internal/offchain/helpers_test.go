@@ -1,10 +1,8 @@
 package offchain
 
 import (
+	"strings"
 	"testing"
-	"math/big"
-	
-	"cre-rebalance/cre-rebalance-workflow/internal/onchain"
 )
 
 func Test_FindEvmConfigByChainSelector_found(t *testing.T) {
@@ -13,7 +11,7 @@ func Test_FindEvmConfigByChainSelector_found(t *testing.T) {
 		{ChainName: "chain-b", ChainSelector: 2},
 	}
 
-	cfg, err := findEvmConfigByChainSelector(evms, 2)
+	cfg, err := FindEvmConfigByChainSelector(evms, 2)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -30,7 +28,7 @@ func Test_FindEvmConfigByChainSelector_notFound(t *testing.T) {
 		{ChainName: "chain-a", ChainSelector: 1},
 	}
 
-	cfg, err := findEvmConfigByChainSelector(evms, 999)
+	cfg, err := FindEvmConfigByChainSelector(evms, 999)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -56,7 +54,7 @@ func Fuzz_FindEvmConfigByChainSelector(f *testing.F) {
 			{ChainName: "c", ChainSelector: c},
 		}
 
-		cfg, err := findEvmConfigByChainSelector(evms, target)
+		cfg, err := FindEvmConfigByChainSelector(evms, target)
 
 		// Compute the expected "first match" by scanning ourselves.
 		var want *EvmConfig

@@ -6,7 +6,8 @@ import (
 	"testing"
 
 	"cre-rebalance/cre-rebalance-workflow/internal/onchain"
-	"cre-rebalance/cre-rebalance-workflow/internal/offchain"
+	
+	"github.com/smartcontractkit/cre-sdk-go/cre/testutils"
 )
 
 func Test_RebalanceIfNeeded_writeFn_notCalledWhen_currentStrategyIsOptimal(t *testing.T) {

@@ -4,7 +4,6 @@ import (
 	"testing"
 	"math/big"
 	"cre-rebalance/cre-rebalance-workflow/internal/onchain"
-	"cre-rebalance/cre-rebalance-workflow/internal/offchain"
 	"github.com/smartcontractkit/cre-sdk-go/cre/testutils"
 )
 
@@ -33,7 +32,7 @@ func Fuzz_CalculateOptimalStrategy(f *testing.F) {
 		}
 		tvl := big.NewInt(tvlRaw)
 
-		optimal := offchain.CalculateOptimalStrategy(logger, current, tvl)
+		optimal := CalculateOptimalStrategy(logger, current, tvl)
 
 		// Invariant: chain selector must not change.
 		if optimal.ChainSelector != current.ChainSelector {
