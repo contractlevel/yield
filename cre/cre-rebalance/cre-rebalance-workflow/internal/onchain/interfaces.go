@@ -12,6 +12,7 @@ import (
 
 // ParentPeerInterface defines the subset used to read the current strategy.
 type ParentPeerInterface interface {
+	YieldPeerInterface
 	GetStrategy(runtime cre.Runtime, blockNumber *big.Int) cre.Promise[parent_peer.IYieldPeerStrategy]
 }
 

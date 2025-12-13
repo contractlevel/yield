@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	"cre-rebalance/contracts/evm/src/generated/parent_peer"
-	"cre-rebalance/contracts/evm/src/generated/rebalancer"
 	"cre-rebalance/cre-rebalance-workflow/internal/onchain"
 	"cre-rebalance/cre-rebalance-workflow/internal/offchain"
 
@@ -67,34 +65,34 @@ func onCronTriggerWithDeps(config *offchain.Config, runtime cre.Runtime, trigger
 	if !common.IsHexAddress(parentCfg.YieldPeerAddress) {
 		return nil, fmt.Errorf("invalid YieldPeer address: %s", parentCfg.YieldPeerAddress)
 	}
-	parentYieldPeerAddr := common.HexToAddress(parentCfg.YieldPeerAddress)
+	parentPeerAddr := common.HexToAddress(parentCfg.YieldPeerAddress)
 
 	// Instantiate ParentPeer contract once.
-	parentYieldPeer, err := parent_peer.NewParentPeer(parentEvmClient, parentYieldPeerAddr, nil)
+	parentPeer, err := onchain.NewParentPeer(parentEvmClient, parentPeerAddr)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create parent YieldPeer binding: %w", err)
+		return nil, fmt.Errorf("failed to create ParentPeer binding: %w", err)
 	}
 
-	// Read current strategy from parent YieldPeer via deps.
-	currentStrategy, err := deps.ReadCurrentStrategy(parentYieldPeer, runtime)
+	// Read current strategy from ParentPeer via deps.
+	currentStrategy, err := deps.ReadCurrentStrategy(parentPeer, runtime)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read strategy from parent YieldPeer: %w", err)
+		return nil, fmt.Errorf("failed to read strategy from ParentPeer: %w", err)
 	}
 	logger.Info(
-		"Read current strategy from parent YieldPeer",
+		"Read current strategy from ParentPeer",
 		"protocolId", fmt.Sprintf("0x%x", currentStrategy.ProtocolId),
 		"chainSelector", currentStrategy.ChainSelector,
 	)
 
 	// Decide which YieldPeer to use for TVL:
-	// - If the strategy lives on the parent chain, reuse parentYieldPeer.
+	// - If the strategy lives on the parent chain, reuse parentPeer.
 	// - Otherwise, instantiate a YieldPeer on the strategy chain.
-	var strategyYieldPeer onchain.YieldPeerInterface
+	var strategyPeer onchain.YieldPeerInterface
 	var rebalanceGasLimit uint64
 
 	if currentStrategy.ChainSelector == parentCfg.ChainSelector {
 		// Same chain: no extra client or contract instantiation.
-		strategyYieldPeer = parentYieldPeer
+		strategyPeer = parentPeer
 		rebalanceGasLimit = parentCfg.GasLimit
 	} else {
 		// Different chain: find config and instantiate strategy peer.
@@ -110,20 +108,20 @@ func onCronTriggerWithDeps(config *offchain.Config, runtime cre.Runtime, trigger
 		if !common.IsHexAddress(strategyChainCfg.YieldPeerAddress) {
 			return nil, fmt.Errorf("invalid YieldPeer address: %s", strategyChainCfg.YieldPeerAddress)
 		}
-		strategyYieldPeerAddr := common.HexToAddress(strategyChainCfg.YieldPeerAddress)
+		strategyPeerAddr := common.HexToAddress(strategyChainCfg.YieldPeerAddress)
 
 		// Instantiate Strategy YieldPeer contract once.
-		// Note: still using parent_peer binding; underlying contract could be a child.
-		strategyPeer, err := parent_peer.NewParentPeer(strategyEvmClient, strategyYieldPeerAddr, nil)
+		// @review still using parent_peer binding; underlying contract could be a child.
+		childPeer, err := onchain.NewChildPeer(strategyEvmClient, strategyPeerAddr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create strategy YieldPeer binding: %w", err)
 		}
-		strategyYieldPeer = strategyPeer
+		strategyPeer = childPeer
 		rebalanceGasLimit = strategyChainCfg.GasLimit
 	}
 
-	// Read the TVL from the selected YieldPeer via deps.
-	tvl, err := deps.ReadTVL(strategyYieldPeer, runtime)
+	// Read the TVL from the strategy YieldPeer via deps.
+	tvl, err := deps.ReadTVL(strategyPeer, runtime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get total value from strategy YieldPeer: %w", err)
 	}
@@ -140,7 +138,7 @@ func onCronTriggerWithDeps(config *offchain.Config, runtime cre.Runtime, trigger
 		parentRebalancerAddr := common.HexToAddress(parentCfg.RebalancerAddress)
 
 		// Instantiate Rebalancer contract once per rebalance attempt.
-		parentRebalancer, err := rebalancer.NewRebalancer(parentEvmClient, parentRebalancerAddr, nil)
+		parentRebalancer, err := onchain.NewRebalancer(parentEvmClient, parentRebalancerAddr)
 		if err != nil {
 			return fmt.Errorf("failed to create parent Rebalancer binding: %w", err)
 		}

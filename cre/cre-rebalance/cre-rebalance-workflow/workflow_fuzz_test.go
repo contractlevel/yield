@@ -159,7 +159,7 @@ func Fuzz_onCronTriggerWithDeps(f *testing.F) {
 			return
 
 		case readStrategyErr:
-			if err == nil || !strings.Contains(err.Error(), "failed to read strategy from parent YieldPeer") {
+			if err == nil || !strings.Contains(err.Error(), "failed to read strategy from ParentPeer") {
 				t.Fatalf("expected read strategy error wrapper, got res=%+v err=%v", res, err)
 			}
 			if res != nil {

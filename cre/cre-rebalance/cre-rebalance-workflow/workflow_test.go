@@ -116,7 +116,7 @@ func Test_onCronTriggerWithDeps_errorWhen_ReadCurrentStrategyFails(t *testing.T)
 	if res != nil {
 		t.Fatalf("expected nil result, got %+v", res)
 	}
-	if !strings.Contains(err.Error(), "failed to read strategy from parent YieldPeer: read-strategy-failed") {
+	if !strings.Contains(err.Error(), "failed to read strategy from ParentPeer: read-strategy-failed") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
