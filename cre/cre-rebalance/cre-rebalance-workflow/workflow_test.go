@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"cre-rebalance/cre-rebalance-workflow/internal/onchain"
+	"cre-rebalance/cre-rebalance-workflow/internal/offchain"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/scheduler/cron"
@@ -22,7 +23,7 @@ import (
 //////////////////////////////////////////////////////////////*/
 
 func Test_onCronTrigger_errorWhen_noEvmConfigsProvided(t *testing.T) {
-	config := &Config{Evms: []EvmConfig{}}
+	config := &offchain.Config{Evms: []offchain.EvmConfig{}}
 	runtime := testutils.NewRuntime(t, nil)
 	scheduled := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
 	payload := &cron.Payload{
@@ -44,8 +45,8 @@ func Test_onCronTrigger_errorWhen_noEvmConfigsProvided(t *testing.T) {
 }
 
 func Test_onCronTrigger_errorWhen_invalidParentPeerAddress(t *testing.T) {
-	config := &Config{
-		Evms: []EvmConfig{
+	config := &offchain.Config{
+		Evms: []offchain.EvmConfig{
 			{
 				ChainName:        "ethereum-testnet-sepolia",
 				ChainSelector:    1,
@@ -83,8 +84,8 @@ func newPayloadNow() *cron.Payload {
 
 // Error when ReadCurrentStrategy fails
 func Test_onCronTriggerWithDeps_errorWhen_ReadCurrentStrategyFails(t *testing.T) {
-	config := &Config{
-		Evms: []EvmConfig{
+	config := &offchain.Config{
+		Evms: []offchain.EvmConfig{
 			{
 				ChainName:        "ethereum-testnet-sepolia",
 				ChainSelector:    1,
@@ -93,7 +94,7 @@ func Test_onCronTriggerWithDeps_errorWhen_ReadCurrentStrategyFails(t *testing.T)
 		},
 	}
 	runtime := testutils.NewRuntime(t, nil)
-	deps := onCronDeps{
+	deps := offchain.OnCronDeps{
 		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
 			return onchain.Strategy{}, fmt.Errorf("read-strategy-failed")
 		},
@@ -122,8 +123,8 @@ func Test_onCronTriggerWithDeps_errorWhen_ReadCurrentStrategyFails(t *testing.T)
 
 // Error when strategy lives on different chain and no config exists
 func Test_onCronTriggerWithDeps_errorWhen_NoConfigForStrategyChain(t *testing.T) {
-	config := &Config{
-		Evms: []EvmConfig{
+	config := &offchain.Config{
+		Evms: []offchain.EvmConfig{
 			{
 				ChainName:        "parent-chain",
 				ChainSelector:    1,
@@ -133,7 +134,7 @@ func Test_onCronTriggerWithDeps_errorWhen_NoConfigForStrategyChain(t *testing.T)
 	}
 	runtime := testutils.NewRuntime(t, nil)
 
-	deps := onCronDeps{
+	deps := offchain.OnCronDeps{
 		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
 			return onchain.Strategy{
 				ProtocolId:    [32]byte{1},
@@ -165,8 +166,8 @@ func Test_onCronTriggerWithDeps_errorWhen_NoConfigForStrategyChain(t *testing.T)
 
 // Error when strategy YieldPeer address is invalid (different chain)
 func Test_onCronTriggerWithDeps_errorWhen_invalidStrategyYieldPeerAddress(t *testing.T) {
-	config := &Config{
-		Evms: []EvmConfig{
+	config := &offchain.Config{
+		Evms: []offchain.EvmConfig{
 			{
 				ChainName:        "parent-chain",
 				ChainSelector:    1,
@@ -181,7 +182,7 @@ func Test_onCronTriggerWithDeps_errorWhen_invalidStrategyYieldPeerAddress(t *tes
 	}
 	runtime := testutils.NewRuntime(t, nil)
 
-	deps := onCronDeps{
+	deps := offchain.OnCronDeps{
 		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
 			return onchain.Strategy{
 				ProtocolId:    [32]byte{1},
@@ -213,8 +214,8 @@ func Test_onCronTriggerWithDeps_errorWhen_invalidStrategyYieldPeerAddress(t *tes
 
 // Error when ReadTVL fails (same chain → reuse parent peer)
 func Test_onCronTriggerWithDeps_errorWhen_ReadTVLFails(t *testing.T) {
-	config := &Config{
-		Evms: []EvmConfig{
+	config := &offchain.Config{
+		Evms: []offchain.EvmConfig{
 			{
 				ChainName:        "parent-chain",
 				ChainSelector:    1,
@@ -224,7 +225,7 @@ func Test_onCronTriggerWithDeps_errorWhen_ReadTVLFails(t *testing.T) {
 	}
 	runtime := testutils.NewRuntime(t, nil)
 
-	deps := onCronDeps{
+	deps := offchain.OnCronDeps{
 		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
 			return onchain.Strategy{
 				ProtocolId:    [32]byte{1},
@@ -262,8 +263,8 @@ func Test_onCronTriggerWithDeps_success_noRebalanceWhenStrategyUnchanged(t *test
 	var protocolId [32]byte
 	copy(protocolId[:], hashed)
 
-	config := &Config{
-		Evms: []EvmConfig{
+	config := &offchain.Config{
+		Evms: []offchain.EvmConfig{
 			{
 				ChainName:         "parent-chain",
 				ChainSelector:     1,
@@ -277,7 +278,7 @@ func Test_onCronTriggerWithDeps_success_noRebalanceWhenStrategyUnchanged(t *test
 
 	writeCalled := false
 
-	deps := onCronDeps{
+	deps := offchain.OnCronDeps{
 		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
 			return onchain.Strategy{
 				ProtocolId:    protocolId,
@@ -310,8 +311,8 @@ func Test_onCronTriggerWithDeps_success_noRebalanceWhenStrategyUnchanged(t *test
 
 // Success path: strategy changes and rebalance succeeds
 func Test_onCronTriggerWithDeps_success_rebalanceWhenStrategyChanges(t *testing.T) {
-	config := &Config{
-		Evms: []EvmConfig{
+	config := &offchain.Config{
+		Evms: []offchain.EvmConfig{
 			{
 				ChainName:         "parent-chain",
 				ChainSelector:     1,
@@ -326,7 +327,7 @@ func Test_onCronTriggerWithDeps_success_rebalanceWhenStrategyChanges(t *testing.
 	writeCalls := 0
 	var lastOptimal onchain.Strategy
 
-	deps := onCronDeps{
+	deps := offchain.OnCronDeps{
 		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
 			// Choose any protocolId that does NOT match the dummy-protocol-v1 hash.
 			// @review this needs to be revisited when we have a real APY model
@@ -365,8 +366,8 @@ func Test_onCronTriggerWithDeps_success_rebalanceWhenStrategyChanges(t *testing.
 
 // Error when WriteRebalance fails
 func Test_onCronTriggerWithDeps_errorWhen_WriteRebalanceFails(t *testing.T) {
-	config := &Config{
-		Evms: []EvmConfig{
+	config := &offchain.Config{
+		Evms: []offchain.EvmConfig{
 			{
 				ChainName:         "parent-chain",
 				ChainSelector:     1,
@@ -378,7 +379,7 @@ func Test_onCronTriggerWithDeps_errorWhen_WriteRebalanceFails(t *testing.T) {
 	}
 	runtime := testutils.NewRuntime(t, nil)
 
-	deps := onCronDeps{
+	deps := offchain.OnCronDeps{
 		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
 			return onchain.Strategy{
 				ProtocolId:    [32]byte{1},
@@ -407,8 +408,8 @@ func Test_onCronTriggerWithDeps_errorWhen_WriteRebalanceFails(t *testing.T) {
 
 // Error when RebalancerAddress is invalid (rebalance path)
 func Test_onCronTriggerWithDeps_errorWhen_invalidRebalancerAddress(t *testing.T) {
-	config := &Config{
-		Evms: []EvmConfig{
+	config := &offchain.Config{
+		Evms: []offchain.EvmConfig{
 			{
 				ChainName:         "parent-chain",
 				ChainSelector:     1,
@@ -420,7 +421,7 @@ func Test_onCronTriggerWithDeps_errorWhen_invalidRebalancerAddress(t *testing.T)
 	}
 	runtime := testutils.NewRuntime(t, nil)
 
-	deps := onCronDeps{
+	deps := offchain.OnCronDeps{
 		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
 			return onchain.Strategy{
 				ProtocolId:    [32]byte{1},
@@ -449,161 +450,11 @@ func Test_onCronTriggerWithDeps_errorWhen_invalidRebalancerAddress(t *testing.T)
 }
 
 /*//////////////////////////////////////////////////////////////
-              TESTS FOR DECIDE AND MAYBE REBALANCE
-//////////////////////////////////////////////////////////////*/
-
-func Test_decideAndMaybeRebalance_writeFn_notCalledWhen_currentStrategyIsOptimal(t *testing.T) {
-	runtime := testutils.NewRuntime(t, nil)
-	logger := runtime.Logger()
-
-	current := onchain.Strategy{
-		ProtocolId:    [32]byte{1},
-		ChainSelector: 10,
-	}
-	optimal := current
-
-	called := false
-	writeFn := func(opt onchain.Strategy) error {
-		called = true
-		return nil
-	}
-
-	res, err := decideAndMaybeRebalance(logger, current, optimal, writeFn)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if called {
-		t.Fatalf("writeFn should not be called when strategies are equal")
-	}
-	if res == nil {
-		t.Fatalf("expected non-nil result")
-	}
-	if res.Updated {
-		t.Fatalf("expected Updated=false when strategies are equal")
-	}
-	if res.Current != current || res.Optimal != optimal {
-		t.Fatalf("unexpected result strategies: got %+v", res)
-	}
-}
-
-func Test_decideAndMaybeRebalance_writeFn_calledWhen_currentStrategyIsDifferentFromOptimal(t *testing.T) {
-	runtime := testutils.NewRuntime(t, nil)
-	logger := runtime.Logger()
-
-	current := onchain.Strategy{
-		ProtocolId:    [32]byte{1},
-		ChainSelector: 10,
-	}
-	optimal := onchain.Strategy{
-		ProtocolId:    [32]byte{2},
-		ChainSelector: 10,
-	}
-
-	callCount := 0
-	var received onchain.Strategy
-
-	writeFn := func(opt onchain.Strategy) error {
-		callCount++
-		received = opt
-		return nil
-	}
-
-	res, err := decideAndMaybeRebalance(logger, current, optimal, writeFn)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if callCount != 1 {
-		t.Fatalf("expected writeFn to be called once, got %d", callCount)
-	}
-	if received != optimal {
-		t.Fatalf("writeFn received unexpected strategy: got %+v, want %+v", received, optimal)
-	}
-	if res == nil {
-		t.Fatalf("expected non-nil result")
-	}
-	if !res.Updated {
-		t.Fatalf("expected Updated=true when strategies differ")
-	}
-	if res.Current != current || res.Optimal != optimal {
-		t.Fatalf("unexpected result strategies: got %+v", res)
-	}
-}
-
-func Test_decideAndMaybeRebalance_writeFn_errorIsPropagated(t *testing.T) {
-	runtime := testutils.NewRuntime(t, nil)
-	logger := runtime.Logger()
-
-	current := onchain.Strategy{
-		ProtocolId:    [32]byte{1},
-		ChainSelector: 10,
-	}
-	optimal := onchain.Strategy{
-		ProtocolId:    [32]byte{2},
-		ChainSelector: 10,
-	}
-
-	expectedErr := fmt.Errorf("boom")
-	writeFn := func(opt onchain.Strategy) error {
-		return expectedErr
-	}
-
-	res, err := decideAndMaybeRebalance(logger, current, optimal, writeFn)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if !strings.Contains(err.Error(), "boom") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if res != nil {
-		t.Fatalf("expected nil result when writeFn fails, got %+v", res)
-	}
-}
-
-/*//////////////////////////////////////////////////////////////
-          TESTS FOR FIND EVM CONFIG BY CHAIN SELECTOR
-//////////////////////////////////////////////////////////////*/
-
-func Test_findEvmConfigByChainSelector_found(t *testing.T) {
-	evms := []EvmConfig{
-		{ChainName: "chain-a", ChainSelector: 1},
-		{ChainName: "chain-b", ChainSelector: 2},
-	}
-
-	cfg, err := findEvmConfigByChainSelector(evms, 2)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if cfg == nil {
-		t.Fatalf("expected non-nil config")
-	}
-	if cfg.ChainName != "chain-b" {
-		t.Fatalf("expected chain-b, got %s", cfg.ChainName)
-	}
-}
-
-func Test_findEvmConfigByChainSelector_notFound(t *testing.T) {
-	evms := []EvmConfig{
-		{ChainName: "chain-a", ChainSelector: 1},
-	}
-
-	cfg, err := findEvmConfigByChainSelector(evms, 999)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if cfg != nil {
-		t.Fatalf("expected nil config when not found, got %+v", cfg)
-	}
-	if !strings.Contains(err.Error(), "no evm config found for chainSelector 999") {
-		t.Fatalf("unexpected error message: %v", err)
-	}
-}
-
-/*//////////////////////////////////////////////////////////////
                     TESTS FOR INIT WORKFLOW
 //////////////////////////////////////////////////////////////*/
 
 func Test_InitWorkflow_setsUpCronHandler(t *testing.T) {
-	config := &Config{
+	config := &offchain.Config{
 		Schedule: "0 */1 * * * *",
 	}
 	logger := testutils.NewRuntime(t, nil).Logger()

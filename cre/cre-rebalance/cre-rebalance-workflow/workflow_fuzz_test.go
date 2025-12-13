@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"cre-rebalance/cre-rebalance-workflow/internal/onchain"
+	"cre-rebalance/cre-rebalance-workflow/internal/offchain"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/scheduler/cron"
@@ -15,112 +16,6 @@ import (
 	"github.com/smartcontractkit/cre-sdk-go/cre/testutils"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
-
-func Fuzz_decideAndMaybeRebalance(f *testing.F) {
-	runtime := testutils.NewRuntime(f, nil)
-	logger := runtime.Logger()
-
-	// Seed corpus with a couple of deterministic examples
-	f.Add(uint8(1), uint64(10), uint8(1), uint64(10)) // equal
-	f.Add(uint8(1), uint64(10), uint8(2), uint64(10)) // different
-
-	f.Fuzz(func(t *testing.T, protocolA uint8, chainSelectorA uint64, protocolB uint8, chainSelectorB uint64) {
-		// Simple way to build ProtocolId from a byte; rest zero.
-		var idA, idB [32]byte
-		idA[0] = protocolA
-		idB[0] = protocolB
-
-		current := onchain.Strategy{
-			ProtocolId:    idA,
-			ChainSelector: chainSelectorA,
-		}
-		optimal := onchain.Strategy{
-			ProtocolId:    idB,
-			ChainSelector: chainSelectorB,
-		}
-
-		callCount := 0
-		writeFn := func(opt onchain.Strategy) error {
-			callCount++
-			return nil
-		}
-
-		res, err := decideAndMaybeRebalance(logger, current, optimal, writeFn)
-		if err != nil {
-			// By construction, decideAndMaybeRebalance only returns an error
-			// from writeFn; our writeFn never errors.
-			t.Fatalf("unexpected error: %v", err)
-		}
-		if res == nil {
-			t.Fatalf("expected non-nil result")
-		}
-
-		if current == optimal {
-			if callCount != 0 {
-				t.Fatalf("writeFn called %d times when strategies equal", callCount)
-			}
-			if res.Updated {
-				t.Fatalf("Updated should be false when strategies equal")
-			}
-		} else {
-			if callCount != 1 {
-				t.Fatalf("writeFn called %d times when strategies differ", callCount)
-			}
-			if !res.Updated {
-				t.Fatalf("Updated should be true when strategies differ")
-			}
-		}
-	})
-}
-
-func Fuzz_findEvmConfigByChainSelector(f *testing.F) {
-	// Seed some simple examples
-	f.Add(uint64(1), uint64(2), uint64(3), uint64(2)) // hit middle
-	f.Add(uint64(1), uint64(2), uint64(3), uint64(9)) // miss all
-	f.Add(uint64(5), uint64(5), uint64(5), uint64(5)) // all same, hit first
-
-	f.Fuzz(func(t *testing.T, a, b, c, target uint64) {
-		// Build a small slice with up to 3 possible matches.
-		evms := []EvmConfig{
-			{ChainName: "a", ChainSelector: a},
-			{ChainName: "b", ChainSelector: b},
-			{ChainName: "c", ChainSelector: c},
-		}
-
-		cfg, err := findEvmConfigByChainSelector(evms, target)
-
-		// Compute the expected "first match" by scanning ourselves.
-		var want *EvmConfig
-		for i := range evms {
-			evm := evms[i]
-			if evm.ChainSelector == target {
-				want = &evm
-				break
-			}
-		}
-
-		if want != nil {
-			// We expect a match.
-			if err != nil {
-				t.Fatalf("expected nil error, got %v", err)
-			}
-			if cfg == nil {
-				t.Fatalf("expected non-nil cfg when selector present")
-			}
-			if cfg.ChainSelector != want.ChainSelector || cfg.ChainName != want.ChainName {
-				t.Fatalf("unexpected cfg: got %+v, want %+v", cfg, want)
-			}
-		} else {
-			// We expect no match.
-			if err == nil {
-				t.Fatalf("expected error when selector missing, got nil")
-			}
-			if cfg != nil {
-				t.Fatalf("expected nil cfg when selector missing, got %+v", cfg)
-			}
-		}
-	})
-}
 
 func Fuzz_calculateOptimalStrategy(f *testing.F) {
 	runtime := testutils.NewRuntime(f, nil)
@@ -225,9 +120,9 @@ func Fuzz_onCronTriggerWithDeps(f *testing.F) {
 		}
 
 		// Build config: always include parent at index 0.
-		cfg := &Config{
+		cfg := &offchain.Config{
 			Schedule: "0 */1 * * * *",
-			Evms: []EvmConfig{
+			Evms: []offchain.EvmConfig{
 				{
 					ChainName:         "parent",
 					ChainSelector:     parentChain,
@@ -244,7 +139,7 @@ func Fuzz_onCronTriggerWithDeps(f *testing.F) {
 			if invalidStrategyAddr {
 				strategyYieldPeerAddr = "invalid-strategy"
 			}
-			cfg.Evms = append(cfg.Evms, EvmConfig{
+			cfg.Evms = append(cfg.Evms, offchain.EvmConfig{
 				ChainName:        "strategy",
 				ChainSelector:    strategyChain,
 				YieldPeerAddress: strategyYieldPeerAddr,
@@ -254,7 +149,7 @@ func Fuzz_onCronTriggerWithDeps(f *testing.F) {
 		// Track whether a write was attempted.
 		writeCalls := 0
 
-		deps := onCronDeps{
+		deps := offchain.OnCronDeps{
 			ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
 				if readStrategyErr {
 					return onchain.Strategy{}, fmt.Errorf("read-strategy-failed")

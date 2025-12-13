@@ -24,3 +24,5 @@ type YieldPeerInterface interface {
 type RebalancerInterface interface {
 	WriteReportFromIYieldPeerStrategy(runtime cre.Runtime, input rebalancer.IYieldPeerStrategy, gasConfig *evm.GasConfig) cre.Promise[*evm.WriteReportReply]
 }
+
+// @review we will need interfaces for reading Aave contracts

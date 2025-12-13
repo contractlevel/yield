@@ -8,6 +8,7 @@ import (
 	"cre-rebalance/contracts/evm/src/generated/parent_peer"
 	"cre-rebalance/contracts/evm/src/generated/rebalancer"
 	"cre-rebalance/cre-rebalance-workflow/internal/onchain"
+	"cre-rebalance/cre-rebalance-workflow/internal/offchain"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
@@ -17,57 +18,13 @@ import (
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 )
 
-
-/*//////////////////////////////////////////////////////////////
-                             TYPES
-//////////////////////////////////////////////////////////////*/
-
-// Config is loaded from config.json
-//
-//	{
-//	  "schedule": "0 */1 * * * *",
-//	  "evms": [
-//	    {
-//	      "chainName": "ethereum-testnet-sepolia",
-//	      "chainSelector": 16015286601757825753,
-//	      "yieldPeerAddress": "0x...",
-//	      "rebalancerAddress": "0x...",
-//	      "gasLimit": 500000
-//	    }
-//	  ]
-//	}
-type Config struct {
-	Schedule string      `json:"schedule"`
-	Evms     []EvmConfig `json:"evms"`
-}
-
-// EvmConfig:
-//   - evms[0] is the parent chain: where the Parent YieldPeer is
-//     and where we read the currentStrategy from.
-//   - currentStrategy.ChainSelector tells us which chain the active strategy
-//     adapter lives on.
-type EvmConfig struct {
-	ChainName         string `json:"chainName"`
-	ChainSelector     uint64 `json:"chainSelector"`
-	YieldPeerAddress  string `json:"yieldPeerAddress"`
-	RebalancerAddress string `json:"rebalancerAddress"`
-	GasLimit          uint64 `json:"gasLimit"`
-}
-
-// StrategyResult is primarily for debugging / testing.
-type StrategyResult struct {
-	Current onchain.Strategy `json:"current"`
-	Optimal onchain.Strategy `json:"optimal"`
-	Updated bool             `json:"updated"`
-}
-
 /*//////////////////////////////////////////////////////////////
                          INIT WORKFLOW
 //////////////////////////////////////////////////////////////*/
 
 // InitWorkflow registers the cron handler.
-func InitWorkflow(config *Config, logger *slog.Logger, secretsProvider cre.SecretsProvider) (cre.Workflow[*Config], error) {
-	return cre.Workflow[*Config]{
+func InitWorkflow(config *offchain.Config, logger *slog.Logger, secretsProvider cre.SecretsProvider) (cre.Workflow[*offchain.Config], error) {
+	return cre.Workflow[*offchain.Config]{
 		cre.Handler(
 			cron.Trigger(&cron.Config{Schedule: config.Schedule}),
 			onCronTrigger,
@@ -79,14 +36,8 @@ func InitWorkflow(config *Config, logger *slog.Logger, secretsProvider cre.Secre
                   DEPS FOR ON-CRON (INJECTION POINT)
 //////////////////////////////////////////////////////////////*/
 
-type onCronDeps struct {
-	ReadCurrentStrategy func(peer onchain.ParentPeerInterface, runtime cre.Runtime) (onchain.Strategy, error)
-	ReadTVL             func(peer onchain.YieldPeerInterface, runtime cre.Runtime) (*big.Int, error)
-	WriteRebalance      func(rb onchain.RebalancerInterface, runtime cre.Runtime, logger *slog.Logger, gasLimit uint64, optimal onchain.Strategy) error
-}
-
 // defaultOnCronDeps are the onchain implementations.
-var defaultOnCronDeps = onCronDeps{
+var defaultOnCronDeps = offchain.OnCronDeps{
 	ReadCurrentStrategy: onchain.ReadCurrentStrategy,
 	ReadTVL:             onchain.ReadTVL,
 	WriteRebalance:      onchain.WriteRebalance,
@@ -96,11 +47,11 @@ var defaultOnCronDeps = onCronDeps{
                         ON CRON TRIGGER
 //////////////////////////////////////////////////////////////*/
 
-func onCronTrigger(config *Config, runtime cre.Runtime, trigger *cron.Payload) (*StrategyResult, error) {
+func onCronTrigger(config *offchain.Config, runtime cre.Runtime, trigger *cron.Payload) (*offchain.StrategyResult, error) {
 	return onCronTriggerWithDeps(config, runtime, trigger, defaultOnCronDeps)
 }
 
-func onCronTriggerWithDeps(config *Config, runtime cre.Runtime, trigger *cron.Payload, deps onCronDeps) (*StrategyResult, error) {
+func onCronTriggerWithDeps(config *offchain.Config, runtime cre.Runtime, trigger *cron.Payload, deps offchain.OnCronDeps) (*offchain.StrategyResult, error) {
 	logger := runtime.Logger()
 
 	// Ensure we have at least one EVM config and treat evms[0] as parent chain.
@@ -149,7 +100,7 @@ func onCronTriggerWithDeps(config *Config, runtime cre.Runtime, trigger *cron.Pa
 		rebalanceGasLimit = parentCfg.GasLimit
 	} else {
 		// Different chain: find config and instantiate strategy peer.
-		strategyChainCfg, err := findEvmConfigByChainSelector(config.Evms, currentStrategy.ChainSelector)
+		strategyChainCfg, err := offchain.FindEvmConfigByChainSelector(config.Evms, currentStrategy.ChainSelector)
 		if err != nil {
 			return nil, fmt.Errorf("no EVM config found for strategy chainSelector %d: %w", currentStrategy.ChainSelector, err)
 		}
@@ -200,16 +151,8 @@ func onCronTriggerWithDeps(config *Config, runtime cre.Runtime, trigger *cron.Pa
 	}
 
 	// Delegate comparison + APY-threshold logic + optional write to the pure function.
-	return decideAndMaybeRebalance(logger, currentStrategy, optimalStrategy, writeFn)
+	return offchain.RebalanceIfNeeded(logger, currentStrategy, optimalStrategy, writeFn)
 }
-
-/*//////////////////////////////////////////////////////////////
-                 ONCHAIN DEPENDENCY IMPLEMENTATIONS
-//////////////////////////////////////////////////////////////*/
-
-// Note: The onchain package functions are now used directly via defaultOnCronDeps.
-// The local implementations (chainReadCurrentStrategy, chainReadTVL, chainWriteRebalance)
-// have been removed in favor of the onchain package implementations.
 
 /*//////////////////////////////////////////////////////////////
                     CALCULATE OPTIMAL STRATEGY
@@ -244,59 +187,4 @@ func calculateOptimalStrategy(
 	)
 
 	return optimal
-}
-
-/*//////////////////////////////////////////////////////////////
-                  DECIDE AND MAYBE REBALANCE
-//////////////////////////////////////////////////////////////*/
-
-func decideAndMaybeRebalance(
-	logger *slog.Logger,
-	current onchain.Strategy,
-	optimal onchain.Strategy,
-	writeFn func(onchain.Strategy) error,
-) (*StrategyResult, error) {
-	// 6. Compare optimal vs current
-	if current == optimal {
-		logger.Info("Strategy unchanged; no update needed")
-		return &StrategyResult{
-			Current: current,
-			Optimal: optimal,
-			Updated: false,
-		}, nil
-	}
-
-	// 7. (else) APY logic placeholder – only rebalance when difference is meaningful. ie higher than neglible threshold
-
-	logger.Info(
-		"Strategy changed and APY improvement deemed worthwhile; rebalancing",
-		"currentProtocolId", fmt.Sprintf("0x%x", current.ProtocolId),
-		"currentChainSelector", current.ChainSelector,
-		"optimalProtocolId", fmt.Sprintf("0x%x", optimal.ProtocolId),
-		"optimalChainSelector", optimal.ChainSelector,
-	)
-
-	// 8. Execute onchain rebalance tx via injected function.
-	if err := writeFn(optimal); err != nil {
-		return nil, err
-	}
-
-	return &StrategyResult{
-		Current: current,
-		Optimal: optimal,
-		Updated: true,
-	}, nil
-}
-
-/*//////////////////////////////////////////////////////////////
-                       HELPER FUNCTIONS
-//////////////////////////////////////////////////////////////*/
-
-func findEvmConfigByChainSelector(evms []EvmConfig, target uint64) (*EvmConfig, error) {
-	for i := range evms {
-		if evms[i].ChainSelector == target {
-			return &evms[i], nil
-		}
-	}
-	return nil, fmt.Errorf("no evm config found for chainSelector %d", target)
 }
