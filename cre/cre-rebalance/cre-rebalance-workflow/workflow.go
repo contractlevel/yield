@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"log/slog"
-	"math/big"
 
 	"cre-rebalance/contracts/evm/src/generated/parent_peer"
 	"cre-rebalance/contracts/evm/src/generated/rebalancer"
@@ -11,7 +10,6 @@ import (
 	"cre-rebalance/cre-rebalance-workflow/internal/offchain"
 
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/blockchain/evm"
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/scheduler/cron"
@@ -131,7 +129,7 @@ func onCronTriggerWithDeps(config *offchain.Config, runtime cre.Runtime, trigger
 	}
 
 	// Calculate optimal strategy based on TVL and lending pool state (pseudocode inside).
-	optimalStrategy := calculateOptimalStrategy(logger, currentStrategy, tvl)
+	optimalStrategy := offchain.CalculateOptimalStrategy(logger, currentStrategy, tvl)
 
 	// Inject write function that performs the actual onchain rebalance on the parent chain.
 	writeFn := func(optimal onchain.Strategy) error {
@@ -152,39 +150,4 @@ func onCronTriggerWithDeps(config *offchain.Config, runtime cre.Runtime, trigger
 
 	// Delegate comparison + APY-threshold logic + optional write to the pure function.
 	return offchain.RebalanceIfNeeded(logger, currentStrategy, optimalStrategy, writeFn)
-}
-
-/*//////////////////////////////////////////////////////////////
-                    CALCULATE OPTIMAL STRATEGY
-//////////////////////////////////////////////////////////////*/
-
-// calculateOptimalStrategy is where the "brains" of the strategy selection live.
-// For now it's just pseudocode / comments.
-func calculateOptimalStrategy(
-	logger *slog.Logger,
-	current onchain.Strategy, // @review not doing anything with currentStrategy here
-	tvl *big.Int,
-) onchain.Strategy {
-	// Placeholder / dummy logic for now:
-	// Use a fixed protocol ID as the "optimal" target, to keep the workflow
-	// behavior deterministic while you iterate on the real APY model.
-	protocol := "dummy-protocol-v1"
-	hashedProtocolId := crypto.Keccak256([]byte(protocol))
-
-	var optimalId [32]byte
-	copy(optimalId[:], hashedProtocolId)
-
-	optimal := onchain.Strategy{
-		ProtocolId:    optimalId,
-		ChainSelector: current.ChainSelector,
-	}
-
-	logger.Info(
-		"Calculated optimal strategy candidate",
-		"protocolId", fmt.Sprintf("0x%x", optimal.ProtocolId),
-		"chainSelector", optimal.ChainSelector,
-		"tvl", tvl.String(),
-	)
-
-	return optimal
 }

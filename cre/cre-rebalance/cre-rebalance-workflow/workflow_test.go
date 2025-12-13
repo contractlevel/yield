@@ -256,7 +256,7 @@ func Test_onCronTriggerWithDeps_errorWhen_ReadTVLFails(t *testing.T) {
 
 // Success path: current strategy already optimal → no rebalance
 func Test_onCronTriggerWithDeps_success_noRebalanceWhenStrategyUnchanged(t *testing.T) {
-	// Make current == optimal by matching calculateOptimalStrategy's protocolId.
+	// Make current == optimal by matching CalculateOptimalStrategy's protocolId.
 	// @review this needs to be revisited when we have a real APY model
 	protocol := "dummy-protocol-v1"
 	hashed := crypto.Keccak256([]byte(protocol))
