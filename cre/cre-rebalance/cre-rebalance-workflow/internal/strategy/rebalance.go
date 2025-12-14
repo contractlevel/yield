@@ -1,4 +1,4 @@
-package offchain
+package strategy
 
 import (
 	"fmt"

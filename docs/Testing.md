@@ -306,7 +306,7 @@ Integration tests:
 
 Fuzz tests:
 
-`go test -fuzz FuzzTest_name`
+`go test -v -fuzz FuzzTest_name`
 
 Formatting:
 

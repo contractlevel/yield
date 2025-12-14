@@ -1,11 +1,7 @@
-package offchain
+package helper
 
 import (
-	"cre-rebalance/cre-rebalance-workflow/internal/onchain"
-
-	"github.com/smartcontractkit/cre-sdk-go/cre"
-	"log/slog"
-	"math/big"
+	"fmt"
 )
 
 // Config is loaded from config.json
@@ -40,15 +36,11 @@ type EvmConfig struct {
 	GasLimit uint64 	     `json:"gasLimit"`
 }
 
-// StrategyResult is primarily for debugging / testing.
-type StrategyResult struct {
-	Current onchain.Strategy `json:"current"`
-	Optimal onchain.Strategy `json:"optimal"`
-	Updated bool             `json:"updated"`
-}
-
-type OnCronDeps struct {
-	ReadCurrentStrategy func(peer onchain.ParentPeerInterface, runtime cre.Runtime) (onchain.Strategy, error)
-	ReadTVL             func(peer onchain.YieldPeerInterface, runtime cre.Runtime) (*big.Int, error)
-	WriteRebalance      func(rb onchain.RebalancerInterface, runtime cre.Runtime, logger *slog.Logger, gasLimit uint64, optimal onchain.Strategy) error
+func FindEvmConfigByChainSelector(evms []EvmConfig, target uint64) (*EvmConfig, error) {
+	for i := range evms {
+		if evms[i].ChainSelector == target {
+			return &evms[i], nil
+		}
+	}
+	return nil, fmt.Errorf("no evm config found for chainSelector %d", target)
 }

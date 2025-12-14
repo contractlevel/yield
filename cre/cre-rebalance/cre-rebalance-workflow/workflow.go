@@ -3,9 +3,11 @@ package main
 import (
 	"fmt"
 	"log/slog"
+	"math/big"
 
 	"cre-rebalance/cre-rebalance-workflow/internal/onchain"
-	"cre-rebalance/cre-rebalance-workflow/internal/offchain"
+	"cre-rebalance/cre-rebalance-workflow/internal/helper"
+	"cre-rebalance/cre-rebalance-workflow/internal/strategy"
 
 	"github.com/ethereum/go-ethereum/common"
 
@@ -19,8 +21,8 @@ import (
 //////////////////////////////////////////////////////////////*/
 
 // InitWorkflow registers the cron handler.
-func InitWorkflow(config *offchain.Config, logger *slog.Logger, secretsProvider cre.SecretsProvider) (cre.Workflow[*offchain.Config], error) {
-	return cre.Workflow[*offchain.Config]{
+func InitWorkflow(config *helper.Config, logger *slog.Logger, secretsProvider cre.SecretsProvider) (cre.Workflow[*helper.Config], error) {
+	return cre.Workflow[*helper.Config]{
 		cre.Handler(
 			cron.Trigger(&cron.Config{Schedule: config.Schedule}),
 			onCronTrigger,
@@ -32,8 +34,14 @@ func InitWorkflow(config *offchain.Config, logger *slog.Logger, secretsProvider 
                   DEPS FOR ON-CRON (INJECTION POINT)
 //////////////////////////////////////////////////////////////*/
 
+type OnCronDeps struct {
+	ReadCurrentStrategy func(peer onchain.ParentPeerInterface, runtime cre.Runtime) (onchain.Strategy, error)
+	ReadTVL             func(peer onchain.YieldPeerInterface,  runtime cre.Runtime) (*big.Int, error)
+	WriteRebalance      func(rb   onchain.RebalancerInterface, runtime cre.Runtime, logger *slog.Logger, gasLimit uint64, optimal onchain.Strategy) error
+}
+
 // defaultOnCronDeps are the onchain implementations.
-var defaultOnCronDeps = offchain.OnCronDeps{
+var defaultOnCronDeps = OnCronDeps{
 	ReadCurrentStrategy: onchain.ReadCurrentStrategy,
 	ReadTVL:             onchain.ReadTVL,
 	WriteRebalance:      onchain.WriteRebalance,
@@ -43,11 +51,11 @@ var defaultOnCronDeps = offchain.OnCronDeps{
                         ON CRON TRIGGER
 //////////////////////////////////////////////////////////////*/
 
-func onCronTrigger(config *offchain.Config, runtime cre.Runtime, trigger *cron.Payload) (*offchain.StrategyResult, error) {
+func onCronTrigger(config *helper.Config, runtime cre.Runtime, trigger *cron.Payload) (*strategy.StrategyResult, error) {
 	return onCronTriggerWithDeps(config, runtime, trigger, defaultOnCronDeps)
 }
 
-func onCronTriggerWithDeps(config *offchain.Config, runtime cre.Runtime, trigger *cron.Payload, deps offchain.OnCronDeps) (*offchain.StrategyResult, error) {
+func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *cron.Payload, deps OnCronDeps) (*strategy.StrategyResult, error) {
 	logger := runtime.Logger()
 
 	// Ensure we have at least one EVM config and treat evms[0] as parent chain.
@@ -68,7 +76,7 @@ func onCronTriggerWithDeps(config *offchain.Config, runtime cre.Runtime, trigger
 	parentPeerAddr := common.HexToAddress(parentCfg.YieldPeerAddress)
 
 	// Instantiate ParentPeer contract once.
-	parentPeer, err := onchain.NewParentPeer(parentEvmClient, parentPeerAddr)
+	parentPeer, err := onchain.NewParentPeerBinding(parentEvmClient, parentPeerAddr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ParentPeer binding: %w", err)
 	}
@@ -96,7 +104,7 @@ func onCronTriggerWithDeps(config *offchain.Config, runtime cre.Runtime, trigger
 		rebalanceGasLimit = parentCfg.GasLimit
 	} else {
 		// Different chain: find config and instantiate strategy peer.
-		strategyChainCfg, err := offchain.FindEvmConfigByChainSelector(config.Evms, currentStrategy.ChainSelector)
+		strategyChainCfg, err := helper.FindEvmConfigByChainSelector(config.Evms, currentStrategy.ChainSelector)
 		if err != nil {
 			return nil, fmt.Errorf("no EVM config found for strategy chainSelector %d: %w", currentStrategy.ChainSelector, err)
 		}
@@ -111,8 +119,8 @@ func onCronTriggerWithDeps(config *offchain.Config, runtime cre.Runtime, trigger
 		strategyPeerAddr := common.HexToAddress(strategyChainCfg.YieldPeerAddress)
 
 		// Instantiate Strategy YieldPeer contract once.
-		// @review still using parent_peer binding; underlying contract could be a child.
-		childPeer, err := onchain.NewChildPeer(strategyEvmClient, strategyPeerAddr)
+		// @review still using parent_peer binding; underlying contract should be a child.
+		childPeer, err := onchain.NewChildPeerBinding(strategyEvmClient, strategyPeerAddr)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create strategy YieldPeer binding: %w", err)
 		}
@@ -127,7 +135,7 @@ func onCronTriggerWithDeps(config *offchain.Config, runtime cre.Runtime, trigger
 	}
 
 	// Calculate optimal strategy based on TVL and lending pool state (pseudocode inside).
-	optimalStrategy := offchain.CalculateOptimalStrategy(logger, currentStrategy, tvl)
+	optimalStrategy := strategy.CalculateOptimalStrategy(logger, currentStrategy, tvl)
 
 	// Inject write function that performs the actual onchain rebalance on the parent chain.
 	writeFn := func(optimal onchain.Strategy) error {
@@ -138,7 +146,7 @@ func onCronTriggerWithDeps(config *offchain.Config, runtime cre.Runtime, trigger
 		parentRebalancerAddr := common.HexToAddress(parentCfg.RebalancerAddress)
 
 		// Instantiate Rebalancer contract once per rebalance attempt.
-		parentRebalancer, err := onchain.NewRebalancer(parentEvmClient, parentRebalancerAddr)
+		parentRebalancer, err := onchain.NewRebalancerBinding(parentEvmClient, parentRebalancerAddr)
 		if err != nil {
 			return fmt.Errorf("failed to create parent Rebalancer binding: %w", err)
 		}
@@ -147,5 +155,6 @@ func onCronTriggerWithDeps(config *offchain.Config, runtime cre.Runtime, trigger
 	}
 
 	// Delegate comparison + APY-threshold logic + optional write to the pure function.
-	return offchain.RebalanceIfNeeded(logger, currentStrategy, optimalStrategy, writeFn)
+	// @review offchain package is confusing here. maybe the logic for deciding to rebalance should not be here
+	return strategy.RebalanceIfNeeded(logger, currentStrategy, optimalStrategy, writeFn)
 }

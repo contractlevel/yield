@@ -1,4 +1,4 @@
-package offchain
+package helper
 
 import (
 	"strings"

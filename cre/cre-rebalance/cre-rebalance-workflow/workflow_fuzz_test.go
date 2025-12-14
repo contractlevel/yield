@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"cre-rebalance/cre-rebalance-workflow/internal/onchain"
-	"cre-rebalance/cre-rebalance-workflow/internal/offchain"
+	"cre-rebalance/cre-rebalance-workflow/internal/helper"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/scheduler/cron"
@@ -77,9 +77,9 @@ func Fuzz_onCronTriggerWithDeps(f *testing.F) {
 		}
 
 		// Build config: always include parent at index 0.
-		cfg := &offchain.Config{
+		config := &helper.Config{
 			Schedule: "0 */1 * * * *",
-			Evms: []offchain.EvmConfig{
+			Evms: []helper.EvmConfig{
 				{
 					ChainName:         "parent",
 					ChainSelector:     parentChain,
@@ -96,7 +96,7 @@ func Fuzz_onCronTriggerWithDeps(f *testing.F) {
 			if invalidStrategyAddr {
 				strategyYieldPeerAddr = "invalid-strategy"
 			}
-			cfg.Evms = append(cfg.Evms, offchain.EvmConfig{
+			config.Evms = append(config.Evms, helper.EvmConfig{
 				ChainName:        "strategy",
 				ChainSelector:    strategyChain,
 				YieldPeerAddress: strategyYieldPeerAddr,
@@ -106,7 +106,7 @@ func Fuzz_onCronTriggerWithDeps(f *testing.F) {
 		// Track whether a write was attempted.
 		writeCalls := 0
 
-		deps := offchain.OnCronDeps{
+		deps := OnCronDeps{
 			ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
 				if readStrategyErr {
 					return onchain.Strategy{}, fmt.Errorf("read-strategy-failed")
@@ -142,7 +142,7 @@ func Fuzz_onCronTriggerWithDeps(f *testing.F) {
 
 		payload := &cron.Payload{ScheduledExecutionTime: timestamppb.Now()}
 
-		res, err := onCronTriggerWithDeps(cfg, runtime, payload, deps)
+		res, err := onCronTriggerWithDeps(config, runtime, payload, deps)
 
 		// Now assert expected outcome based on the earliest branch that should trigger.
 		switch {

@@ -13,7 +13,8 @@ import (
 
 // mockParentPeer is a mock implementation of ParentPeerInterface for testing
 type mockParentPeer struct {
-	getStrategyFunc func(cre.Runtime, *big.Int) cre.Promise[parent_peer.IYieldPeerStrategy]
+	getStrategyFunc  func(cre.Runtime, *big.Int) cre.Promise[parent_peer.IYieldPeerStrategy]
+	getTotalValueFunc func(cre.Runtime, *big.Int) cre.Promise[*big.Int]
 }
 
 func (m *mockParentPeer) GetStrategy(
@@ -24,6 +25,16 @@ func (m *mockParentPeer) GetStrategy(
 		return m.getStrategyFunc(runtime, blockNumber)
 	}
 	return cre.PromiseFromResult[parent_peer.IYieldPeerStrategy](parent_peer.IYieldPeerStrategy{}, errors.New("getStrategyFunc not set"))
+}
+
+func (m *mockParentPeer) GetTotalValue(
+	runtime cre.Runtime,
+	blockNumber *big.Int,
+) cre.Promise[*big.Int] {
+	if m.getTotalValueFunc != nil {
+		return m.getTotalValueFunc(runtime, blockNumber)
+	}
+	return cre.PromiseFromResult[*big.Int](nil, errors.New("getTotalValueFunc not set"))
 }
 
 // mockYieldPeer is a mock implementation of YieldPeerInterface for testing
