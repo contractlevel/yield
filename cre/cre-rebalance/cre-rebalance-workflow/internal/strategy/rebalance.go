@@ -13,6 +13,7 @@ func RebalanceIfNeeded(
 	optimal onchain.Strategy,
 	writeFn func(onchain.Strategy) error,
 ) (*StrategyResult, error) {
+	// @review should move to workflow and then just have rebalance()
 	if current == optimal {
 		logger.Info("Strategy unchanged; no update needed")
 		return &StrategyResult{

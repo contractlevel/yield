@@ -16,6 +16,7 @@ type StrategyResult struct {
 	Updated bool             `json:"updated"`
 }
 
+// @review duplicated in workflow
 type OnCronDeps struct {
 	ReadCurrentStrategy func(peer onchain.ParentPeerInterface, runtime cre.Runtime) (onchain.Strategy, error)
 	ReadTVL             func(peer onchain.YieldPeerInterface,  runtime cre.Runtime) (*big.Int, error)
