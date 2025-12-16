@@ -54,8 +54,6 @@ contract Invariant is StdInvariant, BaseTest {
     IERC20 internal usdc;
     /// @dev Share contract
     Share internal share;
-    /// @dev Chainlink Keystone Forwarder
-    address internal forwarder;
     /// @dev Aave Pool Address
     address internal aavePool;
 
@@ -98,7 +96,6 @@ contract Invariant is StdInvariant, BaseTest {
             share,
             networkConfig.ccip.ccipRouter,
             address(usdc),
-            forwarder,
             aavePool,
             networkConfig.protocols.comet,
             rebalancer
@@ -124,7 +121,6 @@ contract Invariant is StdInvariant, BaseTest {
         usdc = IERC20(networkConfig.tokens.usdc);
         share = Share(networkConfig.tokens.share);
         aavePool = IPoolAddressesProvider(networkConfig.protocols.aavePoolAddressesProvider).getPool();
-        forwarder = networkConfig.cre.keystoneForwarder;
         rebalancer = new Rebalancer();
 
         /// @dev since we are not forking mainnets, we will deploy contracts locally
@@ -142,7 +138,6 @@ contract Invariant is StdInvariant, BaseTest {
         parent.grantRole(Roles.CONFIG_ADMIN_ROLE, parent.owner());
         parent.setRebalancer(address(rebalancer));
         _changePrank(rebalancer.owner());
-        rebalancer.setKeystoneForwarder(forwarder);
         rebalancer.setParentPeer(address(parent));
         _stopPrank();
 

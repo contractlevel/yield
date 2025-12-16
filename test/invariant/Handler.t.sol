@@ -40,7 +40,7 @@ contract Handler is Test {
     Share internal share;
     address internal ccipRouter;
     IERC20 internal usdc;
-    address internal forwarder;
+    address internal forwarder = makeAddr("forwarder");
     address internal admin = makeAddr("admin");
     address internal aavePool;
     address internal compoundPool;
@@ -163,7 +163,6 @@ contract Handler is Test {
         Share _share,
         address _ccipRouter,
         address _usdc,
-        address _forwarder,
         address _aavePool,
         address _compoundPool,
         Rebalancer _rebalancer
@@ -174,7 +173,6 @@ contract Handler is Test {
         share = _share;
         ccipRouter = _ccipRouter;
         usdc = IERC20(_usdc);
-        forwarder = _forwarder;
         aavePool = _aavePool;
         compoundPool = _compoundPool;
         rebalancer = _rebalancer;
