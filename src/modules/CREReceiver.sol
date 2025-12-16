@@ -75,6 +75,8 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
         address workflowOwner = s_workflows[decodedId].owner;
         bytes10 workflowName = s_workflows[decodedId].name;
 
+        // @review Do we want to add a 0 check also?
+        // @review Could someone send a report where there's a workflow id but owner/name are 0 and due to mapping states of 0 get through this?
         if (workflowOwner != decodedOwner || workflowName != decodedName) {
             revert CREReceiver__InvalidWorkflow(decodedId, decodedOwner, decodedName);
         }

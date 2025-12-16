@@ -2,7 +2,8 @@
 pragma solidity 0.8.26;
 
 import {IYieldPeer} from "../../src/interfaces/IYieldPeer.sol";
-import {Client} from "@chainlink/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
+import {Client} from "lib/chainlink/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
+import {WorkflowHelpers} from "test/libraries/WorkflowHelpers.sol";
 
 contract HelperHarness {
     function decodeAddress(bytes memory data) public pure returns (address) {
@@ -96,6 +97,10 @@ contract HelperHarness {
         return uint256(value) != 0;
     }
 
+    function bytes32ToBytes10(bytes32 value) public pure returns (bytes10) {
+        return bytes10(value);
+    }
+
     function calculateWithdrawAmount(uint256 totalValue, uint256 totalShares, uint256 shareBurnAmount)
         public
         pure
@@ -106,5 +111,21 @@ contract HelperHarness {
 
     function createStrategy(uint64 chainSelector, bytes32 protocolId) public pure returns (IYieldPeer.Strategy memory) {
         return IYieldPeer.Strategy({chainSelector: chainSelector, protocolId: protocolId});
+    }
+
+    function createWorkflowReport(uint64 chainSelector, bytes32 protocolId)
+        public
+        pure
+        returns (bytes memory workflowReport)
+    {
+        workflowReport = WorkflowHelpers._createWorkflowReport(chainSelector, protocolId);
+    }
+
+    function createWorkflowMetadata(bytes32 wfId, bytes10 wfName, address wfOwner)
+        public
+        pure
+        returns (bytes memory workflowMetadata)
+    {
+        workflowMetadata = WorkflowHelpers._createWorkflowMetadata(wfId, wfName, wfOwner);
     }
 }

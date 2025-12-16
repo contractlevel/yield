@@ -100,7 +100,8 @@ certoraRun ./certora/conf/parent/BaseParent.conf
 certoraRun ./certora/conf/parent/Parent.conf
 certoraRun ./certora/conf/child/Child.conf
 certoraRun ./certora/conf/Yield.conf
-certoraRun ./certora/conf/modules/Rebalancer.conf --nondet_difficult_funcs
+certoraRun ./certora/conf/modules/BaseRebalancer.conf
+certoraRun ./certora/conf/modules/Rebalancer.conf
 certoraRun ./certora/conf/adapters/AaveV3Adapter.conf
 certoraRun ./certora/conf/adapters/CompoundV3Adapter.conf
 certoraRun ./certora/conf/modules/StrategyRegistry.conf
