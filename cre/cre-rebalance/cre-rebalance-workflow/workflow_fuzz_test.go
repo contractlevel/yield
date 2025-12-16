@@ -147,7 +147,7 @@ func Fuzz_onCronTriggerWithDeps(f *testing.F) {
 		// Now assert expected outcome based on the earliest branch that should trigger.
 		switch {
 		case invalidParentAddr:
-			if err == nil || !strings.Contains(err.Error(), "invalid YieldPeer address") {
+			if err == nil || (!strings.Contains(err.Error(), "invalid ParentPeer address") && !strings.Contains(err.Error(), "failed to create ParentPeer binding")) {
 				t.Fatalf("expected invalid parent YieldPeer address error, got res=%+v err=%v", res, err)
 			}
 			if res != nil {
@@ -183,7 +183,7 @@ func Fuzz_onCronTriggerWithDeps(f *testing.F) {
 			return
 
 		case strategyChain != parentChain && includeStrategyCfg && invalidStrategyAddr:
-			if err == nil || !strings.Contains(err.Error(), "invalid YieldPeer address") {
+			if err == nil || (!strings.Contains(err.Error(), "invalid ChildPeer address") && !strings.Contains(err.Error(), "failed to create strategy YieldPeer binding")) {
 				t.Fatalf("expected invalid strategy YieldPeer address error, got res=%+v err=%v", res, err)
 			}
 			if res != nil {
@@ -229,7 +229,7 @@ func Fuzz_onCronTriggerWithDeps(f *testing.F) {
 
 		// Not equal => write path should be attempted, unless rebalancer address invalid.
 		if invalidRebalancerAddr {
-			if err == nil || !strings.Contains(err.Error(), "invalid Rebalancer address") {
+			if err == nil || (!strings.Contains(err.Error(), "invalid Rebalancer address") && !strings.Contains(err.Error(), "failed to create parent Rebalancer binding")) {
 				t.Fatalf("expected invalid rebalancer address error, got res=%+v err=%v", res, err)
 			}
 			if res != nil {

@@ -9,8 +9,6 @@ import (
 	"cre-rebalance/cre-rebalance-workflow/internal/helper"
 	"cre-rebalance/cre-rebalance-workflow/internal/strategy"
 
-	"github.com/ethereum/go-ethereum/common"
-
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/blockchain/evm"
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/scheduler/cron"
 	"github.com/smartcontractkit/cre-sdk-go/cre"
@@ -69,14 +67,8 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 		ChainSelector: parentCfg.ChainSelector,
 	}
 
-	// Validate + parse ParentPeer address once.
-	if !common.IsHexAddress(parentCfg.YieldPeerAddress) {
-		return nil, fmt.Errorf("invalid YieldPeer address: %s", parentCfg.YieldPeerAddress)
-	}
-	parentPeerAddr := common.HexToAddress(parentCfg.YieldPeerAddress)
-
 	// Instantiate ParentPeer contract once.
-	parentPeer, err := onchain.NewParentPeerBinding(parentEvmClient, parentPeerAddr)
+	parentPeer, err := onchain.NewParentPeerBinding(parentEvmClient, parentCfg.YieldPeerAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ParentPeer binding: %w", err)
 	}
@@ -112,18 +104,13 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 		// Create EVM client for strategy chain once.
 		strategyEvmClient := &evm.Client{ChainSelector: strategyChainCfg.ChainSelector}
 
-		// Validate + parse Strategy YieldPeer address once.
-		if !common.IsHexAddress(strategyChainCfg.YieldPeerAddress) {
-			return nil, fmt.Errorf("invalid YieldPeer address: %s", strategyChainCfg.YieldPeerAddress)
-		}
-		strategyPeerAddr := common.HexToAddress(strategyChainCfg.YieldPeerAddress)
-
 		// Instantiate Strategy YieldPeer contract once.
 		// @review still using parent_peer binding; underlying contract should be a child.
-		childPeer, err := onchain.NewChildPeerBinding(strategyEvmClient, strategyPeerAddr)
+		childPeer, err := onchain.NewChildPeerBinding(strategyEvmClient, strategyChainCfg.YieldPeerAddress)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create strategy YieldPeer binding: %w", err)
 		}
+		
 		strategyPeer = childPeer
 		rebalanceGasLimit = strategyChainCfg.GasLimit
 	}
@@ -140,13 +127,8 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 	// Inject write function that performs the actual onchain rebalance on the parent chain.
 	writeFn := func(optimal onchain.Strategy) error {
 		// Lazily validate + parse Rebalancer address only if we actually rebalance.
-		if !common.IsHexAddress(parentCfg.RebalancerAddress) {
-			return fmt.Errorf("invalid Rebalancer address: %s", parentCfg.RebalancerAddress)
-		}
-		parentRebalancerAddr := common.HexToAddress(parentCfg.RebalancerAddress)
-
 		// Instantiate Rebalancer contract once per rebalance attempt.
-		parentRebalancer, err := onchain.NewRebalancerBinding(parentEvmClient, parentRebalancerAddr)
+		parentRebalancer, err := onchain.NewRebalancerBinding(parentEvmClient, parentCfg.RebalancerAddress)
 		if err != nil {
 			return fmt.Errorf("failed to create parent Rebalancer binding: %w", err)
 		}
@@ -155,6 +137,5 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 	}
 
 	// Delegate comparison + APY-threshold logic + optional write to the pure function.
-	// @review offchain package is confusing here. maybe the logic for deciding to rebalance should not be here
 	return strategy.RebalanceIfNeeded(logger, currentStrategy, optimalStrategy, writeFn)
 }

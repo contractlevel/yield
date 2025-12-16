@@ -44,36 +44,6 @@ func Test_onCronTrigger_errorWhen_noEvmConfigsProvided(t *testing.T) {
 	}
 }
 
-func Test_onCronTrigger_errorWhen_invalidParentPeerAddress(t *testing.T) {
-	config := &helper.Config{
-		Evms: []helper.EvmConfig{
-			{
-				ChainName:        "ethereum-testnet-sepolia",
-				ChainSelector:    1,
-				YieldPeerAddress: "invalid",
-			},
-		},
-	}
-	runtime := testutils.NewRuntime(t, nil)
-	scheduled := time.Date(2025, 1, 2, 3, 4, 5, 0, time.UTC)
-	payload := &cron.Payload{
-		ScheduledExecutionTime: timestamppb.New(scheduled),
-	}
-
-	res, err := onCronTrigger(config, runtime, payload)
-
-	if err == nil {
-		t.Fatalf("onCronTrigger expected error but got nil")
-	}
-	if res != nil {
-		t.Fatalf("onCronTrigger expected nil result but got %v", res)
-	}
-	expectedErrorMsg := "invalid YieldPeer address: invalid"
-	if got := err.Error(); !strings.HasPrefix(got, expectedErrorMsg) {
-		t.Fatalf("unexpected error message: got %q, want prefix %q", got, expectedErrorMsg)
-	}
-}
-
 /*//////////////////////////////////////////////////////////////
            TESTS FOR ON CRON TRIGGER WITH INJECTED DEPS
 //////////////////////////////////////////////////////////////*/
@@ -160,54 +130,6 @@ func Test_onCronTriggerWithDeps_errorWhen_NoConfigForStrategyChain(t *testing.T)
 		t.Fatalf("expected nil result, got %+v", res)
 	}
 	if !strings.Contains(err.Error(), "no EVM config found for strategy chainSelector 999") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-// Error when strategy YieldPeer address is invalid (different chain)
-func Test_onCronTriggerWithDeps_errorWhen_invalidStrategyYieldPeerAddress(t *testing.T) {
-	config := &helper.Config{
-		Evms: []helper.EvmConfig{
-			{
-				ChainName:        "parent-chain",
-				ChainSelector:    1,
-				YieldPeerAddress: "0x0000000000000000000000000000000000000001",
-			},
-			{
-				ChainName:        "strategy-chain",
-				ChainSelector:    2,
-				YieldPeerAddress: "invalid", // invalid address
-			},
-		},
-	}
-	runtime := testutils.NewRuntime(t, nil)
-
-	deps := OnCronDeps{
-		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
-			return onchain.Strategy{
-				ProtocolId:    [32]byte{1},
-				ChainSelector: 2,
-			}, nil
-		},
-		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
-			t.Fatalf("ReadTVL should not be called when strategy YieldPeer address is invalid")
-			return nil, nil
-		},
-		WriteRebalance: func(_ onchain.RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ onchain.Strategy) error {
-			t.Fatalf("WriteRebalance should not be called when strategy YieldPeer address is invalid")
-			return nil
-		},
-	}
-
-	res, err := onCronTriggerWithDeps(config, runtime, newPayloadNow(), deps)
-
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if res != nil {
-		t.Fatalf("expected nil result, got %+v", res)
-	}
-	if !strings.Contains(err.Error(), "invalid YieldPeer address: invalid") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
@@ -403,49 +325,6 @@ func Test_onCronTriggerWithDeps_errorWhen_WriteRebalanceFails(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "rebalance-failed") {
 		t.Fatalf("unexpected error message: %v", err)
-	}
-}
-
-// Error when RebalancerAddress is invalid (rebalance path)
-func Test_onCronTriggerWithDeps_errorWhen_invalidRebalancerAddress(t *testing.T) {
-	config := &helper.Config{
-		Evms: []helper.EvmConfig{
-			{
-				ChainName:         "parent-chain",
-				ChainSelector:     1,
-				YieldPeerAddress:  "0x0000000000000000000000000000000000000001",
-				RebalancerAddress: "invalid-rebalancer",
-				GasLimit:          500000,
-			},
-		},
-	}
-	runtime := testutils.NewRuntime(t, nil)
-
-	deps := OnCronDeps{
-		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
-			return onchain.Strategy{
-				ProtocolId:    [32]byte{1},
-				ChainSelector: 1,
-			}, nil
-		},
-		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
-			return big.NewInt(111), nil
-		},
-		WriteRebalance: func(_ onchain.RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ onchain.Strategy) error {
-			t.Fatalf("WriteRebalance should not be called when RebalancerAddress is invalid")
-			return nil
-		},
-	}
-
-	res, err := onCronTriggerWithDeps(config, runtime, newPayloadNow(), deps)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if res != nil {
-		t.Fatalf("expected nil result, got %+v", res)
-	}
-	if !strings.Contains(err.Error(), "invalid Rebalancer address: invalid-rebalancer") {
-		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
