@@ -393,18 +393,18 @@ contract ParentPeer is YieldPeer {
         Strategy memory oldStrategy = s_strategy;
         Strategy memory newStrategy = Strategy({chainSelector: chainSelector, protocolId: protocolId});
 
-        /// @dev Early return if strategy hasn't changed
+        /// @dev Compare strategies and return early if optimal
         if (oldStrategy.chainSelector == newStrategy.chainSelector && oldStrategy.protocolId == newStrategy.protocolId)
         {
             emit CurrentStrategyOptimal(newStrategy.chainSelector, newStrategy.protocolId);
             return;
         }
 
-        /// @dev Update Strategy and emit StrategyUpdated event
+        /// @dev Update Strategy state and emit StrategyUpdated event
         s_strategy = newStrategy;
         emit StrategyUpdated(newStrategy.chainSelector, newStrategy.protocolId, oldStrategy.chainSelector);
 
-        /// @dev Handle local strategy change on the this parent chain
+        /// @dev Handle local strategy change on this parent chain
         if (newStrategy.chainSelector == i_thisChainSelector && oldStrategy.chainSelector == i_thisChainSelector) {
             _rebalanceParentToParent(newStrategy);
         }
@@ -412,7 +412,7 @@ contract ParentPeer is YieldPeer {
         else if (newStrategy.chainSelector != i_thisChainSelector && oldStrategy.chainSelector == i_thisChainSelector) {
             _rebalanceParentToChild(newStrategy);
         }
-        /// @dev Handle strategy change from a child to other peer
+        /// @dev Handle strategy change from a child to other
         else if (oldStrategy.chainSelector != i_thisChainSelector) {
             _rebalanceChildToOther(oldStrategy.chainSelector, newStrategy);
         }

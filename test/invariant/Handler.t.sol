@@ -496,7 +496,8 @@ contract Handler is Test {
         /// @dev Events to look for + flags to track if they were found
         bytes32 reportDecodedEvent = keccak256("ReportDecoded(uint64,bytes32)");
         bytes32 currentStrategyOptimalEvent = keccak256("CurrentStrategyOptimal(uint64,bytes32)");
-        bytes32 strategyUpdatedEvent = keccak256("StrategyUpdated(uint64,bytes32)");
+        // @review sig wrong, its 3 topics
+        bytes32 strategyUpdatedEvent = keccak256("StrategyUpdated(uint64,bytes32,uint64)");
 
         bool reportDecodedEventFound = false;
         bool currentStrategyOptimalEventFound = false;
@@ -518,6 +519,7 @@ contract Handler is Test {
                 reportDecodedEventFound = true;
                 decodedChainSelector = uint64(uint256(logs[i].topics[1]));
                 decodedProtocolId = logs[i].topics[2];
+
                 /// @dev store the decoded strategy in ghost state
                 ghost_event_lastCREReceivedStrategy =
                     IYieldPeer.Strategy({chainSelector: decodedChainSelector, protocolId: decodedProtocolId});
@@ -558,6 +560,7 @@ contract Handler is Test {
                 if (logs[i].topics[0] == strategyUpdatedEvent) {
                     uint64 emittedChainSelector = uint64(uint256(logs[i].topics[1]));
                     bytes32 emittedProtocolId = logs[i].topics[2];
+                    /// @dev emitted previous chain not used
 
                     if (emittedChainSelector != decodedChainSelector || emittedProtocolId != decodedProtocolId) {
                         ghost_flag_decodedStrategy_mismatchWithEmittedStrategy = true;
@@ -570,6 +573,10 @@ contract Handler is Test {
         /// @dev set ghost flag indicating CRE report was decoded
         ghost_flag_creReport_decoded = true;
         assertTrue(reportDecodedEventFound, "ReportDecoded log not found");
+        assertTrue(
+            currentStrategyOptimalEventFound || strategyUpdatedEventFound,
+            "No strategy event matching decoded strategy found"
+        );
     }
 
     /*//////////////////////////////////////////////////////////////

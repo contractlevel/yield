@@ -16,8 +16,4 @@ contract RebalancerHarness is Rebalancer, HelperHarness {
     function getActiveStrategyAdapterFromParentPeer() public view returns (address) {
         return IParentPeer(s_parentPeer).getActiveStrategyAdapter();
     }
-
-    function getStrategyFromParentPeer() public view returns (IYieldPeer.Strategy memory) {
-        return IParentPeer(s_parentPeer).getStrategy();
-    }
 }
