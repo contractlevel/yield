@@ -3,7 +3,7 @@ using ParentPeer as parent;
 using StrategyRegistry as strategyRegistry;
 
 /// Verification of Rebalancer
-/// @author @contractlevel/George Gorzhiyev | Judge Finance
+/// @author @contractlevel / George Gorzhiyev | Judge Finance
 /// @notice Rebalancer handles the Chainlink CRE report and triggers set strategy on ParentPeer
 
 /*//////////////////////////////////////////////////////////////
@@ -279,9 +279,8 @@ rule onReport_invalidChainSelector_emitsInvalidChainSelectorEvent() {
     bytes32 protocolId;
     bytes report = createWorkflowReport(chainSelector, protocolId);
 
-    // invalid chain, valid protocol (not zero)
+    // return and event emission condition: invalid chain
     require parent.getAllowedChain(chainSelector) == false;
-    require strategyRegistry.getStrategyAdapter(protocolId) != 0x0;
 
     require ghost_invalidChainSelectorInReport_eventCount == 0;
     require ghost_invalidChainSelectorInReport_emittedChainSelector == 0;
@@ -303,9 +302,10 @@ rule onReport_invalidProtocolId_emitsInvalidProtocolIdEvent() {
     bytes32 protocolId;
     bytes report = createWorkflowReport(chainSelector, protocolId);
 
-    // valid chain, invalid protocol (zero)
+    // valid chain
     require parent.getAllowedChain(chainSelector) == true;
-    require strategyRegistry.getStrategyAdapter(protocolId) == 0x0;
+    // return and event emission condition: invalid protocol id
+    require strategyRegistry.getStrategyAdapter(protocolId) == 0;
 
     require ghost_invalidProtocolIdInReport_eventCount == 0;
     require ghost_invalidProtocolIdInReport_emittedProtocolId == to_bytes32(0);
@@ -319,7 +319,7 @@ rule onReport_invalidProtocolId_emitsInvalidProtocolIdEvent() {
 rule onReport_validReport_emitsReportDecodedEvent() {
     env e;
 
-    // worfklow metadata
+    // workflow metadata
     bytes metadata;
 
     // workflow report
@@ -356,9 +356,8 @@ rule onReport_updatesStrategyState_andEmitsStrategyUpdated() {
 
     IYieldPeer.Strategy oldStrategy = getCurrentStrategy();
 
-    // chain and protocol id not current strategy
-    require oldStrategy.chainSelector != chainSelector;
-    require oldStrategy.protocolId != protocolId;
+    // chain or protocol id not current strategy
+    require oldStrategy.chainSelector != chainSelector || oldStrategy.protocolId != protocolId;
 
     // valid chain and protocol
     require parent.getAllowedChain(chainSelector) == true;
@@ -381,10 +380,10 @@ rule onReport_updatesStrategyState_andEmitsStrategyUpdated() {
 }
 
 /// @dev Sanity rule to ensure onReport does not update/emit strategy if already optimal
-rule onReport_noStrategyUpdate_orEventEmission_ifStrategyOptimal() {
+rule onReport_noStrategyUpdate_orEventEmission_ifCurrentStrategyOptimal() {
     env e;
 
-    // worfklow metadata
+    // workflow metadata
     bytes metadata;
 
     // workflow report
@@ -392,15 +391,15 @@ rule onReport_noStrategyUpdate_orEventEmission_ifStrategyOptimal() {
     bytes32 protocolId;
     bytes report = createWorkflowReport(chainSelector, protocolId);
 
+    // valid chain and protocol
+    require parent.getAllowedChain(chainSelector) == true;
+    require strategyRegistry.getStrategyAdapter(protocolId) != 0x0;
+
     IYieldPeer.Strategy currentStrategy = getCurrentStrategy();
 
     // chain and protocol id same as current strategy
     require currentStrategy.chainSelector == chainSelector;
     require currentStrategy.protocolId == protocolId;
-
-    // valid chain and protocol
-    require parent.getAllowedChain(chainSelector) == true;
-    require strategyRegistry.getStrategyAdapter(protocolId) != 0x0;
 
     require ghost_strategyUpdated_eventCount == 0;
     require ghost_currentStrategyOptimal_eventCount == 0;
