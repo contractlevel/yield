@@ -12,8 +12,8 @@ library WorkflowHelpers {
     /// @param chainSelector The chain selector of the strategy
     /// @param protocolId The protocol ID of the strategy
     /// @return workflowReport The Keystone workflow report
-    function _createWorkflowReport(uint64 chainSelector, bytes32 protocolId)
-        internal
+    function createWorkflowReport(uint64 chainSelector, bytes32 protocolId)
+        public
         pure
         returns (bytes memory workflowReport)
     {
@@ -28,8 +28,8 @@ library WorkflowHelpers {
     /// @param wfName The name of the workflow
     /// @param wfOwner The owner of the workflow
     /// @return workflowMetadata The Keystone workflow metadata
-    function _createWorkflowMetadata(bytes32 wfId, bytes10 wfName, address wfOwner)
-        internal
+    function createWorkflowMetadata(bytes32 wfId, bytes10 wfName, address wfOwner)
+        public
         pure
         returns (bytes memory workflowMetadata)
     {
@@ -40,7 +40,7 @@ library WorkflowHelpers {
     /// @dev SEE URL
     /// URL: https://docs.chain.link/cre/guides/workflow/using-evm-client/onchain-write/building-consumer-contracts#how-workflow-names-are-encoded
     /// @param rawName The raw string name of the workflow
-    function _createWorkflowName(string memory rawName) internal pure returns (bytes10 encodedName) {
+    function createWorkflowName(string memory rawName) public pure returns (bytes10 encodedName) {
         // Convert workflow name to bytes10:
         // SHA256 hash → hex encode → take first 10 chars → hex encode those chars
         bytes32 hash = sha256(bytes(rawName));
@@ -54,7 +54,7 @@ library WorkflowHelpers {
 
     /// @dev Helper function for '_createWorkflowName'
     /// @param data The bytes data to convert to a hex string
-    function _bytesToHexString(bytes memory data) private pure returns (bytes memory) {
+    function _bytesToHexString(bytes memory data) internal pure returns (bytes memory) {
         bytes memory hexChars = "0123456789abcdef";
         bytes memory hexString = new bytes(data.length * 2);
 

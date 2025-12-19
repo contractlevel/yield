@@ -23,7 +23,6 @@ contract ParentPeer is YieldPeer {
     /// @dev indicates activeStrategyAdapter not set when parent state shows s_strategy.chainSelector == thisChainSelector
     /// activeStrategyAdapter is updated when rebalance TVL transit concludes
     error ParentPeer__InactiveStrategyAdapter();
-    error ParentPeer__NoStrategyChange();
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES

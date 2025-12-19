@@ -486,7 +486,7 @@ contract Invariant is StdInvariant, BaseTest {
     /// @notice Fee withdrawal integrity: Non-owner should not be able to withdraw fees
     function invariant_feeWithdrawal_onlyOwner() public view {
         assertFalse(
-            handler.ghost_nonFeeWithdrawerAddr_withdrewFees(),
+            handler.ghost_nonFeeWithdrawer_withdrewFees(),
             "Invariant violated: Fees should only be withdrawable by fee withdrawer"
         );
     }
@@ -536,7 +536,8 @@ contract Invariant is StdInvariant, BaseTest {
     }
 
     /// @notice CRE Report Consistency: The strategy decoded in the CRE report
-    /// @notice should match the strategy emitted by ParentPeer after 'onReport'
+    /// @notice should match the strategy emitted by ParentPeer after 'onReport'.
+    /// @notice If a CRE strategy was decoded, it should match a StrategyUpdated or StrategyOptimal event
     function invariant_decodedCREReportStrategy_matches_emittedStrategy() public view {
         assertFalse(
             handler.ghost_flag_decodedStrategy_mismatchWithEmittedStrategy(),

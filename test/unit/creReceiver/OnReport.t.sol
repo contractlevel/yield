@@ -6,12 +6,11 @@ import {BaseTest, Vm, WorkflowHelpers} from "../../BaseTest.t.sol";
 /// @dev CREReceiver inherited by Rebalancer
 contract OnReportTest is BaseTest {
     function test_yield_creReceiver_onReport_revertsWhen_notKeystoneForwarder() public {
-        bytes10 workflowName = WorkflowHelpers._createWorkflowName(workflowNameRaw);
+        // Arrange
+        bytes memory metadata;
+        bytes memory report;
 
-        bytes memory metadata = WorkflowHelpers._createWorkflowMetadata(workflowId, workflowName, workflowOwner);
-        bytes memory report =
-            WorkflowHelpers._createWorkflowReport(optChainSelector, keccak256(abi.encodePacked("aave-v3")));
-
+        // Act & Assert
         vm.prank(configAdmin);
         vm.expectRevert(
             abi.encodeWithSignature(
@@ -22,83 +21,85 @@ contract OnReportTest is BaseTest {
     }
 
     function test_yield_creReceiver_onReport_revertsWhen_wrongWorkflowId() public {
-        bytes10 workflowName = WorkflowHelpers._createWorkflowName(workflowNameRaw);
+        // Arrange
         bytes32 wrongWorkflowId = keccak256(abi.encodePacked("WRONG_ID"));
-
-        bytes memory metadata = WorkflowHelpers._createWorkflowMetadata(wrongWorkflowId, workflowName, workflowOwner);
+        bytes memory newMetadata = WorkflowHelpers.createWorkflowMetadata(wrongWorkflowId, workflowName, workflowOwner);
         bytes memory report =
-            WorkflowHelpers._createWorkflowReport(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
+            WorkflowHelpers.createWorkflowReport(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
 
+        // Act & Assert
         vm.prank(keystoneForwarder);
         vm.expectRevert(
             abi.encodeWithSignature(
                 "CREReceiver__InvalidWorkflow(bytes32,address,bytes10)", wrongWorkflowId, workflowOwner, workflowName
             )
         );
-        baseRebalancer.onReport(metadata, report);
+        baseRebalancer.onReport(newMetadata, report);
     }
 
     function test_yield_creReceiver_onReport_revertsWhen_wrongWorkflowOwner() public {
-        bytes10 workflowName = WorkflowHelpers._createWorkflowName(workflowNameRaw);
-
-        bytes memory metadata = WorkflowHelpers._createWorkflowMetadata(workflowId, workflowName, depositor);
+        // Arrange
+        bytes memory newMetadata = WorkflowHelpers.createWorkflowMetadata(workflowId, workflowName, depositor);
         bytes memory report =
-            WorkflowHelpers._createWorkflowReport(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
+            WorkflowHelpers.createWorkflowReport(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
 
+        // Act & Assert
         vm.prank(keystoneForwarder);
         vm.expectRevert(
             abi.encodeWithSignature(
                 "CREReceiver__InvalidWorkflow(bytes32,address,bytes10)", workflowId, depositor, workflowName
             )
         );
-        baseRebalancer.onReport(metadata, report);
+        baseRebalancer.onReport(newMetadata, report);
     }
 
     function test_yield_creReceiver_onReport_revertsWhen_wrongWorkflowName() public {
-        bytes10 wrongWorkflowName = WorkflowHelpers._createWorkflowName("WRONGNAME");
-
-        bytes memory metadata = WorkflowHelpers._createWorkflowMetadata(workflowId, wrongWorkflowName, workflowOwner);
+        // Arrange
+        bytes10 wrongWorkflowName = WorkflowHelpers.createWorkflowName("WRONGNAME");
+        bytes memory newMetadata = WorkflowHelpers.createWorkflowMetadata(workflowId, wrongWorkflowName, workflowOwner);
         bytes memory report =
-            WorkflowHelpers._createWorkflowReport(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
+            WorkflowHelpers.createWorkflowReport(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
 
+        // Act & Assert
         vm.prank(keystoneForwarder);
         vm.expectRevert(
             abi.encodeWithSignature(
                 "CREReceiver__InvalidWorkflow(bytes32,address,bytes10)", workflowId, workflowOwner, wrongWorkflowName
             )
         );
-        baseRebalancer.onReport(metadata, report);
+        baseRebalancer.onReport(newMetadata, report);
     }
 
     function test_yield_creReceiver_onReport_success_emitsSecurityChecksPassed() public {
-        bytes10 workflowName = WorkflowHelpers._createWorkflowName(workflowNameRaw);
-
-        bytes memory metadata = WorkflowHelpers._createWorkflowMetadata(workflowId, workflowName, workflowOwner);
+        // Arrange
         bytes memory report =
-            WorkflowHelpers._createWorkflowReport(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
-
-        vm.prank(keystoneForwarder);
+            WorkflowHelpers.createWorkflowReport(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
         vm.recordLogs();
-        baseRebalancer.onReport(metadata, report);
 
+        // Act
+        vm.prank(keystoneForwarder);
+        baseRebalancer.onReport(workflowMetadata, report);
+
+        // Handle log for OnReportSecurityChecksPassed event
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bool securityChecksPassedLogFound;
-        bytes32 wfId;
-        address wfOwner;
-        bytes10 wfName;
+        bool securityChecksPassedEventFound;
+        bytes32 decodedWorkflowId;
+        address decodedWorkflowOwner;
+        bytes10 decodedWorkflowfName;
         for (uint256 i = 0; i < logs.length; i++) {
             if (logs[i].topics[0] == keccak256(("OnReportSecurityChecksPassed(bytes32,address,bytes10)"))) {
-                wfId = logs[i].topics[1];
-                wfOwner = address(uint160(uint256(logs[i].topics[2])));
-                wfName = bytes10(logs[i].topics[3]);
-                securityChecksPassedLogFound = true;
+                decodedWorkflowId = bytes32(logs[i].topics[1]);
+                decodedWorkflowOwner = address(uint160(uint256(logs[i].topics[2])));
+                decodedWorkflowfName = bytes10(logs[i].topics[3]);
+                securityChecksPassedEventFound = true;
                 break;
             }
         }
 
-        assertEq(securityChecksPassedLogFound, true);
-        assertEq(wfId, workflowId);
-        assertEq(wfOwner, workflowOwner);
-        assertEq(wfName, workflowName);
+        // Assert
+        assertEq(securityChecksPassedEventFound, true);
+        assertEq(decodedWorkflowId, workflowId);
+        assertEq(decodedWorkflowOwner, workflowOwner);
+        assertEq(decodedWorkflowfName, workflowName);
     }
 }

@@ -31,7 +31,7 @@ import {StrategyRegistry} from "../src/modules/StrategyRegistry.sol";
 import {Roles} from "../src/libraries/Roles.sol";
 
 import {CREReceiver} from "../src/modules/CREReceiver.sol";
-import {WorkflowHelpers} from "./libraries/WorkflowHelpers.sol";
+import {WorkflowHelpers} from "./helpers/WorkflowHelpers.sol";
 
 contract BaseTest is Test {
     /*//////////////////////////////////////////////////////////////
@@ -116,10 +116,12 @@ contract BaseTest is Test {
     address internal feeWithdrawer = makeAddr("feeWithdrawer");
     address internal feeRateSetter = makeAddr("feeRateSetter");
 
-    /// @dev workflow params
+    /// @dev workflow params and metadata setup
     address internal workflowOwner = makeAddr("workflowOwner");
     bytes32 internal workflowId = bytes32("rebalanceWorkflowId");
-    string internal workflowNameRaw = "judge-rebalance-workflow";
+    string internal workflowNameRaw = "yieldcoin-rebalance-workflow";
+    bytes10 internal workflowName = WorkflowHelpers.createWorkflowName(workflowNameRaw);
+    bytes internal workflowMetadata = WorkflowHelpers.createWorkflowMetadata(workflowId, workflowName, workflowOwner);
 
     /// @dev '_setStrategy' flag to control message routing
     bool internal constant SET_CROSS_CHAIN = true;
@@ -651,24 +653,25 @@ contract BaseTest is Test {
     }
 
     /// @notice Helper function to set the strategy across chains
-    /// @dev The "delay" parameter is used to set the strategy on the Parent
-    /// @dev but not route the CCIP message, allowing for any testing that
-    /// @dev requires just a Strategy change with a manual message routing later.
+    /// @dev 1. Takes a chain selector and protocol ID and creates the necessary metadata and report
+    /// @dev 2. Calls onReport on Rebalancer with the metadata and report and sets the strategy on Parent
+    /// @dev The "isSetAcrossChains" parameter is used to set the strategy on the Parent
+    /// @dev but not yet route the message through CCIP.
     /// @param chainSelector The chain selector of the strategy
     /// @param protocolId The protocol ID of the strategy
     /// @param isSetAcrossChains Whether to set strategy across chains - this is used for testing ping pong scenarios
     function _setStrategy(uint64 chainSelector, bytes32 protocolId, bool isSetAcrossChains) internal {
         _selectFork(baseFork);
 
-        bytes10 workflowName = WorkflowHelpers._createWorkflowName(workflowNameRaw);
+        /// @dev report using helper functions
+        bytes memory report = WorkflowHelpers.createWorkflowReport(chainSelector, protocolId);
 
-        bytes memory metadata = WorkflowHelpers._createWorkflowMetadata(workflowId, workflowName, workflowOwner);
-        bytes memory report = WorkflowHelpers._createWorkflowReport(chainSelector, protocolId);
-
+        /// @dev call onReport on Rebalancer with metadata and report as the Keystone Forwarder
         _changePrank(keystoneForwarder);
-        baseRebalancer.onReport(metadata, report);
+        baseRebalancer.onReport(workflowMetadata, report);
         _stopPrank();
 
+        /// @dev route message through CCIP Local Simulator Fork if setting across chains is true
         if (isSetAcrossChains == true) {
             if (chainSelector == optChainSelector) {
                 ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);

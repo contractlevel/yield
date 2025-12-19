@@ -1,117 +1,139 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {BaseTest, Vm, WorkflowHelpers} from "../../BaseTest.t.sol";
-import {CREReceiver} from "../../../src/modules/CREReceiver.sol";
+import {BaseTest, Vm, CREReceiver, WorkflowHelpers} from "../../BaseTest.t.sol";
 
 /// @dev CREReceiver inherited by Rebalancer
 contract SetterTest is BaseTest {
-    address newForwarder = makeAddr("newForwarder");
+    address newKeystoneForwarder = makeAddr("newKeystoneForwarder");
+    string newWorkflowNameRaw = "NEWWORKFLOW";
+    bytes10 newWorkflowName = WorkflowHelpers.createWorkflowName(newWorkflowNameRaw);
+    bytes32 newWorkflowId = keccak256(abi.encodePacked("ANOTHERWORKFLOWID"));
 
     /*//////////////////////////////////////////////////////////////
                                 SET KEYSTONE
     //////////////////////////////////////////////////////////////*/
     function test_yield_creReceiver_setKeystoneForwarder_updatesStorage() public {
+        // Arrange & Act
         _changePrank(baseRebalancer.owner());
-        baseRebalancer.setKeystoneForwarder(newForwarder);
+        baseRebalancer.setKeystoneForwarder(newKeystoneForwarder);
 
-        assertEq(baseRebalancer.getKeystoneForwarder(), newForwarder);
+        // Assert
+        assertEq(baseRebalancer.getKeystoneForwarder(), newKeystoneForwarder);
     }
 
     function test_yield_creReceiver_setKeystoneForwarder_emitsEvent() public {
+        // Arrange & Act
         _changePrank(baseRebalancer.owner());
         vm.recordLogs();
-        baseRebalancer.setKeystoneForwarder(newForwarder);
+        baseRebalancer.setKeystoneForwarder(newKeystoneForwarder);
 
+        // Handle log for KeystoneForwarderSet event
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bool forwarderSetLogFound;
-        address loggedForwarder;
+        bool keystoneForwarderSetEventFound;
+        address emittedKeystoneForwarder;
         for (uint256 i = 0; i < logs.length; i++) {
             if (logs[i].topics[0] == keccak256(("KeystoneForwarderSet(address)"))) {
-                loggedForwarder = address(uint160(uint256(logs[i].topics[1])));
-                forwarderSetLogFound = true;
+                emittedKeystoneForwarder = address(uint160(uint256(logs[i].topics[1])));
+                keystoneForwarderSetEventFound = true;
                 break;
             }
         }
 
-        assertEq(forwarderSetLogFound, true);
-        assertEq(loggedForwarder, newForwarder);
+        // Assert
+        assertEq(keystoneForwarderSetEventFound, true);
+        assertEq(emittedKeystoneForwarder, newKeystoneForwarder);
     }
 
-    function test_yield_creReceiver_setKeystoneForwarder_revetsWhen_notOwner() public {
+    function test_yield_creReceiver_setKeystoneForwarder_revertsWhen_notOwner() public {
+        // Arrange
         vm.prank(depositor);
+
+        // Act & Assert
         vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", depositor));
-        baseRebalancer.setKeystoneForwarder(newForwarder);
+        baseRebalancer.setKeystoneForwarder(newKeystoneForwarder);
     }
 
     function test_yield_creReceiver_setKeystoneForwarders_revertsWhen_zeroAddress() public {
+        // Arrange
+        address newKeystoneForwarderZero = address(0);
+
+        // Act & Assert
         _changePrank(baseRebalancer.owner());
         vm.expectRevert(abi.encodeWithSignature("CREReceiver__NotZeroAddress()"));
-        baseRebalancer.setKeystoneForwarder(address(0));
+        baseRebalancer.setKeystoneForwarder(newKeystoneForwarderZero);
     }
 
     /*//////////////////////////////////////////////////////////////
                                 SET WORKFLOW
     //////////////////////////////////////////////////////////////*/
     function test_yield_creReceiver_setWorkflow_emitstEvent() public {
-        string memory newWorkflowNameRaw = "NEWWORKFLOW";
-        bytes10 newWorkflowName = WorkflowHelpers._createWorkflowName(newWorkflowNameRaw);
-        bytes32 newWorkflowId = keccak256(abi.encodePacked("NEWWORKFLOWID"));
-
+        // Arrange & Act
         vm.recordLogs();
         _changePrank(baseRebalancer.owner());
         baseRebalancer.setWorkflow(newWorkflowId, workflowOwner, newWorkflowNameRaw);
 
+        // Handle log for WorkflowSet event
         Vm.Log[] memory logs = vm.getRecordedLogs();
-        bool workflowSetLogFound;
-        bytes32 wfId;
-        address wfOwner;
-        bytes10 wfName;
+        bool workflowSetEventFound;
+        bytes32 emittedWorkflowId;
+        address emittedWorkflowOwner;
+        bytes10 emittedWorkflowName;
         for (uint256 i = 0; i < logs.length; i++) {
             if (logs[i].topics[0] == keccak256(("WorkflowSet(bytes32,address,bytes10)"))) {
-                wfId = logs[i].topics[1];
-                wfOwner = address(uint160(uint256(logs[i].topics[2])));
-                wfName = bytes10(logs[i].topics[3]);
-                workflowSetLogFound = true;
+                emittedWorkflowId = bytes32(logs[i].topics[1]);
+                emittedWorkflowOwner = address(uint160(uint256(logs[i].topics[2])));
+                emittedWorkflowName = bytes10(logs[i].topics[3]);
+                workflowSetEventFound = true;
                 break;
             }
         }
 
-        assertEq(workflowSetLogFound, true);
-        assertEq(wfId, newWorkflowId);
-        assertEq(wfOwner, workflowOwner);
-        assertEq(wfName, newWorkflowName);
+        // Assert
+        assertEq(workflowSetEventFound, true);
+        assertEq(emittedWorkflowId, newWorkflowId);
+        assertEq(emittedWorkflowOwner, workflowOwner);
+        assertEq(emittedWorkflowName, newWorkflowName);
     }
 
     function test_yield_creReceiver_setWorkflow_updatesStorage() public {
-        string memory newWorkflowNameRaw = "ANOTHERWORKFLOW";
-        bytes10 newWorkflowName = WorkflowHelpers._createWorkflowName(newWorkflowNameRaw);
-        bytes32 newWorkflowId = keccak256(abi.encodePacked("ANOTHERWORKFLOWID"));
-
+        // Arrange & Act
         _changePrank(baseRebalancer.owner());
         baseRebalancer.setWorkflow(newWorkflowId, workflowOwner, newWorkflowNameRaw);
 
+        // Assert
         CREReceiver.Workflow memory storedWorkflow = baseRebalancer.getWorkflow(newWorkflowId);
-
         assertEq(storedWorkflow.name, newWorkflowName);
         assertEq(storedWorkflow.owner, workflowOwner);
     }
 
     function test_yield_creReceiver_setWorkflow_revertsWhen_workflowIdZero() public {
+        // Arrange
+        bytes32 emptyWorkflowId = bytes32(0);
+
+        // Act & Assert
         _changePrank(baseRebalancer.owner());
         vm.expectRevert(abi.encodeWithSignature("CREReceiver__NotZeroId()"));
-        baseRebalancer.setWorkflow(bytes32(0), workflowOwner, workflowNameRaw);
+        baseRebalancer.setWorkflow(emptyWorkflowId, workflowOwner, workflowNameRaw);
     }
 
     function test_yield_creReceiver_setWorkflow_revertsWhen_workflowOwnerZero() public {
+        // Arrange
+        address emptyWorkflowOwner = address(0);
+
+        // Act & Assert
         _changePrank(baseRebalancer.owner());
         vm.expectRevert(abi.encodeWithSignature("CREReceiver__NotZeroAddress()"));
-        baseRebalancer.setWorkflow(workflowId, address(0), workflowNameRaw);
+        baseRebalancer.setWorkflow(workflowId, emptyWorkflowOwner, workflowNameRaw);
     }
 
     function test_yield_creReceiver_setWorkflow_revertsWhen_workflowNameEmpty() public {
+        // Arrange
+        string memory emptyWorkflowName = "";
+
+        // Act & Assert
         _changePrank(baseRebalancer.owner());
         vm.expectRevert(abi.encodeWithSignature("CREReceiver__NotEmptyName()"));
-        baseRebalancer.setWorkflow(workflowId, workflowOwner, "");
+        baseRebalancer.setWorkflow(workflowId, workflowOwner, emptyWorkflowName);
     }
 }

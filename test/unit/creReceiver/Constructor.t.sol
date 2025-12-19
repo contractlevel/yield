@@ -6,7 +6,7 @@ import {BaseTest} from "../../BaseTest.t.sol";
 /// @dev CREReceiver inherited by Rebalancer
 contract ConstructorTest is BaseTest {
     /// @notice 'owner' should be 'DEFAULT_SENDER' from forge-std TestBase
-    /// @notice sanity check to make sure owner is set correctly
+    /// @notice sanity check to make sure owner is set on deployment and not 0 address
     function test_yield_creReceiver_constructor() public view {
         assertEq(baseRebalancer.owner(), DEFAULT_SENDER);
     }

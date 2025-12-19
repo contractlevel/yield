@@ -4,6 +4,7 @@ pragma solidity 0.8.26;
 import {BaseTest, Vm} from "../../BaseTest.t.sol";
 
 contract SetterTest is BaseTest {
+    // New addresses for testing
     address newParentPeer = makeAddr("newParentPeer");
     address newStrategyRegistry = makeAddr("newStrategyRegistry");
 
@@ -11,86 +12,108 @@ contract SetterTest is BaseTest {
                                 SET PARENT
     //////////////////////////////////////////////////////////////*/
     function test_yield_rebalancer_setParentPeer_updatesStorage() public {
+        // Arrange & Act
         vm.prank(baseRebalancer.owner());
         baseRebalancer.setParentPeer(newParentPeer);
+
+        // Assert
         address returnedParentPeer = baseRebalancer.getParentPeer();
         assertEq(returnedParentPeer, newParentPeer);
     }
 
     function test_yield_rebalancer_setParentPeer_emitsEvent() public {
-        /// @dev Arrange / Act
+        // Arrange & Act
         vm.prank(baseRebalancer.owner());
         vm.recordLogs();
         baseRebalancer.setParentPeer(newParentPeer);
 
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        bool parentPeerSetLogFound = false;
+        // Handle log for ParentPeerSet event
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bool parentPeerSetEventFound = false;
         address emittedParentPeer;
-        for (uint256 i = 0; i < entries.length; i++) {
-            if (entries[i].topics[0] == keccak256("ParentPeerSet(address)")) {
-                emittedParentPeer = address(uint160(uint256(entries[i].topics[1])));
-                parentPeerSetLogFound = true;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == keccak256("ParentPeerSet(address)")) {
+                emittedParentPeer = address(uint160(uint256(logs[i].topics[1])));
+                parentPeerSetEventFound = true;
                 break;
             }
         }
 
-        /// @dev Assert
-        assertTrue(parentPeerSetLogFound);
+        // Assert
+        assertTrue(parentPeerSetEventFound);
         assertEq(emittedParentPeer, newParentPeer);
     }
 
     function test_yield_rebalancer_setParentPeer_revertsWhen_notOwner() public {
+        // Arrange
         vm.prank(depositor);
+
+        // Act & Assert
         vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", depositor));
         baseRebalancer.setParentPeer(newParentPeer);
     }
 
     function test_yield_rebalancer_setParentPeer_revertsWhen_zeroAddress() public {
+        // Arrange
+        address zeroAddress = address(0);
+
+        // Act & Assert
         vm.prank(baseRebalancer.owner());
         vm.expectRevert(abi.encodeWithSignature("Rebalancer__NotZeroAddress()"));
-        baseRebalancer.setParentPeer(address(0));
+        baseRebalancer.setParentPeer(zeroAddress);
     }
 
     /*//////////////////////////////////////////////////////////////
                             SET STRATEGY REGISTRY
     //////////////////////////////////////////////////////////////*/
     function test_yield_rebalancer_setStrategyRegistry_updatesStorage() public {
+        // Arrange & Act
         vm.prank(baseRebalancer.owner());
         baseRebalancer.setStrategyRegistry(newStrategyRegistry);
+
+        // Assert
         address returnedStrategyRegistry = baseRebalancer.getStrategyRegistry();
         assertEq(returnedStrategyRegistry, newStrategyRegistry);
     }
 
     function test_yield_rebalancer_setStrategyRegistry_emitsEvent() public {
-        /// @dev Arrange / Act
+        // Arrange & Act
         vm.prank(baseRebalancer.owner());
         vm.recordLogs();
         baseRebalancer.setStrategyRegistry(newStrategyRegistry);
 
-        Vm.Log[] memory entries = vm.getRecordedLogs();
-        bool strategyRegistrySetLogFound = false;
+        // Handle log for StrategyRegistrySet event
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bool strategyRegistrySetEventFound = false;
         address emittedStrategyRegistry;
-        for (uint256 i = 0; i < entries.length; i++) {
-            if (entries[i].topics[0] == keccak256("StrategyRegistrySet(address)")) {
-                emittedStrategyRegistry = address(uint160(uint256(entries[i].topics[1])));
-                strategyRegistrySetLogFound = true;
+        for (uint256 i = 0; i < logs.length; i++) {
+            if (logs[i].topics[0] == keccak256("StrategyRegistrySet(address)")) {
+                emittedStrategyRegistry = address(uint160(uint256(logs[i].topics[1])));
+                strategyRegistrySetEventFound = true;
                 break;
             }
         }
 
-        /// @dev Assert
-        assertTrue(strategyRegistrySetLogFound);
+        // Assert
+        assertTrue(strategyRegistrySetEventFound);
         assertEq(emittedStrategyRegistry, newStrategyRegistry);
     }
 
     function test_yield_rebalancer_setStrategyRegistry_revertsWhen_zeroAddress() public {
+        // Arrange
+        address zeroAddress = address(0);
+
+        // Act & Assert
         vm.prank(baseRebalancer.owner());
         vm.expectRevert(abi.encodeWithSignature("Rebalancer__NotZeroAddress()"));
-        baseRebalancer.setStrategyRegistry(address(0));
+        baseRebalancer.setStrategyRegistry(zeroAddress);
     }
 
     function test_yield_rebalancer_setStrategyRegistry_revertsWhen_notOwner() public {
+        // Arrange
         vm.prank(depositor);
+
+        // Act & Assert
         vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", depositor));
         baseRebalancer.setStrategyRegistry(newStrategyRegistry);
     }
