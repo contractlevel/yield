@@ -502,8 +502,8 @@ contract Handler is Test {
         bool strategyUpdatedEventFound = false;
 
         /// @dev Flag to track which strategy event to check
-        bool checkStrategyOptimal = false;
-        bool checkStrategyUpdated = false;
+        bool isCurrentStrategyOptimal = false;
+        bool isStrategyUpdated = false;
 
         /// @dev previous strategy before onReport changed it
         uint64 previousStrategyChain = ghost_state_previousStrategy.chainSelector;
@@ -534,16 +534,16 @@ contract Handler is Test {
 
                 /// @dev set flag for appropriate emitted strategy event check
                 if (previousStrategyChain == decodedChainSelector && previousStrategyProtocol == decodedProtocolId) {
-                    checkStrategyOptimal = true;
+                    isCurrentStrategyOptimal = true;
                 } else {
-                    checkStrategyUpdated = true;
+                    isStrategyUpdated = true;
                 }
             }
         }
 
         /// @dev If the current strategy is optimal, ensure CurrentStrategyOptimal
         /// @dev event matches decoded strategy
-        if (checkStrategyOptimal) {
+        if (isCurrentStrategyOptimal) {
             for (uint256 i = 0; i < logs.length; i++) {
                 if (logs[i].topics[0] == currentStrategyOptimalEvent) {
                     currentStrategyOptimalEventFound = true;
@@ -560,7 +560,7 @@ contract Handler is Test {
 
         /// @dev If the strategy was updated, ensure StrategyUpdated event
         /// @dev matches decoded strategy
-        if (checkStrategyUpdated) {
+        if (isStrategyUpdated) {
             for (uint256 i = 0; i < logs.length; i++) {
                 if (logs[i].topics[0] == strategyUpdatedEvent) {
                     strategyUpdatedEventFound = true;
