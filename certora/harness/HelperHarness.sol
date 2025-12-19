@@ -3,7 +3,7 @@ pragma solidity 0.8.26;
 
 import {IYieldPeer} from "../../src/interfaces/IYieldPeer.sol";
 import {Client} from "lib/chainlink/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
-import {WorkflowHelpers} from "test/libraries/WorkflowHelpers.sol";
+import {WorkflowHelpers} from "../../test/helpers/WorkflowHelpers.sol";
 
 contract HelperHarness {
     function decodeAddress(bytes memory data) public pure returns (address) {
@@ -118,7 +118,7 @@ contract HelperHarness {
         pure
         returns (bytes memory workflowReport)
     {
-        workflowReport = WorkflowHelpers._createWorkflowReport(chainSelector, protocolId);
+        workflowReport = WorkflowHelpers.createWorkflowReport(chainSelector, protocolId);
     }
 
     function createWorkflowMetadata(bytes32 wfId, bytes10 wfName, address wfOwner)
@@ -126,6 +126,6 @@ contract HelperHarness {
         pure
         returns (bytes memory workflowMetadata)
     {
-        workflowMetadata = WorkflowHelpers._createWorkflowMetadata(wfId, wfName, wfOwner);
+        workflowMetadata = WorkflowHelpers.createWorkflowMetadata(wfId, wfName, wfOwner);
     }
 }
