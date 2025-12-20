@@ -12,10 +12,7 @@ import (
 
 // NewAaveProtocolDataProviderBinding constructs the Aave Protocol Data Provider binding.
 // It validates the address and returns an interface for testability.
-func NewAaveProtocolDataProviderBinding(
-	client *evm.Client,
-	addr string,
-) (AaveProtocolDataProviderInterface, error) {
+func NewAaveProtocolDataProviderBinding(client *evm.Client, addr string) (AaveProtocolDataProviderInterface, error) {
 	if !common.IsHexAddress(addr) {
 		return nil, fmt.Errorf("invalid AaveProtocolDataProvider address: %s", addr)
 	}
@@ -30,18 +27,15 @@ func NewAaveProtocolDataProviderBinding(
 
 // NewDefaultReserveInterestRateStrategyBinding constructs the Interest Rate Strategy binding.
 // It validates the address (checks for zero address) and returns an interface for testability.
-func NewDefaultReserveInterestRateStrategyBinding(
-	client *evm.Client,
-	addr common.Address,
-) (DefaultReserveInterestRateStrategyInterface, error) {
-	// Validate that address is not zero (uninitialized/invalid)
-	if addr == (common.Address{}) {
-		return nil, fmt.Errorf("invalid DefaultReserveInterestRateStrategy address: zero address")
+func NewDefaultReserveInterestRateStrategyBinding(client *evm.Client, addr string) (DefaultReserveInterestRateStrategyInterface, error) {
+	if !common.IsHexAddress(addr) {
+		return nil, fmt.Errorf("invalid DefaultReserveInterestRateStrategy address: %s", addr)
 	}
+	strategyAddr := common.HexToAddress(addr)
 
 	return default_reserve_interest_rate_strategy.NewDefaultReserveInterestRateStrategy(
 		client,
-		addr,
+		strategyAddr,
 		nil, // No filter options needed for reads
 	)
 }
