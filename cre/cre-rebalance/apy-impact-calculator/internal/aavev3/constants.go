@@ -1,4 +1,4 @@
-package aavev3
+package aaveV3
 
 const (
 	// RAY is Aave's fixed-point math unit (27 decimals)
