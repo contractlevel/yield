@@ -4,33 +4,28 @@ import (
 	"math/big"
 
 	"cre-rebalance/contracts/evm/src/generated/aave_protocol_data_provider"
-	"cre-rebalance/contracts/evm/src/generated/default_reserve_interest_rate_strategy"
+	"cre-rebalance/contracts/evm/src/generated/default_reserve_interest_rate_strategy_v2"
+	"cre-rebalance/contracts/evm/src/generated/pool"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 )
 
+// @review all comments
+
 type PoolAddressesProviderInterface interface {
-	GetPool(runtime cre.RunTime, blockNumber *big.Int) cre.Promise[common.Address]
+	GetPool(runtime cre.Runtime, blockNumber *big.Int) cre.Promise[common.Address]
 }
 
 type PoolInterface interface {
-	GetReserveData(runtime cre.RunTime, input pool.GetReserveDataInput, blockNumber *big.Int) cre.Promise[aave_protocol_data_provider.GetReserveDataOutput]
-	GetConfiguration(runtime cre.RunTime, input pool.GetConfigurationInput, blockNumber *big.Int) cre.Promise[aave_protocol_data_provider.GetConfigurationOutput]
+	GetReserveData(runtime cre.Runtime, input pool.GetReserveDataInput, blockNumber *big.Int) cre.Promise[pool.GetReserveDataOutput]
 }
 
 // AaveProtocolDataProviderInterface abstracts the Aave Protocol Data Provider contract
-// @input Asset Address
 type AaveProtocolDataProviderInterface interface {
-	// @review we probably dont need this
-	GetReserveData(
-		runtime cre.Runtime,
-		input aave_protocol_data_provider.GetReserveDataInput,
-		blockNumber *big.Int,
-	) cre.Promise[aave_protocol_data_provider.GetReserveDataOutput]
+	GetTotalDebt(runtime cre.Runtime, input aave_protocol_data_provider.GetTotalDebtInput, blockNumber *big.Int) cre.Promise[*big.Int]
 
-	GetTotalDebt(runtime cre.RunTime, input aave_protocol_data_provider.GetTotalDebtInput, blockNumber *big.Int) cre.Promise[*big.Int]
-
+	GetReserveConfigurationData(runtime cre.Runtime, input aave_protocol_data_provider.GetReserveConfigurationDataInput, blockNumber *big.Int) cre.Promise[aave_protocol_data_provider.GetReserveConfigurationDataOutput]
 }
 
 // DefaultReserveInterestRateStrategyV2Interface abstracts the Interest Rate Strategy contract
@@ -39,13 +34,13 @@ type DefaultReserveInterestRateStrategyV2Interface interface {
 	// @review we probably dont need this
 	GetInterestRateData(
 		runtime cre.Runtime,
-		input default_reserve_interest_rate_strategy.GetInterestRateDataInput,
+		input default_reserve_interest_rate_strategy_v2.GetInterestRateDataInput,
 		blockNumber *big.Int,
-	) cre.Promise[default_reserve_interest_rate_strategy.IDefaultInterestRateStrategyV2InterestRateDataRay]
+	) cre.Promise[default_reserve_interest_rate_strategy_v2.IDefaultInterestRateStrategyV2InterestRateDataRay]
 
 	CalculateInterestRates(
 		runtime cre.Runtime,
-		input default_reserve_interest_rate_strategy.CalculateInterestRatesInput,
+		input default_reserve_interest_rate_strategy_v2.CalculateInterestRatesInput,
 		blockNumber *big.Int,
-	) cre.Promise[default_reserve_interest_rate_strategy.CalculateInterestRatesOutput]
+	) cre.Promise[default_reserve_interest_rate_strategy_v2.CalculateInterestRatesOutput]
 }

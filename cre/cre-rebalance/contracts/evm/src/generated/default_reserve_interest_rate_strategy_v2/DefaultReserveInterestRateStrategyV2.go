@@ -1,6 +1,6 @@
 // Code generated — DO NOT EDIT.
 
-package default_reserve_interest_rate_strategy
+package default_reserve_interest_rate_strategy_v2
 
 import (
 	"bytes"
@@ -50,7 +50,7 @@ var (
 	_ = reflect.Bool
 )
 
-var DefaultReserveInterestRateStrategyMetaData = &bind.MetaData{
+var DefaultReserveInterestRateStrategyV2MetaData = &bind.MetaData{
 	ABI: "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"provider\",\"type\":\"address\"}],\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":true,\"internalType\":\"address\",\"name\":\"reserve\",\"type\":\"address\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"optimalUsageRatio\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"baseVariableBorrowRate\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"variableRateSlope1\",\"type\":\"uint256\"},{\"indexed\":false,\"internalType\":\"uint256\",\"name\":\"variableRateSlope2\",\"type\":\"uint256\"}],\"name\":\"RateDataUpdate\",\"type\":\"event\"},{\"inputs\":[],\"name\":\"ADDRESSES_PROVIDER\",\"outputs\":[{\"internalType\":\"contractIPoolAddressesProvider\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"MAX_BORROW_RATE\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"MAX_OPTIMAL_POINT\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"MIN_OPTIMAL_POINT\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"unbacked\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"liquidityAdded\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"liquidityTaken\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"totalDebt\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"reserveFactor\",\"type\":\"uint256\"},{\"internalType\":\"address\",\"name\":\"reserve\",\"type\":\"address\"},{\"internalType\":\"bool\",\"name\":\"usingVirtualBalance\",\"type\":\"bool\"},{\"internalType\":\"uint256\",\"name\":\"virtualUnderlyingBalance\",\"type\":\"uint256\"}],\"internalType\":\"structDataTypes.CalculateInterestRatesParams\",\"name\":\"params\",\"type\":\"tuple\"}],\"name\":\"calculateInterestRates\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"reserve\",\"type\":\"address\"}],\"name\":\"getBaseVariableBorrowRate\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"reserve\",\"type\":\"address\"}],\"name\":\"getInterestRateData\",\"outputs\":[{\"components\":[{\"internalType\":\"uint256\",\"name\":\"optimalUsageRatio\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"baseVariableBorrowRate\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"variableRateSlope1\",\"type\":\"uint256\"},{\"internalType\":\"uint256\",\"name\":\"variableRateSlope2\",\"type\":\"uint256\"}],\"internalType\":\"structIDefaultInterestRateStrategyV2.InterestRateDataRay\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"reserve\",\"type\":\"address\"}],\"name\":\"getInterestRateDataBps\",\"outputs\":[{\"components\":[{\"internalType\":\"uint16\",\"name\":\"optimalUsageRatio\",\"type\":\"uint16\"},{\"internalType\":\"uint32\",\"name\":\"baseVariableBorrowRate\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"variableRateSlope1\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"variableRateSlope2\",\"type\":\"uint32\"}],\"internalType\":\"structIDefaultInterestRateStrategyV2.InterestRateData\",\"name\":\"\",\"type\":\"tuple\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"reserve\",\"type\":\"address\"}],\"name\":\"getMaxVariableBorrowRate\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"reserve\",\"type\":\"address\"}],\"name\":\"getOptimalUsageRatio\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"reserve\",\"type\":\"address\"}],\"name\":\"getVariableRateSlope1\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"reserve\",\"type\":\"address\"}],\"name\":\"getVariableRateSlope2\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"\",\"type\":\"uint256\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"reserve\",\"type\":\"address\"},{\"internalType\":\"bytes\",\"name\":\"rateData\",\"type\":\"bytes\"}],\"name\":\"setInterestRateParams\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"address\",\"name\":\"reserve\",\"type\":\"address\"},{\"components\":[{\"internalType\":\"uint16\",\"name\":\"optimalUsageRatio\",\"type\":\"uint16\"},{\"internalType\":\"uint32\",\"name\":\"baseVariableBorrowRate\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"variableRateSlope1\",\"type\":\"uint32\"},{\"internalType\":\"uint32\",\"name\":\"variableRateSlope2\",\"type\":\"uint32\"}],\"internalType\":\"structIDefaultInterestRateStrategyV2.InterestRateData\",\"name\":\"rateData\",\"type\":\"tuple\"}],\"name\":\"setInterestRateParams\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}]",
 }
 
@@ -153,16 +153,16 @@ type RateDataUpdateDecoded struct {
 	VariableRateSlope2     *big.Int
 }
 
-// Main Binding Type for DefaultReserveInterestRateStrategy
-type DefaultReserveInterestRateStrategy struct {
+// Main Binding Type for DefaultReserveInterestRateStrategyV2
+type DefaultReserveInterestRateStrategyV2 struct {
 	Address common.Address
 	Options *bindings.ContractInitOptions
 	ABI     *abi.ABI
 	client  *evm.Client
-	Codec   DefaultReserveInterestRateStrategyCodec
+	Codec   DefaultReserveInterestRateStrategyV2Codec
 }
 
-type DefaultReserveInterestRateStrategyCodec interface {
+type DefaultReserveInterestRateStrategyV2Codec interface {
 	EncodeADDRESSESPROVIDERMethodCall() ([]byte, error)
 	DecodeADDRESSESPROVIDERMethodOutput(data []byte) (common.Address, error)
 	EncodeMAXBORROWRATEMethodCall() ([]byte, error)
@@ -197,12 +197,12 @@ type DefaultReserveInterestRateStrategyCodec interface {
 	DecodeRateDataUpdate(log *evm.Log) (*RateDataUpdateDecoded, error)
 }
 
-func NewDefaultReserveInterestRateStrategy(
+func NewDefaultReserveInterestRateStrategyV2(
 	client *evm.Client,
 	address common.Address,
 	options *bindings.ContractInitOptions,
-) (*DefaultReserveInterestRateStrategy, error) {
-	parsed, err := abi.JSON(strings.NewReader(DefaultReserveInterestRateStrategyMetaData.ABI))
+) (*DefaultReserveInterestRateStrategyV2, error) {
+	parsed, err := abi.JSON(strings.NewReader(DefaultReserveInterestRateStrategyV2MetaData.ABI))
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +210,7 @@ func NewDefaultReserveInterestRateStrategy(
 	if err != nil {
 		return nil, err
 	}
-	return &DefaultReserveInterestRateStrategy{
+	return &DefaultReserveInterestRateStrategyV2{
 		Address: address,
 		Options: options,
 		ABI:     &parsed,
@@ -223,8 +223,8 @@ type Codec struct {
 	abi *abi.ABI
 }
 
-func NewCodec() (DefaultReserveInterestRateStrategyCodec, error) {
-	parsed, err := abi.JSON(strings.NewReader(DefaultReserveInterestRateStrategyMetaData.ABI))
+func NewCodec() (DefaultReserveInterestRateStrategyV2Codec, error) {
+	parsed, err := abi.JSON(strings.NewReader(DefaultReserveInterestRateStrategyV2MetaData.ABI))
 	if err != nil {
 		return nil, err
 	}
@@ -640,7 +640,7 @@ func (c *Codec) DecodeRateDataUpdate(log *evm.Log) (*RateDataUpdateDecoded, erro
 	return event, nil
 }
 
-func (c DefaultReserveInterestRateStrategy) ADDRESSESPROVIDER(
+func (c DefaultReserveInterestRateStrategyV2) ADDRESSESPROVIDER(
 	runtime cre.Runtime,
 	blockNumber *big.Int,
 ) cre.Promise[common.Address] {
@@ -677,7 +677,7 @@ func (c DefaultReserveInterestRateStrategy) ADDRESSESPROVIDER(
 
 }
 
-func (c DefaultReserveInterestRateStrategy) MAXBORROWRATE(
+func (c DefaultReserveInterestRateStrategyV2) MAXBORROWRATE(
 	runtime cre.Runtime,
 	blockNumber *big.Int,
 ) cre.Promise[*big.Int] {
@@ -714,7 +714,7 @@ func (c DefaultReserveInterestRateStrategy) MAXBORROWRATE(
 
 }
 
-func (c DefaultReserveInterestRateStrategy) MAXOPTIMALPOINT(
+func (c DefaultReserveInterestRateStrategyV2) MAXOPTIMALPOINT(
 	runtime cre.Runtime,
 	blockNumber *big.Int,
 ) cre.Promise[*big.Int] {
@@ -751,7 +751,7 @@ func (c DefaultReserveInterestRateStrategy) MAXOPTIMALPOINT(
 
 }
 
-func (c DefaultReserveInterestRateStrategy) MINOPTIMALPOINT(
+func (c DefaultReserveInterestRateStrategyV2) MINOPTIMALPOINT(
 	runtime cre.Runtime,
 	blockNumber *big.Int,
 ) cre.Promise[*big.Int] {
@@ -788,7 +788,7 @@ func (c DefaultReserveInterestRateStrategy) MINOPTIMALPOINT(
 
 }
 
-func (c DefaultReserveInterestRateStrategy) CalculateInterestRates(
+func (c DefaultReserveInterestRateStrategyV2) CalculateInterestRates(
 	runtime cre.Runtime,
 	args CalculateInterestRatesInput,
 	blockNumber *big.Int,
@@ -826,7 +826,7 @@ func (c DefaultReserveInterestRateStrategy) CalculateInterestRates(
 
 }
 
-func (c DefaultReserveInterestRateStrategy) GetBaseVariableBorrowRate(
+func (c DefaultReserveInterestRateStrategyV2) GetBaseVariableBorrowRate(
 	runtime cre.Runtime,
 	args GetBaseVariableBorrowRateInput,
 	blockNumber *big.Int,
@@ -864,7 +864,7 @@ func (c DefaultReserveInterestRateStrategy) GetBaseVariableBorrowRate(
 
 }
 
-func (c DefaultReserveInterestRateStrategy) GetInterestRateData(
+func (c DefaultReserveInterestRateStrategyV2) GetInterestRateData(
 	runtime cre.Runtime,
 	args GetInterestRateDataInput,
 	blockNumber *big.Int,
@@ -902,7 +902,7 @@ func (c DefaultReserveInterestRateStrategy) GetInterestRateData(
 
 }
 
-func (c DefaultReserveInterestRateStrategy) GetInterestRateDataBps(
+func (c DefaultReserveInterestRateStrategyV2) GetInterestRateDataBps(
 	runtime cre.Runtime,
 	args GetInterestRateDataBpsInput,
 	blockNumber *big.Int,
@@ -940,7 +940,7 @@ func (c DefaultReserveInterestRateStrategy) GetInterestRateDataBps(
 
 }
 
-func (c DefaultReserveInterestRateStrategy) GetMaxVariableBorrowRate(
+func (c DefaultReserveInterestRateStrategyV2) GetMaxVariableBorrowRate(
 	runtime cre.Runtime,
 	args GetMaxVariableBorrowRateInput,
 	blockNumber *big.Int,
@@ -978,7 +978,7 @@ func (c DefaultReserveInterestRateStrategy) GetMaxVariableBorrowRate(
 
 }
 
-func (c DefaultReserveInterestRateStrategy) GetOptimalUsageRatio(
+func (c DefaultReserveInterestRateStrategyV2) GetOptimalUsageRatio(
 	runtime cre.Runtime,
 	args GetOptimalUsageRatioInput,
 	blockNumber *big.Int,
@@ -1016,7 +1016,7 @@ func (c DefaultReserveInterestRateStrategy) GetOptimalUsageRatio(
 
 }
 
-func (c DefaultReserveInterestRateStrategy) GetVariableRateSlope1(
+func (c DefaultReserveInterestRateStrategyV2) GetVariableRateSlope1(
 	runtime cre.Runtime,
 	args GetVariableRateSlope1Input,
 	blockNumber *big.Int,
@@ -1054,7 +1054,7 @@ func (c DefaultReserveInterestRateStrategy) GetVariableRateSlope1(
 
 }
 
-func (c DefaultReserveInterestRateStrategy) GetVariableRateSlope2(
+func (c DefaultReserveInterestRateStrategyV2) GetVariableRateSlope2(
 	runtime cre.Runtime,
 	args GetVariableRateSlope2Input,
 	blockNumber *big.Int,
@@ -1092,7 +1092,7 @@ func (c DefaultReserveInterestRateStrategy) GetVariableRateSlope2(
 
 }
 
-func (c DefaultReserveInterestRateStrategy) WriteReportFromDataTypesCalculateInterestRatesParams(
+func (c DefaultReserveInterestRateStrategyV2) WriteReportFromDataTypesCalculateInterestRatesParams(
 	runtime cre.Runtime,
 	input DataTypesCalculateInterestRatesParams,
 	gasConfig *evm.GasConfig,
@@ -1117,7 +1117,7 @@ func (c DefaultReserveInterestRateStrategy) WriteReportFromDataTypesCalculateInt
 	})
 }
 
-func (c DefaultReserveInterestRateStrategy) WriteReportFromIDefaultInterestRateStrategyV2InterestRateData(
+func (c DefaultReserveInterestRateStrategyV2) WriteReportFromIDefaultInterestRateStrategyV2InterestRateData(
 	runtime cre.Runtime,
 	input IDefaultInterestRateStrategyV2InterestRateData,
 	gasConfig *evm.GasConfig,
@@ -1142,7 +1142,7 @@ func (c DefaultReserveInterestRateStrategy) WriteReportFromIDefaultInterestRateS
 	})
 }
 
-func (c DefaultReserveInterestRateStrategy) WriteReportFromIDefaultInterestRateStrategyV2InterestRateDataRay(
+func (c DefaultReserveInterestRateStrategyV2) WriteReportFromIDefaultInterestRateStrategyV2InterestRateDataRay(
 	runtime cre.Runtime,
 	input IDefaultInterestRateStrategyV2InterestRateDataRay,
 	gasConfig *evm.GasConfig,
@@ -1167,7 +1167,7 @@ func (c DefaultReserveInterestRateStrategy) WriteReportFromIDefaultInterestRateS
 	})
 }
 
-func (c DefaultReserveInterestRateStrategy) WriteReport(
+func (c DefaultReserveInterestRateStrategyV2) WriteReport(
 	runtime cre.Runtime,
 	report *cre.Report,
 	gasConfig *evm.GasConfig,
@@ -1179,7 +1179,7 @@ func (c DefaultReserveInterestRateStrategy) WriteReport(
 	})
 }
 
-func (c *DefaultReserveInterestRateStrategy) UnpackError(data []byte) (any, error) {
+func (c *DefaultReserveInterestRateStrategyV2) UnpackError(data []byte) (any, error) {
 	switch common.Bytes2Hex(data[:4]) {
 	default:
 		return nil, errors.New("unknown error selector")
@@ -1188,8 +1188,8 @@ func (c *DefaultReserveInterestRateStrategy) UnpackError(data []byte) (any, erro
 
 // RateDataUpdateTrigger wraps the raw log trigger and provides decoded RateDataUpdateDecoded data
 type RateDataUpdateTrigger struct {
-	cre.Trigger[*evm.Log, *evm.Log]                                     // Embed the raw trigger
-	contract                        *DefaultReserveInterestRateStrategy // Keep reference for decoding
+	cre.Trigger[*evm.Log, *evm.Log]                                       // Embed the raw trigger
+	contract                        *DefaultReserveInterestRateStrategyV2 // Keep reference for decoding
 }
 
 // Adapt method that decodes the log into RateDataUpdate data
@@ -1206,7 +1206,7 @@ func (t *RateDataUpdateTrigger) Adapt(l *evm.Log) (*bindings.DecodedLog[RateData
 	}, nil
 }
 
-func (c *DefaultReserveInterestRateStrategy) LogTriggerRateDataUpdateLog(chainSelector uint64, confidence evm.ConfidenceLevel, filters []RateDataUpdateTopics) (cre.Trigger[*evm.Log, *bindings.DecodedLog[RateDataUpdateDecoded]], error) {
+func (c *DefaultReserveInterestRateStrategyV2) LogTriggerRateDataUpdateLog(chainSelector uint64, confidence evm.ConfidenceLevel, filters []RateDataUpdateTopics) (cre.Trigger[*evm.Log, *bindings.DecodedLog[RateDataUpdateDecoded]], error) {
 	event := c.ABI.Events["RateDataUpdate"]
 	topics, err := c.Codec.EncodeRateDataUpdateTopics(event, filters)
 	if err != nil {
@@ -1225,7 +1225,7 @@ func (c *DefaultReserveInterestRateStrategy) LogTriggerRateDataUpdateLog(chainSe
 	}, nil
 }
 
-func (c *DefaultReserveInterestRateStrategy) FilterLogsRateDataUpdate(runtime cre.Runtime, options *bindings.FilterOptions) (cre.Promise[*evm.FilterLogsReply], error) {
+func (c *DefaultReserveInterestRateStrategyV2) FilterLogsRateDataUpdate(runtime cre.Runtime, options *bindings.FilterOptions) (cre.Promise[*evm.FilterLogsReply], error) {
 	if options == nil {
 		return nil, errors.New("FilterLogs options are required.")
 	}

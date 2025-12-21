@@ -2,7 +2,7 @@
 
 //go:build !wasip1
 
-package default_reserve_interest_rate_strategy
+package default_reserve_interest_rate_strategy_v2
 
 import (
 	"errors"
@@ -20,8 +20,8 @@ var (
 	_ = common.Big1
 )
 
-// DefaultReserveInterestRateStrategyMock is a mock implementation of DefaultReserveInterestRateStrategy for testing.
-type DefaultReserveInterestRateStrategyMock struct {
+// DefaultReserveInterestRateStrategyV2Mock is a mock implementation of DefaultReserveInterestRateStrategyV2 for testing.
+type DefaultReserveInterestRateStrategyV2Mock struct {
 	ADDRESSESPROVIDER         func() (common.Address, error)
 	MAXBORROWRATE             func() (*big.Int, error)
 	MAXOPTIMALPOINT           func() (*big.Int, error)
@@ -36,9 +36,9 @@ type DefaultReserveInterestRateStrategyMock struct {
 	GetVariableRateSlope2     func(GetVariableRateSlope2Input) (*big.Int, error)
 }
 
-// NewDefaultReserveInterestRateStrategyMock creates a new DefaultReserveInterestRateStrategyMock for testing.
-func NewDefaultReserveInterestRateStrategyMock(address common.Address, clientMock *evmmock.ClientCapability) *DefaultReserveInterestRateStrategyMock {
-	mock := &DefaultReserveInterestRateStrategyMock{}
+// NewDefaultReserveInterestRateStrategyV2Mock creates a new DefaultReserveInterestRateStrategyV2Mock for testing.
+func NewDefaultReserveInterestRateStrategyV2Mock(address common.Address, clientMock *evmmock.ClientCapability) *DefaultReserveInterestRateStrategyV2Mock {
+	mock := &DefaultReserveInterestRateStrategyV2Mock{}
 
 	codec, err := NewCodec()
 	if err != nil {

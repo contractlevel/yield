@@ -4,10 +4,9 @@ import (
 	"fmt"
 
 	"cre-rebalance/contracts/evm/src/generated/aave_protocol_data_provider"
-	"cre-rebalance/contracts/evm/src/generated/default_reserve_interest_rate_strategy"
-	// @review these need to be added to contracts/evm/src/generated/
-	// "cre-rebalance/contracts/evm/src/generated/pool"
-	// "cre-rebalance/contracts/evm/src/generated/pool_addresses_provider"
+	"cre-rebalance/contracts/evm/src/generated/default_reserve_interest_rate_strategy_v2"
+	"cre-rebalance/contracts/evm/src/generated/pool"
+	"cre-rebalance/contracts/evm/src/generated/pool_addresses_provider"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/blockchain/evm"
@@ -53,7 +52,7 @@ func NewDefaultReserveInterestRateStrategyV2Binding(client *evm.Client, addr str
 	}
 	strategyAddr := common.HexToAddress(addr)
 
-	return default_reserve_interest_rate_strategy.NewDefaultReserveInterestRateStrategyV2(
+	return default_reserve_interest_rate_strategy_v2.NewDefaultReserveInterestRateStrategyV2(
 		client,
 		strategyAddr,
 		nil, // No filter options needed for reads
