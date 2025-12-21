@@ -31,13 +31,6 @@ type AaveProtocolDataProviderInterface interface {
 // DefaultReserveInterestRateStrategyV2Interface abstracts the Interest Rate Strategy contract
 // @input Asset Address
 type DefaultReserveInterestRateStrategyV2Interface interface {
-	// @review we probably dont need this
-	GetInterestRateData(
-		runtime cre.Runtime,
-		input default_reserve_interest_rate_strategy_v2.GetInterestRateDataInput,
-		blockNumber *big.Int,
-	) cre.Promise[default_reserve_interest_rate_strategy_v2.IDefaultInterestRateStrategyV2InterestRateDataRay]
-
 	CalculateInterestRates(
 		runtime cre.Runtime,
 		input default_reserve_interest_rate_strategy_v2.CalculateInterestRatesInput,
