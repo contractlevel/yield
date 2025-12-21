@@ -29,7 +29,6 @@ type AaveProtocolDataProviderInterface interface {
 }
 
 // DefaultReserveInterestRateStrategyV2Interface abstracts the Interest Rate Strategy contract
-// @input Asset Address
 type DefaultReserveInterestRateStrategyV2Interface interface {
 	CalculateInterestRates(
 		runtime cre.Runtime,
