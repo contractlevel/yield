@@ -26,7 +26,7 @@ func NewAaveProtocolDataProviderBinding(client *evm.Client, addr string) (AavePr
 }
 
 // NewDefaultReserveInterestRateStrategyBinding constructs the Interest Rate Strategy binding.
-// It validates the address (checks for zero address) and returns an interface for testability.
+// It validates the address and returns an interface for testability.
 func NewDefaultReserveInterestRateStrategyBinding(client *evm.Client, addr string) (DefaultReserveInterestRateStrategyInterface, error) {
 	if !common.IsHexAddress(addr) {
 		return nil, fmt.Errorf("invalid DefaultReserveInterestRateStrategy address: %s", addr)
