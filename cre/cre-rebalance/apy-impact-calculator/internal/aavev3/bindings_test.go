@@ -5,7 +5,52 @@ import (
 	"testing"
 
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/blockchain/evm"
+	"github.com/ethereum/go-ethereum/common"
 )
+
+func Test_NewPoolAddressesProviderBinding_success(t *testing.T) {
+	var client *evm.Client = nil
+	addr := "0x0000000000000000000000000000000000000001"
+
+	binding, err := NewPoolAddressesProviderBinding(client, addr)
+	if err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+	if binding == nil {
+		t.Fatalf("expected non-nil binding, got nil")
+	}
+	var _ PoolAddressesProviderInterface = binding
+}
+
+func Test_NewPoolAddressesProviderBinding_errorWhen_invalidAddress(t *testing.T) {
+	var client *evm.Client = nil
+	addr := "not-an-address"
+
+	binding, err := NewPoolAddressesProviderBinding(client, addr)
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+	if binding != nil {
+		t.Fatalf("expected nil binding on error, got non-nil")
+	}
+	if !strings.Contains(err.Error(), "invalid PoolAddressesProvider address: "+addr) {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func Test_NewPoolBinding_success(t *testing.T) {
+	var client *evm.Client = nil
+	addr := "0x0000000000000000000000000000000000000001"
+
+	binding, err := NewPoolBinding(client, common.HexToAddress(addr))
+	if err != nil {
+		t.Fatalf("expected nil error, got: %v", err)
+	}
+	if binding == nil {
+		t.Fatalf("expected non-nil binding, got nil")
+	}
+	var _ PoolInterface = binding
+}
 
 func Test_NewAaveProtocolDataProviderBinding_success(t *testing.T) {
 	var client *evm.Client = nil
