@@ -5,6 +5,7 @@ import {BaseTest, Vm, CREReceiver, WorkflowHelpers} from "../../BaseTest.t.sol";
 
 /// @dev CREReceiver inherited by Rebalancer
 contract SetterTest is BaseTest {
+    // New values for testing
     address newKeystoneForwarder = makeAddr("newKeystoneForwarder");
     string newWorkflowNameRaw = "NEWWORKFLOW";
     bytes10 newWorkflowName = WorkflowHelpers.createWorkflowName(newWorkflowNameRaw);
@@ -60,7 +61,7 @@ contract SetterTest is BaseTest {
 
         // Act & Assert
         _changePrank(baseRebalancer.owner());
-        vm.expectRevert(abi.encodeWithSignature("CREReceiver__NotZeroAddress()"));
+        vm.expectRevert(abi.encodeWithSignature("CREReceiver__ForwarderNotZero()"));
         baseRebalancer.setKeystoneForwarder(newKeystoneForwarderZero);
     }
 
@@ -71,7 +72,7 @@ contract SetterTest is BaseTest {
         // Arrange & Act
         vm.recordLogs();
         _changePrank(baseRebalancer.owner());
-        baseRebalancer.setWorkflow(newWorkflowId, workflowOwner, newWorkflowNameRaw);
+        baseRebalancer.setWorkflow(newWorkflowId, workflowOwner, newWorkflowName);
 
         // Handle log for WorkflowSet event
         Vm.Log[] memory logs = vm.getRecordedLogs();
@@ -99,7 +100,7 @@ contract SetterTest is BaseTest {
     function test_yield_creReceiver_setWorkflow_updatesStorage() public {
         // Arrange & Act
         _changePrank(baseRebalancer.owner());
-        baseRebalancer.setWorkflow(newWorkflowId, workflowOwner, newWorkflowNameRaw);
+        baseRebalancer.setWorkflow(newWorkflowId, workflowOwner, newWorkflowName);
 
         // Assert
         CREReceiver.Workflow memory storedWorkflow = baseRebalancer.getWorkflow(newWorkflowId);
@@ -113,8 +114,8 @@ contract SetterTest is BaseTest {
 
         // Act & Assert
         _changePrank(baseRebalancer.owner());
-        vm.expectRevert(abi.encodeWithSignature("CREReceiver__NotZeroId()"));
-        baseRebalancer.setWorkflow(emptyWorkflowId, workflowOwner, workflowNameRaw);
+        vm.expectRevert(abi.encodeWithSignature("CREReceiver__IdNotZero()"));
+        baseRebalancer.setWorkflow(emptyWorkflowId, workflowOwner, workflowName);
     }
 
     function test_yield_creReceiver_setWorkflow_revertsWhen_workflowOwnerZero() public {
@@ -123,17 +124,17 @@ contract SetterTest is BaseTest {
 
         // Act & Assert
         _changePrank(baseRebalancer.owner());
-        vm.expectRevert(abi.encodeWithSignature("CREReceiver__NotZeroAddress()"));
-        baseRebalancer.setWorkflow(workflowId, emptyWorkflowOwner, workflowNameRaw);
+        vm.expectRevert(abi.encodeWithSignature("CREReceiver__OwnerNotZero()"));
+        baseRebalancer.setWorkflow(workflowId, emptyWorkflowOwner, workflowName);
     }
 
-    function test_yield_creReceiver_setWorkflow_revertsWhen_workflowNameEmpty() public {
+    function test_yield_creReceiver_setWorkflow_revertsWhen_workflowNameZero() public {
         // Arrange
-        string memory emptyWorkflowName = "";
+        bytes10 emptyWorkflowName = bytes10(0);
 
         // Act & Assert
         _changePrank(baseRebalancer.owner());
-        vm.expectRevert(abi.encodeWithSignature("CREReceiver__NotEmptyName()"));
+        vm.expectRevert(abi.encodeWithSignature("CREReceiver__NameNotZero()"));
         baseRebalancer.setWorkflow(workflowId, workflowOwner, emptyWorkflowName);
     }
 }

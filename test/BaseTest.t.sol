@@ -550,7 +550,7 @@ contract BaseTest is Test {
 
         /// @dev set keystone forwarder
         baseRebalancer.setKeystoneForwarder(keystoneForwarder);
-        baseRebalancer.setWorkflow(workflowId, workflowOwner, workflowNameRaw);
+        baseRebalancer.setWorkflow(workflowId, workflowOwner, workflowName);
     }
 
     /// @notice empty test to skip file in coverage

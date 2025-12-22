@@ -13,11 +13,15 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
+    error CREReceiver__MetadataZero(bytes32 receivedId, address receivedOwner, bytes10 receivedName);
     error CREReceiver__InvalidKeystoneForwarder(address sender, address expectedForwarder);
-    error CREReceiver__InvalidWorkflow(bytes32 receivedId, address receivedOwner, bytes10 receivedName);
-    error CREReceiver__NotZeroAddress();
-    error CREReceiver__NotEmptyName();
-    error CREReceiver__NotZeroId();
+    error CREReceiver__InvalidWorkflowId(bytes32 receivedId, address storedOwner, bytes10 storedName);
+    error CREReceiver__InvalidWorkflowOwner(bytes32 receivedId, address receivedOwner);
+    error CREReceiver__InvalidWorkflowName(bytes32 receivedId, bytes10 receivedName);
+    error CREReceiver__ForwarderNotZero();
+    error CREReceiver__IdNotZero();
+    error CREReceiver__OwnerNotZero();
+    error CREReceiver__NameNotZero();
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
@@ -36,16 +40,16 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
+    /// @notice Emitted when all security checks pass on 'onReport'
+    event OnReportSecurityChecksPassed(
+        bytes32 indexed workflowId, address indexed workflowOwner, bytes10 indexed workflowName
+    );
     /// @notice Emitted when a Keystone Forwarder address is set
     event KeystoneForwarderSet(address indexed keystoneForwarder);
     /// @notice Emitted when a workflow is set
     event WorkflowSet(bytes32 indexed workflowId, address indexed workflowOwner, bytes10 indexed workflowName);
     /// @notice Emitted when a workflow is removed
     event WorkflowRemoved(bytes32 indexed workflowId, address indexed workflowOwner, bytes10 indexed workflowName);
-    /// @notice Emitted when all security checks pass on 'onReport'
-    event OnReportSecurityChecksPassed(
-        bytes32 indexed workflowId, address indexed workflowOwner, bytes10 indexed workflowName
-    );
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -62,24 +66,32 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
     /// @param metadata Metadata about the report
     /// @param report The CRE report
     function onReport(bytes calldata metadata, bytes calldata report) external {
-        // Security Check 1: Verify caller is the trusted Chainlink Keystone Forwarder
+        /// @dev  Security Check: Verify caller is the trusted Chainlink Keystone Forwarder
         address keystoneForwarder = s_keystoneForwarder;
         if (msg.sender != keystoneForwarder) {
             revert CREReceiver__InvalidKeystoneForwarder(msg.sender, keystoneForwarder);
         }
 
-        // Security Checks 2-4: Verify workflow identity - ID, owner and name
-        /// @dev workflow id is checked by inference with owner/name existing for an id
+        // Decode metadata and verify not zero
         (bytes32 decodedId, bytes10 decodedName, address decodedOwner) = _decodeMetadata(metadata);
 
+        if (decodedId == bytes32(0) || decodedName == bytes10(0) || decodedOwner == address(0)) {
+            revert CREReceiver__MetadataZero(decodedId, decodedOwner, decodedName);
+        }
+
+        /// @dev Security Checks: ID, owner and name
+        /// @dev workflow id is checked by inference with owner/name existing for an id
         address workflowOwner = s_workflows[decodedId].owner;
         bytes10 workflowName = s_workflows[decodedId].name;
 
-        // @review Do we want to add a 0 check also?
-        // @review Could someone send a report where there's a workflow id but owner/name are 0 and due to mapping states of 0 get through this?
-        if (workflowOwner != decodedOwner || workflowName != decodedName) {
-            revert CREReceiver__InvalidWorkflow(decodedId, decodedOwner, decodedName);
+        // Verify mapped workflow id exists
+        if (workflowOwner == address(0) || workflowName == bytes10(0)) {
+            revert CREReceiver__InvalidWorkflowId(decodedId, workflowOwner, workflowName);
         }
+
+        // Verify owner and name match decoded metadata
+        if (workflowOwner != decodedOwner) revert CREReceiver__InvalidWorkflowOwner(decodedId, decodedOwner);
+        if (workflowName != decodedName) revert CREReceiver__InvalidWorkflowName(decodedId, decodedName);
 
         /// @dev Emitted to assist in testing and verification of decoding workflow metadata
         emit OnReportSecurityChecksPassed(decodedId, decodedOwner, decodedName);
@@ -97,21 +109,6 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
     /*//////////////////////////////////////////////////////////////
                                 INTERNAL
     //////////////////////////////////////////////////////////////*/
-    /// @notice Helper function to convert bytes to hex string
-    /// @param data The bytes to convert
-    /// @return The hex string representation
-    function _bytesToHexString(bytes memory data) internal pure returns (bytes memory) {
-        bytes memory hexChars = "0123456789abcdef";
-        bytes memory hexString = new bytes(data.length * 2);
-
-        for (uint256 i = 0; i < data.length; i++) {
-            hexString[i * 2] = hexChars[uint8(data[i] >> 4)];
-            hexString[i * 2 + 1] = hexChars[uint8(data[i] & 0x0f)];
-        }
-
-        return hexString;
-    }
-
     /// @notice Extracts all metadata fields from the onReport metadata parameter
     /// @param metadata The metadata in bytes format
     /// @return workflowId The unique identifier of the workflow (bytes32)
@@ -144,7 +141,7 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
     /// @notice Updates the Chainlink Keystone Forwarder address that is allowed to call onReport
     /// @param keystoneForwarder The new forwader address
     function setKeystoneForwarder(address keystoneForwarder) external onlyOwner {
-        if (keystoneForwarder == address(0)) revert CREReceiver__NotZeroAddress();
+        if (keystoneForwarder == address(0)) revert CREReceiver__ForwarderNotZero();
         s_keystoneForwarder = keystoneForwarder;
         emit KeystoneForwarderSet(keystoneForwarder);
     }
@@ -153,24 +150,15 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
     /// @param workflowId The id of the workflow
     /// @param workflowOwner The owner address of the workflow
     /// @param workflowName The name of the workflow
-    function setWorkflow(bytes32 workflowId, address workflowOwner, string calldata workflowName) external onlyOwner {
-        if (workflowId == bytes32(0)) revert CREReceiver__NotZeroId();
-        if (workflowOwner == address(0)) revert CREReceiver__NotZeroAddress();
-        if (bytes(workflowName).length == 0) revert CREReceiver__NotEmptyName();
+    /// @dev The workflow name is encoded according to CRE guidelines:
+    /// @dev https://docs.chain.link/cre/guides/workflow/using-evm-client/onchain-write/building-consumer-contracts#how-workflow-names-are-encoded
+    function setWorkflow(bytes32 workflowId, address workflowOwner, bytes10 workflowName) external onlyOwner {
+        if (workflowId == bytes32(0)) revert CREReceiver__IdNotZero();
+        if (workflowOwner == address(0)) revert CREReceiver__OwnerNotZero();
+        if (workflowName == bytes10(0)) revert CREReceiver__NameNotZero();
 
-        /// @dev Following method from IReceiverTemplate to encode name for CRE guidelines
-        /// URL: https://docs.chain.link/cre/guides/workflow/using-evm-client/onchain-write/building-consumer-contracts#how-workflow-names-are-encoded
-        // Convert workflow name to bytes10:
-        // SHA256 hash → hex encode → take first 10 chars → hex encode those chars
-        bytes32 hash = sha256(bytes(workflowName));
-        bytes memory hexString = _bytesToHexString(abi.encodePacked(hash));
-        bytes memory encodedName = new bytes(10);
-        for (uint256 i = 0; i < 10; i++) {
-            encodedName[i] = hexString[i];
-        }
-
-        s_workflows[workflowId] = Workflow({owner: workflowOwner, name: bytes10(encodedName)});
-        emit WorkflowSet(workflowId, workflowOwner, bytes10(encodedName));
+        s_workflows[workflowId] = Workflow({owner: workflowOwner, name: workflowName});
+        emit WorkflowSet(workflowId, workflowOwner, workflowName);
     }
 
     /// @notice Removes a workflow from the allowed workflows mapping

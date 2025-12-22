@@ -301,7 +301,7 @@ contract Invariant is StdInvariant, BaseTest {
 
     function _setWorkflow() internal {
         _changePrank(rebalancer.owner());
-        rebalancer.setWorkflow(workflowId, workflowOwner, workflowNameRaw);
+        rebalancer.setWorkflow(workflowId, workflowOwner, workflowName);
         _stopPrank();
     }
 

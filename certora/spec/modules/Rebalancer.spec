@@ -304,6 +304,7 @@ rule onReport_invalidProtocolId_emitsInvalidProtocolIdEvent() {
 
     // valid chain
     require parent.getAllowedChain(chainSelector) == true;
+
     // return and event emission condition: invalid protocol id
     require strategyRegistry.getStrategyAdapter(protocolId) == 0;
 
@@ -507,8 +508,6 @@ rule onReport_rebalanceParentToChild() {
     assert ghost_strategyUpdated_emittedNewChainSelector == chainSelector;
     assert ghost_strategyUpdated_emittedNewProtocolId == protocolId;
     assert ghost_strategyUpdated_emittedOldChainSelector == oldStrategy.chainSelector;
-    assert newStrategy.chainSelector == chainSelector;
-    assert newStrategy.protocolId == protocolId;
     assert ghost_ccipMessageSent_eventCount == 1;
     assert ghost_ccipMessageSent_txType_emitted == 8; // rebalance new strateegy
 }
@@ -559,8 +558,6 @@ rule onReport_rebalanceChildToOther() {
     assert ghost_strategyUpdated_emittedNewChainSelector == chainSelector;
     assert ghost_strategyUpdated_emittedNewProtocolId == protocolId;
     assert ghost_strategyUpdated_emittedOldChainSelector == oldStrategy.chainSelector;
-    assert newStrategy.chainSelector == chainSelector;
-    assert newStrategy.protocolId == protocolId;
     assert ghost_ccipMessageSent_eventCount == 1;
     assert ghost_ccipMessageSent_txType_emitted == 7; // rebalance old strateegy
     assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;

@@ -5,15 +5,6 @@ import {BaseTest, Vm, CREReceiver, WorkflowHelpers} from "../../BaseTest.t.sol";
 
 /// @dev CREReceiver inherited by Rebalancer
 contract RemoveWorkflowTest is BaseTest {
-    function test_yield_creReceiver_removeWorkflow_revertsWhen_notOwner() public {
-        // Arrange
-        vm.prank(depositor);
-
-        // Act & Assert
-        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", depositor));
-        baseRebalancer.removeWorkflow(workflowId);
-    }
-
     function test_yield_creReceiver_removeWorkflow_emitsEvent() public {
         // Arrange
         _changePrank(baseRebalancer.owner());
@@ -62,5 +53,14 @@ contract RemoveWorkflowTest is BaseTest {
         workflow = baseRebalancer.getWorkflow(workflowId);
         assertEq(workflow.owner, address(0));
         assertEq(workflow.name, bytes10(0));
+    }
+
+    function test_yield_creReceiver_removeWorkflow_revertsWhen_notOwner() public {
+        // Arrange
+        vm.prank(depositor);
+
+        // Act & Assert
+        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", depositor));
+        baseRebalancer.removeWorkflow(workflowId);
     }
 }

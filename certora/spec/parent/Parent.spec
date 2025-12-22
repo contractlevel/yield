@@ -894,8 +894,8 @@ rule setStrategy_handles_rebalanceParentToParent() {
     assert usdc.balanceOf(newStrategyPool) == newStrategyPoolBalanceBefore + totalValue;
 }
 
-// @review rule vacuous - was before too - can we make this work?
-rule setStrategy_handles_rebalanceParentToChild_emitsRebalanceNewStrategyTx() {
+// @review rule vacuous - was before too
+rule setStrategy_handles_rebalanceParentToChild() {
     env e;
     uint64 chainSelector;
     bytes32 protocolId;
@@ -922,7 +922,7 @@ rule setStrategy_handles_rebalanceParentToChild_emitsRebalanceNewStrategyTx() {
     assert usdc.balanceOf(strategyPool) == strategyPoolBalanceBefore - totalValue;
 }
 
-rule setStrategy_handles_rebalanceChildToOther_emitsRebalanceOldStrategyTx() {
+rule setStrategy_handles_rebalanceChildToOther() {
     env e;
     uint64 chainSelector;
     bytes32 protocolId;
