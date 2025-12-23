@@ -4,7 +4,11 @@ import (
 	"fmt"
 )
 
-// Config is loaded from config.json
+// Config is the workflow configuration.
+// For cre-rebalance-workflow, it includes schedule and EVM configs.
+// For apy-impact-calculator, it includes schedule, deposit amount, and chains.
+//
+// Example for cre-rebalance-workflow:
 //
 //	{
 //	  "schedule": "0 */1 * * * *",
@@ -18,9 +22,19 @@ import (
 //	    }
 //	  ]
 //	}
+//
+// Example for apy-impact-calculator:
+//
+//	{
+//	  "schedule": "0 */6 * * *",
+//	  "depositUSDC": "10000000000000",
+//	  "chains": [...]
+//	}
 type Config struct {
-	Schedule string      `json:"schedule"`
-	Evms     []EvmConfig `json:"evms"` // Parent chain is Evms[0]
+	Schedule    string        `json:"schedule"`
+	DepositUSDC string        `json:"depositUSDC,omitempty"` // Amount in USDC (with 6 decimals), for apy-impact-calculator
+	Chains      []ChainConfig `json:"chains,omitempty"`      // For apy-impact-calculator
+	Evms        []EvmConfig   `json:"evms,omitempty"`        // For cre-rebalance-workflow
 }
 
 // EvmConfig:
