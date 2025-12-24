@@ -26,6 +26,8 @@ type AaveProtocolDataProviderInterface interface {
 	GetTotalDebt(runtime cre.Runtime, input aave_protocol_data_provider.GetTotalDebtInput, blockNumber *big.Int) cre.Promise[*big.Int]
 
 	GetReserveConfigurationData(runtime cre.Runtime, input aave_protocol_data_provider.GetReserveConfigurationDataInput, blockNumber *big.Int) cre.Promise[aave_protocol_data_provider.GetReserveConfigurationDataOutput]
+
+	GetVirtualUnderlyingBalance(runtime cre.Runtime, input aave_protocol_data_provider.GetVirtualUnderlyingBalanceInput, blockNumber *big.Int) cre.Promise[*big.Int]
 }
 
 // DefaultReserveInterestRateStrategyV2Interface abstracts the Interest Rate Strategy contract
