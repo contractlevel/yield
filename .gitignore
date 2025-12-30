@@ -29,3 +29,4 @@ mutation_campaign/
 test/PoC2.t.sol
 test/PoC.t.sol
 .DS_STORE
+collect.json
