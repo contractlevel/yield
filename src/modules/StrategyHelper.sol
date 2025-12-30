@@ -29,10 +29,18 @@ contract StrategyHelper {
     }
 
     /*//////////////////////////////////////////////////////////////
-                                 GETTER
+                             HELPER GETTER
     //////////////////////////////////////////////////////////////*/
     // @review unit test this!
-    function getAaveV3APR(uint256 liquidityAdded, address asset) external view returns (uint256 apr) {
+    /// @param liquidityAdded The amount of liquidity added to the pool - ie 0 for current APR, amount we are adding for new APR
+    /// @param asset The asset to get the APR for - ie USDC
+    /// @param usingVirtualBalance Whether to use the virtual balance or not
+    /// @return apr The APR for the asset
+    function getAaveV3APR(uint256 liquidityAdded, address asset, bool usingVirtualBalance)
+        external
+        view
+        returns (uint256 apr)
+    {
         address pool = IPoolAddressesProvider(i_poolAddressesProvider).getPool();
         address aaveProtocolDataProvider = IPoolAddressesProvider(i_poolAddressesProvider).getPoolDataProvider();
 
@@ -52,24 +60,23 @@ contract StrategyHelper {
             totalDebt: totalDebt,
             reserveFactor: reserveFactor,
             reserve: asset,
-            usingVirtualBalance: true,
+            usingVirtualBalance: usingVirtualBalance,
             virtualUnderlyingBalance: virtualUnderlyingBalance
         });
 
         (uint256 liquidityRate,) = IReserveInterestRateStrategy(IPool(pool).RESERVE_INTEREST_RATE_STRATEGY())
             .calculateInterestRates(interestRatesParams);
 
-        apr = liquidityRate / RAY;
+        // @review this will return 0 if liquidityRate < 100% ...right?
+        // apr = liquidityRate / RAY;
+        apr = liquidityRate;
     }
 
     // @review getter for compound v3 APR too
 
-    // function getCalculateInterestRatesParams(uint256 liquidityAdded, address asset)
-    //     external
-    //     view
-    //     returns (DataTypes.CalculateInterestRatesParams memory)
-    // {}
-
+    /*//////////////////////////////////////////////////////////////
+                                 GETTER
+    //////////////////////////////////////////////////////////////*/
     /// @return poolAddressesProvider The address of the Aave V3 pool addresses provider
     function getPoolAddressesProvider() external view returns (address) {
         return i_poolAddressesProvider;

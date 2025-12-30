@@ -32,6 +32,8 @@ import {Roles} from "../src/libraries/Roles.sol";
 
 import {CREReceiver} from "../src/modules/CREReceiver.sol";
 
+import {DeployStrategyHelper, StrategyHelper} from "../script/deploy/DeployStrategyHelper.s.sol";
+
 contract BaseTest is Test {
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
@@ -72,6 +74,7 @@ contract BaseTest is Test {
     StrategyRegistry internal baseStrategyRegistry;
     AaveV3Adapter internal baseAaveV3Adapter;
     CompoundV3Adapter internal baseCompoundV3Adapter;
+    StrategyHelper internal baseStrategyHelper;
 
     Share internal optShare;
     SharePool internal optSharePool;
@@ -169,6 +172,10 @@ contract BaseTest is Test {
         baseUsdc = ERC20(baseNetworkConfig.tokens.usdc);
         baseUsdcTokenPool = USDCTokenPool(baseNetworkConfig.ccip.usdcTokenPool);
         baseCCTPMessageTransmitter = IMessageTransmitter(baseNetworkConfig.ccip.cctpMessageTransmitter);
+
+        /// @dev deploy strategy helper on base. (only deploying on base for testing purposes, but should be deployed on all chains)
+        DeployStrategyHelper baseDeployStrategyHelper = new DeployStrategyHelper();
+        baseStrategyHelper = baseDeployStrategyHelper.run();
 
         // Deploy on Optimism
         optFork = vm.createSelectFork(vm.envString("OPTIMISM_MAINNET_RPC_URL"), OPTIMISM_MAINNET_BLOCK_NUMBER);
