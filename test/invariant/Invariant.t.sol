@@ -6,7 +6,7 @@ import {BaseTest, Vm, console2, ParentPeer, ChildPeer, Share, IYieldPeer, Rebala
 import {Handler} from "./Handler.t.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {IRouterClient} from "@chainlink/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
-import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
+import {IPoolAddressesProvider} from "@aave/v3-origin/src/contracts/interfaces/IPoolAddressesProvider.sol";
 import {IComet} from "../../src/interfaces/IComet.sol";
 import {MockCCIPRouter} from "@chainlink-local/test/mocks/MockRouter.sol";
 import {AaveV3Adapter} from "../../src/adapters/AaveV3Adapter.sol";
