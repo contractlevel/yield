@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"cre-rebalance/contracts/evm/src/generated/parent_peer"
-	// "cre-rebalance/contracts/evm/src/generated/child_peer"
+	"cre-rebalance/contracts/evm/src/generated/child_peer"
 	"cre-rebalance/contracts/evm/src/generated/rebalancer"
 	"cre-rebalance/contracts/evm/src/generated/strategy_helper"
 
@@ -23,7 +23,7 @@ func NewParentPeerBinding(client *evm.Client, addr string) (ParentPeerInterface,
 	return parent_peer.NewParentPeer(client, parentPeerAddr, nil)
 }
 
-// NewChildPeerBinding constructs the child peer binding. // @review actually parent, must change to child
+// NewChildPeerBinding constructs the child peer binding.
 // It satisfies YieldPeerInterface.
 func NewChildPeerBinding(client *evm.Client, addr string) (YieldPeerInterface, error) {
 	if !common.IsHexAddress(addr) {
@@ -31,8 +31,7 @@ func NewChildPeerBinding(client *evm.Client, addr string) (YieldPeerInterface, e
 	}
 	childPeerAddr := common.HexToAddress(addr)
 	
-	// @review still using parent_peer binding; underlying contract should beå child.
-	return parent_peer.NewParentPeer(client, childPeerAddr, nil)
+	return child_peer.NewChildPeer(client, childPeerAddr, nil)
 }
 
 // NewRebalancerBinding constructs the rebalancer binding.

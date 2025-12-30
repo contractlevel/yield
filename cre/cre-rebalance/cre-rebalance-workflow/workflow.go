@@ -105,7 +105,6 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 		strategyEvmClient := &evm.Client{ChainSelector: strategyChainCfg.ChainSelector}
 
 		// Instantiate Strategy YieldPeer contract once.
-		// @review still using parent_peer binding; underlying contract should be a child.
 		childPeer, err := onchain.NewChildPeerBinding(strategyEvmClient, strategyChainCfg.YieldPeerAddress)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create strategy YieldPeer binding: %w", err)
