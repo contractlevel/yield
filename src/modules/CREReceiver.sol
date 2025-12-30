@@ -124,6 +124,7 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
         // - Offset 32, size 32: workflow_id (bytes32)
         // - Offset 64, size 10: workflow_name (bytes10)
         // - Offset 74, size 20: workflow_owner (address)
+        //slither-disable-next-line assembly
         assembly {
             workflowId := mload(add(metadata, 32))
             workflowName := mload(add(metadata, 64))

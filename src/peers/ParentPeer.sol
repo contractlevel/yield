@@ -439,6 +439,7 @@ contract ParentPeer is YieldPeer {
         address oldActiveStrategyAdapter = _getActiveStrategyAdapter();
         uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, address(i_usdc));
 
+        // @review unused-return, returns newActiveStrategyAdapter
         _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
 
         if (totalValue != 0) _withdrawFromStrategy(oldActiveStrategyAdapter, totalValue);
@@ -501,6 +502,7 @@ contract ParentPeer is YieldPeer {
         if (s_initialActiveStrategySet) revert ParentPeer__InitialActiveStrategyAlreadySet();
         s_initialActiveStrategySet = true;
         s_strategy = Strategy({chainSelector: i_thisChainSelector, protocolId: protocolId});
+        // @review unused-return, returns newActiveStrategyAdapter
         _updateActiveStrategyAdapter(i_thisChainSelector, protocolId);
     }
 

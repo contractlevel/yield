@@ -59,12 +59,16 @@ abstract contract PausableWithAccessControl is
     /// @inheritdoc AccessControlDefaultAdminRules
     function _grantRole(bytes32 role, address account) internal virtual override returns (bool granted) {
         granted = super._grantRole(role, account);
+        // @review unused-return, add() returns bool
+        // slither . --filter-path lib
         if (granted) s_roleMembers[role].add(account);
     }
 
     /// @inheritdoc AccessControlDefaultAdminRules
     function _revokeRole(bytes32 role, address account) internal virtual override returns (bool revoked) {
         revoked = super._revokeRole(role, account);
+        // @review unused-return, remove() returns bool
+        // slither . --filter-path lib
         if (revoked) s_roleMembers[role].remove(account);
     }
 
