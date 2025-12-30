@@ -43,7 +43,6 @@ contract HelperConfig is Script {
         address comet;
     }
 
-    // @review Do we need this?
     struct CREConfig {
         address keystoneForwarder;
     }

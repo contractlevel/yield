@@ -163,10 +163,6 @@ rule OnReport_decodes_reportMetadata() {
     address workflowOwner;
     bytes10 workflowName;
 
-    require workflowId != to_bytes32(0), "workflowId should be non-zero";
-    require workflowOwner != 0x0, "workflowOwner should be non-zero";
-    require workflowName != to_bytes10(0), "workflowName should be non-zero";
-
     bytes metadata = createWorkflowMetadata(workflowId, workflowName, workflowOwner);
 
     require ghost_onReportSecurityChecksPassed_eventCount == 0, "event count should be zero at start";
@@ -349,6 +345,8 @@ rule setKeystoneForwarder_revertsWhen_notOwner() {
 
     require e.msg.sender != owner(), "msg.sender should not be owner";
 
+    require e.msg.value == 0, "msg.value should be zero";
+
     setKeystoneForwarder@withrevert(e, args);
     assert lastReverted;
 }
@@ -357,8 +355,10 @@ rule setKeystoneForwarder_revertsWhen_zeroAddress() {
     env e;
     address keystoneForwarder;
 
-    require e.msg.sender == owner(), "msg.sender should be owner";
     require keystoneForwarder == 0x0, "keystoneForwarder should be zero address";
+
+    require e.msg.sender == owner(), "msg.sender should be owner";
+    require e.msg.value == 0, "msg.value should be zero";
 
     setKeystoneForwarder@withrevert(e, keystoneForwarder);
     assert lastReverted;
@@ -367,7 +367,6 @@ rule setKeystoneForwarder_revertsWhen_zeroAddress() {
 rule setKeystoneForwarder_success() {
     env e;
     address keystoneForwarder;
-    address returnedKeystoneForwarder;
 
     require ghost_keystoneForwarderSet_eventCount == 0, "event count should be zero at start";
     require ghost_keystoneForwarderSet_emittedAddress == 0x0, "emitted address at start should be zero address";
@@ -381,12 +380,18 @@ rule setKeystoneForwarder_success() {
 
 rule setWorkflow_revertsWhen_notOwner() {
     env e;
-    calldataarg args;
+    bytes32 workflowId;
+    address workflowOwner;
+    bytes10 workflowName;
 
     require e.msg.sender != owner(), "msg.sender should not be owner";
-    require e.msg.value == 0, "msg.value should be zero";
 
-    setWorkflow@withrevert(e, args);
+    require e.msg.value == 0, "msg.value should be zero";
+    require workflowId != to_bytes32(0x0), "workflowId should be non-zero";
+    require workflowOwner != 0x0, "workflowOwner should be non-zero";
+    require workflowName != to_bytes10(0), "workflowName should be non-zero";
+
+    setWorkflow@withrevert(e, workflowId, workflowOwner, workflowName);
     assert lastReverted;
 }
 
@@ -398,6 +403,7 @@ rule setWorkflow_revertsWhen_workflowIdZero() {
 
     require e.msg.value == 0, "msg.value should be zero";
     require e.msg.sender == owner(), "msg.sender should be owner";
+
     require workflowId == to_bytes32(0x0), "workflowId should be zero";
     require workflowOwner != 0x0, "workflowOwner should be non-zero";
     require workflowName != to_bytes10(0), "workflowName should be non-zero";
@@ -414,6 +420,7 @@ rule setWorkflow_revertsWhen_workflowOwnerZero() {
 
     require e.msg.value == 0, "msg.value should be zero";
     require e.msg.sender == owner(), "msg.sender should be owner";
+
     require workflowOwner == 0x0, "workflowOwner should be zero address";
     require workflowName != to_bytes10(0), "workflowName should be non-zero";
     require workflowId != to_bytes32(0), "workflowId should be non-zero";
@@ -504,12 +511,10 @@ rule removeWorkflow_success() {
 rule getKeystoneForwarder_returns_address() {
     env e;
     address keystoneForwarder;
-    address returnedKeystoneForwarder;
 
     setKeystoneForwarder(e, keystoneForwarder);
-    returnedKeystoneForwarder = getKeystoneForwarder();
 
-    assert(keystoneForwarder == returnedKeystoneForwarder);
+    assert(keystoneForwarder == getKeystoneForwarder());
 }
 
 rule getWorkflow_returns_workflow() {

@@ -415,9 +415,6 @@ rule onReport_noStrategyUpdate_orEventEmission_ifCurrentStrategyOptimal() {
     assert ghost_currentStrategyOptimal_emittedProtocolId == protocolId;
 }
 
-// @review This does not check total value, rather just the 
-// deposit to strategy event for local rebalance.
-// Total value is checked in the Parent spec. Is that enough?
 rule onReport_rebalanceParentToParent() {
     env e;
 
@@ -463,9 +460,6 @@ rule onReport_rebalanceParentToParent() {
     assert ghost_depositToStrategy_eventCount == 1;
 }
 
-// @review This does not check total value, rather just the 
-// ccip tx type for the rebalance. Total value is checked in 
-// the Parent spec. Although rule vacuous. Is that enough?
 rule onReport_rebalanceParentToChild() {
     env e;
 
@@ -512,9 +506,6 @@ rule onReport_rebalanceParentToChild() {
     assert ghost_ccipMessageSent_txType_emitted == 8; // rebalance new strateegy
 }
 
-// @review This does not check total value, rather just the 
-// ccip tx type for the rebalance. Total value is checked in 
-// the Parent spec. Is that enough?
 rule onReport_rebalanceChildToOther() {
     env e;
 
