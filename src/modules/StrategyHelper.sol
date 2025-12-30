@@ -7,10 +7,10 @@ import {DataTypes} from "@aave/v3-origin/src/contracts/protocol/libraries/types/
 import {IReserveInterestRateStrategy} from "@aave/v3-origin/src/contracts/interfaces/IReserveInterestRateStrategy.sol";
 import {IPoolDataProvider} from "@aave/v3-origin/src/contracts/interfaces/IPoolDataProvider.sol";
 
-/// @title WorkflowStrategyHelper
+/// @title StrategyHelper
 /// @author @contractlevel
 /// @notice Helper contract for CRE workflow to read information from strategies
-contract WorkflowStrategyHelper {
+contract StrategyHelper {
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
@@ -31,6 +31,7 @@ contract WorkflowStrategyHelper {
     /*//////////////////////////////////////////////////////////////
                                  GETTER
     //////////////////////////////////////////////////////////////*/
+    // @review unit test this!
     function getAaveAPR(uint256 liquidityAdded, address asset) external view returns (uint256 apr) {
         address pool = IPoolAddressesProvider(i_poolAddressesProvider).getPool();
         address aaveProtocolDataProvider = IPoolAddressesProvider(i_poolAddressesProvider).getPoolDataProvider();

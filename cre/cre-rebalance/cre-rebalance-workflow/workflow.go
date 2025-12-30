@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"math/big"
 
-	"cre-rebalance/cre-rebalance-workflow/internal/onchain"
 	"cre-rebalance/cre-rebalance-workflow/internal/helper"
+	"cre-rebalance/cre-rebalance-workflow/internal/onchain"
 	"cre-rebalance/cre-rebalance-workflow/internal/strategy"
 
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/blockchain/evm"
@@ -34,8 +34,8 @@ func InitWorkflow(config *helper.Config, logger *slog.Logger, secretsProvider cr
 
 type OnCronDeps struct {
 	ReadCurrentStrategy func(peer onchain.ParentPeerInterface, runtime cre.Runtime) (onchain.Strategy, error)
-	ReadTVL             func(peer onchain.YieldPeerInterface,  runtime cre.Runtime) (*big.Int, error)
-	WriteRebalance      func(rb   onchain.RebalancerInterface, runtime cre.Runtime, logger *slog.Logger, gasLimit uint64, optimal onchain.Strategy) error
+	ReadTVL             func(peer onchain.YieldPeerInterface, runtime cre.Runtime) (*big.Int, error)
+	WriteRebalance      func(rb onchain.RebalancerInterface, runtime cre.Runtime, logger *slog.Logger, gasLimit uint64, optimal onchain.Strategy) error
 }
 
 // defaultOnCronDeps are the onchain implementations.
@@ -110,7 +110,7 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 		if err != nil {
 			return nil, fmt.Errorf("failed to create strategy YieldPeer binding: %w", err)
 		}
-		
+
 		strategyPeer = childPeer
 		rebalanceGasLimit = strategyChainCfg.GasLimit
 	}

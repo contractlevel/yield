@@ -4,13 +4,15 @@ import (
 	"fmt"
 
 	"cre-rebalance/contracts/evm/src/generated/parent_peer"
+	// "cre-rebalance/contracts/evm/src/generated/child_peer"
 	"cre-rebalance/contracts/evm/src/generated/rebalancer"
+	"cre-rebalance/contracts/evm/src/generated/strategy_helper"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/blockchain/evm"
 )
 
-// NewParentPeer constructs the parent peer binding.
+// NewParentPeerBinding constructs the parent peer binding.
 // It satisfies ParentPeerInterface (and thus YieldPeerInterface via embedding).
 func NewParentPeerBinding(client *evm.Client, addr string) (ParentPeerInterface, error) {
 	if !common.IsHexAddress(addr) {
@@ -21,7 +23,7 @@ func NewParentPeerBinding(client *evm.Client, addr string) (ParentPeerInterface,
 	return parent_peer.NewParentPeer(client, parentPeerAddr, nil)
 }
 
-// NewChildPeer constructs the child peer binding.
+// NewChildPeerBinding constructs the child peer binding. // @review actually parent, must change to child
 // It satisfies YieldPeerInterface.
 func NewChildPeerBinding(client *evm.Client, addr string) (YieldPeerInterface, error) {
 	if !common.IsHexAddress(addr) {
@@ -33,7 +35,8 @@ func NewChildPeerBinding(client *evm.Client, addr string) (YieldPeerInterface, e
 	return parent_peer.NewParentPeer(client, childPeerAddr, nil)
 }
 
-// NewRebalancer constructs the rebalancer binding.
+// NewRebalancerBinding constructs the rebalancer binding.
+// It satisfies RebalancerInterface.
 func NewRebalancerBinding(client *evm.Client, addr string) (RebalancerInterface, error) {
 	if !common.IsHexAddress(addr) {
 		return nil, fmt.Errorf("invalid Rebalancer address: %s", addr)
@@ -41,4 +44,15 @@ func NewRebalancerBinding(client *evm.Client, addr string) (RebalancerInterface,
 	rebalancerAddr := common.HexToAddress(addr)
 
 	return rebalancer.NewRebalancer(client, rebalancerAddr, nil)
+}
+
+// NewStrategyHelperBinding constructs the strategy helper binding.
+// It satisfies StrategyHelperInterface.
+func NewStrategyHelperBinding(client *evm.Client, addr string) (StrategyHelperInterface, error) {
+	if !common.IsHexAddress(addr) {
+		return nil, fmt.Errorf("invalid StrategyHelper address: %s", addr)
+	}
+	strategyHelperAddr := common.HexToAddress(addr)
+
+	return strategy_helper.NewStrategyHelper(client, strategyHelperAddr, nil)
 }

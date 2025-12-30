@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"cre-rebalance/cre-rebalance-workflow/internal/onchain"
 	"cre-rebalance/cre-rebalance-workflow/internal/helper"
+	"cre-rebalance/cre-rebalance-workflow/internal/onchain"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/scheduler/cron"

@@ -1,0 +1,43 @@
+[
+    {
+      "type": "constructor",
+      "inputs": [
+        {
+          "name": "poolAddressesProvider",
+          "type": "address",
+          "internalType": "address"
+        }
+      ],
+      "stateMutability": "nonpayable"
+    },
+    {
+      "type": "function",
+      "name": "getAaveAPR",
+      "inputs": [
+        {
+          "name": "liquidityAdded",
+          "type": "uint256",
+          "internalType": "uint256"
+        },
+        { "name": "asset", "type": "address", "internalType": "address" }
+      ],
+      "outputs": [
+        { "name": "apr", "type": "uint256", "internalType": "uint256" }
+      ],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "getPoolAddressesProvider",
+      "inputs": [],
+      "outputs": [{ "name": "", "type": "address", "internalType": "address" }],
+      "stateMutability": "view"
+    },
+    {
+      "type": "function",
+      "name": "getRAY",
+      "inputs": [],
+      "outputs": [{ "name": "", "type": "uint256", "internalType": "uint256" }],
+      "stateMutability": "pure"
+    }
+  ]
