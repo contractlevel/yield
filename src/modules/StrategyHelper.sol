@@ -62,7 +62,7 @@ contract StrategyHelper {
         apr = liquidityRate / RAY;
     }
 
-    // @review getter for compound APR too
+    // @review getter for compound v3 APR too
 
     // function getCalculateInterestRatesParams(uint256 liquidityAdded, address asset)
     //     external

@@ -84,6 +84,20 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 		"chainSelector", currentStrategy.ChainSelector,
 	)
 
+	// @review pseudocode placeholder: (this will use multiple defillama tier apis to get an aggregated optimal strategy)
+	// aggregatedOptimalStrategy, err := offchain.GetAggregatedOptimalStrategy()
+	// if err != nil {
+	// 	return nil, fmt.Errorf("failed to get aggregated optimal strategy: %w", err)
+	// }
+	// if currentStrategy == aggregatedOptimalStrategy {
+	// 	logger.Info("Strategy unchanged; no rebalance needed")
+	// 	return &strategy.StrategyResult{
+	// 		Current: currentStrategy,
+	// 		Optimal: aggregatedOptimalStrategy,
+	// 		Updated: false,
+	// 	}, nil
+	// }
+
 	// Decide which YieldPeer to use for TVL:
 	// - If the strategy lives on the parent chain, reuse parentPeer.
 	// - Otherwise, instantiate a YieldPeer on the strategy chain.
@@ -120,8 +134,18 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 		return nil, fmt.Errorf("failed to get total value from strategy YieldPeer: %w", err)
 	}
 
-	// pseudocode placeholder: (this will use multiple defillama tier apis to get an aggregated optimal strategy)
-	// aggregatedOptimalStrategy := offchain.GetAggregatedOptimalStrategy()
+	// aggregatedOptimalStrategy
+	// we need to compare the aggregatedOptimalStrategy to what is calculated with onchain reads using the aggregated.params
+	// we need to check the APY decrease of the aggregatedOptimalStrategy
+	// strategy.calculateOptimal(aggregatedOptimalStrategy, tvl)
+	// tvl will be liquidityAdded
+	// strategyHelper instantiated based on aos.chainSelector
+	// switch statement for protocols
+	// aos.protocol == aave => getAaveV3APY(tvl)
+	// aos.protocol == compoundV3 => getCompoundV3APY(tvl)
+	// etc
+	// if optimalStrategy.APY - currentStrategy.APY > threshold {rebalance}
+	// we also need to calculate currentStrategy APY for threshold comparison
 
 	// Calculate optimal strategy based on TVL and lending pool state (pseudocode inside).
 	optimalStrategy := strategy.CalculateOptimalStrategy(logger, currentStrategy, tvl)
