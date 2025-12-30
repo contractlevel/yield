@@ -27,3 +27,6 @@ type RebalancerInterface interface {
 }
 
 // @review we will need interfaces for reading Aave contracts
+type StrategyHelperInterface interface {
+	GetAaveAPR(runtime cre.Runtime, input strategy_helper.GetAaveAPRInput, blockNumber *big.Int) cre.Promise[*big.Int]
+}

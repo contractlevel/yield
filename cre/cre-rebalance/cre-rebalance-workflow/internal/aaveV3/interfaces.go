@@ -19,6 +19,7 @@ type PoolAddressesProviderInterface interface {
 
 type PoolInterface interface {
 	GetReserveData(runtime cre.Runtime, input pool.GetReserveDataInput, blockNumber *big.Int) cre.Promise[pool.GetReserveDataOutput]
+	
 }
 
 // AaveProtocolDataProviderInterface abstracts the Aave Protocol Data Provider contract

@@ -16,9 +16,9 @@ import {Share} from "../src/token/Share.sol";
 import {SharePool} from "../src/token/SharePool.sol";
 import {RateLimiter} from "@chainlink/contracts/src/v0.8/ccip/libraries/RateLimiter.sol";
 import {TokenPool} from "@chainlink/contracts/src/v0.8/ccip/pools/TokenPool.sol";
-import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
-import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
-import {DataTypes} from "@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol";
+import {IPoolAddressesProvider} from "@aave/v3-origin/src/contracts/interfaces/IPoolAddressesProvider.sol";
+import {IPool} from "@aave/v3-origin/src/contracts/interfaces/IPool.sol";
+import {DataTypes} from "@aave/v3-origin/src/contracts/protocol/libraries/types/DataTypes.sol";
 import {USDCTokenPool} from "@chainlink/contracts/src/v0.8/ccip/pools/USDC/USDCTokenPool.sol";
 
 import {LinkTokenInterface} from "@chainlink/contracts/src/v0.8/shared/interfaces/LinkTokenInterface.sol";
@@ -591,7 +591,7 @@ contract BaseTest is Test {
     /// @return aTokenAddress The address of the Aave aToken
     function _getATokenAddress(address poolAddressesProvider, address underlyingToken) internal view returns (address) {
         address aavePool = IPoolAddressesProvider(poolAddressesProvider).getPool();
-        DataTypes.ReserveData memory reserveData = IPool(aavePool).getReserveData(underlyingToken);
+        DataTypes.ReserveDataLegacy memory reserveData = IPool(aavePool).getReserveData(underlyingToken);
         return reserveData.aTokenAddress;
     }
 

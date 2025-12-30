@@ -1,7 +1,4 @@
 {
-  "lib/aave-v3-core": {
-    "rev": "b74526a7bc67a3a117a1963fc871b3eb8cea8435"
-  },
   "lib/chainlink": {
     "rev": "0e8fb1ebd9bc2da1e3ef9454c8489c21c241c327"
   },

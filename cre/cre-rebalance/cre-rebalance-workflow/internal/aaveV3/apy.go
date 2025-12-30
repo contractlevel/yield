@@ -33,6 +33,19 @@ func CalculateAPY(config *helper.Config, liquidityAdded *big.Int, reserve common
 	return apy, nil
 }
 
+// @review unfinished
+func getAaveAPY(config *helper.Config, strategyHelper StrategyHelperInterface, liquidityAdded *big.Int) (*big.Int, error) {
+	// what args does this need
+	apr, err := strategyHelper.GetAaveAPR(evmClient, strategy_helper.GetAaveAPRInput{LiquidityAdded: liquidityAdded}, nil).Await()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get aave apr: %w", err)
+	}
+
+	apy := (1 + apr / SECONDS_PER_YEAR) ^ SECONDS_PER_YEAR − 1
+
+	return apy, nil
+}
+
 func getCalculateInterestRatesParams(config *helper.Config, liquidityAdded *big.Int, reserve common.Address) (CalculateInterestRatesParams, error) {
 
 	// this will be optimized later
