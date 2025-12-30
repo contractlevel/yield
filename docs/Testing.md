@@ -42,6 +42,7 @@ forge test
   - [Certora formal verification](#certora-formal-verification-2)
   - [Mutation tests](#mutation-tests-2)
 - [Go the extra mile](#go-the-extra-mile)
+- [Golang](#golang)
 
 # Commands
 
@@ -99,7 +100,8 @@ certoraRun ./certora/conf/parent/BaseParent.conf
 certoraRun ./certora/conf/parent/Parent.conf
 certoraRun ./certora/conf/child/Child.conf
 certoraRun ./certora/conf/Yield.conf
-certoraRun ./certora/conf/modules/Rebalancer.conf --nondet_difficult_funcs
+certoraRun ./certora/conf/modules/BaseRebalancer.conf
+certoraRun ./certora/conf/modules/Rebalancer.conf
 certoraRun ./certora/conf/adapters/AaveV3Adapter.conf
 certoraRun ./certora/conf/adapters/CompoundV3Adapter.conf
 certoraRun ./certora/conf/modules/StrategyRegistry.conf
@@ -264,3 +266,35 @@ chimera, olympix, 4nlyzer, slither mutate
 https://www.youtube.com/watch?v=DRZogmD647U owen thurm advanced security course part 1
 
 https://www.youtube.com/watch?v=zLnxRvf6IMA owen thurm advanced security course part 2
+
+# Golang
+
+Run tests:
+
+`go test -v .`
+
+See coverage:
+
+`go test -cover .`
+
+`go test -coverprofile=coverage.out`
+
+`go tool cover -html=coverage.out`
+
+Run single test:
+
+`go test -run Test_funcName`
+
+`go test -v -run Test_funcName`
+
+Running groups of tests:
+
+We name our tests like so `Test_group_funcName`
+
+`go test -run Test_group`
+
+`go test -v -run Test_group`
+
+Clean cache:
+
+`go clean -testcache`

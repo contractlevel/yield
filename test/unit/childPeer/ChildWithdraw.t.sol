@@ -41,7 +41,7 @@ contract ChildWithdrawTest is BaseTest {
 
     // Scenario: Strategy is on the same chain as the child the withdrawal was initiated. Strategy is Aave.
     function test_yield_child_withdraw_strategyIsChild_aave() public {
-        _setStrategy(optChainSelector, keccak256(abi.encodePacked("aave-v3")));
+        _setStrategy(optChainSelector, keccak256(abi.encodePacked("aave-v3")), SET_CROSS_CHAIN);
         _selectFork(optFork);
         _changePrank(withdrawer);
 
@@ -70,7 +70,7 @@ contract ChildWithdrawTest is BaseTest {
 
     // Scenario: Strategy is on the same chain as the child the withdrawal was initiated. Strategy is Compound.
     function test_yield_child_withdraw_strategyIsChild_compound() public {
-        _setStrategy(optChainSelector, keccak256(abi.encodePacked("compound-v3")));
+        _setStrategy(optChainSelector, keccak256(abi.encodePacked("compound-v3")), SET_CROSS_CHAIN);
         _selectFork(optFork);
         _changePrank(withdrawer);
 
@@ -99,7 +99,7 @@ contract ChildWithdrawTest is BaseTest {
 
     /// @notice Scenario: Withdrawal is initiated from a child chain, Strategy chain is Parent chain, Strategy Protocol is Aave.
     function test_yield_child_withdraw_strategyIsParent_aave() public {
-        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
+        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")), SET_CROSS_CHAIN);
         _selectFork(optFork);
         _changePrank(withdrawer);
 
@@ -128,7 +128,7 @@ contract ChildWithdrawTest is BaseTest {
 
     /// @notice Scenario: Withdrawal is initiated from a child chain, Strategy chain is Parent chain, Strategy Protocol is Compound.
     function test_yield_child_withdraw_strategyIsParent_compound() public {
-        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("compound-v3")));
+        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("compound-v3")), SET_CROSS_CHAIN);
         _selectFork(optFork);
         _changePrank(withdrawer);
 
@@ -158,7 +158,7 @@ contract ChildWithdrawTest is BaseTest {
     /// @notice Scenario: Withdrawal is initiated from a child chain, Strategy chain is Parent chain, Strategy Protocol is Compound.
     /// But the withdraw chain is a different chain
     function test_yield_child_withdraw_strategyIsParent_compound_withdrawToDifferentChain() public {
-        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("compound-v3")));
+        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("compound-v3")), SET_CROSS_CHAIN);
         _selectFork(optFork);
         _changePrank(withdrawer);
 
@@ -190,7 +190,7 @@ contract ChildWithdrawTest is BaseTest {
     /// @notice Scenario: Withdrawal is initiated from a child chain, Strategy chain is Parent chain, Strategy Protocol is Compound.
     /// But the withdraw chain is the Parent
     function test_yield_child_withdraw_strategyIsParent_compound_withdrawToParentChain() public {
-        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("compound-v3")));
+        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("compound-v3")), SET_CROSS_CHAIN);
         _selectFork(optFork);
         _changePrank(withdrawer);
 
@@ -220,7 +220,7 @@ contract ChildWithdrawTest is BaseTest {
 
     /// @notice Scenario: Withdrawal is initiated from a child chain, Strategy chain is another child chain, Strategy Protocol is Aave.
     function test_yield_child_withdraw_strategyIsChainC_aave() public {
-        _setStrategy(ethChainSelector, keccak256(abi.encodePacked("aave-v3")));
+        _setStrategy(ethChainSelector, keccak256(abi.encodePacked("aave-v3")), SET_CROSS_CHAIN);
         _selectFork(optFork);
         _changePrank(withdrawer);
 
@@ -252,7 +252,7 @@ contract ChildWithdrawTest is BaseTest {
 
     /// @notice Scenario: Withdrawal is initiated from a child chain, Strategy chain is another child chain, Strategy Protocol is Compound.
     function test_yield_child_withdraw_strategyIsChainC_compound() public {
-        _setStrategy(ethChainSelector, keccak256(abi.encodePacked("compound-v3")));
+        _setStrategy(ethChainSelector, keccak256(abi.encodePacked("compound-v3")), SET_CROSS_CHAIN);
         _selectFork(optFork);
         _changePrank(withdrawer);
 
@@ -285,7 +285,7 @@ contract ChildWithdrawTest is BaseTest {
     // Scenario: Strategy is on the same chain as the child the withdrawal was initiated. Strategy is Aave.
     // Withdraw chain selector is a different chain
     function test_yield_child_withdraw_strategyIsChild_aave_withdrawToDifferentChain() public {
-        _setStrategy(optChainSelector, keccak256(abi.encodePacked("aave-v3")));
+        _setStrategy(optChainSelector, keccak256(abi.encodePacked("aave-v3")), SET_CROSS_CHAIN);
         _selectFork(optFork);
         _changePrank(withdrawer);
 
@@ -317,7 +317,7 @@ contract ChildWithdrawTest is BaseTest {
     }
 
     function test_yield_child_onTokenTransfer_revertsWhen_withdrawChainNotAllowed() public {
-        _setStrategy(optChainSelector, keccak256(abi.encodePacked("compound-v3")));
+        _setStrategy(optChainSelector, keccak256(abi.encodePacked("compound-v3")), SET_CROSS_CHAIN);
         _selectFork(optFork);
         _changePrank(withdrawer);
 

@@ -80,7 +80,7 @@ contract ParentDepositTest is BaseTest {
 
     /// @notice Scenario: Deposit made on Parent chain, where the Strategy is, and the Strategy Protocol is Compound
     function test_yield_parent_deposit_strategyIsParent_compound() public {
-        _setStrategy(baseChainSelector, keccak256("compound-v3"));
+        _setStrategy(baseChainSelector, keccak256("compound-v3"), SET_CROSS_CHAIN);
         _selectFork(baseFork);
         _changePrank(depositor);
 
@@ -120,7 +120,7 @@ contract ParentDepositTest is BaseTest {
 
     /// @notice Scenario: Deposit made on Parent chain, where the Strategy is not, and the Strategy Protocol is Aave
     function test_yield_parent_deposit_strategyIsChild_aave() public {
-        _setStrategy(optChainSelector, keccak256("aave-v3"));
+        _setStrategy(optChainSelector, keccak256("aave-v3"), SET_CROSS_CHAIN);
         _selectFork(baseFork);
         _changePrank(depositor);
 
@@ -162,7 +162,7 @@ contract ParentDepositTest is BaseTest {
 
     /// @notice Scenario: Deposit made on Parent chain, where the Strategy is not, and the Strategy Protocol is Compound
     function test_yield_parent_deposit_strategyIsChild_compound() public {
-        _setStrategy(optChainSelector, keccak256("compound-v3"));
+        _setStrategy(optChainSelector, keccak256("compound-v3"), SET_CROSS_CHAIN);
         _selectFork(baseFork);
         _changePrank(depositor);
 
@@ -255,7 +255,7 @@ contract ParentDepositTest is BaseTest {
     /// 3. User tries to deposit on parent
     function test_yield_parent_deposit_revertsWhen_strategyPointsToParent_butActiveAdapterIsZero() public {
         /// @dev Arrange: Set strategy to parent with Aave (this sets both s_strategy and activeStrategyAdapter)
-        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
+        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")), SET_CROSS_CHAIN);
         _selectFork(baseFork);
         _changePrank(depositor);
 

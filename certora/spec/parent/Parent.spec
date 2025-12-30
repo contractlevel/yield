@@ -33,24 +33,24 @@ methods {
     function strategyRegistry.getStrategyAdapter(bytes32) external returns (address) envfree;
 
     // Wildcard dispatcher summaries
-    function _.withdraw(address,uint256) external => DISPATCHER(true);
-    function _.deposit(address,uint256) external => DISPATCHER(true);
+    function _.withdraw(address, uint256) external => DISPATCHER(true);
+    function _.deposit(address, uint256) external => DISPATCHER(true);
     function _.getTotalValue(address) external => DISPATCHER(true);
     function _.balanceOf(address) external => DISPATCHER(true);
-    function _.transfer(address,uint256) external => DISPATCHER(true);
+    function _.transfer(address, uint256) external => DISPATCHER(true);
 
     // Harness helper methods
     function bytes32ToAddress(bytes32 value) external returns (address) envfree;
     function bytes32ToUint256(bytes32) external returns (uint256) envfree;
     function bytes32ToUint8(bytes32) external returns (uint8) envfree;
-    function buildEncodedWithdrawData(address,uint256,uint256,uint256,uint64) external returns (bytes memory) envfree;
+    function buildEncodedWithdrawData(address, uint256, uint256, uint256, uint64) external returns (bytes memory) envfree;
     function encodeUint64(uint64) external returns (bytes memory) envfree;
-    function calculateWithdrawAmount(uint256,uint256,uint256) external returns (uint256) envfree;
-    function buildEncodedDepositData(address,uint256,uint256,uint256,uint64) external returns (bytes memory) envfree;
-    function prepareTokenAmounts(address,uint256) external returns (Client.EVMTokenAmount[] memory) envfree;
-    function calculateMintAmount(uint256,uint256) external returns (uint256) envfree;
+    function calculateWithdrawAmount(uint256, uint256, uint256) external returns (uint256) envfree;
+    function buildEncodedDepositData(address, uint256, uint256, uint256, uint64) external returns (bytes memory) envfree;
+    function prepareTokenAmounts(address, uint256) external returns (Client.EVMTokenAmount[] memory) envfree;
+    function calculateMintAmount(uint256, uint256) external returns (uint256) envfree;
     function calculateTotalValue(uint256) external returns (uint256);
-    function createStrategy(uint64,bytes32) external returns (IYieldPeer.Strategy memory) envfree;
+    function createStrategy(uint64, bytes32) external returns (IYieldPeer.Strategy memory) envfree;
     function convertUsdcToShare(uint256) external returns (uint256) envfree;
     function getStrategyAdapterFromProtocol(bytes32) external returns (address) envfree;
     function calculateFee(uint256) external returns (uint256) envfree;
@@ -61,81 +61,81 @@ methods {
 //////////////////////////////////////////////////////////////*/
 definition defaultAdminRole() returns bytes32 = to_bytes32(0x00);
 
-definition configAdminRole() returns bytes32 = 
+definition configAdminRole() returns bytes32 =
 // keccak256("CONFIG_ADMIN_ROLE")
-    to_bytes32(0xb92d52e77ebaa0cae5c23e882d85609efbcb44029214147dd132daf9ef1018af);
+to_bytes32(0xb92d52e77ebaa0cae5c23e882d85609efbcb44029214147dd132daf9ef1018af);
 
 definition RebalancerSetEvent() returns bytes32 =
 // keccak256(abi.encodePacked("RebalancerSet(address)"))
-    to_bytes32(0xeaa5fe3125389d5a88065ca297da7e3cce7178e00062a28488efbc1550b9c02c);
+to_bytes32(0xeaa5fe3125389d5a88065ca297da7e3cce7178e00062a28488efbc1550b9c02c);
 
 definition ShareMintUpdateEvent() returns bytes32 =
 // keccak256(abi.encodePacked("ShareMintUpdate(uint256,uint64,uint256)"))
-    to_bytes32(0xb72631492a31c565f552fa60e02d84a245e98d5519ff22100b4cae30bb5d8465);
+to_bytes32(0xb72631492a31c565f552fa60e02d84a245e98d5519ff22100b4cae30bb5d8465);
 
 definition ShareBurnUpdateEvent() returns bytes32 =
 // keccak256(abi.encodePacked("ShareBurnUpdate(uint256,uint64,uint256)"))
-    to_bytes32(0xf0d8949c30598c33e13bf98c6e616d7feaecf272318c3ba93d9811f5efbcc2b6);
+to_bytes32(0xf0d8949c30598c33e13bf98c6e616d7feaecf272318c3ba93d9811f5efbcc2b6);
 
 definition SharesMintedEvent() returns bytes32 =
 // keccak256(abi.encodePacked("SharesMinted(address,uint256)"))
-    to_bytes32(0x6332ddaa8a69b5eb2524ec7ca317b7c2b01ecf678d584031415f81270977b8fc);
+to_bytes32(0x6332ddaa8a69b5eb2524ec7ca317b7c2b01ecf678d584031415f81270977b8fc);
 
 definition SharesBurnedEvent() returns bytes32 =
 // keccak256(abi.encodePacked("SharesBurned(address,uint256)"))
-    to_bytes32(0xdb79cc492679ef2624944d6ed3cdbad5b974b5550de330ae18922f2944eec78a);
+to_bytes32(0xdb79cc492679ef2624944d6ed3cdbad5b974b5550de330ae18922f2944eec78a);
 
 definition CCIPMessageSentEvent() returns bytes32 =
 // keccak256(abi.encodePacked("CCIPMessageSent(bytes32,uint8,uint256)"))
-    to_bytes32(0xf58bb6f6ec82990ff728621d18279c43cae3bc9777d052ed0d2316669e58cee6);
+to_bytes32(0xf58bb6f6ec82990ff728621d18279c43cae3bc9777d052ed0d2316669e58cee6);
 
 definition WithdrawInitiatedEvent() returns bytes32 =
 // keccak256(abi.encodePacked("WithdrawInitiated(address,uint256,uint64)"))
-    to_bytes32(0x071730c3ee1a890531b67cec0adad1806a898c172618e7da6b2f77205b17ab0f);
+to_bytes32(0x071730c3ee1a890531b67cec0adad1806a898c172618e7da6b2f77205b17ab0f);
 
 definition WithdrawCompletedEvent() returns bytes32 =
 // keccak256(abi.encodePacked("WithdrawCompleted(address,uint256)"))
-    to_bytes32(0x60188009b974c2fa66ee3b916d93f64d6534ea2204e0c466f9784ace689e8e49);
+to_bytes32(0x60188009b974c2fa66ee3b916d93f64d6534ea2204e0c466f9784ace689e8e49);
 
 definition DepositForwardedToStrategyEvent() returns bytes32 =
 // keccak256(abi.encodePacked("DepositForwardedToStrategy(uint256,uint64)"))
-    to_bytes32(0xa554b5f1c31b39bc39a68f319912196377a72eb969ff7027278fcd981aa33b27);
+to_bytes32(0xa554b5f1c31b39bc39a68f319912196377a72eb969ff7027278fcd981aa33b27);
 
 definition WithdrawForwardedToStrategyEvent() returns bytes32 =
 // keccak256(abi.encodePacked("WithdrawForwardedToStrategy(uint256,uint64)"))
-    to_bytes32(0x62b63098828571301ff9aea97af7a6df908783e702393e063e1adf27d89605e4);
+to_bytes32(0x62b63098828571301ff9aea97af7a6df908783e702393e063e1adf27d89605e4);
 
 definition CurrentStrategyOptimalEvent() returns bytes32 =
 // keccak256(abi.encodePacked("CurrentStrategyOptimal(uint64,bytes32)"))
-    to_bytes32(0x8a2bbc9188a750bed30596d0ed7ae5d7b521e02729739c43b6e7106bdfb7e89d);
+to_bytes32(0x8a2bbc9188a750bed30596d0ed7ae5d7b521e02729739c43b6e7106bdfb7e89d);
 
 definition StrategyUpdatedEvent() returns bytes32 =
 // keccak256(abi.encodePacked("StrategyUpdated(uint64,bytes32,uint64)"))
-    to_bytes32(0x60d0790094d9774dbd1ef0d8d0a670010be9595ac41c3215452ac9430a078aa6);
+to_bytes32(0x60d0790094d9774dbd1ef0d8d0a670010be9595ac41c3215452ac9430a078aa6);
 
 definition WithdrawFromStrategyEvent() returns bytes32 =
 // keccak256(abi.encodePacked("WithdrawFromStrategy(address,uint256)"))
-    to_bytes32(0xb28e99afed98b3607aeea074f84c346dc4135d86f35b1c28bc35ab6782e7ce30);
+to_bytes32(0xb28e99afed98b3607aeea074f84c346dc4135d86f35b1c28bc35ab6782e7ce30);
 
 definition StrategyPoolUpdatedEvent() returns bytes32 =
 // keccak256(abi.encodePacked("StrategyPoolUpdated(address)"))
-    to_bytes32(0xe93cbfefd912dc9a1b30a0c2333d11e2bffb32d29ae125c33bbdba59af9e387c);
+to_bytes32(0xe93cbfefd912dc9a1b30a0c2333d11e2bffb32d29ae125c33bbdba59af9e387c);
 
 definition DepositToStrategyEvent() returns bytes32 =
 // keccak256(abi.encodePacked("DepositToStrategy(address,uint256)"))
-    to_bytes32(0x8125d05f0839eec6c1f6b1674833e01f11ab362bd9c60eb2e3b274fa3b47e4f4);
+to_bytes32(0x8125d05f0839eec6c1f6b1674833e01f11ab362bd9c60eb2e3b274fa3b47e4f4);
 
 definition ActiveStrategyAdapterUpdatedEvent() returns bytes32 =
 // keccak256(abi.encodePacked("ActiveStrategyAdapterUpdated(address)"))
-    to_bytes32(0xebe96b449bfdb3f1ed534cb774b9a9b0954447b489e45e828c81a03fec492cc7);
+to_bytes32(0xebe96b449bfdb3f1ed534cb774b9a9b0954447b489e45e828c81a03fec492cc7);
 
 definition DepositPingPongToChildEvent() returns bytes32 =
 // keccak256(abi.encodePacked("DepositPingPongToChild(uint256,uint64)"))
-    to_bytes32(0xd226c55624acdf7dc487bf2d322d07feef128f29f6bb7793e03ba147d84b5c98);
+to_bytes32(0xd226c55624acdf7dc487bf2d322d07feef128f29f6bb7793e03ba147d84b5c98);
 
 definition WithdrawPingPongToChildEvent() returns bytes32 =
 // keccak256(abi.encodePacked("WithdrawPingPongToChild(uint256,uint64)"))
-    to_bytes32(0xc75e77a40c4dc3a53d5deb9d8fb9d32536847fcc2c9d2d88f1f6f1aed0f71de5);
+to_bytes32(0xc75e77a40c4dc3a53d5deb9d8fb9d32536847fcc2c9d2d88f1f6f1aed0f71de5);
 
 /*//////////////////////////////////////////////////////////////
                              GHOSTS
@@ -254,13 +254,13 @@ ghost mathint ghost_depositPingPongToChild_eventCount {
 ghost mathint ghost_withdrawPingPongToChild_eventCount {
     init_state axiom ghost_withdrawPingPongToChild_eventCount == 0;
 }
+
 /*//////////////////////////////////////////////////////////////
                              HOOKS
 //////////////////////////////////////////////////////////////*/
 /// @notice hook onto emitted events and increment relevant ghosts
 hook LOG4(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2, bytes32 t3) {
-    if (t0 == WithdrawInitiatedEvent())
-        ghost_withdrawInitiated_eventCount = ghost_withdrawInitiated_eventCount + 1;
+    if (t0 == WithdrawInitiatedEvent()) ghost_withdrawInitiated_eventCount = ghost_withdrawInitiated_eventCount + 1;
     if (t0 == ShareMintUpdateEvent()) {
         ghost_shareMintUpdate_eventCount = ghost_shareMintUpdate_eventCount + 1;
         ghost_shareMintUpdate_totalAmount_emitted = ghost_shareMintUpdate_totalAmount_emitted + bytes32ToUint256(t1);
@@ -269,47 +269,34 @@ hook LOG4(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2, bytes32 
         ghost_shareBurnUpdate_eventCount = ghost_shareBurnUpdate_eventCount + 1;
         ghost_shareBurnUpdate_totalAmount_emitted = ghost_shareBurnUpdate_totalAmount_emitted + bytes32ToUint256(t1);
     }
-    if (t0 == CCIPMessageSentEvent()) { 
+    if (t0 == CCIPMessageSentEvent()) {
         ghost_ccipMessageSent_eventCount = ghost_ccipMessageSent_eventCount + 1;
         ghost_ccipMessageSent_txType_emitted = bytes32ToUint8(t2);
         ghost_ccipMessageSent_bridgeAmount_emitted = bytes32ToUint256(t3);
     }
-    if (t0 == StrategyUpdatedEvent())
-        ghost_strategyUpdated_eventCount = ghost_strategyUpdated_eventCount + 1;
+    if (t0 == StrategyUpdatedEvent()) ghost_strategyUpdated_eventCount = ghost_strategyUpdated_eventCount + 1;
 }
 
 hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
-    if (t0 == SharesBurnedEvent()) 
-        ghost_sharesBurned_eventCount = ghost_sharesBurned_eventCount + 1;
-    if (t0 == SharesMintedEvent())
-        ghost_sharesMinted_eventCount = ghost_sharesMinted_eventCount + 1;
-    if (t0 == WithdrawCompletedEvent())
-        ghost_withdrawCompleted_eventCount = ghost_withdrawCompleted_eventCount + 1;
-    if (t0 == DepositForwardedToStrategyEvent())
-        ghost_depositForwardedToStrategy_eventCount = ghost_depositForwardedToStrategy_eventCount + 1;
-    if (t0 == WithdrawForwardedToStrategyEvent())
-        ghost_withdrawForwardedToStrategy_eventCount = ghost_withdrawForwardedToStrategy_eventCount + 1;
-    if (t0 == CurrentStrategyOptimalEvent())
-        ghost_currentStrategyOptimal_eventCount = ghost_currentStrategyOptimal_eventCount + 1;
-    if (t0 == WithdrawFromStrategyEvent()) 
-        ghost_withdrawFromStrategy_eventCount = ghost_withdrawFromStrategy_eventCount + 1;
-    if (t0 == DepositToStrategyEvent()) 
-        ghost_depositToStrategy_eventCount = ghost_depositToStrategy_eventCount + 1;
-    if (t0 == DepositPingPongToChildEvent())
-        ghost_depositPingPongToChild_eventCount = ghost_depositPingPongToChild_eventCount + 1;
-    if (t0 == WithdrawPingPongToChildEvent())
-        ghost_withdrawPingPongToChild_eventCount = ghost_withdrawPingPongToChild_eventCount + 1;
+    if (t0 == SharesBurnedEvent()) ghost_sharesBurned_eventCount = ghost_sharesBurned_eventCount + 1;
+    if (t0 == SharesMintedEvent()) ghost_sharesMinted_eventCount = ghost_sharesMinted_eventCount + 1;
+    if (t0 == WithdrawCompletedEvent()) ghost_withdrawCompleted_eventCount = ghost_withdrawCompleted_eventCount + 1;
+    if (t0 == DepositForwardedToStrategyEvent()) ghost_depositForwardedToStrategy_eventCount = ghost_depositForwardedToStrategy_eventCount + 1;
+    if (t0 == WithdrawForwardedToStrategyEvent()) ghost_withdrawForwardedToStrategy_eventCount = ghost_withdrawForwardedToStrategy_eventCount + 1;
+    if (t0 == CurrentStrategyOptimalEvent()) ghost_currentStrategyOptimal_eventCount = ghost_currentStrategyOptimal_eventCount + 1;
+    if (t0 == WithdrawFromStrategyEvent()) ghost_withdrawFromStrategy_eventCount = ghost_withdrawFromStrategy_eventCount + 1;
+    if (t0 == DepositToStrategyEvent()) ghost_depositToStrategy_eventCount = ghost_depositToStrategy_eventCount + 1;
+    if (t0 == DepositPingPongToChildEvent()) ghost_depositPingPongToChild_eventCount = ghost_depositPingPongToChild_eventCount + 1;
+    if (t0 == WithdrawPingPongToChildEvent()) ghost_withdrawPingPongToChild_eventCount = ghost_withdrawPingPongToChild_eventCount + 1;
 }
 
 hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
-    if (t0 == StrategyPoolUpdatedEvent()) 
-        ghost_strategyPoolUpdated_eventCount = ghost_strategyPoolUpdated_eventCount + 1;
-    if (t0 == ActiveStrategyAdapterUpdatedEvent()) 
-        ghost_activeStrategyAdapterUpdated_eventCount = ghost_activeStrategyAdapterUpdated_eventCount + 1;
+    if (t0 == StrategyPoolUpdatedEvent()) ghost_strategyPoolUpdated_eventCount = ghost_strategyPoolUpdated_eventCount + 1;
+    if (t0 == ActiveStrategyAdapterUpdatedEvent()) ghost_activeStrategyAdapterUpdated_eventCount = ghost_activeStrategyAdapterUpdated_eventCount + 1;
     if (t0 == RebalancerSetEvent()) {
         ghost_rebalancerSet_eventCount = ghost_rebalancerSet_eventCount + 1;
         ghost_rebalancerSet_emittedAddress = bytes32ToAddress(t1);
-    } 
+    }
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -347,7 +334,7 @@ rule deposit_mintsShares_when_parent_is_strategy() {
     env e;
     calldataarg args;
     require getStrategy().chainSelector == getThisChainSelector();
-    
+
     uint256 shareSupplyBefore = share.totalSupply();
     uint256 totalSharesBefore = getTotalShares();
 
@@ -541,8 +528,7 @@ rule handleCCIPDepositToParent_depositsToStrategy_when_parent_is_strategy() {
     uint256 totalValue;
     uint256 shareMintAmount;
     uint64 chainSelector;
-    bytes encodedDepositData = 
-        buildEncodedDepositData(depositor, usdcDepositAmount, totalValue, shareMintAmount, chainSelector);
+    bytes encodedDepositData = buildEncodedDepositData(depositor, usdcDepositAmount, totalValue, shareMintAmount, chainSelector);
     Client.EVMTokenAmount[] tokenAmounts = prepareTokenAmounts(usdc, usdcDepositAmount);
 
     require getStrategy().chainSelector == getThisChainSelector();
@@ -594,7 +580,7 @@ rule handleCCIPDepositToParent_ping_pongs_to_child_when_activeStrategyAdapter_is
 
     require ghost_depositPingPongToChild_eventCount == 0;
     require ghost_ccipMessageSent_eventCount == 0;
-    
+
     handleCCIPDepositToParent(e, tokenAmounts, encodedDepositData);
     assert ghost_depositPingPongToChild_eventCount == 1;
     assert ghost_ccipMessageSent_eventCount == 1;
@@ -654,7 +640,6 @@ rule handleCCIPDepositCallbackParent_mintsShares_when_depositChain_is_parent() {
 
     require shareBalanceBefore + expectedShareMintAmount <= max_uint256;
 
- 
     require ghost_sharesMinted_eventCount == 0;
     handleCCIPDepositCallbackParent(e, encodedDepositData);
     assert ghost_sharesMinted_eventCount == 1;
@@ -665,7 +650,7 @@ rule handleCCIPDepositCallbackParent_mintsShares_when_depositChain_is_parent() {
 
 rule handleCCIPDepositCallbackParent_forwardsCallbackToChild() {
     env e;
-     address depositor;
+    address depositor;
     uint256 usdcDepositAmount;
     uint256 totalValue;
     uint256 shareMintAmount; // irrelevant placeholder
@@ -708,8 +693,7 @@ rule handleCCIPWithdrawToParent_withdrawsUsdc_when_parent_is_strategy() {
     uint256 usdcWithdrawAmount;
     uint64 withdrawChainSelector;
     uint64 sourceChainSelector;
-    bytes encodedWithdrawData = 
-        buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, withdrawChainSelector);
+    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, withdrawChainSelector);
     require getStrategy().chainSelector == getThisChainSelector();
 
     uint256 expectedWithdrawAmount = calculateWithdrawAmount(getTotalValue(e), getTotalShares(), shareBurnAmount);
@@ -732,8 +716,7 @@ rule handleCCIPWithdrawToParent_transferUsdcToWithdrawer_when_parent_is_strategy
     uint256 usdcWithdrawAmount;
     uint64 withdrawChainSelector;
     uint64 sourceChainSelector;
-    bytes encodedWithdrawData = 
-        buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, withdrawChainSelector);
+    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, withdrawChainSelector);
     require getStrategy().chainSelector == getThisChainSelector();
     require withdrawChainSelector == getThisChainSelector();
 
@@ -802,7 +785,7 @@ rule handleCCIPWithdraw_forwardsToStrategy_and_emits_WithdrawPingPongToChild_whe
     uint256 usdcWithdrawAmount;
     uint64 chainSelector;
     bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
-    
+
     require getStrategy().chainSelector == getThisChainSelector();
     require getActiveStrategyAdapter() == 0;
 
@@ -816,6 +799,16 @@ rule handleCCIPWithdraw_forwardsToStrategy_and_emits_WithdrawPingPongToChild_whe
 }
 
 // --- setStrategy --- //
+rule setStrategy_revertsWhen_notRebalancer() {
+    env e;
+    calldataarg args;
+
+    require e.msg.sender != currentContract.s_rebalancer;
+
+    setStrategy@withrevert(e, args);
+    assert lastReverted;
+}
+
 rule setStrategy_emits_CurrentStrategyOptimal_when_currentStrategy_is_optimal() {
     env e;
     uint64 chainSelector;
@@ -848,7 +841,7 @@ rule setStrategy_updatesStrategy_when_newStrategy_is_different() {
     assert getStrategy() != oldStrategy;
 }
 
-rule setStrategy_handlesLocalStrategyChange() {
+rule setStrategy_handles_rebalanceParentToParent() {
     env e;
     uint64 chainSelector;
     bytes32 protocolId;
@@ -856,22 +849,19 @@ rule setStrategy_handlesLocalStrategyChange() {
     bytes32 compoundV3ProtocolId;
 
     /// @dev require the storage mappings for active strategy adapters to be the correct contracts
-    require strategyRegistry.getStrategyAdapter(aaveV3ProtocolId)     == aaveV3Adapter;
+    require strategyRegistry.getStrategyAdapter(aaveV3ProtocolId) == aaveV3Adapter;
     require strategyRegistry.getStrategyAdapter(compoundV3ProtocolId) == compoundV3Adapter;
 
     /// @dev require the storage for active strategy adapter to be aave or compound adapters
-    require currentContract.s_activeStrategyAdapter == aaveV3Adapter ||
-            currentContract.s_activeStrategyAdapter == compoundV3Adapter;
+    require currentContract.s_activeStrategyAdapter == aaveV3Adapter || currentContract.s_activeStrategyAdapter == compoundV3Adapter;
     address oldActiveStrategyAdapter = getActiveStrategyAdapter();
 
     /// @dev cache old strategy
     IYieldPeer.Strategy oldStrategy = getStrategy();
 
     /// @dev require old strategy values to enable local strategy change
-    require oldStrategy.chainSelector == chainSelector &&
-            oldStrategy.chainSelector == getThisChainSelector() &&
-            oldStrategy.protocolId    != protocolId;
-    require oldActiveStrategyAdapter  != getStrategyAdapterFromProtocol(protocolId);
+    require oldStrategy.chainSelector == chainSelector && oldStrategy.chainSelector == getThisChainSelector() && oldStrategy.protocolId != protocolId;
+    require oldActiveStrategyAdapter != getStrategyAdapterFromProtocol(protocolId);
 
     /// @dev cache total value and require it to be more than 0
     uint256 totalValue = getTotalValue(e);
@@ -904,46 +894,16 @@ rule setStrategy_handlesLocalStrategyChange() {
     assert usdc.balanceOf(newStrategyPool) == newStrategyPoolBalanceBefore + totalValue;
 }
 
-rule setStrategy_no_localStrategyChange_when_newStrategy_is_different() {
-    env e;
-    uint64 newChainSelector;
-    bytes32 newProtocolId;
-
-    IYieldPeer.Strategy oldStrategy = getStrategy();
-
-    require oldStrategy.chainSelector != getThisChainSelector() && oldStrategy.protocolId != newProtocolId;
-
-    require ghost_withdrawFromStrategy_eventCount == 0;
-    require ghost_depositToStrategy_eventCount == 0;
-    require ghost_strategyPoolUpdated_eventCount == 0;
-    setStrategy(e, newChainSelector, newProtocolId);
-    assert ghost_withdrawFromStrategy_eventCount == 0;
-    assert ghost_depositToStrategy_eventCount == 0;
-    assert ghost_strategyPoolUpdated_eventCount == 0;
-}
-
-// --- RebalanceNewStrategy --- //
-rule rebalanceParentToChild_revertsWhen_notRebalancer() {
-    env e;
-    calldataarg args;
-
-    require e.msg.sender != currentContract.s_rebalancer;
-
-    rebalanceParentToChild@withrevert(e, args);
-    assert lastReverted;
-}
-
-// @review:certora vacuous rule
-rule rebalanceParentToChild_movesStrategyToNewChain() {
+// @review rule vacuous - was before too
+rule setStrategy_handles_rebalanceParentToChild() {
     env e;
     uint64 chainSelector;
     bytes32 protocolId;
-    IYieldPeer.Strategy newStrategy = createStrategy(chainSelector, protocolId);
 
     IYieldPeer.Strategy oldStrategy = getStrategy();
+    IYieldPeer.Strategy newStrategy = createStrategy(chainSelector, protocolId);
 
-    require oldStrategy.chainSelector != chainSelector &&
-            oldStrategy.chainSelector == getThisChainSelector();
+    require oldStrategy.chainSelector != chainSelector && oldStrategy.chainSelector == getThisChainSelector();
 
     uint256 totalValue = getTotalValue(e);
     require totalValue > 0;
@@ -954,7 +914,7 @@ rule rebalanceParentToChild_movesStrategyToNewChain() {
     require usdc.balanceOf(currentContract) == 0;
 
     require ghost_ccipMessageSent_eventCount == 0;
-    rebalanceParentToChild(e, strategyPool, totalValue, newStrategy);
+    setStrategy(e, newStrategy.chainSelector, newStrategy.protocolId);
     assert ghost_ccipMessageSent_eventCount == 1;
     assert ghost_ccipMessageSent_txType_emitted == 8; // RebalanceNewStrategy
     assert ghost_ccipMessageSent_bridgeAmount_emitted == totalValue;
@@ -962,29 +922,19 @@ rule rebalanceParentToChild_movesStrategyToNewChain() {
     assert usdc.balanceOf(strategyPool) == strategyPoolBalanceBefore - totalValue;
 }
 
-// --- RebalanceOldStrategy --- //
-rule rebalanceChildToOther_revertsWhen_notRebalancer() {
-    env e;
-    calldataarg args;
-
-    require e.msg.sender != currentContract.s_rebalancer;
-
-    rebalanceChildToOther@withrevert(e, args);
-    assert lastReverted;
-}
-
-rule rebalanceChildToOther_forwardsRebalanceToOldStrategy() {
+rule setStrategy_handles_rebalanceChildToOther() {
     env e;
     uint64 chainSelector;
     bytes32 protocolId;
 
     IYieldPeer.Strategy oldStrategy = getStrategy();
 
-    require oldStrategy.chainSelector != getThisChainSelector() &&
-            oldStrategy.chainSelector != chainSelector;
+    require oldStrategy.chainSelector != getThisChainSelector() && oldStrategy.chainSelector != chainSelector;
+
+    IYieldPeer.Strategy newStrategy = createStrategy(chainSelector, protocolId);
 
     require ghost_ccipMessageSent_eventCount == 0;
-    rebalanceChildToOther(e, oldStrategy.chainSelector, createStrategy(chainSelector, protocolId));
+    setStrategy(e, newStrategy.chainSelector, newStrategy.protocolId);
     assert ghost_ccipMessageSent_eventCount == 1;
     assert ghost_ccipMessageSent_txType_emitted == 7; // RebalanceOldStrategy
     assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;
@@ -997,9 +947,7 @@ rule calculateMintAmount_calculation() {
     require depositAmount > 0;
     require totalValue > 0;
 
-    mathint expectedMintAmount = 
-        convertUsdcToShare(depositAmount) * currentContract.s_totalShares 
-            / convertUsdcToShare(totalValue);
+    mathint expectedMintAmount = convertUsdcToShare(depositAmount) * currentContract.s_totalShares / convertUsdcToShare(totalValue);
     require expectedMintAmount > 0;
 
     uint256 actualMintAmount = calculateMintAmount(totalValue, depositAmount);
@@ -1039,7 +987,7 @@ rule setInitialActiveStrategy_revertsWhen_alreadyCalled() {
     require e2.msg.sender == currentContract.owner();
     require currentContract.hasRole(defaultAdminRole(), e2.msg.sender) == true;
     require e2.msg.value == 0;
-    setInitialActiveStrategy@withrevert(e2, protocolId2); 
+    setInitialActiveStrategy@withrevert(e2, protocolId2);
 
     assert lastReverted;
 }
@@ -1068,11 +1016,11 @@ rule setInitialActiveStrategy_updatesStorage() {
 }
 
 // --- setRebalancer --- //
-rule setRebalancer_revertsWhen_noConfigAdminRole {
+rule setRebalancer_revertsWhen_noConfigAdminRole() {
     env e;
     address rebalancer;
 
-    require hasRole(configAdminRole(), e.msg.sender) == false; 
+    require hasRole(configAdminRole(), e.msg.sender) == false;
     require e.msg.value == 0;
 
     setRebalancer@withrevert(e, rebalancer);
@@ -1080,7 +1028,7 @@ rule setRebalancer_revertsWhen_noConfigAdminRole {
     assert lastReverted;
 }
 
-rule setRebalancer_success () {
+rule setRebalancer_success() {
     env e;
     address rebalancer;
 
@@ -1088,7 +1036,7 @@ rule setRebalancer_success () {
     require ghost_rebalancerSet_emittedAddress == 0;
 
     setRebalancer(e, rebalancer);
-    
+
     assert ghost_rebalancerSet_eventCount == 1; /// @dev check rebalancer set event
     assert ghost_rebalancerSet_emittedAddress == rebalancer; /// @dev check rebalancer set event emitted address
     assert currentContract.s_rebalancer == rebalancer; /// @dev check storage variable was updated

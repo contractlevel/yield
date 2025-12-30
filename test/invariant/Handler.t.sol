@@ -11,7 +11,9 @@ import {
     Share,
     IYieldPeer,
     Rebalancer,
-    Roles
+    Roles,
+    IYieldPeer,
+    WorkflowHelpers
 } from "../BaseTest.t.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
@@ -38,19 +40,24 @@ contract Handler is Test {
     Share internal share;
     address internal ccipRouter;
     IERC20 internal usdc;
-    address internal upkeep;
-    address internal functionsRouter;
+    address internal forwarder = makeAddr("forwarder");
     address internal admin = makeAddr("admin");
     address internal aavePool;
     address internal compoundPool;
     Rebalancer internal rebalancer;
-    address internal forwarder = makeAddr("forwarder");
 
     uint64 internal parentChainSelector;
     uint64 internal child1ChainSelector;
     uint64 internal child2ChainSelector;
     mapping(uint64 => address) public chainSelectorsToPeers;
     mapping(address => uint64) public peersToChainSelectors;
+
+    /// @dev workflow params and metadata
+    address internal workflowOwner = makeAddr("workflowOwner");
+    bytes32 internal workflowId = bytes32("rebalanceWorkflowId");
+    string internal workflowNameRaw = "yieldcoin-rebalance-workflow";
+    bytes10 internal workflowName = WorkflowHelpers.createWorkflowName(workflowNameRaw);
+    bytes internal workflowMetadata = WorkflowHelpers.createWorkflowMetadata(workflowId, workflowName, workflowOwner);
 
     /*//////////////////////////////////////////////////////////////
                             ENUMERABLE SETS
@@ -118,7 +125,20 @@ contract Handler is Test {
     uint256 public ghost_state_feeRate;
 
     /// @dev tracks if a non-FeeWithdrawer withdrew fees
-    bool public ghost_nonFeeWithdrawerAddr_withdrewFees;
+    bool public ghost_nonFeeWithdrawer_withdrewFees;
+
+    /// @dev tracks decoded strategy in CRE report
+    IYieldPeer.Strategy public ghost_event_lastCREReceivedStrategy;
+
+    /// @dev tracks previous strategy before onReport changes it
+    IYieldPeer.Strategy public ghost_state_previousStrategy;
+
+    /// @dev ghost flag to track if the CRE report was decoded
+    bool public ghost_flag_creReport_decoded;
+
+    /// @dev ghost flag to track if the decoded CRE report strategy
+    /// @dev doesn't match the strategy emitted by Parent after 'onReport'
+    bool public ghost_flag_decodedStrategy_mismatchWithEmittedStrategy;
 
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT TRACKING
@@ -145,8 +165,6 @@ contract Handler is Test {
         Share _share,
         address _ccipRouter,
         address _usdc,
-        address _upkeep,
-        address _functionsRouter,
         address _aavePool,
         address _compoundPool,
         Rebalancer _rebalancer
@@ -157,16 +175,11 @@ contract Handler is Test {
         share = _share;
         ccipRouter = _ccipRouter;
         usdc = IERC20(_usdc);
-        upkeep = _upkeep;
-        functionsRouter = _functionsRouter;
         aavePool = _aavePool;
         compoundPool = _compoundPool;
         rebalancer = _rebalancer;
-        vm.startPrank(rebalancer.owner());
-        rebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, rebalancer.owner());
-        rebalancer.setForwarder(forwarder);
-        rebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, rebalancer.owner());
-        vm.stopPrank();
+        vm.prank(rebalancer.owner());
+        rebalancer.setKeystoneForwarder(forwarder);
 
         parentChainSelector = parent.getThisChainSelector();
         child1ChainSelector = child1.getThisChainSelector();
@@ -273,8 +286,10 @@ contract Handler is Test {
         _handleWithdrawLogs();
     }
 
-    /// @notice This function handles the fulfillment of requests to the CLF don - the purpose of which is to update the strategy
-    function fulfillRequest(uint256 chainSelectorSeed, uint256 protocolIdSeed) public {
+    /// @notice This function handles rebalancer cre reports
+    /// @param chainSelectorSeed the seed used to set the chain selector in the report
+    /// @param protocolIdSeed the seed used to set the protocol id in the report
+    function onReport(uint256 chainSelectorSeed, uint256 protocolIdSeed) public {
         /// @dev ensure the pools have enough liquidity
         // uint256 totalValue =
         _dealPoolsUsdc();
@@ -285,29 +300,20 @@ contract Handler is Test {
         if (protocolIdSeed % 2 == 0) protocolId = keccak256(abi.encodePacked("aave-v3"));
         else protocolId = keccak256(abi.encodePacked("compound-v3"));
 
+        /// @dev workflow report setup
+        bytes memory report = WorkflowHelpers.createWorkflowReport(chainSelector, protocolId);
+
         /// @dev simulate the passing of time
         /// @notice we are simulating time based automation triggering once per day
         vm.warp(block.timestamp + 1 days);
 
-        /// @dev simulate sending request to CLF don and get the request id
-        vm.recordLogs();
-        _changePrank(upkeep);
-        rebalancer.sendCLFRequest();
-        bytes memory response = abi.encode(chainSelector, protocolId);
-        bytes32 requestId;
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        for (uint256 i = 0; i < logs.length; i++) {
-            if (logs[i].topics[0] == keccak256("RequestSent(bytes32)")) {
-                requestId = bytes32(logs[i].data);
-            }
-        }
+        /// @dev store previous(current) strategy before onReport changes it
+        ghost_state_previousStrategy = parent.getStrategy();
 
-        /// @dev simulate fulfilling request from CLF don to update the strategy
         vm.recordLogs();
-        _changePrank(functionsRouter);
-        rebalancer.handleOracleFulfillment(requestId, response, "");
-        /// @dev if the logs contain a StrategyUpdated event with relevant data, perform upkeep
-        _handleCLFLogs();
+        _changePrank(forwarder);
+        rebalancer.onReport(workflowMetadata, report);
+        _handleOnReportLogs();
     }
 
     /// @notice This function handles withdrawing fees
@@ -328,7 +334,7 @@ contract Handler is Test {
         vm.assume(nonFeeWithdrawerAddr != feeWithdrawer);
         _changePrank(nonFeeWithdrawerAddr);
         try parent.withdrawFees(address(usdc)) {
-            ghost_nonFeeWithdrawerAddr_withdrewFees = true;
+            ghost_nonFeeWithdrawer_withdrewFees = true;
         } catch {
             console2.log("nonFeeWithdrawerRoleAddr withdrawFees failed");
         }
@@ -365,28 +371,6 @@ contract Handler is Test {
         usdc.approve(peer, depositAmount);
         IYieldPeer(peer).deposit(depositAmount);
         _stopPrank();
-    }
-
-    function _performUpkeep(uint64 newChainSelector, bytes32 protocolId, uint64 oldChainSelector) internal {
-        if (newChainSelector == parentChainSelector && oldChainSelector == parentChainSelector) return;
-
-        IYieldPeer.Strategy memory newStrategy =
-            IYieldPeer.Strategy({chainSelector: newChainSelector, protocolId: protocolId});
-        IYieldPeer.CcipTxType txType;
-        if (oldChainSelector == parentChainSelector && newChainSelector != parentChainSelector) {
-            txType = IYieldPeer.CcipTxType.RebalanceNewStrategy;
-        } else {
-            txType = IYieldPeer.CcipTxType.RebalanceOldStrategy;
-        }
-
-        address oldStrategyAdapter = parent.getActiveStrategyAdapter();
-        uint256 totalValue;
-        if (oldStrategyAdapter != address(0)) totalValue = parent.getTotalValue();
-
-        bytes memory performData =
-            abi.encode(address(parent), newStrategy, txType, oldChainSelector, oldStrategyAdapter, totalValue);
-        _changePrank(forwarder);
-        rebalancer.performUpkeep(performData);
     }
 
     /// @dev calculate the fee for a deposit
@@ -506,20 +490,100 @@ contract Handler is Test {
         assertTrue(withdrawCompletedEventFound, "WithdrawCompleted log not found");
     }
 
-    /// @notice Handle the logs emitted during Chainlink Functions callback
-    /// @dev If the logs contain a StrategyUpdated event with relevant data, perform upkeep
-    function _handleCLFLogs() internal {
+    function _handleOnReportLogs() internal {
+        /// @dev Events to look for
+        bytes32 reportDecodedEvent = keccak256("ReportDecoded(uint64,bytes32)");
+        bytes32 currentStrategyOptimalEvent = keccak256("CurrentStrategyOptimal(uint64,bytes32)");
         bytes32 strategyUpdatedEvent = keccak256("StrategyUpdated(uint64,bytes32,uint64)");
+
+        /// @dev Flags to track if the appropriate strategy event was emitted
+        bool reportDecodedEventFound = false;
+        bool currentStrategyOptimalEventFound = false;
+        bool strategyUpdatedEventFound = false;
+
+        /// @dev Flag to track which strategy event to check
+        bool isCurrentStrategyOptimal = false;
+        bool isStrategyUpdated = false;
+
+        /// @dev previous strategy before onReport changed it
+        uint64 previousStrategyChain = ghost_state_previousStrategy.chainSelector;
+        bytes32 previousStrategyProtocol = ghost_state_previousStrategy.protocolId;
+
+        /// @dev decoded strategy from ReportDecoded event
+        uint64 decodedChainSelector;
+        bytes32 decodedProtocolId;
+
+        /// @dev Pass to find ReportDecoded event and extract strategy
         Vm.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i = 0; i < logs.length; i++) {
-            if (logs[i].topics[0] == strategyUpdatedEvent) {
-                uint64 newChainSelector = uint64(uint256(logs[i].topics[1]));
-                bytes32 protocolId = logs[i].topics[2];
-                uint64 oldChainSelector = uint64(uint256(logs[i].topics[3]));
+            if (logs[i].topics[0] == reportDecodedEvent) {
+                /// @dev set ghost flag indicating CRE report was decoded
+                ghost_flag_creReport_decoded = true;
+                /// @dev update event flag and decode strategy
+                reportDecodedEventFound = true;
+                decodedChainSelector = uint64(uint256(logs[i].topics[1]));
+                decodedProtocolId = logs[i].topics[2];
 
-                _performUpkeep(newChainSelector, protocolId, oldChainSelector);
+                /// @dev store the decoded strategy in ghost state
+                ghost_event_lastCREReceivedStrategy =
+                    IYieldPeer.Strategy({chainSelector: decodedChainSelector, protocolId: decodedProtocolId});
+                /// @dev log decoded strategy for debugging
+                console2.log("Decoded Report - chainSelector:", decodedChainSelector);
+                console2.log("Decoded Report - protocolId:");
+                console2.logBytes32(decodedProtocolId);
+
+                /// @dev set flag for appropriate emitted strategy event check
+                if (previousStrategyChain == decodedChainSelector && previousStrategyProtocol == decodedProtocolId) {
+                    isCurrentStrategyOptimal = true;
+                } else {
+                    isStrategyUpdated = true;
+                }
             }
         }
+
+        /// @dev If the current strategy is optimal, ensure CurrentStrategyOptimal
+        /// @dev event matches decoded strategy
+        if (isCurrentStrategyOptimal) {
+            for (uint256 i = 0; i < logs.length; i++) {
+                if (logs[i].topics[0] == currentStrategyOptimalEvent) {
+                    currentStrategyOptimalEventFound = true;
+                    uint64 emittedChainSelector = uint64(uint256(logs[i].topics[1]));
+                    bytes32 emittedProtocolId = logs[i].topics[2];
+
+                    if (emittedChainSelector != decodedChainSelector || emittedProtocolId != decodedProtocolId) {
+                        ghost_flag_decodedStrategy_mismatchWithEmittedStrategy = true;
+                        console2.log("CRE report strategy mismatch with emitted strategy detected");
+                    }
+                }
+            }
+        }
+
+        /// @dev If the strategy was updated, ensure StrategyUpdated event
+        /// @dev matches decoded strategy
+        if (isStrategyUpdated) {
+            for (uint256 i = 0; i < logs.length; i++) {
+                if (logs[i].topics[0] == strategyUpdatedEvent) {
+                    strategyUpdatedEventFound = true;
+                    uint64 emittedChainSelector = uint64(uint256(logs[i].topics[1]));
+                    bytes32 emittedProtocolId = logs[i].topics[2];
+                    uint64 emittedOldStrategyChain = uint64(uint256(logs[i].topics[3]));
+
+                    if (emittedChainSelector != decodedChainSelector || emittedProtocolId != decodedProtocolId) {
+                        ghost_flag_decodedStrategy_mismatchWithEmittedStrategy = true;
+                        console2.log("CRE report strategy mismatch with emitted strategy detected");
+                    }
+
+                    /// @dev consistency/sanity check that emitted old strategy chain matches the previous strategy chain
+                    assertTrue(emittedOldStrategyChain == previousStrategyChain, "Old strategy chain mismatch");
+                }
+            }
+        }
+
+        assertTrue(reportDecodedEventFound, "ReportDecoded log not found");
+        assertTrue(
+            currentStrategyOptimalEventFound || strategyUpdatedEventFound,
+            "No strategy event matching decoded strategy found"
+        );
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -645,6 +709,16 @@ contract Handler is Test {
     /// @dev get a specific deposit record for a user
     function getUserDeposit(address user, uint256 index) external view returns (DepositRecord memory) {
         return ghost_userDeposits[user][index];
+    }
+
+    /// @dev get the previous strategy before onReport changed it
+    function getPreviousStrategy() external view returns (IYieldPeer.Strategy memory) {
+        return ghost_state_previousStrategy;
+    }
+
+    /// @dev get the last decoded strategy from CRE report
+    function getLastCREReceivedStrategy() external view returns (IYieldPeer.Strategy memory) {
+        return ghost_event_lastCREReceivedStrategy;
     }
 
     /// @dev empty test to ignore in coverage report

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {BaseTest, Vm, console2, IYieldPeer, Log, Roles} from "../../BaseTest.t.sol";
+import {BaseTest, Vm, console2, IYieldPeer, Roles} from "../../BaseTest.t.sol";
 
 contract SetterTest is BaseTest {
     // --- setRebalancer --- //

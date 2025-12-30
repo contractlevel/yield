@@ -1,0 +1,12 @@
+{
+  "schedule": "0 */1 * * * *",
+  "evms": [
+    {
+      "chainName": "ethereum-testnet-sepolia",
+      "chainSelector": 16015286601757825753,
+      "yieldPeerAddress": "0x660f8ab44263347c7704aDa8C016951ecf906A80",
+      "rebalancerAddress": "0x660f8ab44263347c7704aDa8C016951ecf906A80",
+      "gasLimit": 500000
+    }
+  ]
+}

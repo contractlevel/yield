@@ -22,7 +22,7 @@ contract ParentWithdrawPingPongTest is BaseTest {
     /// @notice The ping-pong happens inside _handleCCIPWithdraw on the parent
     function test_yield_parent_handleCCIPWithdraw_pingPongsWhen_activeStrategyAdapterIsZero() public {
         /// @dev arrange: Strategy on BASE parent, deposit on OPT child so shares live on child chain
-        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
+        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")), NO_CROSS_CHAIN);
 
         _selectFork(optFork);
         _changePrank(withdrawer);
@@ -73,7 +73,7 @@ contract ParentWithdrawPingPongTest is BaseTest {
     /// @notice Flow: Child withdraw -> Parent (strategy, adapter=0) -> Ping-pong -> Child -> Parent (strategy, adapter still 0) -> Ping-pong again
     function test_yield_parent_handleCCIPWithdrawPingPong_multiplePingPongsWhen_activeStrategyAdapterIsZero() public {
         /// @dev arrange: Strategy on parent, deposit on OPT child
-        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
+        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")), NO_CROSS_CHAIN);
 
         /// @dev arrange: Deposit on OPT child
         _selectFork(optFork);

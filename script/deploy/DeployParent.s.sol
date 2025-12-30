@@ -7,10 +7,6 @@ import {Script} from "forge-std/Script.sol";
 import {HelperConfig} from "../HelperConfig.s.sol";
 import {Share} from "../../src/token/Share.sol";
 import {SharePool} from "../../src/token/SharePool.sol";
-import {
-    IFunctionsSubscriptions
-} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/interfaces/IFunctionsSubscriptions.sol";
-import {IFunctionsRouter} from "@chainlink/contracts/src/v0.8/functions/v1_0_0/interfaces/IFunctionsRouter.sol";
 import {ITokenAdminRegistry} from "@chainlink/contracts/src/v0.8/ccip/interfaces/ITokenAdminRegistry.sol";
 import {
     RegistryModuleOwnerCustom
@@ -29,7 +25,6 @@ contract DeployParent is Script {
         ParentPeer parentPeer;
         Rebalancer rebalancer;
         HelperConfig config;
-        uint64 clfSubId;
         StrategyRegistry strategyRegistry;
         AaveV3Adapter aaveV3Adapter;
         CompoundV3Adapter compoundV3Adapter;
@@ -44,11 +39,6 @@ contract DeployParent is Script {
         vm.startBroadcast();
         HelperConfig.NetworkConfig memory networkConfig = deploy.config.getActiveNetworkConfig();
 
-        // Unit tests:
-        deploy.clfSubId = IFunctionsSubscriptions(networkConfig.clf.functionsRouter).createSubscription();
-        /// @notice Use this instead of the above line for premade subscription:
-        // deploy.clfSubId = networkConfig.clf.clfSubId;
-
         deploy.share = new Share();
         deploy.sharePool =
             new SharePool(address(deploy.share), networkConfig.ccip.rmnProxy, networkConfig.ccip.ccipRouter);
@@ -59,7 +49,7 @@ contract DeployParent is Script {
         ITokenAdminRegistry(networkConfig.ccip.tokenAdminRegistry)
             .setPool(address(deploy.share), address(deploy.sharePool));
 
-        deploy.rebalancer = new Rebalancer(networkConfig.clf.functionsRouter, networkConfig.clf.donId, deploy.clfSubId);
+        deploy.rebalancer = new Rebalancer();
         deploy.parentPeer = new ParentPeer(
             networkConfig.ccip.ccipRouter,
             networkConfig.tokens.link,
@@ -70,8 +60,7 @@ contract DeployParent is Script {
 
         deploy.share.grantMintAndBurnRoles(address(deploy.sharePool));
         deploy.share.grantMintAndBurnRoles(address(deploy.parentPeer));
-        /// @dev config admin role granted to deployer/'owner' in rebalancer/parent to set necessary configs
-        deploy.rebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, deploy.rebalancer.owner());
+        /// @dev config admin role granted to deployer/'owner' in parent to set necessary configs
         deploy.parentPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, deploy.parentPeer.owner());
         deploy.rebalancer.setParentPeer(address(deploy.parentPeer));
         deploy.parentPeer.setRebalancer(address(deploy.rebalancer));
@@ -89,7 +78,6 @@ contract DeployParent is Script {
         deploy.parentPeer.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")));
 
         /// @dev revoke config admin role from deployer after necessary configs set
-        deploy.rebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, deploy.rebalancer.owner());
         deploy.parentPeer.revokeRole(Roles.CONFIG_ADMIN_ROLE, deploy.parentPeer.owner());
 
         vm.stopBroadcast();

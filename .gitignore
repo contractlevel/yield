@@ -11,7 +11,6 @@ out/
 docs/
 
 # Test helpers
-test/helpers/
 
 # Dotenv file
 .env
@@ -29,3 +28,5 @@ gambit_out/
 mutation_campaign/
 test/PoC2.t.sol
 test/PoC.t.sol
+.DS_STORE
+collect.json

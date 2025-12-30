@@ -24,7 +24,7 @@ contract ParentDepositPingPongTest is BaseTest {
     function test_yield_parent_handleCCIPDepositToParent_pingPongsWhen_activeStrategyAdapterIsZero() public {
         /// @dev arrange: Strategy on parent, but adapter is 0 (rebalance in transit)
         /// @dev First set strategy normally, then manually set adapter to 0
-        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
+        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")), NO_CROSS_CHAIN);
         _selectFork(baseFork);
 
         /// @dev Now manually set adapter to 0 to simulate rebalance in transit

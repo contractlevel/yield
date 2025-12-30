@@ -2,7 +2,18 @@
 pragma solidity 0.8.26;
 
 import {StdInvariant} from "forge-std/StdInvariant.sol";
-import {BaseTest, Vm, console2, ParentPeer, ChildPeer, Share, IYieldPeer, Rebalancer, Roles} from "../BaseTest.t.sol";
+import {
+    BaseTest,
+    Vm,
+    console2,
+    ParentPeer,
+    ChildPeer,
+    Share,
+    IYieldPeer,
+    Rebalancer,
+    Roles,
+    IYieldPeer
+} from "../BaseTest.t.sol";
 import {Handler} from "./Handler.t.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {IRouterClient} from "@chainlink/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
@@ -43,8 +54,6 @@ contract Invariant is StdInvariant, BaseTest {
     IERC20 internal usdc;
     /// @dev Share contract
     Share internal share;
-    /// @dev Chainlink Automation Time-based Upkeep Address
-    address internal upkeep = makeAddr("upkeep");
     /// @dev Aave Pool Address
     address internal aavePool;
 
@@ -77,6 +86,7 @@ contract Invariant is StdInvariant, BaseTest {
         _grantRoles();
         _dealLinkToPeers(true, address(parent), address(child1), address(child2), networkConfig.tokens.link);
         _setCrossChainPeers();
+        _setWorkflow();
 
         /// @dev deploy handler
         handler = new Handler(
@@ -86,8 +96,6 @@ contract Invariant is StdInvariant, BaseTest {
             share,
             networkConfig.ccip.ccipRouter,
             address(usdc),
-            upkeep,
-            networkConfig.clf.functionsRouter,
             aavePool,
             networkConfig.protocols.comet,
             rebalancer
@@ -97,7 +105,7 @@ contract Invariant is StdInvariant, BaseTest {
         bytes4[] memory selectors = new bytes4[](5);
         selectors[0] = Handler.deposit.selector;
         selectors[1] = Handler.withdraw.selector;
-        selectors[2] = Handler.fulfillRequest.selector;
+        selectors[2] = Handler.onReport.selector;
         selectors[3] = Handler.withdrawFees.selector;
         selectors[4] = Handler.setFeeRate.selector;
 
@@ -113,8 +121,7 @@ contract Invariant is StdInvariant, BaseTest {
         usdc = IERC20(networkConfig.tokens.usdc);
         share = Share(networkConfig.tokens.share);
         aavePool = IPoolAddressesProvider(networkConfig.protocols.aavePoolAddressesProvider).getPool();
-        rebalancer =
-            new Rebalancer(networkConfig.clf.functionsRouter, networkConfig.clf.donId, networkConfig.clf.clfSubId);
+        rebalancer = new Rebalancer();
 
         /// @dev since we are not forking mainnets, we will deploy contracts locally
         /// the deployed peers will interact via the ccip local simulator as if they were crosschain
@@ -130,9 +137,9 @@ contract Invariant is StdInvariant, BaseTest {
         /// @dev temp config admin role granted to deployer/owner to set necessary configs
         parent.grantRole(Roles.CONFIG_ADMIN_ROLE, parent.owner());
         parent.setRebalancer(address(rebalancer));
-        rebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, rebalancer.owner());
-        rebalancer.setUpkeepAddress(upkeep);
+        _changePrank(rebalancer.owner());
         rebalancer.setParentPeer(address(parent));
+        _stopPrank();
 
         /// @dev deploy parent adapters
         strategyRegistryParent = new StrategyRegistry();
@@ -142,11 +149,12 @@ contract Invariant is StdInvariant, BaseTest {
         strategyRegistryParent.setStrategyAdapter(
             keccak256(abi.encodePacked("compound-v3")), address(compoundV3AdapterParent)
         );
+        _changePrank(rebalancer.owner());
         rebalancer.setStrategyRegistry(address(strategyRegistryParent));
+        _stopPrank();
         parent.setStrategyRegistry(address(strategyRegistryParent));
         parent.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")));
         parent.revokeRole(Roles.CONFIG_ADMIN_ROLE, parent.owner());
-        rebalancer.revokeRole(Roles.CONFIG_ADMIN_ROLE, rebalancer.owner());
 
         /// @dev deploy at least 2 child peers to cover all CCIP tx types
         child1 = new ChildPeer(
@@ -161,8 +169,8 @@ contract Invariant is StdInvariant, BaseTest {
         strategyRegistryChild1 = new StrategyRegistry();
         aaveV3AdapterChild1 = new AaveV3Adapter(address(child1), networkConfig.protocols.aavePoolAddressesProvider);
         compoundV3AdapterChild1 = new CompoundV3Adapter(address(child1), networkConfig.protocols.comet);
-        child1.grantRole(Roles.CONFIG_ADMIN_ROLE, child1.owner());
         /// @dev role granted to set registry
+        child1.grantRole(Roles.CONFIG_ADMIN_ROLE, child1.owner());
         child1.setStrategyRegistry(address(strategyRegistryChild1));
         child1.revokeRole(Roles.CONFIG_ADMIN_ROLE, child1.owner());
         strategyRegistryChild1.setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(aaveV3AdapterChild1));
@@ -181,8 +189,8 @@ contract Invariant is StdInvariant, BaseTest {
         strategyRegistryChild2 = new StrategyRegistry();
         aaveV3AdapterChild2 = new AaveV3Adapter(address(child2), networkConfig.protocols.aavePoolAddressesProvider);
         compoundV3AdapterChild2 = new CompoundV3Adapter(address(child2), networkConfig.protocols.comet);
-        child2.grantRole(Roles.CONFIG_ADMIN_ROLE, child2.owner());
         /// @dev role granted to set registry
+        child2.grantRole(Roles.CONFIG_ADMIN_ROLE, child2.owner());
         child2.setStrategyRegistry(address(strategyRegistryChild2));
         child2.revokeRole(Roles.CONFIG_ADMIN_ROLE, child2.owner());
         strategyRegistryChild2.setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(aaveV3AdapterChild2));
@@ -203,15 +211,6 @@ contract Invariant is StdInvariant, BaseTest {
     }
 
     function _grantRoles() internal override {
-        // grant roles - rebalancer
-        _changePrank(rebalancer.owner());
-        rebalancer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
-        rebalancer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
-        rebalancer.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
-        assertTrue(rebalancer.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
-        assertTrue(rebalancer.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
-        assertTrue(rebalancer.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
-
         // grant roles - parent
         _changePrank(parent.owner());
         parent.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
@@ -298,6 +297,12 @@ contract Invariant is StdInvariant, BaseTest {
         MockCCIPRouter(networkConfig.ccip.ccipRouter).setPeerToChainSelector(address(parent), PARENT_SELECTOR);
         MockCCIPRouter(networkConfig.ccip.ccipRouter).setPeerToChainSelector(address(child1), CHILD1_SELECTOR);
         MockCCIPRouter(networkConfig.ccip.ccipRouter).setPeerToChainSelector(address(child2), CHILD2_SELECTOR);
+    }
+
+    function _setWorkflow() internal {
+        _changePrank(rebalancer.owner());
+        rebalancer.setWorkflow(workflowId, workflowOwner, workflowName);
+        _stopPrank();
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -481,7 +486,7 @@ contract Invariant is StdInvariant, BaseTest {
     /// @notice Fee withdrawal integrity: Non-owner should not be able to withdraw fees
     function invariant_feeWithdrawal_onlyOwner() public view {
         assertFalse(
-            handler.ghost_nonFeeWithdrawerAddr_withdrewFees(),
+            handler.ghost_nonFeeWithdrawer_withdrewFees(),
             "Invariant violated: Fees should only be withdrawable by fee withdrawer"
         );
     }
@@ -504,6 +509,39 @@ contract Invariant is StdInvariant, BaseTest {
             IYieldPeer(activePeer).getActiveStrategyAdapter(),
             StrategyRegistry(IYieldPeer(activePeer).getStrategyRegistry()).getStrategyAdapter(protocolId),
             "Invariant violated: Active adapter must match registered adapter for protocolId stored in ParentPeer"
+        );
+    }
+
+    /// @notice CRE Report Consistency: The strategy decoded in the CRE report
+    /// @notice should match the strategy state stored in ParentPeer
+    function invariant_decodedCREReportStrategy_matchesParentStrategyState() public view {
+        /// @dev only check if CRE report was decoded
+        /// @dev to avoid false positive in run where no CRE report was decoded
+        if (!handler.ghost_flag_creReport_decoded()) {
+            return;
+        }
+        IYieldPeer.Strategy memory strategy = parent.getStrategy();
+        IYieldPeer.Strategy memory reportedStrategy = handler.getLastCREReceivedStrategy();
+
+        assertEq(
+            reportedStrategy.chainSelector,
+            strategy.chainSelector,
+            "Invariant violated: Reported chain selector should match ParentPeer strategy chain selector"
+        );
+        assertEq(
+            reportedStrategy.protocolId,
+            strategy.protocolId,
+            "Invariant violated: Reported protocol Id should match ParentPeer strategy protocol Id"
+        );
+    }
+
+    /// @notice CRE Report Consistency: The strategy decoded in the CRE report
+    /// @notice should match the strategy emitted by ParentPeer after 'onReport'.
+    /// @notice If a CRE strategy was decoded, it should match a StrategyUpdated or StrategyOptimal event
+    function invariant_decodedCREReportStrategy_matches_emittedStrategy() public view {
+        assertFalse(
+            handler.ghost_flag_decodedStrategy_mismatchWithEmittedStrategy(),
+            "Invariant violated: CRE decoded strategy should match emitted strategy"
         );
     }
 

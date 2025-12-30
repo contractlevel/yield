@@ -71,7 +71,7 @@ contract ParentWithdrawTest is BaseTest {
 
     /// @notice Scenario: Withdraw made on Parent chain, where the Strategy is, and the Strategy Protocol is Compound
     function test_yield_parent_withdraw_strategyIsParent_compound_withdrawToLocalChain() public {
-        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("compound-v3")));
+        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("compound-v3")), SET_CROSS_CHAIN);
         _changePrank(withdrawer);
 
         /// @dev arrange
@@ -102,7 +102,7 @@ contract ParentWithdrawTest is BaseTest {
 
     /// @notice Scenario: Withdraw made on Parent chain, where the Strategy is not, and the Strategy Protocol is Aave
     function test_yield_parent_withdraw_strategyIsNotParent_aave() public {
-        _setStrategy(optChainSelector, keccak256(abi.encodePacked("aave-v3")));
+        _setStrategy(optChainSelector, keccak256(abi.encodePacked("aave-v3")), SET_CROSS_CHAIN);
         _selectFork(baseFork);
         _changePrank(withdrawer);
 
@@ -137,7 +137,7 @@ contract ParentWithdrawTest is BaseTest {
 
     /// @notice Scenario: Withdraw made on Parent chain, where the Strategy is not, and the Strategy Protocol is Compound
     function test_yield_parent_withdraw_strategyIsNotParent_compound() public {
-        _setStrategy(optChainSelector, keccak256(abi.encodePacked("compound-v3")));
+        _setStrategy(optChainSelector, keccak256(abi.encodePacked("compound-v3")), SET_CROSS_CHAIN);
         _selectFork(baseFork);
         _changePrank(withdrawer);
 
@@ -273,7 +273,7 @@ contract ParentWithdrawTest is BaseTest {
     /// @notice Withdraw Scenario: Withdraw on Parent, TVL in transit
     function test_yield_parent_withdraw_revertsWhen_strategyPointsToParent_butActiveAdapterIsZero() public {
         /// @dev Arrange: Set strategy to parent with Aave and make a deposit first
-        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
+        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")), SET_CROSS_CHAIN);
         _selectFork(baseFork);
         _changePrank(withdrawer);
         baseParentPeer.deposit(DEPOSIT_AMOUNT);

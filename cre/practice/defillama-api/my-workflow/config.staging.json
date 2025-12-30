@@ -1,0 +1,4 @@
+{
+    "schedule": "0 */1 * * * *",
+    "apiUrl": "https://yields.llama.fi/pools"
+}
