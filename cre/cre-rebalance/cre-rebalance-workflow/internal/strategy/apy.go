@@ -2,7 +2,7 @@ package strategy
 
 import "math/big"
 
-func CalculateAPY(apr *big.Int) (*big.Int, error) {
+func CalculateAaveAPY(apr *big.Int) *big.Int {
 	apy := (1 + apr / SecondsPerYear) ^ SecondsPerYear − 1
-	return apy, nil
+	return apy
 }

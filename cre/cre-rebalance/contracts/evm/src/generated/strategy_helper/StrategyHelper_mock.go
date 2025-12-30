@@ -22,7 +22,7 @@ var (
 
 // StrategyHelperMock is a mock implementation of StrategyHelper for testing.
 type StrategyHelperMock struct {
-	GetAaveAPR               func(GetAaveAPRInput) (*big.Int, error)
+	GetAaveV3APR             func(GetAaveV3APRInput) (*big.Int, error)
 	GetPoolAddressesProvider func() (common.Address, error)
 }
 
@@ -39,11 +39,11 @@ func NewStrategyHelperMock(address common.Address, clientMock *evmmock.ClientCap
 	_ = abi
 
 	funcMap := map[string]func([]byte) ([]byte, error){
-		string(abi.Methods["getAaveAPR"].ID[:4]): func(payload []byte) ([]byte, error) {
-			if mock.GetAaveAPR == nil {
-				return nil, errors.New("getAaveAPR method not mocked")
+		string(abi.Methods["getAaveV3APR"].ID[:4]): func(payload []byte) ([]byte, error) {
+			if mock.GetAaveV3APR == nil {
+				return nil, errors.New("getAaveV3APR method not mocked")
 			}
-			inputs := abi.Methods["getAaveAPR"].Inputs
+			inputs := abi.Methods["getAaveV3APR"].Inputs
 
 			values, err := inputs.Unpack(payload)
 			if err != nil {
@@ -53,16 +53,16 @@ func NewStrategyHelperMock(address common.Address, clientMock *evmmock.ClientCap
 				return nil, errors.New("expected 2 input values")
 			}
 
-			args := GetAaveAPRInput{
+			args := GetAaveV3APRInput{
 				LiquidityAdded: values[0].(*big.Int),
 				Asset:          values[1].(common.Address),
 			}
 
-			result, err := mock.GetAaveAPR(args)
+			result, err := mock.GetAaveV3APR(args)
 			if err != nil {
 				return nil, err
 			}
-			return abi.Methods["getAaveAPR"].Outputs.Pack(result)
+			return abi.Methods["getAaveV3APR"].Outputs.Pack(result)
 		},
 		string(abi.Methods["getPoolAddressesProvider"].ID[:4]): func(payload []byte) ([]byte, error) {
 			if mock.GetPoolAddressesProvider == nil {

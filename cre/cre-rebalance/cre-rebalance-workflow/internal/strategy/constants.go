@@ -1,5 +1,7 @@
 package strategy
 
+import "math/big"
+
 const (
-	SecondsPerYear = 31536000
+	SecondsPerYear = big.NewInt(31_536_000)
 )

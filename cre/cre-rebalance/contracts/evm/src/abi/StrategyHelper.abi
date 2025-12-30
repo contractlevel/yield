@@ -12,7 +12,7 @@
     },
     {
       "type": "function",
-      "name": "getAaveAPR",
+      "name": "getAaveV3APR",
       "inputs": [
         {
           "name": "liquidityAdded",

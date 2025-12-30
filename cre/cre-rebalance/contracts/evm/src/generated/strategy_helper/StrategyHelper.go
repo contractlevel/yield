@@ -51,13 +51,13 @@ var (
 )
 
 var StrategyHelperMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"poolAddressesProvider\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getAaveAPR\",\"inputs\":[{\"name\":\"liquidityAdded\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"asset\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"apr\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getPoolAddressesProvider\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRAY\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"pure\"}]",
+	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"poolAddressesProvider\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getAaveV3APR\",\"inputs\":[{\"name\":\"liquidityAdded\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"asset\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"apr\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getPoolAddressesProvider\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRAY\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"pure\"}]",
 }
 
 // Structs
 
 // Contract Method Inputs
-type GetAaveAPRInput struct {
+type GetAaveV3APRInput struct {
 	LiquidityAdded *big.Int
 	Asset          common.Address
 }
@@ -86,8 +86,8 @@ type StrategyHelper struct {
 }
 
 type StrategyHelperCodec interface {
-	EncodeGetAaveAPRMethodCall(in GetAaveAPRInput) ([]byte, error)
-	DecodeGetAaveAPRMethodOutput(data []byte) (*big.Int, error)
+	EncodeGetAaveV3APRMethodCall(in GetAaveV3APRInput) ([]byte, error)
+	DecodeGetAaveV3APRMethodOutput(data []byte) (*big.Int, error)
 	EncodeGetPoolAddressesProviderMethodCall() ([]byte, error)
 	DecodeGetPoolAddressesProviderMethodOutput(data []byte) (common.Address, error)
 	EncodeGetRAYMethodCall() ([]byte, error)
@@ -128,12 +128,12 @@ func NewCodec() (StrategyHelperCodec, error) {
 	return &Codec{abi: &parsed}, nil
 }
 
-func (c *Codec) EncodeGetAaveAPRMethodCall(in GetAaveAPRInput) ([]byte, error) {
-	return c.abi.Pack("getAaveAPR", in.LiquidityAdded, in.Asset)
+func (c *Codec) EncodeGetAaveV3APRMethodCall(in GetAaveV3APRInput) ([]byte, error) {
+	return c.abi.Pack("getAaveV3APR", in.LiquidityAdded, in.Asset)
 }
 
-func (c *Codec) DecodeGetAaveAPRMethodOutput(data []byte) (*big.Int, error) {
-	vals, err := c.abi.Methods["getAaveAPR"].Outputs.Unpack(data)
+func (c *Codec) DecodeGetAaveV3APRMethodOutput(data []byte) (*big.Int, error) {
+	vals, err := c.abi.Methods["getAaveV3APR"].Outputs.Unpack(data)
 	if err != nil {
 		return *new(*big.Int), err
 	}
@@ -194,12 +194,12 @@ func (c *Codec) DecodeGetRAYMethodOutput(data []byte) (*big.Int, error) {
 	return result, nil
 }
 
-func (c StrategyHelper) GetAaveAPR(
+func (c StrategyHelper) GetAaveV3APR(
 	runtime cre.Runtime,
-	args GetAaveAPRInput,
+	args GetAaveV3APRInput,
 	blockNumber *big.Int,
 ) cre.Promise[*big.Int] {
-	calldata, err := c.Codec.EncodeGetAaveAPRMethodCall(args)
+	calldata, err := c.Codec.EncodeGetAaveV3APRMethodCall(args)
 	if err != nil {
 		return cre.PromiseFromResult[*big.Int](*new(*big.Int), err)
 	}
@@ -227,7 +227,7 @@ func (c StrategyHelper) GetAaveAPR(
 		})
 	})
 	return cre.Then(promise, func(response *evm.CallContractReply) (*big.Int, error) {
-		return c.Codec.DecodeGetAaveAPRMethodOutput(response.Data)
+		return c.Codec.DecodeGetAaveV3APRMethodOutput(response.Data)
 	})
 
 }

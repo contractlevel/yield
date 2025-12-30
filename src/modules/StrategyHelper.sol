@@ -32,7 +32,7 @@ contract StrategyHelper {
                                  GETTER
     //////////////////////////////////////////////////////////////*/
     // @review unit test this!
-    function getAaveAPR(uint256 liquidityAdded, address asset) external view returns (uint256 apr) {
+    function getAaveV3APR(uint256 liquidityAdded, address asset) external view returns (uint256 apr) {
         address pool = IPoolAddressesProvider(i_poolAddressesProvider).getPool();
         address aaveProtocolDataProvider = IPoolAddressesProvider(i_poolAddressesProvider).getPoolDataProvider();
 
@@ -61,6 +61,8 @@ contract StrategyHelper {
 
         apr = liquidityRate / RAY;
     }
+
+    // @review getter for compound APR too
 
     // function getCalculateInterestRatesParams(uint256 liquidityAdded, address asset)
     //     external
