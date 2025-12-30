@@ -35,11 +35,11 @@ contract StrategyHelper {
     /// @param liquidityAdded The amount of liquidity added to the pool - ie 0 for current APR, amount we are adding for new APR
     /// @param asset The asset to get the APR for - ie USDC
     /// @param usingVirtualBalance Whether to use the virtual balance or not
-    /// @return apr The APR for the asset
-    function getAaveV3APR(uint256 liquidityAdded, address asset, bool usingVirtualBalance)
+    /// @return liquidityRateRay
+    function getAaveV3LiquidityRateRay(uint256 liquidityAdded, address asset, bool usingVirtualBalance)
         external
         view
-        returns (uint256 apr)
+        returns (uint256 liquidityRateRay)
     {
         address pool = IPoolAddressesProvider(i_poolAddressesProvider).getPool();
         address aaveProtocolDataProvider = IPoolAddressesProvider(i_poolAddressesProvider).getPoolDataProvider();
@@ -64,12 +64,8 @@ contract StrategyHelper {
             virtualUnderlyingBalance: virtualUnderlyingBalance
         });
 
-        (uint256 liquidityRate,) = IReserveInterestRateStrategy(IPool(pool).RESERVE_INTEREST_RATE_STRATEGY())
+        (liquidityRateRay,) = IReserveInterestRateStrategy(IPool(pool).RESERVE_INTEREST_RATE_STRATEGY())
             .calculateInterestRates(interestRatesParams);
-
-        // @review this will return 0 if liquidityRate < 100% ...right?
-        // apr = liquidityRate / RAY;
-        apr = liquidityRate;
     }
 
     // @review getter for compound v3 APR too
