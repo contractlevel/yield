@@ -28,9 +28,9 @@ type ChainResult struct {
 type ChainConfig struct {
 	ChainName                            string `json:"chainName"`
 	ChainSelector                        uint64 `json:"chainSelector"`
-	PoolDataProvider                     string `json:"poolDataProvider"`                               // Protocol Data Provider address
-	PoolAddressesProvider                string `json:"poolAddressesProvider,omitempty"`                // Pool Addresses Provider address (currently unused, kept for compatibility)
-	DefaultReserveInterestRateStrategyV2 string `json:"defaultReserveInterestRateStrategyV2,omitempty"` // Strategy V2 address (currently unused, fetched dynamically)
+	PoolAddressesProvider                string `json:"poolAddressesProvider"`                          // Pool Addresses Provider address (MOST IMMUTABLE - single hardcoded dependency)
+	PoolDataProvider                     string `json:"poolDataProvider,omitempty"`                     // Protocol Data Provider address (DEPRECATED - now fetched dynamically from PoolAddressesProvider)
+	DefaultReserveInterestRateStrategyV2 string `json:"defaultReserveInterestRateStrategyV2,omitempty"` // Strategy V2 address (unused, fetched dynamically)
 	USDCAddress                          string `json:"usdcAddress"`                                    // USDC token address
 }
 
@@ -42,7 +42,7 @@ type TargetChain struct {
 	StablecoinAddress string `json:"stablecoinAddress"` // Stablecoin contract address on the target chain (needed?)
 
 	// Fields for verification/debugging
-	NewAPY    string `json:"newAPY"`    // Projected APY after deposit 
+	NewAPY    string `json:"newAPY"`    // Projected APY after deposit
 	ChainName string `json:"chainName"` // Readable chain name
 }
 

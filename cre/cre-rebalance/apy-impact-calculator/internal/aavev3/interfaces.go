@@ -5,6 +5,7 @@ import (
 
 	"cre-rebalance/contracts/evm/src/generated/aave_protocol_data_provider"
 	"cre-rebalance/contracts/evm/src/generated/default_reserve_interest_rate_strategy_v2"
+	"cre-rebalance/contracts/evm/src/generated/pool_addresses_provider"
 
 	// "cre-rebalance/contracts/evm/src/generated/pool" // Unused - PoolInterface is commented out
 
@@ -63,10 +64,12 @@ type DefaultReserveInterestRateStrategyV2Interface interface {
 }
 
 // PoolAddressesProviderInterface abstracts the Pool Addresses Provider contract
-// NOTE: Currently unused - we no longer need Pool address since all data comes from ProtocolDataProvider
-// type PoolAddressesProviderInterface interface {
-// 	GetPool(runtime cre.Runtime, blockNumber *big.Int) cre.Promise[common.Address]
-// }
+// This is the most immutable contract and acts as the central registry for all Aave contract addresses
+type PoolAddressesProviderInterface interface {
+	GetPool(runtime cre.Runtime, blockNumber *big.Int) cre.Promise[common.Address]
+	GetPoolDataProvider(runtime cre.Runtime, blockNumber *big.Int) cre.Promise[common.Address]
+	GetAddress(runtime cre.Runtime, input pool_addresses_provider.GetAddressInput, blockNumber *big.Int) cre.Promise[common.Address]
+}
 
 // PoolInterface abstracts the Pool contract
 // NOTE: Currently unused - we get unbacked from ProtocolDataProvider.getReserveData().Arg0 instead

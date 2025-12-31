@@ -117,7 +117,7 @@ func onCronTrigger(config *Config, runtime cre.Runtime, outputs *cron.Payload) (
 	}, nil
 }
 
-// @review Maybe abstract everything away, let chainConfig to be passed and get outputs
+
 func processChain(runtime cre.Runtime, chainCfg aavev3.ChainConfig, depositAmountRaw *big.Int) cre.Promise[*aavev3.ChainResult] {
 	logger := runtime.Logger()
 
@@ -130,130 +130,144 @@ func processChain(runtime cre.Runtime, chainCfg aavev3.ChainConfig, depositAmoun
 
 	logger.Info("Processing chain", "chain", chainCfg.ChainName, "usdcAddress", usdcAddress.Hex())
 
-	// Create contract bindings
-	protocolDataProvider, err := aavev3.NewAaveProtocolDataProviderBinding(evmClient, chainCfg.PoolDataProvider)
+	// Start with PoolAddressesProvider (most immutable contract)
+	// This is the single hardcoded dependency - all other contracts are derived from it
+	poolAddressesProvider, err := aavev3.NewPoolAddressesProviderBinding(evmClient, chainCfg.PoolAddressesProvider)
 	if err != nil {
-		return cre.PromiseFromResult[*aavev3.ChainResult](nil, fmt.Errorf("failed to create ProtocolDataProvider binding: %w", err))
+		return cre.PromiseFromResult[*aavev3.ChainResult](nil, fmt.Errorf("failed to create PoolAddressesProvider binding: %w", err))
 	}
 
-	// Fetch strategy address dynamically from ProtocolDataProvider
-	strategyAddrPromise := protocolDataProvider.GetInterestRateStrategyAddress(
-		runtime,
-		aave_protocol_data_provider.GetInterestRateStrategyAddressInput{Arg0: usdcAddress},
-		nil,
-	)
+	// Fetch ProtocolDataProvider address dynamically from PoolAddressesProvider
+	protocolDataProviderAddrPromise := poolAddressesProvider.GetPoolDataProvider(runtime, nil)
 
-	return cre.ThenPromise(strategyAddrPromise, func(strategyAddr common.Address) cre.Promise[*aavev3.ChainResult] {
-		logger.Info("Got strategy address", "strategy", strategyAddr.Hex())
+	return cre.ThenPromise(protocolDataProviderAddrPromise, func(protocolDataProviderAddr common.Address) cre.Promise[*aavev3.ChainResult] {
+		logger.Info("Got ProtocolDataProvider address", "address", protocolDataProviderAddr.Hex())
 
-		// Create Strategy V2 binding with dynamically fetched address
-		strategyV2, err := aavev3.NewDefaultReserveInterestRateStrategyV2Binding(evmClient, strategyAddr.Hex())
+		// Create ProtocolDataProvider binding with dynamically fetched address
+		protocolDataProvider, err := aavev3.NewAaveProtocolDataProviderBinding(evmClient, protocolDataProviderAddr.Hex())
 		if err != nil {
-			return cre.PromiseFromResult[*aavev3.ChainResult](nil, fmt.Errorf("failed to create Strategy V2 binding: %w", err))
+			return cre.PromiseFromResult[*aavev3.ChainResult](nil, fmt.Errorf("failed to create ProtocolDataProvider binding: %w", err))
 		}
 
-		// Fetch reserve data from ProtocolDataProvider for totalSupply/totalBorrow (for display)
-		reserveDataPromise := protocolDataProvider.GetReserveData(
+		// Fetch strategy address dynamically from ProtocolDataProvider
+		strategyAddrPromise := protocolDataProvider.GetInterestRateStrategyAddress(
 			runtime,
-			aave_protocol_data_provider.GetReserveDataInput{Asset: usdcAddress},
+			aave_protocol_data_provider.GetInterestRateStrategyAddressInput{Arg0: usdcAddress},
 			nil,
 		)
 
-		return cre.ThenPromise(reserveDataPromise, func(reserveData aave_protocol_data_provider.GetReserveDataOutput) cre.Promise[*aavev3.ChainResult] {
-			// Extract totalSupply and totalBorrow for ChainResult display
-			// @review maybe redundant?
-			totalSupply := reserveData.TotalAToken
-			totalStableDebt := reserveData.Arg3 // Unnamed field in ABI
-			totalVariableDebt := reserveData.TotalVariableDebt
-			totalBorrow := new(big.Int).Add(totalStableDebt, totalVariableDebt)
+		return cre.ThenPromise(strategyAddrPromise, func(strategyAddr common.Address) cre.Promise[*aavev3.ChainResult] {
+			logger.Info("Got strategy address", "strategy", strategyAddr.Hex())
 
-			logger.Info("Got reserve data",
-				"totalSupply", totalSupply.String(),
-				"totalBorrow", totalBorrow.String())
+			// Create Strategy V2 binding with dynamically fetched address
+			strategyV2, err := aavev3.NewDefaultReserveInterestRateStrategyV2Binding(evmClient, strategyAddr.Hex())
+			if err != nil {
+				return cre.PromiseFromResult[*aavev3.ChainResult](nil, fmt.Errorf("failed to create Strategy V2 binding: %w", err))
+			}
 
-			// FIRST CALL: CalculateInterestRates with liquidityAdded = 0 (current APY)
-			//@review  Maybe confusing, because from the workflow POV
-			// it looks like we are fetching from protocolDataProvider
-			currentParamsPromise := aavev3.FetchCalculateInterestRatesParams(
+			// Fetch reserve data from ProtocolDataProvider for totalSupply/totalBorrow (for display)
+			reserveDataPromise := protocolDataProvider.GetReserveData(
 				runtime,
-				protocolDataProvider,
-				usdcAddress,
-				big.NewInt(0), // No deposit for current APY
+				aave_protocol_data_provider.GetReserveDataInput{Asset: usdcAddress},
+				nil,
 			)
 
-			return cre.ThenPromise(currentParamsPromise, func(currentParams *aavev3.CalculateInterestRatesParams) cre.Promise[*aavev3.ChainResult] {
-				// Call CalculateInterestRates for current state
-				currentAPYPromise := aavev3.CalculateAPYFromContract(runtime, strategyV2, currentParams)
+			return cre.ThenPromise(reserveDataPromise, func(reserveData aave_protocol_data_provider.GetReserveDataOutput) cre.Promise[*aavev3.ChainResult] {
+				// Extract totalSupply and totalBorrow for ChainResult display
+				// @review maybe redundant?
+				totalSupply := reserveData.TotalAToken
+				totalStableDebt := reserveData.Arg3 // Unnamed field in ABI
+				totalVariableDebt := reserveData.TotalVariableDebt
+				totalBorrow := new(big.Int).Add(totalStableDebt, totalVariableDebt)
 
-				return cre.ThenPromise(currentAPYPromise, func(currentAPY *big.Rat) cre.Promise[*aavev3.ChainResult] {
-					// SECOND CALL: CalculateInterestRates with liquidityAdded = depositAmountRaw (projected APY)
-					newParamsPromise := aavev3.FetchCalculateInterestRatesParams(
-						runtime,
-						protocolDataProvider,
-						usdcAddress,
-						depositAmountRaw, // Deposit amount for projected APY
-					)
+				logger.Info("Got reserve data",
+					"totalSupply", totalSupply.String(),
+					"totalBorrow", totalBorrow.String())
 
-					return cre.ThenPromise(newParamsPromise, func(newParams *aavev3.CalculateInterestRatesParams) cre.Promise[*aavev3.ChainResult] {
-						// Call CalculateInterestRates for projected state
-						newAPYPromise := aavev3.CalculateAPYFromContract(runtime, strategyV2, newParams)
+				// FIRST CALL: CalculateInterestRates with liquidityAdded = 0 (current APY)
+				//@review  Maybe confusing, because from the workflow POV
+				// it looks like we are fetching from protocolDataProvider
+				currentParamsPromise := aavev3.FetchCalculateInterestRatesParams(
+					runtime,
+					protocolDataProvider,
+					usdcAddress,
+					big.NewInt(0), // No deposit for current APY
+				)
 
-						//@review Just for display purposes at this moment
-						return cre.Then(newAPYPromise, func(newAPY *big.Rat) (*aavev3.ChainResult, error) {
-							// Calculate current utilization using contract's formula:
-							// borrowUsageRatio = totalDebt / (availableLiquidity + totalDebt)
-							// where availableLiquidity = virtualUnderlyingBalance + liquidityAdded - liquidityTaken
-							// For current: liquidityAdded = 0, liquidityTaken = 0
-							currentUtilization := big.NewRat(0, 1)
-							if currentParams.TotalDebt.Sign() > 0 {
-								// availableLiquidity = virtualUnderlyingBalance + 0 - 0
-								availableLiquidity := currentParams.VirtualUnderlyingBalance
-								// availableLiquidityPlusDebt = availableLiquidity + totalDebt
-								availableLiquidityPlusDebt := new(big.Int).Add(availableLiquidity, currentParams.TotalDebt)
-								if availableLiquidityPlusDebt.Sign() > 0 {
-									currentUtilization = new(big.Rat).Quo(
-										new(big.Rat).SetInt(currentParams.TotalDebt),
-										new(big.Rat).SetInt(availableLiquidityPlusDebt),
-									)
+				return cre.ThenPromise(currentParamsPromise, func(currentParams *aavev3.CalculateInterestRatesParams) cre.Promise[*aavev3.ChainResult] {
+					// Call CalculateInterestRates for current state
+					currentAPYPromise := aavev3.CalculateAPYFromContract(runtime, strategyV2, currentParams)
+
+					return cre.ThenPromise(currentAPYPromise, func(currentAPY *big.Rat) cre.Promise[*aavev3.ChainResult] {
+						// SECOND CALL: CalculateInterestRates with liquidityAdded = depositAmountRaw (projected APY)
+						newParamsPromise := aavev3.FetchCalculateInterestRatesParams(
+							runtime,
+							protocolDataProvider,
+							usdcAddress,
+							depositAmountRaw, // Deposit amount for projected APY
+						)
+
+						return cre.ThenPromise(newParamsPromise, func(newParams *aavev3.CalculateInterestRatesParams) cre.Promise[*aavev3.ChainResult] {
+							// Call CalculateInterestRates for projected state
+							newAPYPromise := aavev3.CalculateAPYFromContract(runtime, strategyV2, newParams)
+
+							//@review Just for display purposes at this moment
+							return cre.Then(newAPYPromise, func(newAPY *big.Rat) (*aavev3.ChainResult, error) {
+								// Calculate current utilization using contract's formula:
+								// borrowUsageRatio = totalDebt / (availableLiquidity + totalDebt)
+								// where availableLiquidity = virtualUnderlyingBalance + liquidityAdded - liquidityTaken
+								// For current: liquidityAdded = 0, liquidityTaken = 0
+								currentUtilization := big.NewRat(0, 1)
+								if currentParams.TotalDebt.Sign() > 0 {
+									// availableLiquidity = virtualUnderlyingBalance + 0 - 0
+									availableLiquidity := currentParams.VirtualUnderlyingBalance
+									// availableLiquidityPlusDebt = availableLiquidity + totalDebt
+									availableLiquidityPlusDebt := new(big.Int).Add(availableLiquidity, currentParams.TotalDebt)
+									if availableLiquidityPlusDebt.Sign() > 0 {
+										currentUtilization = new(big.Rat).Quo(
+											new(big.Rat).SetInt(currentParams.TotalDebt),
+											new(big.Rat).SetInt(availableLiquidityPlusDebt),
+										)
+									}
 								}
-							}
 
-							// Calculate new total supply after deposit (for display purposes)
-							newTotalSupply := new(big.Int).Add(totalSupply, depositAmountRaw)
+								// Calculate new total supply after deposit (for display purposes)
+								newTotalSupply := new(big.Int).Add(totalSupply, depositAmountRaw)
 
-							// Calculate new utilization using contract's formula:
-							// For projected: liquidityAdded = depositAmount, liquidityTaken = 0
-							newUtilization := big.NewRat(0, 1)
-							if newParams.TotalDebt.Sign() > 0 {
-								// availableLiquidity = virtualUnderlyingBalance + depositAmount - 0
-								availableLiquidity := new(big.Int).Add(newParams.VirtualUnderlyingBalance, depositAmountRaw)
-								// availableLiquidityPlusDebt = availableLiquidity + totalDebt
-								availableLiquidityPlusDebt := new(big.Int).Add(availableLiquidity, newParams.TotalDebt)
-								if availableLiquidityPlusDebt.Sign() > 0 {
-									newUtilization = new(big.Rat).Quo(
-										new(big.Rat).SetInt(newParams.TotalDebt),
-										new(big.Rat).SetInt(availableLiquidityPlusDebt),
-									)
+								// Calculate new utilization using contract's formula:
+								// For projected: liquidityAdded = depositAmount, liquidityTaken = 0
+								newUtilization := big.NewRat(0, 1)
+								if newParams.TotalDebt.Sign() > 0 {
+									// availableLiquidity = virtualUnderlyingBalance + depositAmount - 0
+									availableLiquidity := new(big.Int).Add(newParams.VirtualUnderlyingBalance, depositAmountRaw)
+									// availableLiquidityPlusDebt = availableLiquidity + totalDebt
+									availableLiquidityPlusDebt := new(big.Int).Add(availableLiquidity, newParams.TotalDebt)
+									if availableLiquidityPlusDebt.Sign() > 0 {
+										newUtilization = new(big.Rat).Quo(
+											new(big.Rat).SetInt(newParams.TotalDebt),
+											new(big.Rat).SetInt(availableLiquidityPlusDebt),
+										)
+									}
 								}
-							}
 
-							// Calculate changes as big.Rat
-							apyChange := new(big.Rat).Sub(newAPY, currentAPY)
-							utilizationChange := new(big.Rat).Sub(newUtilization, currentUtilization)
+								// Calculate changes as big.Rat
+								apyChange := new(big.Rat).Sub(newAPY, currentAPY)
+								utilizationChange := new(big.Rat).Sub(newUtilization, currentUtilization)
 
-							// Convert all values to strings for JSON output
-							return &aavev3.ChainResult{
-								ChainName:          chainCfg.ChainName,
-								CurrentTotalSupply: aavev3.BigIntToUSDCString(totalSupply),
-								CurrentTotalBorrow: aavev3.BigIntToUSDCString(totalBorrow),
-								CurrentUtilization: aavev3.BigRatToString(currentUtilization),
-								CurrentAPY:         aavev3.BigRatToString(currentAPY),
-								NewTotalSupply:     aavev3.BigIntToUSDCString(newTotalSupply),
-								NewUtilization:     aavev3.BigRatToString(newUtilization),
-								NewAPY:             aavev3.BigRatToString(newAPY),
-								APYChange:          aavev3.BigRatToString(apyChange),
-								UtilizationChange:  aavev3.BigRatToString(utilizationChange),
-							}, nil
+								// Convert all values to strings for JSON output
+								return &aavev3.ChainResult{
+									ChainName:          chainCfg.ChainName,
+									CurrentTotalSupply: aavev3.BigIntToUSDCString(totalSupply),
+									CurrentTotalBorrow: aavev3.BigIntToUSDCString(totalBorrow),
+									CurrentUtilization: aavev3.BigRatToString(currentUtilization),
+									CurrentAPY:         aavev3.BigRatToString(currentAPY),
+									NewTotalSupply:     aavev3.BigIntToUSDCString(newTotalSupply),
+									NewUtilization:     aavev3.BigRatToString(newUtilization),
+									NewAPY:             aavev3.BigRatToString(newAPY),
+									APYChange:          aavev3.BigRatToString(apyChange),
+									UtilizationChange:  aavev3.BigRatToString(utilizationChange),
+								}, nil
+							})
 						})
 					})
 				})
