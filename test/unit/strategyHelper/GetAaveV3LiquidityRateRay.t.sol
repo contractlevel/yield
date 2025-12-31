@@ -4,7 +4,7 @@ pragma solidity 0.8.26;
 import {BaseTest} from "../../BaseTest.t.sol";
 import {console2} from "forge-std/Test.sol";
 
-contract GetAaveV3APRTest is BaseTest {
+contract GetAaveV3LiquidityRateRayTest is BaseTest {
     function test_strategyHelper_getAaveV3LiquidityRateRay_success() public view {
         bool usingVirtualBalance = true;
         uint256 liquidityAdded = 0;
