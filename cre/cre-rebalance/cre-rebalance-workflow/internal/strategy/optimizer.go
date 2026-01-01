@@ -10,6 +10,22 @@ import (
 	"github.com/ethereum/go-ethereum/crypto"
 )
 
+func CalculateAPYForStrategy(
+	strategy onchain.Strategy,
+	liquidityAdded *big.Int,
+) (*big.Int, error) {
+	switch strategy.ProtocolId {
+		case AaveV3ProtocolId:
+			return aaveV3.GetAPY(liquidityAdded)
+
+		case CompoundV3ProtocolId:
+			return compoundV3.GetAPY(liquidityAdded)
+
+		default:
+			return nil, fmt.Errorf("unsupported protocolId: %d", strategy.ProtocolId)
+	}
+}
+
 // CalculateOptimalStrategy is where the "brains" of the strategy selection live.
 // For now it's just pseudocode / comments.
 func CalculateOptimalStrategy(
