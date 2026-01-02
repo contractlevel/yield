@@ -12,5 +12,4 @@ type CometInterface interface {
 	TotalBorrow(runtime cre.Runtime, blockNumber *big.Int) cre.Promise[*big.Int]
 	// input: uint256 utilization = totalBorrow / totalSupply
 	GetSupplyRate(runtime cre.Runtime, input comet.GetSupplyRateInput, blockNumber *big.Int) cre.Promise[*big.Int]
-	GetUtilization(runtime cre.Runtime, blockNumber *big.Int) cre.Promise[*big.Int]
 }

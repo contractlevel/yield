@@ -6,6 +6,7 @@ import (
 	"math/big"
 
 	"cre-rebalance/cre-rebalance-workflow/internal/helper"
+	"cre-rebalance/cre-rebalance-workflow/internal/offchain"
 	"cre-rebalance/cre-rebalance-workflow/internal/onchain"
 	"cre-rebalance/cre-rebalance-workflow/internal/strategy"
 
@@ -15,11 +16,22 @@ import (
 )
 
 /*//////////////////////////////////////////////////////////////
+                           CONFIG
+//////////////////////////////////////////////////////////////*/
+
+// threshold is the minimum APY improvement (in whatever units
+// CalculateAPYForStrategy returns, typically 1e18 precision) required
+// before we actually rebalance.
+var threshold = big.NewInt(0) // @review TODO: set to something sensible, e.g. 5e15 for 0.5%
+
+/*//////////////////////////////////////////////////////////////
                          INIT WORKFLOW
 //////////////////////////////////////////////////////////////*/
 
 // InitWorkflow registers the cron handler.
 func InitWorkflow(config *helper.Config, logger *slog.Logger, secretsProvider cre.SecretsProvider) (cre.Workflow[*helper.Config], error) {
+	onchain.InitSupportedStrategies(config)
+
 	return cre.Workflow[*helper.Config]{
 		cre.Handler(
 			cron.Trigger(&cron.Config{Schedule: config.Schedule}),
@@ -84,25 +96,29 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 		"chainSelector", currentStrategy.ChainSelector,
 	)
 
-	// @review pseudocode placeholder: (this will use multiple defillama tier apis to get an aggregated optimal strategy)
-	// aggregatedOptimalStrategy, err := offchain.GetAggregatedOptimalStrategy()
-	// if err != nil {
-	// 	return nil, fmt.Errorf("failed to get aggregated optimal strategy: %w", err)
-	// }
-	// if currentStrategy == aggregatedOptimalStrategy {
-	// 	logger.Info("Strategy unchanged; no rebalance needed")
-	// 	return &strategy.StrategyResult{
-	// 		Current: currentStrategy,
-	// 		Optimal: aggregatedOptimalStrategy,
-	// 		Updated: false,
-	// 	}, nil
-	// }
+	// @review pseudocode placeholder: (this will use multiple defillama-tier APIs to get an aggregated optimal strategy)
+	optimalStrategy, err := offchain.GetOptimalStrategy()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get optimal strategy: %w", err)
+	}
+
+	// If nothing has changed, we can stop early.
+	if currentStrategy == optimalStrategy {
+		logger.Info("Strategy unchanged; no rebalance needed")
+		return &strategy.StrategyResult{
+			Current: currentStrategy,
+			Optimal: optimalStrategy,
+			Updated: false,
+		}, nil
+	}
 
 	// Decide which YieldPeer to use for TVL:
 	// - If the strategy lives on the parent chain, reuse parentPeer.
 	// - Otherwise, instantiate a YieldPeer on the strategy chain.
-	var strategyPeer onchain.YieldPeerInterface
-	var rebalanceGasLimit uint64
+	var (
+		strategyPeer      onchain.YieldPeerInterface
+		rebalanceGasLimit uint64
+	)
 
 	if currentStrategy.ChainSelector == parentCfg.ChainSelector {
 		// Same chain: no extra client or contract instantiation.
@@ -119,12 +135,11 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 		strategyEvmClient := &evm.Client{ChainSelector: strategyChainCfg.ChainSelector}
 
 		// Instantiate Strategy YieldPeer contract once.
-		childPeer, err := onchain.NewChildPeerBinding(strategyEvmClient, strategyChainCfg.YieldPeerAddress)
+		strategyPeer, err := onchain.NewChildPeerBinding(strategyEvmClient, strategyChainCfg.YieldPeerAddress)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create strategy YieldPeer binding: %w", err)
 		}
 
-		strategyPeer = childPeer
 		rebalanceGasLimit = strategyChainCfg.GasLimit
 	}
 
@@ -134,58 +149,57 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 		return nil, fmt.Errorf("failed to get total value from strategy YieldPeer: %w", err)
 	}
 
-	// aggregatedOptimalStrategy
-	// we need to compare the aggregatedOptimalStrategy to what is calculated with onchain reads using the aggregated.params
-	// we need to check the APY decrease of the aggregatedOptimalStrategy
-	// strategy.calculateOptimal(aggregatedOptimalStrategy, tvl)
-	// tvl will be liquidityAdded
-	// strategyHelper instantiated based on aos.chainSelector
-	// switch statement for protocols
-	// aos.protocol == aave => getAaveV3APY(tvl)
-	// aos.protocol == compoundV3 => getCompoundV3APY(tvl)
-	// etc
-	// if optimalStrategy.APY - currentStrategy.APY > threshold {rebalance}
-	// we also need to calculate currentStrategy APY for threshold comparison
+	// Calculate the new APY for the optimal strategy if we deposit the Yieldcoin TVL into it.
+	optimalStrategyAPY, err := onchain.CalculateAPYForStrategy(optimalStrategy, tvl)
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate optimal strategy APY: %w", err)
+	}
 
-	// Calculate optimal strategy based on TVL and lending pool state (pseudocode inside).
-	optimalStrategy := strategy.CalculateOptimalStrategy(logger, currentStrategy, tvl)
+	// Calculate the current APY for the current strategy (liquidityAdded = 0).
+	currentStrategyAPY, err := onchain.CalculateAPYForStrategy(currentStrategy, big.NewInt(0))
+	if err != nil {
+		return nil, fmt.Errorf("failed to calculate current strategy APY: %w", err)
+	}
 
-	if currentStrategy != optimalStrategy {
-		// Inject write function that performs the actual onchain rebalance on the parent chain.
-		writeFn := func(optimal onchain.Strategy) error {
-			// Lazily validate + parse Rebalancer address only if we actually rebalance.
-			// Instantiate Rebalancer contract once per rebalance attempt.
-			parentRebalancer, err := onchain.NewRebalancerBinding(parentEvmClient, parentCfg.RebalancerAddress)
-			if err != nil {
-				return fmt.Errorf("failed to create parent Rebalancer binding: %w", err)
-			}
+	// Compute delta := optimal - current as big.Int.
+	delta := new(big.Int).Sub(optimalStrategyAPY, currentStrategyAPY)
 
-			return deps.WriteRebalance(parentRebalancer, runtime, logger, rebalanceGasLimit, optimal)
-		}
+	logger.Info(
+		"Computed APYs",
+		"tvl", tvl.String(),
+		"currentAPY", currentStrategyAPY.String(),
+		"optimalAPY", optimalStrategyAPY.String(),
+		"delta", delta.String(),
+		"threshold", threshold.String(),
+	)
 
-		logger.Info(
-			"Strategy changed and APY improvement deemed worthwhile; rebalancing",
-			"currentProtocolId", fmt.Sprintf("0x%x", currentStrategy.ProtocolId),
-			"currentChainSelector", currentStrategy.ChainSelector,
-			"optimalProtocolId", fmt.Sprintf("0x%x", optimalStrategy.ProtocolId),
-			"optimalChainSelector", optimalStrategy.ChainSelector,
-		)
-
-		err := strategy.Rebalance(optimalStrategy, writeFn)
-		if err != nil {
-			return nil, fmt.Errorf("failed to rebalance: %w", err)
-		}
+	// If the delta is below the threshold, return without updating.
+	if delta.Cmp(threshold) < 0 {
+		logger.Info("Delta below threshold; no rebalance needed")
 		return &strategy.StrategyResult{
 			Current: currentStrategy,
 			Optimal: optimalStrategy,
-			Updated: true,
+			Updated: false,
 		}, nil
 	}
 
-	logger.Info("Strategy unchanged; no rebalance needed")
+	// At this point:
+	// - optimal APY is strictly better than current
+	// - improvement exceeds threshold
+	// so we go ahead and rebalance.
+
+	parentRebalancer, err := onchain.NewRebalancerBinding(parentEvmClient, parentCfg.RebalancerAddress)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create parent Rebalancer binding: %w", err)
+	}
+
+	if err := deps.WriteRebalance(parentRebalancer, runtime, logger, rebalanceGasLimit, optimalStrategy); err != nil {
+		return nil, fmt.Errorf("failed to rebalance: %w", err)
+	}
+
 	return &strategy.StrategyResult{
 		Current: currentStrategy,
 		Optimal: optimalStrategy,
-		Updated: false,
+		Updated: true,
 	}, nil
 }

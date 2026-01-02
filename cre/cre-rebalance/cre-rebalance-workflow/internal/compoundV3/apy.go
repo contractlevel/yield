@@ -8,6 +8,7 @@ import (
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/blockchain/evm"
 )
 
+// @review pass this stablecoin as an arg when doing modular stable support task
 func GetAPY(config *helper.Config, liquidityAdded *big.Int, chainSelector int64) (*big.Int, error) {
 	// instantiate client
 	evmClient := &evm.Client{
@@ -21,7 +22,7 @@ func GetAPY(config *helper.Config, liquidityAdded *big.Int, chainSelector int64)
 	}
 
 	// instantiate comet
-	comet, err := NewCometBinding(evmClient, evmConfig.CometAddr)
+	comet, err := NewCometBinding(evmClient, evmConfig.CometAddr) // @review CometAddr will depend on stablecoin
 	if err != nil {
 		return nil, fmt.Errorf("failed to create comet binding: %w", err)
 	}
