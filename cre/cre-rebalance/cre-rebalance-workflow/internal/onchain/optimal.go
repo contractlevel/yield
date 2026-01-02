@@ -23,24 +23,24 @@ func GetOptimalStrategy(currentStrategy Strategy, liquidityAdded *big.Int) (Stra
 		bestSet      bool
 	)
 
-	for _, cand := range SupportedStrategies {
+	for _, strategy := range SupportedStrategies {
 		// For the current strategy, we want the APY “as is”, so liquidityAdded = 0.
 		liq := liquidityAdded
-		if sameStrategy(cand, currentStrategy) {
+		if sameStrategy(strategy, currentStrategy) {
 			liq = big.NewInt(0)
 		}
 
-		apy, err := CalculateAPYForStrategy(cand, liq)
+		apy, err := CalculateAPYForStrategy(strategy, liq)
 		if err != nil {
-			return Strategy{}, fmt.Errorf("calculate APY for strategy %+v: %w", cand, err)
+			return Strategy{}, fmt.Errorf("calculate APY for strategy %+v: %w", strategy, err)
 		}
 		if apy == nil {
-			return Strategy{}, fmt.Errorf("nil APY returned for strategy %+v", cand)
+			return Strategy{}, fmt.Errorf("nil APY returned for strategy %+v", strategy)
 		}
 
 		if !bestSet || apy.Cmp(bestAPY) > 0 {
 			bestAPY = new(big.Int).Set(apy)
-			bestStrategy = cand
+			bestStrategy = strategy
 			bestSet = true
 		}
 	}
