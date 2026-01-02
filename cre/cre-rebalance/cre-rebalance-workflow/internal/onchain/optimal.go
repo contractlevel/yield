@@ -8,6 +8,7 @@ import (
 	"cre-rebalance/cre-rebalance-workflow/internal/compoundV3"
 )
 
+// @review need to call onchain.InitSupportedStrategies(config)
 func GetOptimalStrategy(currentStrategy Strategy, liquidityAdded *big.Int) (Strategy, error) {
 	if len(SupportedStrategies) == 0 {
 		return Strategy{}, fmt.Errorf("no supported strategies configured")

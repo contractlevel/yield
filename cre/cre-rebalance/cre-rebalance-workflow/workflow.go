@@ -30,8 +30,6 @@ var threshold = big.NewInt(0) // @review TODO: set to something sensible, e.g. 5
 
 // InitWorkflow registers the cron handler.
 func InitWorkflow(config *helper.Config, logger *slog.Logger, secretsProvider cre.SecretsProvider) (cre.Workflow[*helper.Config], error) {
-	onchain.InitSupportedStrategies(config)
-
 	return cre.Workflow[*helper.Config]{
 		cre.Handler(
 			cron.Trigger(&cron.Config{Schedule: config.Schedule}),
