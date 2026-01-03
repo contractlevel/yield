@@ -52,6 +52,8 @@ func GetOptimalStrategy(currentStrategy Strategy, liquidityAdded *big.Int) (Stra
 	return bestStrategy, nil
 }
 
+// @review scaling for different strategy package GetAPY return values needs to be consistent!
+// ie is the aaveV3 value scaled to RAY when compoundV3 scales to WAD?
 func CalculateAPYForStrategy(strategy Strategy, liquidityAdded *big.Int) (*big.Int, error) {
 	switch strategy.ProtocolId {
 		case AaveV3ProtocolId:
