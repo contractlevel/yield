@@ -581,10 +581,10 @@ func Test_onCronTriggerWithDeps_errorWhen_RebalancerBindingFails(t *testing.T) {
 		},
 		CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (*big.Int, error) {
 			if s == opt {
-				return big.NewInt(200), nil
+				return big.NewInt(2e17), nil // 2e17
 			}
 			if s == cur {
-				return big.NewInt(100), nil // delta = 100 >= threshold(0)
+				return big.NewInt(1e17), nil // delta = 1e17 >= threshold(1e17)
 			}
 			return big.NewInt(0), nil
 		},
@@ -641,10 +641,10 @@ func Test_onCronTriggerWithDeps_errorWhen_WriteRebalanceFails(t *testing.T) {
 		},
 		CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (*big.Int, error) {
 			if s == opt {
-				return big.NewInt(200), nil
+				return big.NewInt(2e17), nil // 2e17
 			}
 			if s == cur {
-				return big.NewInt(100), nil // delta = 100 >= threshold(0)
+				return big.NewInt(1e17), nil // delta = 1e17 >= threshold(1e17)
 			}
 			return big.NewInt(0), nil
 		},
@@ -704,10 +704,10 @@ func Test_onCronTriggerWithDeps_success_rebalanceWhenStrategyChanges_sameChain(t
 		},
 		CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (*big.Int, error) {
 			if s == opt {
-				return big.NewInt(200), nil
+				return big.NewInt(2e17), nil // 2e17
 			}
 			if s == cur {
-				return big.NewInt(100), nil // delta = 100 >= threshold(0)
+				return big.NewInt(1e17), nil // delta = 1e17 >= threshold(1e17)
 			}
 			return big.NewInt(0), nil
 		},
@@ -791,10 +791,10 @@ func Test_onCronTriggerWithDeps_success_rebalanceWhenStrategyChanges_differentCh
 		},
 		CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (*big.Int, error) {
 			if s == opt {
-				return big.NewInt(300), nil
+				return big.NewInt(3e17), nil // 3e17
 			}
 			if s == cur {
-				return big.NewInt(100), nil // delta = 200 >= threshold(0)
+				return big.NewInt(1e17), nil // delta = 2e17 >= threshold(1e17)
 			}
 			return big.NewInt(0), nil
 		},

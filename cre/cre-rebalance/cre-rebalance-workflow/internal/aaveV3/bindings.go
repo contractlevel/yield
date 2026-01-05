@@ -40,7 +40,7 @@ func NewAaveProtocolDataProviderBinding(client *evm.Client, addr string) (AavePr
 	return aave_protocol_data_provider.NewAaveProtocolDataProvider(
 		client,
 		providerAddr,
-		nil, // No filter options needed for reads
+		nil, // No filter options needed for reads // @review - what does this mean???
 	)
 }
 
