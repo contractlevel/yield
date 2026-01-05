@@ -6,7 +6,6 @@ import (
 	"cre-rebalance/contracts/evm/src/generated/parent_peer"
 	"cre-rebalance/contracts/evm/src/generated/child_peer"
 	"cre-rebalance/contracts/evm/src/generated/rebalancer"
-	"cre-rebalance/contracts/evm/src/generated/strategy_helper"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/blockchain/evm"
@@ -43,15 +42,4 @@ func NewRebalancerBinding(client *evm.Client, addr string) (RebalancerInterface,
 	rebalancerAddr := common.HexToAddress(addr)
 
 	return rebalancer.NewRebalancer(client, rebalancerAddr, nil)
-}
-
-// NewStrategyHelperBinding constructs the strategy helper binding.
-// It satisfies StrategyHelperInterface.
-func NewStrategyHelperBinding(client *evm.Client, addr string) (StrategyHelperInterface, error) {
-	if !common.IsHexAddress(addr) {
-		return nil, fmt.Errorf("invalid StrategyHelper address: %s", addr)
-	}
-	strategyHelperAddr := common.HexToAddress(addr)
-
-	return strategy_helper.NewStrategyHelper(client, strategyHelperAddr, nil)
 }

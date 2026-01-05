@@ -29,20 +29,14 @@ type Config struct {
 //   - currentStrategy.ChainSelector tells us which chain the active strategy
 //     adapter lives on.
 type EvmConfig struct {
-	ChainName         string `json:"chainName"`
-	ChainSelector     uint64 `json:"chainSelector"`
-	YieldPeerAddress  string `json:"yieldPeerAddress"`
-	RebalancerAddress string `json:"rebalancerAddress"`
-	GasLimit          uint64 `json:"gasLimit"`
-}
-
-// ChainConfig holds AAVE v3 contract addresses for each chain
-// This is shared between apy-impact-calculator and cre-rebalance-workflow
-type ChainConfig struct {
-	ChainName        string `json:"chainName"`
-	ChainSelector    uint64 `json:"chainSelector"`
-	PoolDataProvider string `json:"poolDataProvider"` // For reading data
-	USDCAddress      string `json:"usdcAddress"`      // USDC token address
+	ChainName         				   string `json:"chainName"`
+	ChainSelector     				   uint64 `json:"chainSelector"`
+	YieldPeerAddress  				   string `json:"yieldPeerAddress"`
+	RebalancerAddress 				   string `json:"rebalancerAddress"`
+	GasLimit                           uint64 `json:"gasLimit"`
+	USDCAddress       				   string `json:"usdcAddress"`
+	AaveV3PoolAddressesProviderAddress string `json:"aaveV3PoolAddressesProviderAddress"`
+	CompoundV3CometUSDCAddress         string `json:"compoundV3CometUSDCAddress"`
 }
 
 func FindEvmConfigByChainSelector(evms []EvmConfig, target uint64) (*EvmConfig, error) {

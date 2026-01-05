@@ -6,10 +6,13 @@ import (
 
 	"cre-rebalance/cre-rebalance-workflow/internal/aaveV3"
 	"cre-rebalance/cre-rebalance-workflow/internal/compoundV3"
+	"cre-rebalance/cre-rebalance-workflow/internal/helper"
+	
+	"github.com/smartcontractkit/cre-sdk-go/cre"
 )
 
-// @review need to call onchain.InitSupportedStrategies(config)
-func GetOptimalStrategy(currentStrategy Strategy, liquidityAdded *big.Int) (Strategy, error) {
+// @review need to call onchain.InitSupportedStrategies(config) - see strategy_registry.go
+func GetOptimalStrategy(config *helper.Config, runtime cre.Runtime, currentStrategy Strategy, liquidityAdded *big.Int) (Strategy, error) {
 	if len(SupportedStrategies) == 0 {
 		return Strategy{}, fmt.Errorf("no supported strategies configured")
 	}
@@ -30,7 +33,7 @@ func GetOptimalStrategy(currentStrategy Strategy, liquidityAdded *big.Int) (Stra
 			liq = big.NewInt(0)
 		}
 
-		apy, err := CalculateAPYForStrategy(strategy, liq)
+		apy, err := CalculateAPYForStrategy(config, runtime, strategy, liq)
 		if err != nil {
 			return Strategy{}, fmt.Errorf("calculate APY for strategy %+v: %w", strategy, err)
 		}
@@ -54,13 +57,13 @@ func GetOptimalStrategy(currentStrategy Strategy, liquidityAdded *big.Int) (Stra
 
 // @review scaling for different strategy package GetAPY return values needs to be consistent!
 // ie is the aaveV3 value scaled to RAY when compoundV3 scales to WAD?
-func CalculateAPYForStrategy(strategy Strategy, liquidityAdded *big.Int) (*big.Int, error) {
+func CalculateAPYForStrategy(config *helper.Config, runtime cre.Runtime, strategy Strategy, liquidityAdded *big.Int) (*big.Int, error) {
 	switch strategy.ProtocolId {
 		case AaveV3ProtocolId:
-			return aaveV3.GetAPY(strategy.ChainSelector, liquidityAdded)
+			return aaveV3.GetAPY(config, runtime, liquidityAdded, strategy.ChainSelector)
 
 		case CompoundV3ProtocolId:
-			return compoundV3.GetAPY(strategy.ChainSelector, liquidityAdded)
+			return compoundV3.GetAPY(config, runtime, liquidityAdded, strategy.ChainSelector)
 
 		default:
 			return nil, fmt.Errorf("unsupported protocolId: %d", strategy.ProtocolId)

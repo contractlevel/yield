@@ -3,7 +3,7 @@ package compoundV3
 import (
 	"fmt"
 
-	// "cre-rebalance/contracts/evm/src/generated/comet"
+	"cre-rebalance/contracts/evm/src/generated/comet"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/blockchain/evm"

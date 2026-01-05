@@ -1,15 +1,20 @@
 package compoundV3
 
 import (
+	"fmt"
 	"math/big"
 
 	"cre-rebalance/cre-rebalance-workflow/internal/helper"
+	"cre-rebalance/cre-rebalance-workflow/internal/constants"
+
+	"cre-rebalance/contracts/evm/src/generated/comet"
 
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/blockchain/evm"
+	"github.com/smartcontractkit/cre-sdk-go/cre"
 )
 
 // @review pass this stablecoin as an arg when doing modular stable support task
-func GetAPY(config *helper.Config, liquidityAdded *big.Int, chainSelector int64) (*big.Int, error) {
+func GetAPY(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int, chainSelector uint64) (*big.Int, error) {
 	// instantiate client
 	evmClient := &evm.Client{
 		ChainSelector: chainSelector,
@@ -22,13 +27,13 @@ func GetAPY(config *helper.Config, liquidityAdded *big.Int, chainSelector int64)
 	}
 
 	// instantiate comet
-	comet, err := NewCometBinding(evmClient, evmConfig.CometAddr) // @review CometAddr will depend on stablecoin
+	cometUSDC, err := NewCometBinding(evmClient, evmConfig.CompoundV3CometUSDCAddress) // @review CometAddr will depend on stablecoin
 	if err != nil {
 		return nil, fmt.Errorf("failed to create comet binding: %w", err)
 	}
 
 	// @review some pseudocode
-	totalSupply, err := comet.GetTotalSupply()
+	totalSupply, err := cometUSDC.TotalSupply(runtime, big.NewInt(constants.LatestBlock)).Await()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get total supply: %w", err)
 	}
@@ -36,52 +41,28 @@ func GetAPY(config *helper.Config, liquidityAdded *big.Int, chainSelector int64)
 		totalSupply = new(big.Int).Add(totalSupply, liquidityAdded) // ok if liquidityAdded == 0
 	}
 
-	totalBorrow, err := comet.GetTotalBorrow()
+	totalBorrow, err := cometUSDC.TotalBorrow(runtime, big.NewInt(constants.LatestBlock)).Await()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get total borrow: %w", err)
 	}
 
 	// @review why do we need the WAD scaling here?
 	// utilization = (borrow * 1e18) / supply 
-	utilization := new(big.Int).Mul(totalBorrow, WAD)
+	utilization := new(big.Int).Mul(totalBorrow, big.NewInt(constants.WAD))
 	utilization.Div(utilization, totalSupply)
-	
-	supplyRate, err := comet.GetSupplyRate(utilization)
+
+	supplyRate, err := cometUSDC.GetSupplyRate(runtime, comet.GetSupplyRateInput{Utilization: utilization}, big.NewInt(constants.LatestBlock)).Await()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get supply rate: %w", err)
 	}
 
 	// apy = (1 + supplyRate)^secondsPerYear − 1
 	apy := APYFromSupplyRate(supplyRate)
-	// @review log this and compare to 
+	// @review log this and compare to defillama or some other source
 	return apy, nil
 }
 
-// rpsWad = rate per second in WAD
-func APYFromSupplyRate(rpsWad *big.Int) *big.Int {
-	base := new(big.Int).Add(WAD, rpsWad)
-	growth := powWad(base, SecondsPerYear)
-	return new(big.Int).Sub(growth, WAD)
-}
-
-func powWad(xWad *big.Int, n uint64) *big.Int {
-	res := new(big.Int).Set(WAD)
-	base := new(big.Int).Set(xWad)
-
-	for n > 0 {
-		if n&1 == 1 {
-			res = mulWad(res, base)
-		}
-		n >>= 1
-		if n > 0 {
-			base = mulWad(base, base)
-		}
-	}
-	return res
-}
-
-func mulWad(a, b *big.Int) *big.Int {
-	z := new(big.Int).Mul(a, b)
-	z.Div(z, WAD)
-	return z
+// @review placeholder
+func APYFromSupplyRate(supplyRateInWad uint64) *big.Int {
+	return nil
 }

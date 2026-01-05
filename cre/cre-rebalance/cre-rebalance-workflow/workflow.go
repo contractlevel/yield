@@ -8,7 +8,6 @@ import (
 	"cre-rebalance/cre-rebalance-workflow/internal/helper"
 	"cre-rebalance/cre-rebalance-workflow/internal/offchain"
 	"cre-rebalance/cre-rebalance-workflow/internal/onchain"
-	"cre-rebalance/cre-rebalance-workflow/internal/strategy"
 
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/blockchain/evm"
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/scheduler/cron"
@@ -19,10 +18,17 @@ import (
                            CONFIG
 //////////////////////////////////////////////////////////////*/
 
-// threshold is the minimum APY improvement (in whatever units
+// threshold is the minimum APY improvement (in the same units that
 // CalculateAPYForStrategy returns, typically 1e18 precision) required
-// before we actually rebalance.
-var threshold = big.NewInt(0) // @review TODO: set to something sensible, e.g. 5e15 for 0.5%
+// before we rebalance.
+var threshold = big.NewInt(1e17) // @review TODO: set a sensible threshold and determine scaling. 1e17 is placeholder
+
+// StrategyResult is primarily for debugging / testing.
+type StrategyResult struct {
+	Current onchain.Strategy `json:"current"`
+	Optimal onchain.Strategy `json:"optimal"`
+	Updated bool             `json:"updated"`
+}
 
 /*//////////////////////////////////////////////////////////////
                          INIT WORKFLOW
@@ -43,30 +49,40 @@ func InitWorkflow(config *helper.Config, logger *slog.Logger, secretsProvider cr
 //////////////////////////////////////////////////////////////*/
 
 type OnCronDeps struct {
-	ReadCurrentStrategy func(peer onchain.ParentPeerInterface, runtime cre.Runtime) (onchain.Strategy, error)
-	ReadTVL             func(peer onchain.YieldPeerInterface, runtime cre.Runtime) (*big.Int, error)
-	WriteRebalance      func(rb onchain.RebalancerInterface, runtime cre.Runtime, logger *slog.Logger, gasLimit uint64, optimal onchain.Strategy) error
+	NewParentPeerBinding    func(client *evm.Client, addr string) (onchain.ParentPeerInterface, error)
+	NewChildPeerBinding     func(client *evm.Client, addr string) (onchain.YieldPeerInterface, error)
+	NewRebalancerBinding    func(client *evm.Client, addr string) (onchain.RebalancerInterface, error)
+	ReadCurrentStrategy     func(peer onchain.ParentPeerInterface, runtime cre.Runtime) (onchain.Strategy, error)
+	ReadTVL                 func(peer onchain.YieldPeerInterface, runtime cre.Runtime) (*big.Int, error)
+	WriteRebalance          func(rb onchain.RebalancerInterface, runtime cre.Runtime, logger *slog.Logger, gasLimit uint64, optimal onchain.Strategy) error
+	GetOptimalStrategy      func() (onchain.Strategy, error)
+	CalculateAPYForStrategy func(config *helper.Config, runtime cre.Runtime, strategy onchain.Strategy, liquidityAdded *big.Int) (*big.Int, error)
 }
 
-// defaultOnCronDeps are the onchain implementations.
+// defaultOnCronDeps are the real onchain/offchain implementations.
 var defaultOnCronDeps = OnCronDeps{
-	ReadCurrentStrategy: onchain.ReadCurrentStrategy,
-	ReadTVL:             onchain.ReadTVL,
-	WriteRebalance:      onchain.WriteRebalance,
+	NewParentPeerBinding:    onchain.NewParentPeerBinding,
+	NewChildPeerBinding:     onchain.NewChildPeerBinding,
+	NewRebalancerBinding:    onchain.NewRebalancerBinding,
+	ReadCurrentStrategy:     onchain.ReadCurrentStrategy,
+	ReadTVL:                 onchain.ReadTVL,
+	WriteRebalance:          onchain.WriteRebalance,
+	GetOptimalStrategy:      offchain.GetOptimalStrategy,
+	CalculateAPYForStrategy: onchain.CalculateAPYForStrategy,
 }
 
 /*//////////////////////////////////////////////////////////////
                         ON CRON TRIGGER
 //////////////////////////////////////////////////////////////*/
 
-func onCronTrigger(config *helper.Config, runtime cre.Runtime, trigger *cron.Payload) (*strategy.StrategyResult, error) {
+func onCronTrigger(config *helper.Config, runtime cre.Runtime, trigger *cron.Payload) (*StrategyResult, error) {
 	return onCronTriggerWithDeps(config, runtime, trigger, defaultOnCronDeps)
 }
 
-func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *cron.Payload, deps OnCronDeps) (*strategy.StrategyResult, error) {
+func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *cron.Payload, deps OnCronDeps) (*StrategyResult, error) {
 	logger := runtime.Logger()
 
-	// Ensure we have at least one EVM config and treat evms[0] as parent chain.
+	// Ensure we have at least one EVM config and treat evms[0] as the parent chain.
 	if len(config.Evms) == 0 {
 		return nil, fmt.Errorf("no EVM configs provided")
 	}
@@ -78,7 +94,7 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 	}
 
 	// Instantiate ParentPeer contract once.
-	parentPeer, err := onchain.NewParentPeerBinding(parentEvmClient, parentCfg.YieldPeerAddress)
+	parentPeer, err := deps.NewParentPeerBinding(parentEvmClient, parentCfg.YieldPeerAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create ParentPeer binding: %w", err)
 	}
@@ -94,8 +110,8 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 		"chainSelector", currentStrategy.ChainSelector,
 	)
 
-	// @review pseudocode placeholder: (this will use multiple defillama-tier APIs to get an aggregated optimal strategy)
-	optimalStrategy, err := offchain.GetOptimalStrategy()
+	// Get aggregated optimal strategy from offchain.
+	optimalStrategy, err := deps.GetOptimalStrategy()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get optimal strategy: %w", err)
 	}
@@ -103,7 +119,7 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 	// If nothing has changed, we can stop early.
 	if currentStrategy == optimalStrategy {
 		logger.Info("Strategy unchanged; no rebalance needed")
-		return &strategy.StrategyResult{
+		return &StrategyResult{
 			Current: currentStrategy,
 			Optimal: optimalStrategy,
 			Updated: false,
@@ -133,7 +149,7 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 		strategyEvmClient := &evm.Client{ChainSelector: strategyChainCfg.ChainSelector}
 
 		// Instantiate Strategy YieldPeer contract once.
-		strategyPeer, err := onchain.NewChildPeerBinding(strategyEvmClient, strategyChainCfg.YieldPeerAddress)
+		strategyPeer, err = deps.NewChildPeerBinding(strategyEvmClient, strategyChainCfg.YieldPeerAddress)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create strategy YieldPeer binding: %w", err)
 		}
@@ -148,13 +164,13 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 	}
 
 	// Calculate the new APY for the optimal strategy if we deposit the Yieldcoin TVL into it.
-	optimalStrategyAPY, err := onchain.CalculateAPYForStrategy(optimalStrategy, tvl)
+	optimalStrategyAPY, err := deps.CalculateAPYForStrategy(config, runtime, optimalStrategy, tvl)
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate optimal strategy APY: %w", err)
 	}
 
 	// Calculate the current APY for the current strategy (liquidityAdded = 0).
-	currentStrategyAPY, err := onchain.CalculateAPYForStrategy(currentStrategy, big.NewInt(0))
+	currentStrategyAPY, err := deps.CalculateAPYForStrategy(config, runtime, currentStrategy, big.NewInt(0))
 	if err != nil {
 		return nil, fmt.Errorf("failed to calculate current strategy APY: %w", err)
 	}
@@ -174,7 +190,7 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 	// If the delta is below the threshold, return without updating.
 	if delta.Cmp(threshold) < 0 {
 		logger.Info("Delta below threshold; no rebalance needed")
-		return &strategy.StrategyResult{
+		return &StrategyResult{
 			Current: currentStrategy,
 			Optimal: optimalStrategy,
 			Updated: false,
@@ -183,10 +199,10 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 
 	// At this point:
 	// - optimal APY is strictly better than current
-	// - improvement exceeds threshold
+	// - improvement meets or exceeds threshold
 	// so we go ahead and rebalance.
 
-	parentRebalancer, err := onchain.NewRebalancerBinding(parentEvmClient, parentCfg.RebalancerAddress)
+	parentRebalancer, err := deps.NewRebalancerBinding(parentEvmClient, parentCfg.RebalancerAddress)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create parent Rebalancer binding: %w", err)
 	}
@@ -195,7 +211,7 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 		return nil, fmt.Errorf("failed to rebalance: %w", err)
 	}
 
-	return &strategy.StrategyResult{
+	return &StrategyResult{
 		Current: currentStrategy,
 		Optimal: optimalStrategy,
 		Updated: true,
