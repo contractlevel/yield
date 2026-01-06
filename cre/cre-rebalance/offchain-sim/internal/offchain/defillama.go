@@ -79,7 +79,7 @@ func fetchAndParsePools(config *Config, logger *slog.Logger, sendRequester *http
 	var maxApy float64 = -1
 	var selectedPool *Pool
 	for _, pool := range apiResponse.Data {
-		if AllowedSymbols[pool.Symbol] && AllowedChains[pool.Chain] && AllowedProjects[pool.Project] && pool.Apy > maxApy {
+		if AllowedSymbol[pool.Symbol] && AllowedChain[pool.Chain] && AllowedProject[pool.Project] && pool.Apy > maxApy {
 			maxApy = pool.Apy
 			selectedPool = &Pool{
 				Chain:   pool.Chain,
