@@ -15,5 +15,4 @@ var AllowedProject = map[string]bool{
 
 var AllowedSymbol = map[string]bool{
 	"USDC": true,
-	"USDT": true,
 }
