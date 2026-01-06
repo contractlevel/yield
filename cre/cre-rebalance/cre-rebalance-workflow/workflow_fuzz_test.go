@@ -13,6 +13,10 @@ import (
 	"github.com/smartcontractkit/cre-sdk-go/cre/testutils"
 )
 
+/*//////////////////////////////////////////////////////////////
+                        SETUP / UTILITY
+//////////////////////////////////////////////////////////////*/
+
 const (
     parentChainSelector = 1
     childChainSelector  = 2
@@ -45,6 +49,10 @@ func newTestConfig(withChild bool) *helper.Config {
     }
     return cfg
 }
+
+/*//////////////////////////////////////////////////////////////
+                           FUZZ TESTS
+//////////////////////////////////////////////////////////////*/
 
 // Fuzz_onCronTriggerWithDeps_RebalanceThresholdAndGasLimit fuzzes the APY delta and
 // whether the current strategy is on the parent or child chain. It verifies:
