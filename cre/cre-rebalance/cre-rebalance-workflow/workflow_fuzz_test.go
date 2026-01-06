@@ -13,6 +13,39 @@ import (
 	"github.com/smartcontractkit/cre-sdk-go/cre/testutils"
 )
 
+const (
+    parentChainSelector = 1
+    childChainSelector  = 2
+    parentGasLimit      = 500_000
+    childGasLimit       = 777_000
+    parentYieldAddr     = "0xparent"
+    parentRebalancer    = "0xrebalancer-parent"
+    childYieldAddr      = "0xchild"
+)
+
+func newTestConfig(withChild bool) *helper.Config {
+    cfg := &helper.Config{
+        Evms: []helper.EvmConfig{
+            {
+                ChainName:         "parent-chain",
+                ChainSelector:     parentChainSelector,
+                YieldPeerAddress:  parentYieldAddr,
+                RebalancerAddress: parentRebalancer,
+                GasLimit:          parentGasLimit,
+            },
+        },
+    }
+    if withChild {
+        cfg.Evms = append(cfg.Evms, helper.EvmConfig{
+            ChainName:        "child-chain",
+            ChainSelector:    childChainSelector,
+            YieldPeerAddress: childYieldAddr,
+            GasLimit:         childGasLimit,
+        })
+    }
+    return cfg
+}
+
 // Fuzz_onCronTriggerWithDeps_RebalanceThresholdAndGasLimit fuzzes the APY delta and
 // whether the current strategy is on the parent or child chain. It verifies:
 //   - WriteRebalance is called iff delta >= threshold.
@@ -40,23 +73,7 @@ func Fuzz_onCronTriggerWithDeps_RebalanceThresholdAndGasLimit(f *testing.F) {
 		runtime := testutils.NewRuntime(t, nil)
 
 		// Two EVM configs: parent and child.
-		cfg := &helper.Config{
-			Evms: []helper.EvmConfig{
-				{
-					ChainName:         "parent-chain",
-					ChainSelector:     1,
-					YieldPeerAddress:  "0xparent",
-					RebalancerAddress: "0xrebalancer-parent",
-					GasLimit:          500_000,
-				},
-				{
-					ChainName:        "child-chain",
-					ChainSelector:    2,
-					YieldPeerAddress: "0xchild",
-					GasLimit:         777_000,
-				},
-			},
-		}
+		cfg := newTestConfig(true)
 		parentCfg := cfg.Evms[0]
 		childCfg := cfg.Evms[1]
 
@@ -169,17 +186,7 @@ func Fuzz_onCronTriggerWithDeps_StrategyEqualityNoRebalance(f *testing.F) {
 
 		runtime := testutils.NewRuntime(t, nil)
 
-		cfg := &helper.Config{
-			Evms: []helper.EvmConfig{
-				{
-					ChainName:         "parent-chain",
-					ChainSelector:     1,
-					YieldPeerAddress:  "0xparent",
-					RebalancerAddress: "0xrebalancer-parent",
-					GasLimit:          500_000,
-				},
-			},
-		}
+		cfg := newTestConfig(false)
 		parentCfg := cfg.Evms[0]
 
 		currentStrategy := onchain.Strategy{
@@ -296,23 +303,7 @@ func Fuzz_onCronTriggerWithDeps_ChildPeerBindingUsage(f *testing.F) {
 
 		runtime := testutils.NewRuntime(t, nil)
 
-		cfg := &helper.Config{
-			Evms: []helper.EvmConfig{
-				{
-					ChainName:         "parent-chain",
-					ChainSelector:     1,
-					YieldPeerAddress:  "0xparent",
-					RebalancerAddress: "0xrebalancer-parent",
-					GasLimit:          500_000,
-				},
-				{
-					ChainName:        "child-chain",
-					ChainSelector:    2,
-					YieldPeerAddress: "0xchild",
-					GasLimit:         777_000,
-				},
-			},
-		}
+		cfg := newTestConfig(true)
 		parentCfg := cfg.Evms[0]
 		childCfg := cfg.Evms[1]
 
@@ -419,23 +410,7 @@ func Fuzz_onCronTriggerWithDeps_APYLiquidityAddedWiring(f *testing.F) {
 
 		runtime := testutils.NewRuntime(t, nil)
 
-		cfg := &helper.Config{
-			Evms: []helper.EvmConfig{
-				{
-					ChainName:         "parent-chain",
-					ChainSelector:     1,
-					YieldPeerAddress:  "0xparent",
-					RebalancerAddress: "0xrebalancer-parent",
-					GasLimit:          500_000,
-				},
-				{
-					ChainName:        "child-chain",
-					ChainSelector:    2,
-					YieldPeerAddress: "0xchild",
-					GasLimit:         777_000,
-				},
-			},
-		}
+		cfg := newTestConfig(true)
 		parentCfg := cfg.Evms[0]
 		childCfg := cfg.Evms[1]
 
@@ -549,17 +524,7 @@ func Fuzz_onCronTriggerWithDeps_DeltaTranslationInvariance(f *testing.F) {
 		runOnce := func(base, delta, shift int64) decision {
 			runtime := testutils.NewRuntime(t, nil)
 
-			cfg := &helper.Config{
-				Evms: []helper.EvmConfig{
-					{
-						ChainName:         "parent-chain",
-						ChainSelector:     1,
-						YieldPeerAddress:  "0xparent",
-						RebalancerAddress: "0xrebalancer-parent",
-						GasLimit:          500_000,
-					},
-				},
-			}
+			cfg := newTestConfig(false)
 			parentCfg := cfg.Evms[0]
 
 			currentStrategy := onchain.Strategy{
