@@ -50,6 +50,13 @@ func newTestConfig(withChild bool) *helper.Config {
     return cfg
 }
 
+func newStrategy(id byte, chainSelector uint64) onchain.Strategy {
+	return onchain.Strategy{
+		ProtocolId:    [32]byte{id},
+		ChainSelector: chainSelector,
+	}
+}
+
 /*//////////////////////////////////////////////////////////////
                            FUZZ TESTS
 //////////////////////////////////////////////////////////////*/
@@ -91,14 +98,8 @@ func Fuzz_onCronTriggerWithDeps_RebalanceThresholdAndGasLimit(f *testing.F) {
 			curChainSelector = childCfg.ChainSelector
 		}
 
-		currentStrategy := onchain.Strategy{
-			ProtocolId:    [32]byte{1},
-			ChainSelector: curChainSelector,
-		}
-		optimalStrategy := onchain.Strategy{
-			ProtocolId:    [32]byte{2},
-			ChainSelector: parentCfg.ChainSelector,
-		}
+		currentStrategy := newStrategy(1, curChainSelector)
+		optimalStrategy := newStrategy(2, parentCfg.ChainSelector)
 
 		var (
 			writeCalled bool
@@ -197,10 +198,7 @@ func Fuzz_onCronTriggerWithDeps_StrategyEqualityNoRebalance(f *testing.F) {
 		cfg := newTestConfig(false)
 		parentCfg := cfg.Evms[0]
 
-		currentStrategy := onchain.Strategy{
-			ProtocolId:    [32]byte{1},
-			ChainSelector: parentCfg.ChainSelector,
-		}
+		currentStrategy := newStrategy(1, parentCfg.ChainSelector)
 		optimalStrategy := currentStrategy
 		if !equal {
 			// Minimal deterministic difference.
@@ -320,14 +318,8 @@ func Fuzz_onCronTriggerWithDeps_ChildPeerBindingUsage(f *testing.F) {
 			curChainSelector = childCfg.ChainSelector
 		}
 
-		currentStrategy := onchain.Strategy{
-			ProtocolId:    [32]byte{1},
-			ChainSelector: curChainSelector,
-		}
-		optimalStrategy := onchain.Strategy{
-			ProtocolId:    [32]byte{2},
-			ChainSelector: parentCfg.ChainSelector,
-		}
+		currentStrategy := newStrategy(1, curChainSelector)
+		optimalStrategy := newStrategy(2, parentCfg.ChainSelector)
 
 		var (
 			childBindCalls   int
@@ -429,14 +421,8 @@ func Fuzz_onCronTriggerWithDeps_APYLiquidityAddedWiring(f *testing.F) {
 			curChainSelector = childCfg.ChainSelector
 		}
 
-		currentStrategy := onchain.Strategy{
-			ProtocolId:    [32]byte{1},
-			ChainSelector: curChainSelector,
-		}
-		optimalStrategy := onchain.Strategy{
-			ProtocolId:    [32]byte{2},
-			ChainSelector: parentCfg.ChainSelector,
-		}
+		currentStrategy := newStrategy(1, curChainSelector)
+		optimalStrategy := newStrategy(2, parentCfg.ChainSelector)
 
 		var (
 			optimalLiquAdded *big.Int
@@ -535,14 +521,8 @@ func Fuzz_onCronTriggerWithDeps_DeltaTranslationInvariance(f *testing.F) {
 			cfg := newTestConfig(false)
 			parentCfg := cfg.Evms[0]
 
-			currentStrategy := onchain.Strategy{
-				ProtocolId:    [32]byte{1},
-				ChainSelector: parentCfg.ChainSelector,
-			}
-			optimalStrategy := onchain.Strategy{
-				ProtocolId:    [32]byte{2},
-				ChainSelector: parentCfg.ChainSelector,
-			}
+			currentStrategy := newStrategy(1, parentCfg.ChainSelector)
+			optimalStrategy := newStrategy(2, parentCfg.ChainSelector)
 
 			baseBI := big.NewInt(base)
 			deltaBI := big.NewInt(delta)
