@@ -11,9 +11,10 @@ import (
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 )
 
-// @review need to call onchain.InitSupportedStrategies(config) - see strategy_registry.go
 func GetOptimalStrategy(config *helper.Config, runtime cre.Runtime, currentStrategy Strategy, liquidityAdded *big.Int) (Strategy, error) {
-	if len(SupportedStrategies) == 0 {
+	initSupportedStrategies(config)
+
+	if len(supportedStrategies) == 0 {
 		return Strategy{}, fmt.Errorf("no supported strategies configured")
 	}
 	if liquidityAdded == nil {
@@ -26,7 +27,7 @@ func GetOptimalStrategy(config *helper.Config, runtime cre.Runtime, currentStrat
 		bestSet      bool
 	)
 
-	for _, strategy := range SupportedStrategies {
+	for _, strategy := range supportedStrategies {
 		// For the current strategy, we want the APY “as is”, so liquidityAdded = 0.
 		liq := liquidityAdded
 		if sameStrategy(strategy, currentStrategy) {

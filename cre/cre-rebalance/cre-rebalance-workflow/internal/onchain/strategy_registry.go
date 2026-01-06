@@ -2,24 +2,25 @@ package onchain
 
 import "cre-rebalance/cre-rebalance-workflow/internal/helper"
 
-var SupportedStrategies []Strategy
+var supportedStrategies []Strategy
 
-// InitSupportedStrategies builds the cross-product of
+// initSupportedStrategies builds the cross-product of
 //   all configured chains × all hardcoded protocols.
 // Call this once at startup, after config is loaded.
-func InitSupportedStrategies(cfg *helper.Config) {
+func initSupportedStrategies(cfg *helper.Config) {
     // 2 protocols right now; pre-allocate capacity for less GC.
-    SupportedStrategies = make([]Strategy, 0, len(cfg.Evms)*2)
+    supportedStrategies = make([]Strategy, 0, len(cfg.Evms)*2)
 
+    // @review do we want to add a bool to config for whether a strategy is supported on that chain?
     for _, evm := range cfg.Evms {
         // AaveV3 on this chain
-        SupportedStrategies = append(SupportedStrategies, Strategy{
+        supportedStrategies = append(supportedStrategies, Strategy{
             ProtocolId:    AaveV3ProtocolId,
             ChainSelector: evm.ChainSelector,
         })
 
         // CompoundV3 on this chain
-        SupportedStrategies = append(SupportedStrategies, Strategy{
+        supportedStrategies = append(supportedStrategies, Strategy{
             ProtocolId:    CompoundV3ProtocolId,
             ChainSelector: evm.ChainSelector,
         })
