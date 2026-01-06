@@ -21,18 +21,3 @@ func ReadCurrentStrategy(peer ParentPeerInterface, runtime cre.Runtime) (Strateg
 func ReadTVL(peer YieldPeerInterface, runtime cre.Runtime) (*big.Int, error) {
 	return peer.GetTotalValue(runtime, big.NewInt(constants.LatestBlock)).Await()
 }
-
-// // ReadAaveAPR reads the Aave APR for a given liquidity added and asset
-// // liquidityAdded should be 0 for current APR or the amount we are adding to see the new APR
-// func ReadAaveAPR(strategyHelper StrategyHelperInterface, runtime cre.Runtime, liquidityAdded *big.Int, asset common.Address) (*big.Int, error) {
-//     args := strategy_helper.GetAaveAPRInput{
-//         LiquidityAdded: liquidityAdded,
-//         Asset:          asset,
-//     }
-
-//     apr, err := strategyHelper.GetAaveAPR(runtime, args, big.NewInt(constants.LatestBlock)).Await()
-//     if err != nil {
-//         return nil, err
-//     }
-//     return apr, nil
-// }

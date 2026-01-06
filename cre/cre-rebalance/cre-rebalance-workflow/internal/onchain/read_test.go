@@ -6,11 +6,9 @@ import (
 	"testing"
 
 	"cre-rebalance/contracts/evm/src/generated/parent_peer"
-	"cre-rebalance/contracts/evm/src/generated/strategy_helper"
 
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 	"github.com/smartcontractkit/cre-sdk-go/cre/testutils"
-	"github.com/ethereum/go-ethereum/common"
 )
 
 /*//////////////////////////////////////////////////////////////
@@ -55,22 +53,6 @@ func (m *mockYieldPeer) GetTotalValue(
 		return m.getTotalValueFunc(runtime, blockNumber)
 	}
 	return cre.PromiseFromResult[*big.Int](nil, errors.New("getTotalValueFunc not set"))
-}
-
-// mockStrategyHelper is a mock implementation of StrategyHelperInterface for testing.
-type mockStrategyHelper struct {
-	getAaveAPRFunc func(cre.Runtime, strategy_helper.GetAaveAPRInput, *big.Int) cre.Promise[*big.Int]
-}
-
-func (m *mockStrategyHelper) GetAaveAPR(
-	runtime cre.Runtime,
-	args strategy_helper.GetAaveAPRInput,
-	blockNumber *big.Int,
-) cre.Promise[*big.Int] {
-	if m.getAaveAPRFunc != nil {
-		return m.getAaveAPRFunc(runtime, args, blockNumber)
-	}
-	return cre.PromiseFromResult[*big.Int](nil, errors.New("getAaveAPRFunc not set"))
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -268,69 +250,5 @@ func Test_ReadTVL_WithZeroValue(t *testing.T) {
 
 	if tvl.Cmp(expectedTVL) != 0 {
 		t.Errorf("expected TVL %v, got %v", expectedTVL, tvl)
-	}
-}
-
-func Test_ReadAaveAPR_Success(t *testing.T) {
-	runtime := testutils.NewRuntime(t, nil)
-
-	liquidityAdded := big.NewInt(0) // current APR path
-	asset := common.HexToAddress("0x00000000000000000000000000000000000000Aa")
-	expectedAPR := big.NewInt(123456789)
-
-	mockHelper := &mockStrategyHelper{
-		getAaveAPRFunc: func(_ cre.Runtime, args strategy_helper.GetAaveAPRInput, blockNumber *big.Int) cre.Promise[*big.Int] {
-			// Verify block number
-			expectedBlock := big.NewInt(LatestBlock)
-			if blockNumber.Cmp(expectedBlock) != 0 {
-				t.Errorf("expected blockNumber %v, got %v", expectedBlock, blockNumber)
-			}
-
-			// Verify args passthrough
-			if args.LiquidityAdded == nil || args.LiquidityAdded.Cmp(liquidityAdded) != 0 {
-				t.Errorf("expected LiquidityAdded %v, got %v", liquidityAdded, args.LiquidityAdded)
-			}
-			if args.Asset != asset {
-				t.Errorf("expected Asset %v, got %v", asset, args.Asset)
-			}
-
-			return cre.PromiseFromResult(expectedAPR, nil)
-		},
-	}
-
-	apr, err := ReadAaveAPR(mockHelper, runtime, liquidityAdded, asset)
-	if err != nil {
-		t.Fatalf("ReadAaveAPR returned unexpected error: %v", err)
-	}
-	if apr == nil {
-		t.Fatal("ReadAaveAPR returned nil apr")
-	}
-	if apr.Cmp(expectedAPR) != 0 {
-		t.Errorf("expected apr %v, got %v", expectedAPR, apr)
-	}
-}
-
-func Test_ReadAaveAPR_Error(t *testing.T) {
-	runtime := testutils.NewRuntime(t, nil)
-
-	liquidityAdded := big.NewInt(1000) // simulate deposit
-	asset := common.HexToAddress("0x00000000000000000000000000000000000000Bb")
-	expectedErr := errors.New("failed to read apr")
-
-	mockHelper := &mockStrategyHelper{
-		getAaveAPRFunc: func(_ cre.Runtime, _ strategy_helper.GetAaveAPRInput, _ *big.Int) cre.Promise[*big.Int] {
-			return cre.PromiseFromResult[*big.Int](nil, expectedErr)
-		},
-	}
-
-	apr, err := ReadAaveAPR(mockHelper, runtime, liquidityAdded, asset)
-	if err == nil {
-		t.Fatal("ReadAaveAPR expected error but got nil")
-	}
-	if !errors.Is(err, expectedErr) {
-		t.Errorf("expected error %v, got %v", expectedErr, err)
-	}
-	if apr != nil {
-		t.Errorf("expected nil apr on error, got %v", apr)
 	}
 }

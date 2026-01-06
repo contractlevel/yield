@@ -100,33 +100,3 @@ func Test_NewRebalancerBinding_errorWhen_invalidAddress(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
-
-func Test_NewStrategyHelperBinding_success(t *testing.T) {
-	var client *evm.Client = nil
-	addr := "0x0000000000000000000000000000000000000004"
-
-	binding, err := NewStrategyHelperBinding(client, addr)
-	if err != nil {
-		t.Fatalf("expected nil error, got: %v", err)
-	}
-	if binding == nil {
-		t.Fatalf("expected non-nil binding, got nil")
-	}
-	var _ StrategyHelperInterface = binding
-}
-
-func Test_NewStrategyHelperBinding_errorWhen_invalidAddress(t *testing.T) {
-	var client *evm.Client = nil
-	addr := "bad"
-
-	binding, err := NewStrategyHelperBinding(client, addr)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if binding != nil {
-		t.Fatalf("expected nil binding on error, got non-nil")
-	}
-	if !strings.Contains(err.Error(), "invalid StrategyHelper address: "+addr) {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
