@@ -12,6 +12,7 @@ import (
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/blockchain/evm"
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 	"github.com/smartcontractkit/cre-sdk-go/cre/testutils"
+	"github.com/stretchr/testify/require"
 )
 
 /*//////////////////////////////////////////////////////////////
@@ -65,8 +66,8 @@ func newStrategy(id byte, chainSelector uint64) onchain.Strategy {
 
 // Fuzz_onCronTriggerWithDeps_RebalanceThresholdAndGasLimit fuzzes the APY delta and
 // whether the current strategy is on the parent or child chain. It verifies:
-//   - WriteRebalance is called iff delta >= threshold.
-//   - StrategyResult.Updated == (delta >= threshold).
+//   - WriteRebalance is called iff delta >= threshold and APYs are finite.
+//   - StrategyResult.Updated == (delta >= threshold and APYs are finite).
 //   - gasLimit passed to WriteRebalance matches the gasLimit of the correct EVM config:
 //       * parent gasLimit when currentStrategy.ChainSelector == parentCfg.ChainSelector
 //       * child gasLimit otherwise.
@@ -81,12 +82,6 @@ func Fuzz_onCronTriggerWithDeps_RebalanceThresholdAndGasLimit(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, delta float64, sameChain bool) {
 		t.Helper()
-
-		// Avoid feeding NaN/Inf into the workflow; the real CalculateAPYForStrategy
-		// never returns these by contract.
-		if math.IsNaN(delta) || math.IsInf(delta, 0) {
-			delta = 0
-		}
 
 		// Model: currentAPY = 0, optimalAPY = delta.
 		currentAPY := 0.0
@@ -133,9 +128,7 @@ func Fuzz_onCronTriggerWithDeps_RebalanceThresholdAndGasLimit(f *testing.F) {
 			WriteRebalance: func(_ onchain.RebalancerInterface, _ cre.Runtime, _ *slog.Logger, gasLimit uint64, optimal onchain.Strategy) error {
 				writeCalled = true
 				gotGasLimit = gasLimit
-				if optimal != optimalStrategy {
-					t.Fatalf("WriteRebalance optimal mismatch: got %+v, want %+v", optimal, optimalStrategy)
-				}
+				require.Equal(t, optimalStrategy, optimal, "WriteRebalance optimal mismatch")
 				return nil
 			},
 			GetOptimalStrategy: func(_ *helper.Config, _ cre.Runtime) (onchain.Strategy, error) {
@@ -148,43 +141,37 @@ func Fuzz_onCronTriggerWithDeps_RebalanceThresholdAndGasLimit(f *testing.F) {
 				case currentStrategy:
 					return currentAPY, nil
 				default:
-					return 0, nil
+					return 0.0, nil
 				}
 			},
 		}
 
 		res, err := onCronTriggerWithDeps(cfg, runtime, nil, deps)
-		if err != nil {
-			t.Fatalf("unexpected error from onCronTriggerWithDeps: %v", err)
-		}
-		if res == nil {
-			t.Fatalf("expected non-nil result")
-		}
+		require.NoError(t, err, "unexpected error from onCronTriggerWithDeps")
+		require.NotNil(t, res, "expected non-nil result")
 
-		shouldRebalance := delta >= threshold
+		// Mirror the NaN/Inf guard from workflow.go.
+		invalid := math.IsNaN(optimalAPY) || math.IsNaN(currentAPY) ||
+			math.IsInf(optimalAPY, 0) || math.IsInf(currentAPY, 0)
+
+		shouldRebalance := !invalid && delta >= threshold
 
 		if shouldRebalance {
-			if !writeCalled {
-				t.Fatalf("expected WriteRebalance to be called when delta >= threshold (delta=%f, threshold=%f)", delta, threshold)
-			}
-			if !res.Updated {
-				t.Fatalf("expected result.Updated=true when delta >= threshold")
-			}
+			require.True(t, writeCalled,
+				"expected WriteRebalance to be called when delta >= threshold (delta=%f, threshold=%f)", delta, threshold)
+			require.True(t, res.Updated, "expected result.Updated=true when delta >= threshold")
 
 			expectedGas := parentCfg.GasLimit
 			if !sameChain {
 				expectedGas = childCfg.GasLimit
 			}
-			if gotGasLimit != expectedGas {
-				t.Fatalf("unexpected gasLimit passed to WriteRebalance: got %d, want %d (sameChain=%v)", gotGasLimit, expectedGas, sameChain)
-			}
+			require.Equal(t, expectedGas, gotGasLimit,
+				"unexpected gasLimit passed to WriteRebalance (sameChain=%v)", sameChain)
 		} else {
-			if writeCalled {
-				t.Fatalf("expected WriteRebalance NOT to be called when delta < threshold (delta=%f, threshold=%f)", delta, threshold)
-			}
-			if res.Updated {
-				t.Fatalf("expected result.Updated=false when delta < threshold")
-			}
+			require.False(t, writeCalled,
+				"expected WriteRebalance NOT to be called when delta < threshold or APYs invalid (delta=%f, threshold=%f)", delta, threshold)
+			require.False(t, res.Updated,
+				"expected result.Updated=false when delta < threshold or APYs invalid")
 		}
 	})
 }
@@ -272,32 +259,24 @@ func Fuzz_onCronTriggerWithDeps_StrategyEqualityNoRebalance(f *testing.F) {
 		}
 
 		res, err := onCronTriggerWithDeps(cfg, runtime, nil, deps)
-		if err != nil {
-			t.Fatalf("unexpected error from onCronTriggerWithDeps: %v", err)
-		}
-		if res == nil {
-			t.Fatalf("expected non-nil result")
-		}
+		require.NoError(t, err, "unexpected error from onCronTriggerWithDeps")
+		require.NotNil(t, res, "expected non-nil result")
 
 		if equal {
-			if res.Updated {
-				t.Fatalf("expected Updated=false when strategies are equal")
-			}
-			if res.Current != currentStrategy || res.Optimal != optimalStrategy {
-				t.Fatalf("unexpected result when equal: %+v", res)
-			}
-			if tvlCalled || apyCalled || rebalancerCalled || writeCalled {
-				t.Fatalf("unexpected downstream calls when strategies are equal: tvl=%v apy=%v rebinder=%v write=%v",
-					tvlCalled, apyCalled, rebalancerCalled, writeCalled)
-			}
+			require.False(t, res.Updated, "expected Updated=false when strategies are equal")
+			require.Equal(t, currentStrategy, res.Current)
+			require.Equal(t, optimalStrategy, res.Optimal)
+
+			require.False(t, tvlCalled, "ReadTVL should not be called when strategies are equal")
+			require.False(t, apyCalled, "CalculateAPYForStrategy should not be called when strategies are equal")
+			require.False(t, rebalancerCalled, "NewRebalancerBinding should not be called when strategies are equal")
+			require.False(t, writeCalled, "WriteRebalance should not be called when strategies are equal")
 		} else {
-			if !res.Updated {
-				t.Fatalf("expected Updated=true when strategies differ and delta >= threshold")
-			}
-			if !tvlCalled || !apyCalled || !rebalancerCalled || !writeCalled {
-				t.Fatalf("expected all downstream calls when strategies differ; tvl=%v apy=%v rebinder=%v write=%v",
-					tvlCalled, apyCalled, rebalancerCalled, writeCalled)
-			}
+			require.True(t, res.Updated, "expected Updated=true when strategies differ and delta >= threshold")
+			require.True(t, tvlCalled, "expected ReadTVL to be called when strategies differ")
+			require.True(t, apyCalled, "expected CalculateAPYForStrategy to be called when strategies differ")
+			require.True(t, rebalancerCalled, "expected NewRebalancerBinding to be called when strategies differ")
+			require.True(t, writeCalled, "expected WriteRebalance to be called when strategies differ")
 		}
 	})
 }
@@ -374,30 +353,20 @@ func Fuzz_onCronTriggerWithDeps_ChildPeerBindingUsage(f *testing.F) {
 		}
 
 		res, err := onCronTriggerWithDeps(cfg, runtime, nil, deps)
-		if err != nil {
-			t.Fatalf("unexpected error from onCronTriggerWithDeps: %v", err)
-		}
-		if res == nil {
-			t.Fatalf("expected non-nil result")
-		}
-		if res.Updated {
-			t.Fatalf("expected Updated=false when delta < threshold")
-		}
-		if readTVLCalls != 1 {
-			t.Fatalf("expected ReadTVL to be called exactly once, got %d", readTVLCalls)
-		}
-		if rebalancerCalled || writeCalled {
-			t.Fatalf("rebalancer/write should not be called when delta < threshold; rebinder=%v write=%v", rebalancerCalled, writeCalled)
-		}
+		require.NoError(t, err, "unexpected error from onCronTriggerWithDeps")
+		require.NotNil(t, res, "expected non-nil result")
+
+		require.False(t, res.Updated, "expected Updated=false when delta < threshold")
+		require.Equal(t, 1, readTVLCalls, "expected ReadTVL to be called exactly once")
+		require.False(t, rebalancerCalled, "Rebalancer should not be called when delta < threshold")
+		require.False(t, writeCalled, "WriteRebalance should not be called when delta < threshold")
 
 		if sameChain {
-			if childBindCalls != 0 {
-				t.Fatalf("expected NewChildPeerBinding not to be called when strategy is on parent chain; got %d calls", childBindCalls)
-			}
+			require.Equal(t, 0, childBindCalls,
+				"expected NewChildPeerBinding not to be called when strategy is on parent chain")
 		} else {
-			if childBindCalls != 1 {
-				t.Fatalf("expected NewChildPeerBinding to be called once when strategy is on child chain; got %d calls", childBindCalls)
-			}
+			require.Equal(t, 1, childBindCalls,
+				"expected NewChildPeerBinding to be called once when strategy is on child chain")
 		}
 	})
 }
@@ -463,14 +432,10 @@ func Fuzz_onCronTriggerWithDeps_APYLiquidityAddedWiring(f *testing.F) {
 			},
 			CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, liquidityAdded *big.Int) (float64, error) {
 				if s == optimalStrategy {
-					if optimalLiquAdded != nil {
-						t.Fatalf("optimal strategy APY calculation called more than once")
-					}
+					require.Nil(t, optimalLiquAdded, "optimal strategy APY calculation called more than once")
 					optimalLiquAdded = new(big.Int).Set(liquidityAdded)
 				} else if s == currentStrategy {
-					if currentLiquAdded != nil {
-						t.Fatalf("current strategy APY calculation called more than once")
-					}
+					require.Nil(t, currentLiquAdded, "current strategy APY calculation called more than once")
 					currentLiquAdded = new(big.Int).Set(liquidityAdded)
 				}
 				// APY values themselves don't matter here, only liquidityAdded.
@@ -479,26 +444,19 @@ func Fuzz_onCronTriggerWithDeps_APYLiquidityAddedWiring(f *testing.F) {
 		}
 
 		res, err := onCronTriggerWithDeps(cfg, runtime, nil, deps)
-		if err != nil {
-			t.Fatalf("unexpected error from onCronTriggerWithDeps: %v", err)
-		}
-		if res == nil {
-			t.Fatalf("expected non-nil result")
-		}
+		require.NoError(t, err, "unexpected error from onCronTriggerWithDeps")
+		require.NotNil(t, res, "expected non-nil result")
 
-		if optimalLiquAdded == nil || currentLiquAdded == nil {
-			t.Fatalf("expected CalculateAPYForStrategy to be called for both strategies; optimalAdded=%v currentAdded=%v",
-				optimalLiquAdded, currentLiquAdded)
-		}
+		require.NotNil(t, optimalLiquAdded, "expected CalculateAPYForStrategy to be called for optimal strategy")
+		require.NotNil(t, currentLiquAdded, "expected CalculateAPYForStrategy to be called for current strategy")
 
-		if optimalLiquAdded.Cmp(tvl) != 0 {
-			t.Fatalf("expected optimal strategy to be called with liquidityAdded == TVL; got %s, want %s",
-				optimalLiquAdded.String(), tvl.String())
-		}
-		if currentLiquAdded.Sign() != 0 {
-			t.Fatalf("expected current strategy to be called with liquidityAdded == 0; got %s",
-				currentLiquAdded.String())
-		}
+		require.Equal(t, 0, optimalLiquAdded.Cmp(tvl),
+			"expected optimal strategy to be called with liquidityAdded == TVL; got %s, want %s",
+			optimalLiquAdded.String(), tvl.String())
+
+		require.Equal(t, 0, currentLiquAdded.Sign(),
+			"expected current strategy to be called with liquidityAdded == 0; got %s",
+			currentLiquAdded.String())
 	})
 }
 
@@ -579,12 +537,9 @@ func Fuzz_onCronTriggerWithDeps_DeltaTranslationInvariance(f *testing.F) {
 			}
 
 			res, err := onCronTriggerWithDeps(cfg, runtime, nil, deps)
-			if err != nil {
-				t.Fatalf("unexpected error from onCronTriggerWithDeps: %v", err)
-			}
-			if res == nil {
-				t.Fatalf("expected non-nil result")
-			}
+			require.NoError(t, err, "unexpected error from onCronTriggerWithDeps")
+			require.NotNil(t, res, "expected non-nil result")
+
 			updated = res.Updated
 
 			return decision{
@@ -601,19 +556,13 @@ func Fuzz_onCronTriggerWithDeps_DeltaTranslationInvariance(f *testing.F) {
 		dec2 := runOnce(baseRaw, deltaRaw, shiftRaw)
 
 		// The delta should be identical in both runs.
-		if dec1.writeDelta != dec2.writeDelta {
-			t.Fatalf("expected identical APY deltas; got %f and %f",
-				dec1.writeDelta, dec2.writeDelta)
-		}
+		require.Equal(t, dec1.writeDelta, dec2.writeDelta,
+			"expected identical APY deltas; got %f and %f", dec1.writeDelta, dec2.writeDelta)
 
 		// Property: rebalance decision depends only on delta, not on absolute APY levels.
-		if dec1.updated != dec2.updated {
-			t.Fatalf("Updated mismatch between runs with same delta: run1=%v run2=%v",
-				dec1.updated, dec2.updated)
-		}
-		if dec1.wrote != dec2.wrote {
-			t.Fatalf("WriteRebalance mismatch between runs with same delta: run1=%v run2=%v",
-				dec1.wrote, dec2.wrote)
-		}
+		require.Equal(t, dec1.updated, dec2.updated,
+			"Updated mismatch between runs with same delta: run1=%v run2=%v", dec1.updated, dec2.updated)
+		require.Equal(t, dec1.wrote, dec2.wrote,
+			"WriteRebalance mismatch between runs with same delta: run1=%v run2=%v", dec1.wrote, dec2.wrote)
 	})
 }
