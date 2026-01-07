@@ -14,11 +14,12 @@ import (
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/scheduler/cron"
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 	"github.com/smartcontractkit/cre-sdk-go/cre/testutils"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 /*//////////////////////////////////////////////////////////////
-                   TEST HELPERS
+                          TEST HELPERS
 //////////////////////////////////////////////////////////////*/
 
 func newPayloadNow() *cron.Payload {
@@ -28,7 +29,7 @@ func newPayloadNow() *cron.Payload {
 }
 
 /*//////////////////////////////////////////////////////////////
-                   TESTS FOR ON CRON TRIGGER
+                     TESTS FOR ON CRON TRIGGER
 //////////////////////////////////////////////////////////////*/
 
 func Test_onCronTrigger_errorWhen_noEvmConfigsProvided(t *testing.T) {
@@ -36,26 +37,20 @@ func Test_onCronTrigger_errorWhen_noEvmConfigsProvided(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
 
 	res, err := onCronTrigger(config, runtime, newPayloadNow())
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if res != nil {
-		t.Fatalf("expected nil result, got %v", res)
-	}
-	if got, want := err.Error(), "no EVM configs provided"; !strings.HasPrefix(got, want) {
-		t.Fatalf("unexpected error: got %q, want prefix %q", got, want)
-	}
+
+	require.Error(t, err)
+	require.Nil(t, res)
+	require.True(t, strings.HasPrefix(err.Error(), "no EVM configs provided"),
+		"unexpected error: %v", err)
 }
 
 func Test_onCronTriggerWithDeps_errorWhen_ParentPeerBindingFails(t *testing.T) {
 	config := &helper.Config{
-		Evms: []helper.EvmConfig{
-			{
-				ChainName:        "parent-chain",
-				ChainSelector:    1,
-				YieldPeerAddress: "0xparent",
-			},
-		},
+		Evms: []helper.EvmConfig{{
+			ChainName:        "parent-chain",
+			ChainSelector:    1,
+			YieldPeerAddress: "0xparent",
+		}},
 	}
 	runtime := testutils.NewRuntime(t, nil)
 
@@ -63,30 +58,22 @@ func Test_onCronTriggerWithDeps_errorWhen_ParentPeerBindingFails(t *testing.T) {
 		NewParentPeerBinding: func(_ *evm.Client, _ string) (onchain.ParentPeerInterface, error) {
 			return nil, fmt.Errorf("parent-binding-failed")
 		},
-		// remaining deps are irrelevant because we fail before using them
 	}
 
 	res, err := onCronTriggerWithDeps(config, runtime, newPayloadNow(), deps)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if res != nil {
-		t.Fatalf("expected nil result, got %v", res)
-	}
-	if !strings.Contains(err.Error(), "failed to create ParentPeer binding: parent-binding-failed") {
-		t.Fatalf("unexpected error: %v", err)
-	}
+
+	require.Error(t, err)
+	require.Nil(t, res)
+	require.Contains(t, err.Error(), "failed to create ParentPeer binding: parent-binding-failed")
 }
 
 func Test_onCronTriggerWithDeps_errorWhen_ReadCurrentStrategyFails(t *testing.T) {
 	config := &helper.Config{
-		Evms: []helper.EvmConfig{
-			{
-				ChainName:        "parent-chain",
-				ChainSelector:    1,
-				YieldPeerAddress: "0xparent",
-			},
-		},
+		Evms: []helper.EvmConfig{{
+			ChainName:        "parent-chain",
+			ChainSelector:    1,
+			YieldPeerAddress: "0xparent",
+		}},
 	}
 	runtime := testutils.NewRuntime(t, nil)
 
@@ -100,32 +87,23 @@ func Test_onCronTriggerWithDeps_errorWhen_ReadCurrentStrategyFails(t *testing.T)
 	}
 
 	res, err := onCronTriggerWithDeps(config, runtime, newPayloadNow(), deps)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if res != nil {
-		t.Fatalf("expected nil result, got %+v", res)
-	}
-	if !strings.Contains(err.Error(), "failed to read strategy from ParentPeer: read-strategy-failed") {
-		t.Fatalf("unexpected error: %v", err)
-	}
+
+	require.Error(t, err)
+	require.Nil(t, res)
+	require.Contains(t, err.Error(), "failed to read strategy from ParentPeer: read-strategy-failed")
 }
 
 func Test_onCronTriggerWithDeps_errorWhen_GetOptimalStrategyFails(t *testing.T) {
 	config := &helper.Config{
-		Evms: []helper.EvmConfig{
-			{
-				ChainName:        "parent-chain",
-				ChainSelector:    1,
-				YieldPeerAddress: "0xparent",
-			},
-		},
+		Evms: []helper.EvmConfig{{
+			ChainName:        "parent-chain",
+			ChainSelector:    1,
+			YieldPeerAddress: "0xparent",
+		}},
 	}
 	runtime := testutils.NewRuntime(t, nil)
 
-	cur := onchain.Strategy{
-		ChainSelector: 1,
-	}
+	cur := onchain.Strategy{ChainSelector: 1}
 
 	deps := OnCronDeps{
 		NewParentPeerBinding: func(_ *evm.Client, _ string) (onchain.ParentPeerInterface, error) {
@@ -138,42 +116,33 @@ func Test_onCronTriggerWithDeps_errorWhen_GetOptimalStrategyFails(t *testing.T) 
 			return onchain.Strategy{}, fmt.Errorf("optimal-failed")
 		},
 		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
-			t.Fatalf("ReadTVL should not be called when GetOptimalStrategy fails")
+			require.FailNow(t, "ReadTVL should not be called when GetOptimalStrategy fails")
 			return nil, nil
 		},
 		WriteRebalance: func(_ onchain.RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ onchain.Strategy) error {
-			t.Fatalf("WriteRebalance should not be called when GetOptimalStrategy fails")
+			require.FailNow(t, "WriteRebalance should not be called when GetOptimalStrategy fails")
 			return nil
 		},
 	}
 
 	res, err := onCronTriggerWithDeps(config, runtime, newPayloadNow(), deps)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if res != nil {
-		t.Fatalf("expected nil result, got %+v", res)
-	}
-	if !strings.Contains(err.Error(), "failed to get optimal strategy: optimal-failed") {
-		t.Fatalf("unexpected error: %v", err)
-	}
+
+	require.Error(t, err)
+	require.Nil(t, res)
+	require.Contains(t, err.Error(), "failed to get optimal strategy: optimal-failed")
 }
 
 func Test_onCronTriggerWithDeps_success_noRebalanceWhenStrategyUnchanged(t *testing.T) {
 	config := &helper.Config{
-		Evms: []helper.EvmConfig{
-			{
-				ChainName:        "parent-chain",
-				ChainSelector:    1,
-				YieldPeerAddress: "0xparent",
-			},
-		},
+		Evms: []helper.EvmConfig{{
+			ChainName:        "parent-chain",
+			ChainSelector:    1,
+			YieldPeerAddress: "0xparent",
+		}},
 	}
 	runtime := testutils.NewRuntime(t, nil)
 
-	strat := onchain.Strategy{
-		ChainSelector: 1,
-	}
+	strat := onchain.Strategy{ChainSelector: 1}
 
 	deps := OnCronDeps{
 		NewParentPeerBinding: func(_ *evm.Client, _ string) (onchain.ParentPeerInterface, error) {
@@ -186,39 +155,31 @@ func Test_onCronTriggerWithDeps_success_noRebalanceWhenStrategyUnchanged(t *test
 			return strat, nil
 		},
 		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
-			t.Fatalf("ReadTVL should not be called when strategy is unchanged")
+			require.FailNow(t, "ReadTVL should not be called when strategy is unchanged")
 			return nil, nil
 		},
 		WriteRebalance: func(_ onchain.RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ onchain.Strategy) error {
-			t.Fatalf("WriteRebalance should not be called when strategy is unchanged")
+			require.FailNow(t, "WriteRebalance should not be called when strategy is unchanged")
 			return nil
 		},
 	}
 
 	res, err := onCronTriggerWithDeps(config, runtime, newPayloadNow(), deps)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if res == nil {
-		t.Fatalf("expected non-nil result")
-	}
-	if res.Updated {
-		t.Fatalf("expected Updated=false when strategies are equal")
-	}
-	if res.Current != strat || res.Optimal != strat {
-		t.Fatalf("unexpected result: %+v", res)
-	}
+
+	require.NoError(t, err)
+	require.NotNil(t, res)
+	require.False(t, res.Updated)
+	require.Equal(t, strat, res.Current)
+	require.Equal(t, strat, res.Optimal)
 }
 
 func Test_onCronTriggerWithDeps_errorWhen_NoConfigForStrategyChain(t *testing.T) {
 	config := &helper.Config{
-		Evms: []helper.EvmConfig{
-			{
-				ChainName:        "parent-chain",
-				ChainSelector:    1,
-				YieldPeerAddress: "0xparent",
-			},
-		},
+		Evms: []helper.EvmConfig{{
+			ChainName:        "parent-chain",
+			ChainSelector:    1,
+			YieldPeerAddress: "0xparent",
+		}},
 	}
 	runtime := testutils.NewRuntime(t, nil)
 
@@ -242,25 +203,20 @@ func Test_onCronTriggerWithDeps_errorWhen_NoConfigForStrategyChain(t *testing.T)
 			return opt, nil
 		},
 		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
-			t.Fatalf("ReadTVL should not be called when no EVM config exists for strategy chain")
+			require.FailNow(t, "ReadTVL should not be called when no EVM config exists for strategy chain")
 			return nil, nil
 		},
 		WriteRebalance: func(_ onchain.RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ onchain.Strategy) error {
-			t.Fatalf("WriteRebalance should not be called when no EVM config exists for strategy chain")
+			require.FailNow(t, "WriteRebalance should not be called when no EVM config exists for strategy chain")
 			return nil
 		},
 	}
 
 	res, err := onCronTriggerWithDeps(config, runtime, newPayloadNow(), deps)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if res != nil {
-		t.Fatalf("expected nil result, got %+v", res)
-	}
-	if !strings.Contains(err.Error(), "no EVM config found for strategy chainSelector 999") {
-		t.Fatalf("unexpected error: %v", err)
-	}
+
+	require.Error(t, err)
+	require.Nil(t, res)
+	require.Contains(t, err.Error(), "no EVM config found for strategy chainSelector 999")
 }
 
 func Test_onCronTriggerWithDeps_errorWhen_ChildPeerBindingFails(t *testing.T) {
@@ -303,36 +259,29 @@ func Test_onCronTriggerWithDeps_errorWhen_ChildPeerBindingFails(t *testing.T) {
 			return opt, nil
 		},
 		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
-			t.Fatalf("ReadTVL should not be called when ChildPeer binding fails")
+			require.FailNow(t, "ReadTVL should not be called when ChildPeer binding fails")
 			return nil, nil
 		},
 		WriteRebalance: func(_ onchain.RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ onchain.Strategy) error {
-			t.Fatalf("WriteRebalance should not be called when ChildPeer binding fails")
+			require.FailNow(t, "WriteRebalance should not be called when ChildPeer binding fails")
 			return nil
 		},
 	}
 
 	res, err := onCronTriggerWithDeps(config, runtime, newPayloadNow(), deps)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if res != nil {
-		t.Fatalf("expected nil result, got %+v", res)
-	}
-	if !strings.Contains(err.Error(), "failed to create strategy YieldPeer binding: child-binding-failed") {
-		t.Fatalf("unexpected error: %v", err)
-	}
+
+	require.Error(t, err)
+	require.Nil(t, res)
+	require.Contains(t, err.Error(), "failed to create strategy YieldPeer binding: child-binding-failed")
 }
 
 func Test_onCronTriggerWithDeps_errorWhen_ReadTVLFails_sameChain(t *testing.T) {
 	config := &helper.Config{
-		Evms: []helper.EvmConfig{
-			{
-				ChainName:        "parent-chain",
-				ChainSelector:    1,
-				YieldPeerAddress: "0xparent",
-			},
-		},
+		Evms: []helper.EvmConfig{{
+			ChainName:        "parent-chain",
+			ChainSelector:    1,
+			YieldPeerAddress: "0xparent",
+		}},
 	}
 	runtime := testutils.NewRuntime(t, nil)
 
@@ -359,32 +308,25 @@ func Test_onCronTriggerWithDeps_errorWhen_ReadTVLFails_sameChain(t *testing.T) {
 			return nil, fmt.Errorf("tvl-failed")
 		},
 		WriteRebalance: func(_ onchain.RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ onchain.Strategy) error {
-			t.Fatalf("WriteRebalance should not be called when ReadTVL fails")
+			require.FailNow(t, "WriteRebalance should not be called when ReadTVL fails")
 			return nil
 		},
 	}
 
 	res, err := onCronTriggerWithDeps(config, runtime, newPayloadNow(), deps)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if res != nil {
-		t.Fatalf("expected nil result, got %+v", res)
-	}
-	if !strings.Contains(err.Error(), "failed to get total value from strategy YieldPeer: tvl-failed") {
-		t.Fatalf("unexpected error: %v", err)
-	}
+
+	require.Error(t, err)
+	require.Nil(t, res)
+	require.Contains(t, err.Error(), "failed to get total value from strategy YieldPeer: tvl-failed")
 }
 
 func Test_onCronTriggerWithDeps_errorWhen_OptimalAPYCalculationFails(t *testing.T) {
 	config := &helper.Config{
-		Evms: []helper.EvmConfig{
-			{
-				ChainName:        "parent-chain",
-				ChainSelector:    1,
-				YieldPeerAddress: "0xparent",
-			},
-		},
+		Evms: []helper.EvmConfig{{
+			ChainName:        "parent-chain",
+			ChainSelector:    1,
+			YieldPeerAddress: "0xparent",
+		}},
 	}
 	runtime := testutils.NewRuntime(t, nil)
 
@@ -411,32 +353,25 @@ func Test_onCronTriggerWithDeps_errorWhen_OptimalAPYCalculationFails(t *testing.
 			return 0.0, nil
 		},
 		WriteRebalance: func(_ onchain.RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ onchain.Strategy) error {
-			t.Fatalf("WriteRebalance should not be called when optimal APY calculation fails")
+			require.FailNow(t, "WriteRebalance should not be called when optimal APY calculation fails")
 			return nil
 		},
 	}
 
 	res, err := onCronTriggerWithDeps(config, runtime, newPayloadNow(), deps)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if res != nil {
-		t.Fatalf("expected nil result, got %+v", res)
-	}
-	if !strings.Contains(err.Error(), "failed to calculate optimal strategy APY: optimal-apy-failed") {
-		t.Fatalf("unexpected error: %v", err)
-	}
+
+	require.Error(t, err)
+	require.Nil(t, res)
+	require.Contains(t, err.Error(), "failed to calculate optimal strategy APY: optimal-apy-failed")
 }
 
 func Test_onCronTriggerWithDeps_errorWhen_CurrentAPYCalculationFails(t *testing.T) {
 	config := &helper.Config{
-		Evms: []helper.EvmConfig{
-			{
-				ChainName:        "parent-chain",
-				ChainSelector:    1,
-				YieldPeerAddress: "0xparent",
-			},
-		},
+		Evms: []helper.EvmConfig{{
+			ChainName:        "parent-chain",
+			ChainSelector:    1,
+			YieldPeerAddress: "0xparent",
+		}},
 	}
 	runtime := testutils.NewRuntime(t, nil)
 
@@ -463,33 +398,26 @@ func Test_onCronTriggerWithDeps_errorWhen_CurrentAPYCalculationFails(t *testing.
 			return 0.0, nil
 		},
 		WriteRebalance: func(_ onchain.RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ onchain.Strategy) error {
-			t.Fatalf("WriteRebalance should not be called when current APY calculation fails")
+			require.FailNow(t, "WriteRebalance should not be called when current APY calculation fails")
 			return nil
 		},
 	}
 
 	res, err := onCronTriggerWithDeps(config, runtime, newPayloadNow(), deps)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if res != nil {
-		t.Fatalf("expected nil result, got %+v", res)
-	}
-	if !strings.Contains(err.Error(), "failed to calculate current strategy APY: current-apy-failed") {
-		t.Fatalf("unexpected error: %v", err)
-	}
+
+	require.Error(t, err)
+	require.Nil(t, res)
+	require.Contains(t, err.Error(), "failed to calculate current strategy APY: current-apy-failed")
 }
 
 func Test_onCronTriggerWithDeps_success_noRebalanceWhenDeltaBelowThreshold(t *testing.T) {
 	config := &helper.Config{
-		Evms: []helper.EvmConfig{
-			{
-				ChainName:        "parent-chain",
-				ChainSelector:    1,
-				YieldPeerAddress: "0xparent",
-				GasLimit:         500000,
-			},
-		},
+		Evms: []helper.EvmConfig{{
+			ChainName:        "parent-chain",
+			ChainSelector:    1,
+			YieldPeerAddress: "0xparent",
+			GasLimit:         500000,
+		}},
 	}
 	runtime := testutils.NewRuntime(t, nil)
 
@@ -511,7 +439,7 @@ func Test_onCronTriggerWithDeps_success_noRebalanceWhenDeltaBelowThreshold(t *te
 		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
 			return big.NewInt(1000), nil
 		},
-		// Choose APYs so that delta = optimal - current = 0.01 - 0.02 = -0.01 < threshold(0.01).
+		// delta = 0.01 - 0.02 = -0.01 < threshold(0.01)
 		CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (float64, error) {
 			if s == opt {
 				return 0.01, nil
@@ -522,7 +450,7 @@ func Test_onCronTriggerWithDeps_success_noRebalanceWhenDeltaBelowThreshold(t *te
 			return 0.0, nil
 		},
 		NewRebalancerBinding: func(_ *evm.Client, _ string) (onchain.RebalancerInterface, error) {
-			t.Fatalf("NewRebalancerBinding should not be called when delta < threshold")
+			require.FailNow(t, "NewRebalancerBinding should not be called when delta < threshold")
 			return nil, nil
 		},
 		WriteRebalance: func(_ onchain.RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ onchain.Strategy) error {
@@ -532,34 +460,24 @@ func Test_onCronTriggerWithDeps_success_noRebalanceWhenDeltaBelowThreshold(t *te
 	}
 
 	res, err := onCronTriggerWithDeps(config, runtime, newPayloadNow(), deps)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if res == nil {
-		t.Fatalf("expected non-nil result")
-	}
-	if res.Updated {
-		t.Fatalf("expected Updated=false when delta < threshold")
-	}
-	if writeCalled {
-		t.Fatalf("WriteRebalance should not be called when delta < threshold")
-	}
-	if res.Current != cur || res.Optimal != opt {
-		t.Fatalf("unexpected result: %+v", res)
-	}
+
+	require.NoError(t, err)
+	require.NotNil(t, res)
+	require.False(t, res.Updated)
+	require.False(t, writeCalled, "WriteRebalance should not be called when delta < threshold")
+	require.Equal(t, cur, res.Current)
+	require.Equal(t, opt, res.Optimal)
 }
 
 func Test_onCronTriggerWithDeps_errorWhen_RebalancerBindingFails(t *testing.T) {
 	config := &helper.Config{
-		Evms: []helper.EvmConfig{
-			{
-				ChainName:         "parent-chain",
-				ChainSelector:     1,
-				YieldPeerAddress:  "0xparent",
-				RebalancerAddress: "0xrebalancer",
-				GasLimit:          500000,
-			},
-		},
+		Evms: []helper.EvmConfig{{
+			ChainName:         "parent-chain",
+			ChainSelector:     1,
+			YieldPeerAddress:  "0xparent",
+			RebalancerAddress: "0xrebalancer",
+			GasLimit:          500000,
+		}},
 	}
 	runtime := testutils.NewRuntime(t, nil)
 
@@ -593,34 +511,27 @@ func Test_onCronTriggerWithDeps_errorWhen_RebalancerBindingFails(t *testing.T) {
 			return nil, fmt.Errorf("rebalancer-binding-failed")
 		},
 		WriteRebalance: func(_ onchain.RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ onchain.Strategy) error {
-			t.Fatalf("WriteRebalance should not be called when Rebalancer binding fails")
+			require.FailNow(t, "WriteRebalance should not be called when Rebalancer binding fails")
 			return nil
 		},
 	}
 
 	res, err := onCronTriggerWithDeps(config, runtime, newPayloadNow(), deps)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if res != nil {
-		t.Fatalf("expected nil result, got %+v", res)
-	}
-	if !strings.Contains(err.Error(), "failed to create parent Rebalancer binding: rebalancer-binding-failed") {
-		t.Fatalf("unexpected error: %v", err)
-	}
+
+	require.Error(t, err)
+	require.Nil(t, res)
+	require.Contains(t, err.Error(), "failed to create parent Rebalancer binding: rebalancer-binding-failed")
 }
 
 func Test_onCronTriggerWithDeps_errorWhen_WriteRebalanceFails(t *testing.T) {
 	config := &helper.Config{
-		Evms: []helper.EvmConfig{
-			{
-				ChainName:         "parent-chain",
-				ChainSelector:     1,
-				YieldPeerAddress:  "0xparent",
-				RebalancerAddress: "0xrebalancer",
-				GasLimit:          500000,
-			},
-		},
+		Evms: []helper.EvmConfig{{
+			ChainName:         "parent-chain",
+			ChainSelector:     1,
+			YieldPeerAddress:  "0xparent",
+			RebalancerAddress: "0xrebalancer",
+			GasLimit:          500000,
+		}},
 	}
 	runtime := testutils.NewRuntime(t, nil)
 
@@ -659,28 +570,21 @@ func Test_onCronTriggerWithDeps_errorWhen_WriteRebalanceFails(t *testing.T) {
 	}
 
 	res, err := onCronTriggerWithDeps(config, runtime, newPayloadNow(), deps)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if res != nil {
-		t.Fatalf("expected nil result, got %+v", res)
-	}
-	if !strings.Contains(err.Error(), "failed to rebalance: rebalance-failed") {
-		t.Fatalf("unexpected error: %v", err)
-	}
+
+	require.Error(t, err)
+	require.Nil(t, res)
+	require.Contains(t, err.Error(), "failed to rebalance: rebalance-failed")
 }
 
 func Test_onCronTriggerWithDeps_success_rebalanceWhenStrategyChanges_sameChain(t *testing.T) {
 	config := &helper.Config{
-		Evms: []helper.EvmConfig{
-			{
-				ChainName:         "parent-chain",
-				ChainSelector:     1,
-				YieldPeerAddress:  "0xparent",
-				RebalancerAddress: "0xrebalancer",
-				GasLimit:          500000,
-			},
-		},
+		Evms: []helper.EvmConfig{{
+			ChainName:         "parent-chain",
+			ChainSelector:     1,
+			YieldPeerAddress:  "0xparent",
+			RebalancerAddress: "0xrebalancer",
+			GasLimit:          500000,
+		}},
 	}
 	runtime := testutils.NewRuntime(t, nil)
 
@@ -726,27 +630,15 @@ func Test_onCronTriggerWithDeps_success_rebalanceWhenStrategyChanges_sameChain(t
 	}
 
 	res, err := onCronTriggerWithDeps(config, runtime, newPayloadNow(), deps)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if res == nil {
-		t.Fatalf("expected non-nil result")
-	}
-	if !res.Updated {
-		t.Fatalf("expected Updated=true when strategies differ and delta >= threshold")
-	}
-	if writeCalls != 1 {
-		t.Fatalf("expected WriteRebalance to be called once, got %d", writeCalls)
-	}
-	if lastOptimal != opt {
-		t.Fatalf("unexpected optimal passed to WriteRebalance: got %+v, want %+v", lastOptimal, opt)
-	}
-	if lastGasLimit != config.Evms[0].GasLimit {
-		t.Fatalf("unexpected gasLimit passed to WriteRebalance: got %d, want %d", lastGasLimit, config.Evms[0].GasLimit)
-	}
-	if res.Current != cur || res.Optimal != opt {
-		t.Fatalf("unexpected result: %+v", res)
-	}
+
+	require.NoError(t, err)
+	require.NotNil(t, res)
+	require.True(t, res.Updated)
+	require.Equal(t, 1, writeCalls)
+	require.Equal(t, opt, lastOptimal)
+	require.Equal(t, config.Evms[0].GasLimit, lastGasLimit)
+	require.Equal(t, cur, res.Current)
+	require.Equal(t, opt, res.Optimal)
 }
 
 func Test_onCronTriggerWithDeps_success_rebalanceWhenStrategyChanges_differentChain(t *testing.T) {
@@ -814,31 +706,19 @@ func Test_onCronTriggerWithDeps_success_rebalanceWhenStrategyChanges_differentCh
 	}
 
 	res, err := onCronTriggerWithDeps(config, runtime, newPayloadNow(), deps)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if res == nil {
-		t.Fatalf("expected non-nil result")
-	}
-	if !res.Updated {
-		t.Fatalf("expected Updated=true when strategies differ and delta >= threshold")
-	}
-	if writeCalls != 1 {
-		t.Fatalf("expected WriteRebalance to be called once, got %d", writeCalls)
-	}
-	if lastOptimal != opt {
-		t.Fatalf("unexpected optimal passed to WriteRebalance: got %+v, want %+v", lastOptimal, opt)
-	}
-	if lastGasLimit != config.Evms[1].GasLimit {
-		t.Fatalf("unexpected gasLimit passed to WriteRebalance: got %d, want %d", lastGasLimit, config.Evms[1].GasLimit)
-	}
-	if res.Current != cur || res.Optimal != opt {
-		t.Fatalf("unexpected result: %+v", res)
-	}
+
+	require.NoError(t, err)
+	require.NotNil(t, res)
+	require.True(t, res.Updated)
+	require.Equal(t, 1, writeCalls)
+	require.Equal(t, opt, lastOptimal)
+	require.Equal(t, config.Evms[1].GasLimit, lastGasLimit)
+	require.Equal(t, cur, res.Current)
+	require.Equal(t, opt, res.Optimal)
 }
 
 /*//////////////////////////////////////////////////////////////
-                    TESTS FOR INIT WORKFLOW
+                       TESTS FOR INIT WORKFLOW
 //////////////////////////////////////////////////////////////*/
 
 func Test_InitWorkflow_setsUpCronHandler(t *testing.T) {
@@ -848,11 +728,7 @@ func Test_InitWorkflow_setsUpCronHandler(t *testing.T) {
 	logger := testutils.NewRuntime(t, nil).Logger()
 
 	wf, err := InitWorkflow(config, logger, nil)
-	if err != nil {
-		t.Fatalf("InitWorkflow returned error: %v", err)
-	}
 
-	if len(wf) != 1 {
-		t.Fatalf("expected 1 handler, got %d", len(wf))
-	}
+	require.NoError(t, err)
+	require.Len(t, wf, 1)
 }
