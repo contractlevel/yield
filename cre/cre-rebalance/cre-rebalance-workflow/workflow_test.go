@@ -134,7 +134,7 @@ func Test_onCronTriggerWithDeps_errorWhen_GetOptimalStrategyFails(t *testing.T) 
 		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
 			return cur, nil
 		},
-		GetOptimalStrategy: func() (onchain.Strategy, error) {
+		GetOptimalStrategy: func(_ *helper.Config, _ cre.Runtime) (onchain.Strategy, error) {
 			return onchain.Strategy{}, fmt.Errorf("optimal-failed")
 		},
 		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
@@ -182,7 +182,7 @@ func Test_onCronTriggerWithDeps_success_noRebalanceWhenStrategyUnchanged(t *test
 		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
 			return strat, nil
 		},
-		GetOptimalStrategy: func() (onchain.Strategy, error) {
+		GetOptimalStrategy: func(_ *helper.Config, _ cre.Runtime) (onchain.Strategy, error) {
 			return strat, nil
 		},
 		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
@@ -238,7 +238,7 @@ func Test_onCronTriggerWithDeps_errorWhen_NoConfigForStrategyChain(t *testing.T)
 		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
 			return cur, nil
 		},
-		GetOptimalStrategy: func() (onchain.Strategy, error) {
+		GetOptimalStrategy: func(_ *helper.Config, _ cre.Runtime) (onchain.Strategy, error) {
 			return opt, nil
 		},
 		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
@@ -299,7 +299,7 @@ func Test_onCronTriggerWithDeps_errorWhen_ChildPeerBindingFails(t *testing.T) {
 		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
 			return cur, nil
 		},
-		GetOptimalStrategy: func() (onchain.Strategy, error) {
+		GetOptimalStrategy: func(_ *helper.Config, _ cre.Runtime) (onchain.Strategy, error) {
 			return opt, nil
 		},
 		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
@@ -352,7 +352,7 @@ func Test_onCronTriggerWithDeps_errorWhen_ReadTVLFails_sameChain(t *testing.T) {
 		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
 			return cur, nil
 		},
-		GetOptimalStrategy: func() (onchain.Strategy, error) {
+		GetOptimalStrategy: func(_ *helper.Config, _ cre.Runtime) (onchain.Strategy, error) {
 			return opt, nil
 		},
 		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
@@ -398,17 +398,17 @@ func Test_onCronTriggerWithDeps_errorWhen_OptimalAPYCalculationFails(t *testing.
 		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
 			return cur, nil
 		},
-		GetOptimalStrategy: func() (onchain.Strategy, error) {
+		GetOptimalStrategy: func(_ *helper.Config, _ cre.Runtime) (onchain.Strategy, error) {
 			return opt, nil
 		},
 		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
 			return big.NewInt(123), nil
 		},
-		CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (*big.Int, error) {
+		CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (float64, error) {
 			if s == opt {
-				return nil, fmt.Errorf("optimal-apy-failed")
+				return 0.0, fmt.Errorf("optimal-apy-failed")
 			}
-			return big.NewInt(0), nil
+			return 0.0, nil
 		},
 		WriteRebalance: func(_ onchain.RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ onchain.Strategy) error {
 			t.Fatalf("WriteRebalance should not be called when optimal APY calculation fails")
@@ -450,17 +450,17 @@ func Test_onCronTriggerWithDeps_errorWhen_CurrentAPYCalculationFails(t *testing.
 		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
 			return cur, nil
 		},
-		GetOptimalStrategy: func() (onchain.Strategy, error) {
+		GetOptimalStrategy: func(_ *helper.Config, _ cre.Runtime) (onchain.Strategy, error) {
 			return opt, nil
 		},
 		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
 			return big.NewInt(456), nil
 		},
-		CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (*big.Int, error) {
+		CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (float64, error) {
 			if s == cur {
-				return nil, fmt.Errorf("current-apy-failed")
+				return 0.0, fmt.Errorf("current-apy-failed")
 			}
-			return big.NewInt(0), nil
+			return 0.0, nil
 		},
 		WriteRebalance: func(_ onchain.RebalancerInterface, _ cre.Runtime, _ *slog.Logger, _ uint64, _ onchain.Strategy) error {
 			t.Fatalf("WriteRebalance should not be called when current APY calculation fails")
@@ -505,20 +505,21 @@ func Test_onCronTriggerWithDeps_success_noRebalanceWhenDeltaBelowThreshold(t *te
 		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
 			return cur, nil
 		},
-		GetOptimalStrategy: func() (onchain.Strategy, error) {
+		GetOptimalStrategy: func(_ *helper.Config, _ cre.Runtime) (onchain.Strategy, error) {
 			return opt, nil
 		},
 		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
 			return big.NewInt(1000), nil
 		},
-		CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (*big.Int, error) {
+		// Choose APYs so that delta = optimal - current = 0.01 - 0.02 = -0.01 < threshold(0.01).
+		CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (float64, error) {
 			if s == opt {
-				return big.NewInt(50), nil
+				return 0.01, nil
 			}
 			if s == cur {
-				return big.NewInt(100), nil // delta = -50 < threshold(0)
+				return 0.02, nil
 			}
-			return big.NewInt(0), nil
+			return 0.0, nil
 		},
 		NewRebalancerBinding: func(_ *evm.Client, _ string) (onchain.RebalancerInterface, error) {
 			t.Fatalf("NewRebalancerBinding should not be called when delta < threshold")
@@ -572,20 +573,21 @@ func Test_onCronTriggerWithDeps_errorWhen_RebalancerBindingFails(t *testing.T) {
 		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
 			return cur, nil
 		},
-		GetOptimalStrategy: func() (onchain.Strategy, error) {
+		GetOptimalStrategy: func(_ *helper.Config, _ cre.Runtime) (onchain.Strategy, error) {
 			return opt, nil
 		},
 		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
 			return big.NewInt(1000), nil
 		},
-		CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (*big.Int, error) {
+		// delta = 0.02 - 0.01 = 0.01 >= threshold(0.01)
+		CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (float64, error) {
 			if s == opt {
-				return big.NewInt(2e17), nil // 2e17
+				return 0.02, nil
 			}
 			if s == cur {
-				return big.NewInt(1e17), nil // delta = 1e17 >= threshold(1e17)
+				return 0.01, nil
 			}
-			return big.NewInt(0), nil
+			return 0.0, nil
 		},
 		NewRebalancerBinding: func(_ *evm.Client, _ string) (onchain.RebalancerInterface, error) {
 			return nil, fmt.Errorf("rebalancer-binding-failed")
@@ -632,20 +634,21 @@ func Test_onCronTriggerWithDeps_errorWhen_WriteRebalanceFails(t *testing.T) {
 		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
 			return cur, nil
 		},
-		GetOptimalStrategy: func() (onchain.Strategy, error) {
+		GetOptimalStrategy: func(_ *helper.Config, _ cre.Runtime) (onchain.Strategy, error) {
 			return opt, nil
 		},
 		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
 			return big.NewInt(1000), nil
 		},
-		CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (*big.Int, error) {
+		// delta = 0.02 - 0.01 = 0.01 >= threshold(0.01)
+		CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (float64, error) {
 			if s == opt {
-				return big.NewInt(2e17), nil // 2e17
+				return 0.02, nil
 			}
 			if s == cur {
-				return big.NewInt(1e17), nil // delta = 1e17 >= threshold(1e17)
+				return 0.01, nil
 			}
-			return big.NewInt(0), nil
+			return 0.0, nil
 		},
 		NewRebalancerBinding: func(_ *evm.Client, _ string) (onchain.RebalancerInterface, error) {
 			return nil, nil
@@ -695,20 +698,21 @@ func Test_onCronTriggerWithDeps_success_rebalanceWhenStrategyChanges_sameChain(t
 		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
 			return cur, nil
 		},
-		GetOptimalStrategy: func() (onchain.Strategy, error) {
+		GetOptimalStrategy: func(_ *helper.Config, _ cre.Runtime) (onchain.Strategy, error) {
 			return opt, nil
 		},
 		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
 			return big.NewInt(1000), nil
 		},
-		CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (*big.Int, error) {
+		// delta = 0.02 - 0.01 = 0.01 >= threshold(0.01)
+		CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (float64, error) {
 			if s == opt {
-				return big.NewInt(2e17), nil // 2e17
+				return 0.02, nil
 			}
 			if s == cur {
-				return big.NewInt(1e17), nil // delta = 1e17 >= threshold(1e17)
+				return 0.01, nil
 			}
-			return big.NewInt(0), nil
+			return 0.0, nil
 		},
 		NewRebalancerBinding: func(_ *evm.Client, _ string) (onchain.RebalancerInterface, error) {
 			return nil, nil
@@ -782,20 +786,21 @@ func Test_onCronTriggerWithDeps_success_rebalanceWhenStrategyChanges_differentCh
 		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
 			return cur, nil
 		},
-		GetOptimalStrategy: func() (onchain.Strategy, error) {
+		GetOptimalStrategy: func(_ *helper.Config, _ cre.Runtime) (onchain.Strategy, error) {
 			return opt, nil
 		},
 		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
 			return big.NewInt(1000), nil
 		},
-		CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (*big.Int, error) {
+		// delta = 0.03 - 0.01 = 0.02 >= threshold(0.01)
+		CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (float64, error) {
 			if s == opt {
-				return big.NewInt(3e17), nil // 3e17
+				return 0.03, nil
 			}
 			if s == cur {
-				return big.NewInt(1e17), nil // delta = 2e17 >= threshold(1e17)
+				return 0.01, nil
 			}
-			return big.NewInt(0), nil
+			return 0.0, nil
 		},
 		NewRebalancerBinding: func(_ *evm.Client, _ string) (onchain.RebalancerInterface, error) {
 			return nil, nil

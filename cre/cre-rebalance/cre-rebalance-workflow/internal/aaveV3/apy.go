@@ -9,8 +9,8 @@ import (
 )
 
 // @review placeholder
-func GetAPY(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int, chainSelector uint64) (*big.Int, error) {
-	return nil, nil
+func GetAPY(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int, chainSelector uint64) (float64, error) {
+	return 0, nil
 }
 
 // func CalculateAPY(config *helper.Config, liquidityAdded *big.Int, reserve common.Address) (*big.Int, error) {

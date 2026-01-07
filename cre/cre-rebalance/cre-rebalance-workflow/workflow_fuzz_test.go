@@ -2,6 +2,7 @@ package main
 
 import (
 	"log/slog"
+	"math"
 	"math/big"
 	"testing"
 
@@ -18,36 +19,37 @@ import (
 //////////////////////////////////////////////////////////////*/
 
 const (
-    parentChainSelector = 1
-    childChainSelector  = 2
-    parentGasLimit      = 500_000
-    childGasLimit       = 777_000
-    parentYieldAddr     = "0xparent"
-    parentRebalancer    = "0xrebalancer-parent"
-    childYieldAddr      = "0xchild"
+	parentChainSelector = 1
+	childChainSelector  = 2
+	parentGasLimit      = 500_000
+	childGasLimit       = 777_000
+	parentYieldAddr     = "0xparent"
+	parentRebalancer    = "0xrebalancer-parent"
+	childYieldAddr      = "0xchild"
 )
 
+// @review should this move to the helper package?
 func newTestConfig(withChild bool) *helper.Config {
-    cfg := &helper.Config{
-        Evms: []helper.EvmConfig{
-            {
-                ChainName:         "parent-chain",
-                ChainSelector:     parentChainSelector,
-                YieldPeerAddress:  parentYieldAddr,
-                RebalancerAddress: parentRebalancer,
-                GasLimit:          parentGasLimit,
-            },
-        },
-    }
-    if withChild {
-        cfg.Evms = append(cfg.Evms, helper.EvmConfig{
-            ChainName:        "child-chain",
-            ChainSelector:    childChainSelector,
-            YieldPeerAddress: childYieldAddr,
-            GasLimit:         childGasLimit,
-        })
-    }
-    return cfg
+	cfg := &helper.Config{
+		Evms: []helper.EvmConfig{
+			{
+				ChainName:         "parent-chain",
+				ChainSelector:     parentChainSelector,
+				YieldPeerAddress:  parentYieldAddr,
+				RebalancerAddress: parentRebalancer,
+				GasLimit:          parentGasLimit,
+			},
+		},
+	}
+	if withChild {
+		cfg.Evms = append(cfg.Evms, helper.EvmConfig{
+			ChainName:        "child-chain",
+			ChainSelector:    childChainSelector,
+			YieldPeerAddress: childYieldAddr,
+			GasLimit:         childGasLimit,
+		})
+	}
+	return cfg
 }
 
 func newStrategy(id byte, chainSelector uint64) onchain.Strategy {
@@ -70,20 +72,25 @@ func newStrategy(id byte, chainSelector uint64) onchain.Strategy {
 //       * child gasLimit otherwise.
 func Fuzz_onCronTriggerWithDeps_RebalanceThresholdAndGasLimit(f *testing.F) {
 	// Seed a few interesting edge/near-edge cases.
-	f.Add(int64(-1), true)  // below threshold, same chain
-	f.Add(int64(0), true)   // at threshold, same chain
-	f.Add(int64(1), true)   // above threshold, same chain
-	f.Add(int64(-1), false) // below threshold, different chain
-	f.Add(int64(0), false)  // at threshold, different chain
-	f.Add(int64(1), false)  // above threshold, different chain
+	f.Add(-1.0, true)  // below threshold, same chain
+	f.Add(0.0, true)   // at threshold boundary, same chain
+	f.Add(1.0, true)   // above threshold, same chain
+	f.Add(-1.0, false) // below threshold, different chain
+	f.Add(0.0, false)  // at threshold boundary, different chain
+	f.Add(1.0, false)  // above threshold, different chain
 
-	f.Fuzz(func(t *testing.T, deltaRaw int64, sameChain bool) {
+	f.Fuzz(func(t *testing.T, delta float64, sameChain bool) {
 		t.Helper()
 
+		// Avoid feeding NaN/Inf into the workflow; the real CalculateAPYForStrategy
+		// never returns these by contract.
+		if math.IsNaN(delta) || math.IsInf(delta, 0) {
+			delta = 0
+		}
+
 		// Model: currentAPY = 0, optimalAPY = delta.
-		delta := big.NewInt(deltaRaw)
-		currentAPY := big.NewInt(0)
-		optimalAPY := new(big.Int).Add(currentAPY, delta)
+		currentAPY := 0.0
+		optimalAPY := currentAPY + delta
 
 		runtime := testutils.NewRuntime(t, nil)
 
@@ -131,17 +138,17 @@ func Fuzz_onCronTriggerWithDeps_RebalanceThresholdAndGasLimit(f *testing.F) {
 				}
 				return nil
 			},
-			GetOptimalStrategy: func() (onchain.Strategy, error) {
+			GetOptimalStrategy: func(_ *helper.Config, _ cre.Runtime) (onchain.Strategy, error) {
 				return optimalStrategy, nil
 			},
-			CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (*big.Int, error) {
+			CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (float64, error) {
 				switch s {
 				case optimalStrategy:
-					return new(big.Int).Set(optimalAPY), nil
+					return optimalAPY, nil
 				case currentStrategy:
-					return new(big.Int).Set(currentAPY), nil
+					return currentAPY, nil
 				default:
-					return big.NewInt(0), nil
+					return 0, nil
 				}
 			},
 		}
@@ -154,11 +161,11 @@ func Fuzz_onCronTriggerWithDeps_RebalanceThresholdAndGasLimit(f *testing.F) {
 			t.Fatalf("expected non-nil result")
 		}
 
-		shouldRebalance := delta.Cmp(threshold) >= 0
+		shouldRebalance := delta >= threshold
 
 		if shouldRebalance {
 			if !writeCalled {
-				t.Fatalf("expected WriteRebalance to be called when delta >= threshold (delta=%s, threshold=%s)", delta.String(), threshold.String())
+				t.Fatalf("expected WriteRebalance to be called when delta >= threshold (delta=%f, threshold=%f)", delta, threshold)
 			}
 			if !res.Updated {
 				t.Fatalf("expected result.Updated=true when delta >= threshold")
@@ -173,7 +180,7 @@ func Fuzz_onCronTriggerWithDeps_RebalanceThresholdAndGasLimit(f *testing.F) {
 			}
 		} else {
 			if writeCalled {
-				t.Fatalf("expected WriteRebalance NOT to be called when delta < threshold (delta=%s, threshold=%s)", delta.String(), threshold.String())
+				t.Fatalf("expected WriteRebalance NOT to be called when delta < threshold (delta=%f, threshold=%f)", delta, threshold)
 			}
 			if res.Updated {
 				t.Fatalf("expected result.Updated=false when delta < threshold")
@@ -245,22 +252,22 @@ func Fuzz_onCronTriggerWithDeps_StrategyEqualityNoRebalance(f *testing.F) {
 				}
 				return nil
 			},
-			GetOptimalStrategy: func() (onchain.Strategy, error) {
+			GetOptimalStrategy: func(_ *helper.Config, _ cre.Runtime) (onchain.Strategy, error) {
 				return optimalStrategy, nil
 			},
-			CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (*big.Int, error) {
+			CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (float64, error) {
 				apyCalled = true
 				if equal {
 					t.Fatalf("CalculateAPYForStrategy should not be called when strategies are equal")
 				}
 				// For unequal case, force delta >= threshold so rebalance path is exercised.
 				if s == optimalStrategy {
-					return new(big.Int).Add(threshold, big.NewInt(1)), nil
+					return threshold + 1.0, nil
 				}
 				if s == currentStrategy {
-					return big.NewInt(0), nil
+					return 0.0, nil
 				}
-				return big.NewInt(0), nil
+				return 0.0, nil
 			},
 		}
 
@@ -351,19 +358,18 @@ func Fuzz_onCronTriggerWithDeps_ChildPeerBindingUsage(f *testing.F) {
 				writeCalled = true
 				return nil
 			},
-			GetOptimalStrategy: func() (onchain.Strategy, error) {
+			GetOptimalStrategy: func(_ *helper.Config, _ cre.Runtime) (onchain.Strategy, error) {
 				return optimalStrategy, nil
 			},
-			CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (*big.Int, error) {
-				// Keep delta < threshold so rebalance never happens:
-				// optimal=1, current=0 => delta=1 << threshold(1e17).
+			CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (float64, error) {
+				// Keep delta < threshold so rebalance never happens.
 				if s == optimalStrategy {
-					return big.NewInt(1), nil
+					return 0.0, nil
 				}
 				if s == currentStrategy {
-					return big.NewInt(0), nil
+					return 0.0, nil
 				}
-				return big.NewInt(0), nil
+				return 0.0, nil
 			},
 		}
 
@@ -452,10 +458,10 @@ func Fuzz_onCronTriggerWithDeps_APYLiquidityAddedWiring(f *testing.F) {
 				t.Fatalf("WriteRebalance should not be called in APY wiring fuzz")
 				return nil
 			},
-			GetOptimalStrategy: func() (onchain.Strategy, error) {
+			GetOptimalStrategy: func(_ *helper.Config, _ cre.Runtime) (onchain.Strategy, error) {
 				return optimalStrategy, nil
 			},
-			CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, liquidityAdded *big.Int) (*big.Int, error) {
+			CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, liquidityAdded *big.Int) (float64, error) {
 				if s == optimalStrategy {
 					if optimalLiquAdded != nil {
 						t.Fatalf("optimal strategy APY calculation called more than once")
@@ -468,7 +474,7 @@ func Fuzz_onCronTriggerWithDeps_APYLiquidityAddedWiring(f *testing.F) {
 					currentLiquAdded = new(big.Int).Set(liquidityAdded)
 				}
 				// APY values themselves don't matter here, only liquidityAdded.
-				return big.NewInt(0), nil
+				return 0.0, nil
 			},
 		}
 
@@ -508,11 +514,11 @@ func Fuzz_onCronTriggerWithDeps_DeltaTranslationInvariance(f *testing.F) {
 		t.Helper()
 
 		type decision struct {
-			updated     bool
-			wrote       bool
-			writeDelta  *big.Int
-			optimalAPY  *big.Int
-			currentAPY  *big.Int
+			updated    bool
+			wrote      bool
+			writeDelta float64
+			optimalAPY float64
+			currentAPY float64
 		}
 
 		runOnce := func(base, delta, shift int64) decision {
@@ -524,12 +530,12 @@ func Fuzz_onCronTriggerWithDeps_DeltaTranslationInvariance(f *testing.F) {
 			currentStrategy := newStrategy(1, parentCfg.ChainSelector)
 			optimalStrategy := newStrategy(2, parentCfg.ChainSelector)
 
-			baseBI := big.NewInt(base)
-			deltaBI := big.NewInt(delta)
-			shiftBI := big.NewInt(shift)
+			baseF := float64(base)
+			deltaF := float64(delta)
+			shiftF := float64(shift)
 
-			currentAPY := new(big.Int).Add(baseBI, shiftBI)
-			optimalAPY := new(big.Int).Add(currentAPY, deltaBI)
+			currentAPY := baseF + shiftF
+			optimalAPY := currentAPY + deltaF
 
 			var (
 				writeCalled bool
@@ -558,17 +564,17 @@ func Fuzz_onCronTriggerWithDeps_DeltaTranslationInvariance(f *testing.F) {
 					writeCalled = true
 					return nil
 				},
-				GetOptimalStrategy: func() (onchain.Strategy, error) {
+				GetOptimalStrategy: func(_ *helper.Config, _ cre.Runtime) (onchain.Strategy, error) {
 					return optimalStrategy, nil
 				},
-				CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (*big.Int, error) {
+				CalculateAPYForStrategy: func(_ *helper.Config, _ cre.Runtime, s onchain.Strategy, _ *big.Int) (float64, error) {
 					if s == optimalStrategy {
-						return new(big.Int).Set(optimalAPY), nil
+						return optimalAPY, nil
 					}
 					if s == currentStrategy {
-						return new(big.Int).Set(currentAPY), nil
+						return currentAPY, nil
 					}
-					return big.NewInt(0), nil
+					return 0.0, nil
 				},
 			}
 
@@ -586,7 +592,7 @@ func Fuzz_onCronTriggerWithDeps_DeltaTranslationInvariance(f *testing.F) {
 				wrote:      writeCalled,
 				optimalAPY: optimalAPY,
 				currentAPY: currentAPY,
-				writeDelta: new(big.Int).Sub(optimalAPY, currentAPY),
+				writeDelta: optimalAPY - currentAPY,
 			}
 		}
 
@@ -595,9 +601,9 @@ func Fuzz_onCronTriggerWithDeps_DeltaTranslationInvariance(f *testing.F) {
 		dec2 := runOnce(baseRaw, deltaRaw, shiftRaw)
 
 		// The delta should be identical in both runs.
-		if dec1.writeDelta.Cmp(dec2.writeDelta) != 0 {
-			t.Fatalf("expected identical APY deltas; got %s and %s",
-				dec1.writeDelta.String(), dec2.writeDelta.String())
+		if dec1.writeDelta != dec2.writeDelta {
+			t.Fatalf("expected identical APY deltas; got %f and %f",
+				dec1.writeDelta, dec2.writeDelta)
 		}
 
 		// Property: rebalance decision depends only on delta, not on absolute APY levels.

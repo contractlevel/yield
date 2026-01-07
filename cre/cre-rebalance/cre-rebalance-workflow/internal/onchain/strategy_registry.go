@@ -9,7 +9,7 @@ var supportedStrategies []Strategy
 // Call this once at startup, after config is loaded.
 func initSupportedStrategies(cfg *helper.Config) {
     // 2 protocols right now; pre-allocate capacity for less GC.
-    supportedStrategies = make([]Strategy, 0, len(cfg.Evms)*2)
+    supportedStrategies = make([]Strategy, 0, len(cfg.Evms)*2) // @review hardcoded number of protocols
 
     // @review do we want to add a bool to config for whether a strategy is supported on that chain?
     for _, evm := range cfg.Evms {

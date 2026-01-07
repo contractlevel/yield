@@ -14,7 +14,7 @@ import (
 )
 
 // @review pass this stablecoin as an arg when doing modular stable support task
-func GetAPY(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int, chainSelector uint64) (*big.Int, error) {
+func GetAPY(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int, chainSelector uint64) (float64, error) {
 	// instantiate client
 	evmClient := &evm.Client{
 		ChainSelector: chainSelector,
@@ -23,19 +23,19 @@ func GetAPY(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int,
 	// find chain config
 	evmConfig, err := helper.FindEvmConfigByChainSelector(config.Evms, chainSelector)
 	if err != nil {
-		return nil, fmt.Errorf("failed to find evm config: %w", err)
+		return 0, fmt.Errorf("failed to find evm config: %w", err)
 	}
 
 	// instantiate comet
 	cometUSDC, err := NewCometBinding(evmClient, evmConfig.CompoundV3CometUSDCAddress) // @review CometAddr will depend on stablecoin
 	if err != nil {
-		return nil, fmt.Errorf("failed to create comet binding: %w", err)
+		return 0, fmt.Errorf("failed to create comet binding: %w", err)
 	}
 
 	// @review some pseudocode
 	totalSupply, err := cometUSDC.TotalSupply(runtime, big.NewInt(constants.LatestBlock)).Await()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get total supply: %w", err)
+		return 0, fmt.Errorf("failed to get total supply: %w", err)
 	}
 	if liquidityAdded != nil {
 		totalSupply = new(big.Int).Add(totalSupply, liquidityAdded) // ok if liquidityAdded == 0
@@ -43,7 +43,7 @@ func GetAPY(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int,
 
 	totalBorrow, err := cometUSDC.TotalBorrow(runtime, big.NewInt(constants.LatestBlock)).Await()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get total borrow: %w", err)
+		return 0, fmt.Errorf("failed to get total borrow: %w", err)
 	}
 
 	// @review why do we need the WAD scaling here?
@@ -53,7 +53,7 @@ func GetAPY(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int,
 
 	supplyRate, err := cometUSDC.GetSupplyRate(runtime, comet.GetSupplyRateInput{Utilization: utilization}, big.NewInt(constants.LatestBlock)).Await()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get supply rate: %w", err)
+		return 0, fmt.Errorf("failed to get supply rate: %w", err)
 	}
 
 	// apy = (1 + supplyRate)^secondsPerYear − 1
@@ -63,6 +63,8 @@ func GetAPY(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int,
 }
 
 // @review placeholder
-func APYFromSupplyRate(supplyRateInWad uint64) *big.Int {
-	return nil
+func APYFromSupplyRate(supplyRateInWad uint64) float64 {
+	return 1
 }
+
+// convert supply rate from WAD to RAY

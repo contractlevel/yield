@@ -19,9 +19,11 @@ import (
 //////////////////////////////////////////////////////////////*/
 
 // threshold is the minimum APY improvement (in the same units that
-// CalculateAPYForStrategy returns, typically 1e18 precision) required
+// CalculateAPYForStrategy returns, e.g. 0.05 for 5% APY) required
 // before we rebalance.
-var threshold = big.NewInt(1e17) // @review TODO: set a sensible threshold and determine scaling. 1e17 is placeholder
+// @review check the units are actually returned as described above.
+// @review TODO: set a sensible threshold and determine scaling. 0.01 = 1 percentage point.
+const threshold = 0.01
 
 // StrategyResult is primarily for debugging / testing.
 type StrategyResult struct {
@@ -55,8 +57,8 @@ type OnCronDeps struct {
 	ReadCurrentStrategy     func(peer onchain.ParentPeerInterface, runtime cre.Runtime) (onchain.Strategy, error)
 	ReadTVL                 func(peer onchain.YieldPeerInterface, runtime cre.Runtime) (*big.Int, error)
 	WriteRebalance          func(rb onchain.RebalancerInterface, runtime cre.Runtime, logger *slog.Logger, gasLimit uint64, optimal onchain.Strategy) error
-	GetOptimalStrategy      func() (onchain.Strategy, error)
-	CalculateAPYForStrategy func(config *helper.Config, runtime cre.Runtime, strategy onchain.Strategy, liquidityAdded *big.Int) (*big.Int, error)
+	GetOptimalStrategy      func(config *helper.Config, runtime cre.Runtime) (onchain.Strategy, error)
+	CalculateAPYForStrategy func(config *helper.Config, runtime cre.Runtime, strategy onchain.Strategy, liquidityAdded *big.Int) (float64, error)
 }
 
 // defaultOnCronDeps are the real onchain/offchain implementations.
@@ -79,7 +81,7 @@ func onCronTrigger(config *helper.Config, runtime cre.Runtime, trigger *cron.Pay
 	return onCronTriggerWithDeps(config, runtime, trigger, defaultOnCronDeps)
 }
 
-// @review logging trigger
+// @review logging or removing trigger
 func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *cron.Payload, deps OnCronDeps) (*StrategyResult, error) {
 	logger := runtime.Logger()
 
@@ -112,9 +114,10 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 	)
 
 	// Get aggregated optimal strategy from offchain.
-	optimalStrategy, err := deps.GetOptimalStrategy()
+	optimalStrategy, err := deps.GetOptimalStrategy(config, runtime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get optimal strategy: %w", err)
+		// @review fallback to onchain.GetOptimalStrategy here instead of erroring?
 	}
 
 	// If nothing has changed, we can stop early.
@@ -176,20 +179,20 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 		return nil, fmt.Errorf("failed to calculate current strategy APY: %w", err)
 	}
 
-	// Compute delta := optimal - current as big.Int.
-	delta := new(big.Int).Sub(optimalStrategyAPY, currentStrategyAPY)
+	// Compute delta := optimal - current as float64.
+	delta := optimalStrategyAPY - currentStrategyAPY
 
 	logger.Info(
 		"Computed APYs",
 		"tvl", tvl.String(),
-		"currentAPY", currentStrategyAPY.String(),
-		"optimalAPY", optimalStrategyAPY.String(),
-		"delta", delta.String(),
-		"threshold", threshold.String(),
+		"currentAPY", currentStrategyAPY,
+		"optimalAPY", optimalStrategyAPY,
+		"delta", delta,
+		"threshold", threshold,
 	)
 
 	// If the delta is below the threshold, return without updating.
-	if delta.Cmp(threshold) < 0 {
+	if delta < threshold {
 		logger.Info("Delta below threshold; no rebalance needed")
 		return &StrategyResult{
 			Current: currentStrategy,
