@@ -2,7 +2,6 @@ package main
 
 import (
 	"log/slog"
-	"math"
 	"math/big"
 	"testing"
 
@@ -150,11 +149,7 @@ func Fuzz_onCronTriggerWithDeps_RebalanceThresholdAndGasLimit(f *testing.F) {
 		require.NoError(t, err, "unexpected error from onCronTriggerWithDeps")
 		require.NotNil(t, res, "expected non-nil result")
 
-		// Mirror the NaN/Inf guard from workflow.go.
-		invalid := math.IsNaN(optimalAPY) || math.IsNaN(currentAPY) ||
-			math.IsInf(optimalAPY, 0) || math.IsInf(currentAPY, 0)
-
-		shouldRebalance := !invalid && delta >= threshold
+		shouldRebalance := delta >= threshold
 
 		if shouldRebalance {
 			require.True(t, writeCalled,
