@@ -4,13 +4,23 @@ import (
 	"fmt"
 	"math"
 	"math/big"
-	"strings"
 	"testing"
 
 	"cre-rebalance/cre-rebalance-workflow/internal/helper"
 
 	"github.com/smartcontractkit/cre-sdk-go/cre"
+	"github.com/stretchr/testify/require"
 )
+
+/*//////////////////////////////////////////////////////////////
+                         TEST HELPERS
+//////////////////////////////////////////////////////////////*/
+
+func requireBigEqual(t *testing.T, want, got *big.Int) {
+	t.Helper()
+	// 0 = Equal, 1 = want > got, -1 = want < got
+	require.Zero(t, want.Cmp(got), "big.Int mismatch: want=%s got=%s", want.String(), got.String())
+}
 
 /*//////////////////////////////////////////////////////////////
                           SAME STRATEGY
@@ -34,14 +44,21 @@ func Test_sameStrategy(t *testing.T) {
 		ChainSelector: 456,
 	}
 
-	if !sameStrategy(a, b) {
-		t.Fatalf("expected sameStrategy to return true for identical strategies")
+	tests := []struct {
+		name string
+		x, y Strategy
+		want bool
+	}{
+		{"identical", a, b, true},
+		{"different_protocol", a, c, false},
+		{"different_chain", a, d, false},
 	}
-	if sameStrategy(a, c) {
-		t.Fatalf("expected sameStrategy to return false for different protocolIds")
-	}
-	if sameStrategy(a, d) {
-		t.Fatalf("expected sameStrategy to return false for different chainSelectors")
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := sameStrategy(tt.x, tt.y)
+			require.Equal(t, tt.want, got)
+		})
 	}
 }
 
@@ -60,12 +77,9 @@ func Test_CalculateAPYForStrategy_UnsupportedProtocol(t *testing.T) {
 	}
 
 	apy, err := CalculateAPYForStrategy(cfg, nil, strategy, liquidityAdded)
-	if err == nil {
-		t.Fatalf("expected error for unsupported protocolId, got nil")
-	}
-	if apy != 0 {
-		t.Fatalf("expected APY=0 on error, got %v", apy)
-	}
+	require.Error(t, err)
+	require.ErrorContains(t, err, "unsupported protocolId")
+	require.Equal(t, 0.0, apy)
 }
 
 func Test_calculateAPYForStrategyWithDeps_RoutesToAave(t *testing.T) {
@@ -98,25 +112,13 @@ func Test_calculateAPYForStrategyWithDeps_RoutesToAave(t *testing.T) {
 	}
 
 	apy, err := calculateAPYForStrategyWithDeps(cfg, nil, strategy, liquidity, deps)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if !aaveCalled {
-		t.Fatalf("expected AaveV3GetAPY to be called")
-	}
-	if compoundCalled {
-		t.Fatalf("did not expect CompoundV3GetAPY to be called")
-	}
-	if apy != 0.123 {
-		t.Fatalf("unexpected APY: got %v, want %v", apy, 0.123)
-	}
-	if gotChain != strategy.ChainSelector {
-		t.Fatalf("unexpected chainSelector passed: got %d, want %d", gotChain, strategy.ChainSelector)
-	}
-	if gotLiq.Cmp(liquidity) != 0 {
-		t.Fatalf("unexpected liquidity passed: got %s, want %s", gotLiq.String(), liquidity.String())
-	}
+	require.True(t, aaveCalled, "AaveV3GetAPY should be called")
+	require.False(t, compoundCalled, "CompoundV3GetAPY should not be called")
+	require.Equal(t, 0.123, apy)
+	require.Equal(t, strategy.ChainSelector, gotChain)
+	requireBigEqual(t, liquidity, gotLiq)
 }
 
 func Test_calculateAPYForStrategyWithDeps_RoutesToCompound(t *testing.T) {
@@ -149,25 +151,13 @@ func Test_calculateAPYForStrategyWithDeps_RoutesToCompound(t *testing.T) {
 	}
 
 	apy, err := calculateAPYForStrategyWithDeps(cfg, nil, strategy, liquidity, deps)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if !compoundCalled {
-		t.Fatalf("expected CompoundV3GetAPY to be called")
-	}
-	if aaveCalled {
-		t.Fatalf("did not expect AaveV3GetAPY to be called")
-	}
-	if apy != 0.456 {
-		t.Fatalf("unexpected APY: got %v, want %v", apy, 0.456)
-	}
-	if gotChain != strategy.ChainSelector {
-		t.Fatalf("unexpected chainSelector passed: got %d, want %d", gotChain, strategy.ChainSelector)
-	}
-	if gotLiq.Cmp(liquidity) != 0 {
-		t.Fatalf("unexpected liquidity passed: got %s, want %s", gotLiq.String(), liquidity.String())
-	}
+	require.True(t, compoundCalled, "CompoundV3GetAPY should be called")
+	require.False(t, aaveCalled, "AaveV3GetAPY should not be called")
+	require.Equal(t, 0.456, apy)
+	require.Equal(t, strategy.ChainSelector, gotChain)
+	requireBigEqual(t, liquidity, gotLiq)
 }
 
 func Test_calculateAPYForStrategyWithDeps_InvalidAPY_NaN(t *testing.T) {
@@ -189,12 +179,9 @@ func Test_calculateAPYForStrategyWithDeps_InvalidAPY_NaN(t *testing.T) {
 	}
 
 	apy, err := calculateAPYForStrategyWithDeps(cfg, nil, strategy, liquidity, deps)
-	if err == nil {
-		t.Fatalf("expected error for NaN APY, got nil")
-	}
-	if apy != 0 {
-		t.Fatalf("expected APY=0 on error, got %v", apy)
-	}
+	require.Error(t, err)
+	require.ErrorContains(t, err, "invalid APY value")
+	require.Equal(t, 0.0, apy)
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -220,15 +207,9 @@ func Test_calculateAPYForStrategyWithDeps_AaveErrorWrapped(t *testing.T) {
 	}
 
 	apy, err := calculateAPYForStrategyWithDeps(cfg, nil, strategy, liquidity, deps)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if !strings.Contains(err.Error(), "getting APY from AaveV3: aave-apy-failed") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if apy != 0 {
-		t.Fatalf("expected APY=0 on error, got %v", apy)
-	}
+	require.Error(t, err)
+	require.ErrorContains(t, err, "getting APY from AaveV3: aave-apy-failed")
+	require.Equal(t, 0.0, apy)
 }
 
 func Test_calculateAPYForStrategyWithDeps_CompoundErrorWrapped(t *testing.T) {
@@ -250,15 +231,9 @@ func Test_calculateAPYForStrategyWithDeps_CompoundErrorWrapped(t *testing.T) {
 	}
 
 	apy, err := calculateAPYForStrategyWithDeps(cfg, nil, strategy, liquidity, deps)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if !strings.Contains(err.Error(), "getting APY from CompoundV3: compound-apy-failed") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if apy != 0 {
-		t.Fatalf("expected APY=0 on error, got %v", apy)
-	}
+	require.Error(t, err)
+	require.ErrorContains(t, err, "getting APY from CompoundV3: compound-apy-failed")
+	require.Equal(t, 0.0, apy)
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -273,9 +248,8 @@ func Test_GetOptimalStrategy_NoSupportedStrategies(t *testing.T) {
 	current := Strategy{} // value doesn't matter here
 
 	_, err := GetOptimalStrategy(cfg, nil, current, liquidityAdded)
-	if err == nil {
-		t.Fatalf("expected error when no supported strategies are configured, got nil")
-	}
+	require.Error(t, err)
+	require.ErrorContains(t, err, "no supported strategies configured")
 }
 
 func Test_GetOptimalStrategy_NilLiquidityAdded(t *testing.T) {
@@ -291,9 +265,8 @@ func Test_GetOptimalStrategy_NilLiquidityAdded(t *testing.T) {
 	}
 
 	_, err := GetOptimalStrategy(cfg, nil, current, nil)
-	if err == nil {
-		t.Fatalf("expected error when liquidityAdded is nil, got nil")
-	}
+	require.Error(t, err)
+	require.ErrorContains(t, err, "liquidityAdded must not be nil")
 }
 
 func Test_getOptimalStrategyWithDeps_SelectsHighestAPYProtocol(t *testing.T) {
@@ -322,17 +295,10 @@ func Test_getOptimalStrategyWithDeps_SelectsHighestAPYProtocol(t *testing.T) {
 	}
 
 	best, err := getOptimalStrategyWithDeps(cfg, nil, current, liquidityAdded, deps)
-	if err != nil {
-		t.Fatalf("unexpected error in happy path: %v", err)
-	}
+	require.NoError(t, err)
 
-	if best.ProtocolId != AaveV3ProtocolId {
-		t.Fatalf("expected best strategy to be AaveV3, got protocolId %x", best.ProtocolId)
-	}
-	if best.ChainSelector != cfg.Evms[0].ChainSelector {
-		t.Fatalf("unexpected ChainSelector in best strategy: got %d, want %d",
-			best.ChainSelector, cfg.Evms[0].ChainSelector)
-	}
+	require.Equal(t, AaveV3ProtocolId, best.ProtocolId)
+	require.Equal(t, cfg.Evms[0].ChainSelector, best.ChainSelector)
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -364,12 +330,8 @@ func Test_getOptimalStrategyWithDeps_ErrorWhenAPYCalculationFails(t *testing.T) 
 	}
 
 	_, err := getOptimalStrategyWithDeps(cfg, nil, current, liquidityAdded, deps)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if !strings.Contains(err.Error(), "calculate APY for strategy") {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.Error(t, err)
+	require.ErrorContains(t, err, "calculate APY for strategy")
 }
 
 func Test_getOptimalStrategyWithDeps_ErrorWhenZeroAPY(t *testing.T) {
@@ -397,10 +359,6 @@ func Test_getOptimalStrategyWithDeps_ErrorWhenZeroAPY(t *testing.T) {
 	}
 
 	_, err := getOptimalStrategyWithDeps(cfg, nil, current, liquidityAdded, deps)
-	if err == nil {
-		t.Fatalf("expected error for 0 APY, got nil")
-	}
-	if !strings.Contains(err.Error(), "0 APY returned for strategy") {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.Error(t, err)
+	require.ErrorContains(t, err, "0 APY returned for strategy")
 }
