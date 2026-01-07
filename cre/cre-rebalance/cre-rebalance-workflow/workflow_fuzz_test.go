@@ -29,7 +29,7 @@ const (
 )
 
 // @review should this move to the helper package?
-func newTestConfig(withChild bool) *helper.Config {
+func newTestConfig() *helper.Config {
 	cfg := &helper.Config{
 		Evms: []helper.EvmConfig{
 			{
@@ -39,15 +39,13 @@ func newTestConfig(withChild bool) *helper.Config {
 				RebalancerAddress: parentRebalancer,
 				GasLimit:          parentGasLimit,
 			},
+			{
+				ChainName:        "child-chain",
+				ChainSelector:    childChainSelector,
+				YieldPeerAddress: childYieldAddr,
+				GasLimit:         childGasLimit,
+			},
 		},
-	}
-	if withChild {
-		cfg.Evms = append(cfg.Evms, helper.EvmConfig{
-			ChainName:        "child-chain",
-			ChainSelector:    childChainSelector,
-			YieldPeerAddress: childYieldAddr,
-			GasLimit:         childGasLimit,
-		})
 	}
 	return cfg
 }
@@ -65,8 +63,8 @@ func newStrategy(id byte, chainSelector uint64) onchain.Strategy {
 
 // Fuzz_onCronTriggerWithDeps_RebalanceThresholdAndGasLimit fuzzes the APY delta and
 // whether the current strategy is on the parent or child chain. It verifies:
-//   - WriteRebalance is called iff delta >= threshold and APYs are finite.
-//   - StrategyResult.Updated == (delta >= threshold and APYs are finite).
+//   - WriteRebalance is called iff delta >= threshold.
+//   - StrategyResult.Updated == (delta >= threshold).
 //   - gasLimit passed to WriteRebalance matches the gasLimit of the correct EVM config:
 //       * parent gasLimit when currentStrategy.ChainSelector == parentCfg.ChainSelector
 //       * child gasLimit otherwise.
@@ -89,7 +87,7 @@ func Fuzz_onCronTriggerWithDeps_RebalanceThresholdAndGasLimit(f *testing.F) {
 		runtime := testutils.NewRuntime(t, nil)
 
 		// Two EVM configs: parent and child.
-		cfg := newTestConfig(true)
+		cfg := newTestConfig()
 		parentCfg := cfg.Evms[0]
 		childCfg := cfg.Evms[1]
 
@@ -184,7 +182,7 @@ func Fuzz_onCronTriggerWithDeps_StrategyEqualityNoRebalance(f *testing.F) {
 
 		runtime := testutils.NewRuntime(t, nil)
 
-		cfg := newTestConfig(false)
+		cfg := newTestConfig()
 		parentCfg := cfg.Evms[0]
 
 		currentStrategy := newStrategy(1, parentCfg.ChainSelector)
@@ -290,7 +288,7 @@ func Fuzz_onCronTriggerWithDeps_ChildPeerBindingUsage(f *testing.F) {
 
 		runtime := testutils.NewRuntime(t, nil)
 
-		cfg := newTestConfig(true)
+		cfg := newTestConfig()
 		parentCfg := cfg.Evms[0]
 		childCfg := cfg.Evms[1]
 
@@ -380,7 +378,7 @@ func Fuzz_onCronTriggerWithDeps_APYLiquidityAddedWiring(f *testing.F) {
 
 		runtime := testutils.NewRuntime(t, nil)
 
-		cfg := newTestConfig(true)
+		cfg := newTestConfig()
 		parentCfg := cfg.Evms[0]
 		childCfg := cfg.Evms[1]
 
@@ -477,7 +475,7 @@ func Fuzz_onCronTriggerWithDeps_DeltaTranslationInvariance(f *testing.F) {
 		runOnce := func(base, delta, shift int64) decision {
 			runtime := testutils.NewRuntime(t, nil)
 
-			cfg := newTestConfig(false)
+			cfg := newTestConfig()
 			parentCfg := cfg.Evms[0]
 
 			currentStrategy := newStrategy(1, parentCfg.ChainSelector)
