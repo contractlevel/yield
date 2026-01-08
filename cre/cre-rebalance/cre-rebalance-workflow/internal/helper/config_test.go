@@ -1,8 +1,9 @@
 package helper
 
 import (
-	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func Test_FindEvmConfigByChainSelector_found(t *testing.T) {
@@ -12,15 +13,9 @@ func Test_FindEvmConfigByChainSelector_found(t *testing.T) {
 	}
 
 	cfg, err := FindEvmConfigByChainSelector(evms, 2)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if cfg == nil {
-		t.Fatalf("expected non-nil config")
-	}
-	if cfg.ChainName != "chain-b" {
-		t.Fatalf("expected chain-b, got %s", cfg.ChainName)
-	}
+	require.NoError(t, err, "expected no error when selector exists")
+	require.NotNil(t, cfg, "expected non-nil config when selector exists")
+	require.Equal(t, "chain-b", cfg.ChainName, "unexpected ChainName")
 }
 
 func Test_FindEvmConfigByChainSelector_notFound(t *testing.T) {
@@ -29,25 +24,18 @@ func Test_FindEvmConfigByChainSelector_notFound(t *testing.T) {
 	}
 
 	cfg, err := FindEvmConfigByChainSelector(evms, 999)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if cfg != nil {
-		t.Fatalf("expected nil config when not found, got %+v", cfg)
-	}
-	if !strings.Contains(err.Error(), "no evm config found for chainSelector 999") {
-		t.Fatalf("unexpected error message: %v", err)
-	}
+	require.Error(t, err, "expected error when selector does not exist")
+	require.Nil(t, cfg, "expected nil config when selector does not exist")
+	require.ErrorContains(t, err, "no evm config found for chainSelector 999")
 }
 
 func Fuzz_FindEvmConfigByChainSelector(f *testing.F) {
-	// Seed some simple examples
+	// Seed some simple examples.
 	f.Add(uint64(1), uint64(2), uint64(3), uint64(2)) // hit middle
 	f.Add(uint64(1), uint64(2), uint64(3), uint64(9)) // miss all
 	f.Add(uint64(5), uint64(5), uint64(5), uint64(5)) // all same, hit first
 
 	f.Fuzz(func(t *testing.T, a, b, c, target uint64) {
-		// Build a small slice with up to 3 possible matches.
 		evms := []EvmConfig{
 			{ChainName: "a", ChainSelector: a},
 			{ChainName: "b", ChainSelector: b},
@@ -61,30 +49,23 @@ func Fuzz_FindEvmConfigByChainSelector(f *testing.F) {
 		for i := range evms {
 			evm := evms[i]
 			if evm.ChainSelector == target {
-				want = &evm
+				// Capture value of evm, not pointer to loop var.
+				copy := evm
+				want = &copy
 				break
 			}
 		}
 
 		if want != nil {
 			// We expect a match.
-			if err != nil {
-				t.Fatalf("expected nil error, got %v", err)
-			}
-			if cfg == nil {
-				t.Fatalf("expected non-nil cfg when selector present")
-			}
-			if cfg.ChainSelector != want.ChainSelector || cfg.ChainName != want.ChainName {
-				t.Fatalf("unexpected cfg: got %+v, want %+v", cfg, want)
-			}
+			require.NoError(t, err, "expected no error when selector present")
+			require.NotNil(t, cfg, "expected non-nil cfg when selector present")
+			require.Equal(t, want.ChainSelector, cfg.ChainSelector, "unexpected ChainSelector")
+			require.Equal(t, want.ChainName, cfg.ChainName, "unexpected ChainName")
 		} else {
 			// We expect no match.
-			if err == nil {
-				t.Fatalf("expected error when selector missing, got nil")
-			}
-			if cfg != nil {
-				t.Fatalf("expected nil cfg when selector missing, got %+v", cfg)
-			}
+			require.Error(t, err, "expected error when selector missing")
+			require.Nil(t, cfg, "expected nil cfg when selector missing")
 		}
 	})
 }
