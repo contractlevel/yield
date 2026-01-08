@@ -1,16 +1,104 @@
 package aaveV3
 
 import (
+	"fmt"
 	"math/big"
 
 	"cre-rebalance/cre-rebalance-workflow/internal/helper"
 
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/cre-sdk-go/capabilities/blockchain/evm"
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 )
 
-// @review placeholder
+// GetAPY calculates the APY for AaveV3 on a specific chain.
+// Parameters:
+//   - config: The helper.Config containing all chain configurations
+//   - runtime: CRE runtime for contract calls
+//   - liquidityAdded: Amount of liquidity being added (use big.NewInt(0) for current APY)
+//   - chainSelector: Chain selector to identify which chain config to use
+//
+// Returns:
+//   - APY as float64 (e.g., 0.0523 = 5.23%)
+//   - Error if chain not found or APY calculation fails
 func GetAPY(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int, chainSelector uint64) (float64, error) {
-	return 0, nil
+	logger := runtime.Logger()
+
+	// Find the chain config by chainSelector
+	evmCfg, err := helper.FindEvmConfigByChainSelector(config.Evms, chainSelector)
+	if err != nil {
+		return 0, fmt.Errorf("chain config not found for chainSelector %d: %w", chainSelector, err)
+	}
+
+	// Validate required fields
+	if evmCfg.AaveV3PoolAddressesProviderAddress == "" {
+		return 0, fmt.Errorf("AaveV3PoolAddressesProviderAddress not configured for chain %s", evmCfg.ChainName)
+	}
+	if evmCfg.USDCAddress == "" {
+		return 0, fmt.Errorf("USDCAddress not configured for chain %s", evmCfg.ChainName)
+	}
+
+	logger.Info("GetAPY: Starting APY calculation",
+		"chain", evmCfg.ChainName,
+		"chainSelector", chainSelector,
+		"asset", evmCfg.USDCAddress,
+		"liquidityAdded", liquidityAdded.String())
+
+	// Step 1: Create EVM client for this chain
+	evmClient := &evm.Client{
+		ChainSelector: evmCfg.ChainSelector,
+	}
+
+	// Step 2: Create PoolAddressesProvider binding
+	poolAddressesProvider, err := NewPoolAddressesProviderBinding(evmClient, evmCfg.AaveV3PoolAddressesProviderAddress)
+	if err != nil {
+		return 0, fmt.Errorf("failed to create PoolAddressesProvider binding for chain %s: %w", evmCfg.ChainName, err)
+	}
+
+	// Step 3: Get ProtocolDataProvider binding (helper reduces nesting)
+	protocolDataProviderPromise := getProtocolDataProviderBinding(runtime, evmClient, poolAddressesProvider, evmCfg.ChainName)
+
+	// Step 4: Get Strategy binding and pass ProtocolDataProvider through for params
+	apyPromise := cre.ThenPromise(protocolDataProviderPromise, func(protocolDataProvider AaveProtocolDataProviderInterface) cre.Promise[float64] {
+		// Get USDC address
+		usdcAddress := common.HexToAddress(evmCfg.USDCAddress)
+
+		// Get Strategy binding
+		strategyPromise := getStrategyBinding(runtime, evmClient, protocolDataProvider, usdcAddress, evmCfg.ChainName)
+
+		// Step 5: Fetch params and calculate APY
+		return cre.ThenPromise(strategyPromise, func(strategyV2 DefaultReserveInterestRateStrategyV2Interface) cre.Promise[float64] {
+			// Step 6: Fetch CalculateInterestRatesParams
+			paramsPromise := FetchCalculateInterestRatesParams(
+				runtime,
+				protocolDataProvider,
+				usdcAddress,
+				liquidityAdded,
+			)
+
+			// Step 7: Calculate APY using the strategy contract
+			return cre.ThenPromise(paramsPromise, func(params *CalculateInterestRatesParams) cre.Promise[float64] {
+				logger.Info("GetAPY: Got CalculateInterestRatesParams",
+					"chain", evmCfg.ChainName,
+					"totalDebt", params.TotalDebt.String(),
+					"virtualUnderlyingBalance", params.VirtualUnderlyingBalance.String())
+
+				return CalculateAPYFromContract(runtime, strategyV2, params)
+			})
+		})
+	})
+
+	// Await for sychronousity for APY to be used in any workflow
+	apy, err := apyPromise.Await()
+	if err != nil {
+		return 0, fmt.Errorf("failed to calculate APY for chain %s: %w", evmCfg.ChainName, err)
+	}
+
+	logger.Info("GetAPY: Calculated APY",
+		"chain", evmCfg.ChainName,
+		"apy", apy)
+
+	return apy, nil
 }
 
 // func CalculateAPY(config *helper.Config, liquidityAdded *big.Int, reserve common.Address) (*big.Int, error) {
@@ -18,7 +106,7 @@ func GetAPY(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int,
 // 	if err != nil {
 // 		return nil, fmt.Errorf("failed to get calculate interest rates params: %w", err)
 // 	}
-	
+
 // 	// instantiate DefaultReserveInterestRateStrategyV2 - this will be optimized later
 // 	defaultReserveInterestRateStrategyV2, err := NewDefaultReserveInterestRateStrategyV2Binding(evmClient, config.DefaultReserveInterestRateStrategyV2Addr)
 // 	if err != nil {
@@ -95,23 +183,22 @@ func GetAPY(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int,
 // 		VirtualUnderlyingBalance: virtualUnderlyingBalance,
 // 	}, nil
 
-
 // }
 
-	// unbacked = pool.getReserveData(asset).unbacked
-	// liquidityAdded = 0 for current APY, amount we are depositing for new APY
-	// liquidityTaken = 0 (we arent simulating withdraws/borrows)
-	// totalDebt = protocolDataProvider.getReserveData(asset) totalVariableDebt + totalStableDebt (totalStableDebt is deprecated)
-	// reserveFactor = protocolDataProvider.getReserveConfigurationData(asset).reserveFactor (thing we already got that gets taken away) 
-	// reserve = stablecoin address (USDC)
-	// usingVirtualBalance = deprecated
-	// virtualUnderlyingBalance = deprecated
+// unbacked = pool.getReserveData(asset).unbacked
+// liquidityAdded = 0 for current APY, amount we are depositing for new APY
+// liquidityTaken = 0 (we arent simulating withdraws/borrows)
+// totalDebt = protocolDataProvider.getReserveData(asset) totalVariableDebt + totalStableDebt (totalStableDebt is deprecated)
+// reserveFactor = protocolDataProvider.getReserveConfigurationData(asset).reserveFactor (thing we already got that gets taken away)
+// reserve = stablecoin address (USDC)
+// usingVirtualBalance = deprecated
+// virtualUnderlyingBalance = deprecated
 
-	// Unbacked                 *big.Int
-	// LiquidityAdded           *big.Int
-	// LiquidityTaken           *big.Int
-	// TotalDebt                *big.Int
-	// ReserveFactor            *big.Int
-	// Reserve                  common.Address
-	// UsingVirtualBalance      bool
-	// VirtualUnderlyingBalance *big.Int
+// Unbacked                 *big.Int
+// LiquidityAdded           *big.Int
+// LiquidityTaken           *big.Int
+// TotalDebt                *big.Int
+// ReserveFactor            *big.Int
+// Reserve                  common.Address
+// UsingVirtualBalance      bool
+// VirtualUnderlyingBalance *big.Int
