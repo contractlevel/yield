@@ -1,102 +1,74 @@
 package onchain
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/blockchain/evm"
+	"github.com/stretchr/testify/require"
 )
 
 func Test_NewParentPeerBinding_success(t *testing.T) {
-	var client *evm.Client = nil
+	var client *evm.Client
 	addr := "0x0000000000000000000000000000000000000001"
 
 	binding, err := NewParentPeerBinding(client, addr)
-	if err != nil {
-		t.Fatalf("expected nil error, got: %v", err)
-	}
-	if binding == nil {
-		t.Fatalf("expected non-nil binding, got nil")
-	}
+	require.NoError(t, err)
+	require.NotNil(t, binding)
 
-	// Verify that the binding implements ParentPeerInterface
-	// This is a compile-time type check: if binding doesn't implement
-	// ParentPeerInterface, this line will fail to compile.
+	// Compile-time check: binding implements ParentPeerInterface.
 	var _ ParentPeerInterface = binding
 }
 
 func Test_NewParentPeerBinding_errorWhen_invalidAddress(t *testing.T) {
-	var client *evm.Client = nil
+	var client *evm.Client
 	addr := "not-an-address"
 
 	binding, err := NewParentPeerBinding(client, addr)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if binding != nil {
-		t.Fatalf("expected nil binding on error, got non-nil")
-	}
-	if !strings.Contains(err.Error(), "invalid ParentPeer address: "+addr) {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.Error(t, err)
+	require.Nil(t, binding)
+	require.ErrorContains(t, err, "invalid ParentPeer address: "+addr)
 }
 
 func Test_NewChildPeerBinding_success(t *testing.T) {
-	var client *evm.Client = nil
+	var client *evm.Client
 	addr := "0x0000000000000000000000000000000000000002"
 
 	binding, err := NewChildPeerBinding(client, addr)
-	if err != nil {
-		t.Fatalf("expected nil error, got: %v", err)
-	}
-	if binding == nil {
-		t.Fatalf("expected non-nil binding, got nil")
-	}
+	require.NoError(t, err)
+	require.NotNil(t, binding)
+
+	// Compile-time check: binding implements YieldPeerInterface.
 	var _ YieldPeerInterface = binding
 }
 
 func Test_NewChildPeerBinding_errorWhen_invalidAddress(t *testing.T) {
-	var client *evm.Client = nil
+	var client *evm.Client
 	addr := "still-not-an-address"
 
 	binding, err := NewChildPeerBinding(client, addr)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if binding != nil {
-		t.Fatalf("expected nil binding on error, got non-nil")
-	}
-	if !strings.Contains(err.Error(), "invalid ChildPeer address: "+addr) {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.Error(t, err)
+	require.Nil(t, binding)
+	require.ErrorContains(t, err, "invalid ChildPeer address: "+addr)
 }
 
 func Test_NewRebalancerBinding_success(t *testing.T) {
-	var client *evm.Client = nil
+	var client *evm.Client
 	addr := "0x0000000000000000000000000000000000000003"
 
 	binding, err := NewRebalancerBinding(client, addr)
-	if err != nil {
-		t.Fatalf("expected nil error, got: %v", err)
-	}
-	if binding == nil {
-		t.Fatalf("expected non-nil binding, got nil")
-	}
+	require.NoError(t, err)
+	require.NotNil(t, binding)
+
+	// Compile-time check: binding implements RebalancerInterface.
 	var _ RebalancerInterface = binding
 }
 
 func Test_NewRebalancerBinding_errorWhen_invalidAddress(t *testing.T) {
-	var client *evm.Client = nil
+	var client *evm.Client
 	addr := "bad"
 
 	binding, err := NewRebalancerBinding(client, addr)
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if binding != nil {
-		t.Fatalf("expected nil binding on error, got non-nil")
-	}
-	if !strings.Contains(err.Error(), "invalid Rebalancer address: "+addr) {
-		t.Fatalf("unexpected error: %v", err)
-	}
+	require.Error(t, err)
+	require.Nil(t, binding)
+	require.ErrorContains(t, err, "invalid Rebalancer address: "+addr)
 }

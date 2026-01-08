@@ -9,14 +9,16 @@ import (
 
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 	"github.com/smartcontractkit/cre-sdk-go/cre/testutils"
+	"github.com/stretchr/testify/require"
 )
 
 /*//////////////////////////////////////////////////////////////
                              MOCKS
 //////////////////////////////////////////////////////////////*/
-// mockParentPeer is a mock implementation of ParentPeerInterface for testing
+
+// mockParentPeer is a mock implementation of ParentPeerInterface for testing.
 type mockParentPeer struct {
-	getStrategyFunc  func(cre.Runtime, *big.Int) cre.Promise[parent_peer.IYieldPeerStrategy]
+	getStrategyFunc   func(cre.Runtime, *big.Int) cre.Promise[parent_peer.IYieldPeerStrategy]
 	getTotalValueFunc func(cre.Runtime, *big.Int) cre.Promise[*big.Int]
 }
 
@@ -27,7 +29,10 @@ func (m *mockParentPeer) GetStrategy(
 	if m.getStrategyFunc != nil {
 		return m.getStrategyFunc(runtime, blockNumber)
 	}
-	return cre.PromiseFromResult[parent_peer.IYieldPeerStrategy](parent_peer.IYieldPeerStrategy{}, errors.New("getStrategyFunc not set"))
+	return cre.PromiseFromResult[parent_peer.IYieldPeerStrategy](
+		parent_peer.IYieldPeerStrategy{},
+		errors.New("getStrategyFunc not set"),
+	)
 }
 
 func (m *mockParentPeer) GetTotalValue(
@@ -40,7 +45,7 @@ func (m *mockParentPeer) GetTotalValue(
 	return cre.PromiseFromResult[*big.Int](nil, errors.New("getTotalValueFunc not set"))
 }
 
-// mockYieldPeer is a mock implementation of YieldPeerInterface for testing
+// mockYieldPeer is a mock implementation of YieldPeerInterface for testing.
 type mockYieldPeer struct {
 	getTotalValueFunc func(cre.Runtime, *big.Int) cre.Promise[*big.Int]
 }
@@ -58,7 +63,8 @@ func (m *mockYieldPeer) GetTotalValue(
 /*//////////////////////////////////////////////////////////////
                              TESTS
 //////////////////////////////////////////////////////////////*/
-func Test_ReadCurrentStrategy_Success(t *testing.T) {
+
+func Test_ReadCurrentStrategy_success(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
 
 	var expectedProtocolId [32]byte
@@ -72,58 +78,42 @@ func Test_ReadCurrentStrategy_Success(t *testing.T) {
 
 	mockPeer := &mockParentPeer{
 		getStrategyFunc: func(_ cre.Runtime, blockNumber *big.Int) cre.Promise[parent_peer.IYieldPeerStrategy] {
-			// Verify the block number is LatestBlock
 			expectedBlock := big.NewInt(LatestBlock)
-			if blockNumber.Cmp(expectedBlock) != 0 {
-				t.Errorf("expected blockNumber %v, got %v", expectedBlock, blockNumber)
-			}
+			require.Equal(t, 0, expectedBlock.Cmp(blockNumber), "expected LatestBlock")
 
 			return cre.PromiseFromResult(expectedStrategy, nil)
 		},
 	}
 
 	strategy, err := ReadCurrentStrategy(mockPeer, runtime)
-	if err != nil {
-		t.Fatalf("ReadCurrentStrategy returned unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if strategy.ProtocolId != expectedProtocolId {
-		t.Errorf("expected ProtocolId %v, got %v", expectedProtocolId, strategy.ProtocolId)
-	}
-
-	if strategy.ChainSelector != expectedChainSelector {
-		t.Errorf("expected ChainSelector %d, got %d", expectedChainSelector, strategy.ChainSelector)
-	}
+	require.Equal(t, expectedProtocolId, strategy.ProtocolId)
+	require.Equal(t, expectedChainSelector, strategy.ChainSelector)
 }
 
-func Test_ReadCurrentStrategy_Error(t *testing.T) {
+func Test_ReadCurrentStrategy_error(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
 
 	expectedError := errors.New("failed to read strategy")
 
 	mockPeer := &mockParentPeer{
 		getStrategyFunc: func(_ cre.Runtime, _ *big.Int) cre.Promise[parent_peer.IYieldPeerStrategy] {
-			return cre.PromiseFromResult[parent_peer.IYieldPeerStrategy](parent_peer.IYieldPeerStrategy{}, expectedError)
+			return cre.PromiseFromResult[parent_peer.IYieldPeerStrategy](
+				parent_peer.IYieldPeerStrategy{},
+				expectedError,
+			)
 		},
 	}
 
 	strategy, err := ReadCurrentStrategy(mockPeer, runtime)
-	if err == nil {
-		t.Fatal("ReadCurrentStrategy expected error but got nil")
-	}
+	require.Error(t, err)
+	require.ErrorIs(t, err, expectedError)
 
-	if !errors.Is(err, expectedError) {
-		t.Errorf("expected error %v, got %v", expectedError, err)
-	}
-
-	// Verify that an empty strategy is returned on error
-	emptyStrategy := Strategy{}
-	if strategy != emptyStrategy {
-		t.Errorf("expected empty strategy on error, got %v", strategy)
-	}
+	require.Equal(t, Strategy{}, strategy, "expected empty strategy on error")
 }
 
-func Test_ReadCurrentStrategy_WithDifferentValues(t *testing.T) {
+func Test_ReadCurrentStrategy_withDifferentValues(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
 
 	var protocolId [32]byte
@@ -142,51 +132,33 @@ func Test_ReadCurrentStrategy_WithDifferentValues(t *testing.T) {
 	}
 
 	strategy, err := ReadCurrentStrategy(mockPeer, runtime)
-	if err != nil {
-		t.Fatalf("ReadCurrentStrategy returned unexpected error: %v", err)
-	}
+	require.NoError(t, err)
 
-	if strategy.ProtocolId != protocolId {
-		t.Errorf("expected ProtocolId %v, got %v", protocolId, strategy.ProtocolId)
-	}
-
-	if strategy.ChainSelector != chainSelector {
-		t.Errorf("expected ChainSelector %d, got %d", chainSelector, strategy.ChainSelector)
-	}
+	require.Equal(t, protocolId, strategy.ProtocolId)
+	require.Equal(t, chainSelector, strategy.ChainSelector)
 }
 
-func Test_ReadTVL_Success(t *testing.T) {
+func Test_ReadTVL_success(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
 
-	expectedTVL := big.NewInt(1000000000000000000) // 1 ETH in wei
+	expectedTVL := big.NewInt(1_000_000_000_000_000_000) // 1 ETH in wei
 
 	mockPeer := &mockYieldPeer{
 		getTotalValueFunc: func(_ cre.Runtime, blockNumber *big.Int) cre.Promise[*big.Int] {
-			// Verify the block number is LatestBlock
 			expectedBlock := big.NewInt(LatestBlock)
-			if blockNumber.Cmp(expectedBlock) != 0 {
-				t.Errorf("expected blockNumber %v, got %v", expectedBlock, blockNumber)
-			}
+			require.Equal(t, 0, expectedBlock.Cmp(blockNumber), "expected LatestBlock")
 
 			return cre.PromiseFromResult(expectedTVL, nil)
 		},
 	}
 
 	tvl, err := ReadTVL(mockPeer, runtime)
-	if err != nil {
-		t.Fatalf("ReadTVL returned unexpected error: %v", err)
-	}
-
-	if tvl == nil {
-		t.Fatal("ReadTVL returned nil TVL")
-	}
-
-	if tvl.Cmp(expectedTVL) != 0 {
-		t.Errorf("expected TVL %v, got %v", expectedTVL, tvl)
-	}
+	require.NoError(t, err)
+	require.NotNil(t, tvl)
+	require.Equal(t, 0, expectedTVL.Cmp(tvl))
 }
 
-func Test_ReadTVL_Error(t *testing.T) {
+func Test_ReadTVL_error(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
 
 	expectedError := errors.New("failed to read TVL")
@@ -198,23 +170,15 @@ func Test_ReadTVL_Error(t *testing.T) {
 	}
 
 	tvl, err := ReadTVL(mockPeer, runtime)
-	if err == nil {
-		t.Fatal("ReadTVL expected error but got nil")
-	}
-
-	if !errors.Is(err, expectedError) {
-		t.Errorf("expected error %v, got %v", expectedError, err)
-	}
-
-	if tvl != nil {
-		t.Errorf("expected nil TVL on error, got %v", tvl)
-	}
+	require.Error(t, err)
+	require.ErrorIs(t, err, expectedError)
+	require.Nil(t, tvl)
 }
 
-func Test_ReadTVL_WithDifferentValues(t *testing.T) {
+func Test_ReadTVL_withDifferentValues(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
 
-	expectedTVL := big.NewInt(5000000000000000000) // 5 ETH in wei
+	expectedTVL := big.NewInt(5_000_000_000_000_000_000) // 5 ETH in wei
 
 	mockPeer := &mockYieldPeer{
 		getTotalValueFunc: func(_ cre.Runtime, _ *big.Int) cre.Promise[*big.Int] {
@@ -223,16 +187,13 @@ func Test_ReadTVL_WithDifferentValues(t *testing.T) {
 	}
 
 	tvl, err := ReadTVL(mockPeer, runtime)
-	if err != nil {
-		t.Fatalf("ReadTVL returned unexpected error: %v", err)
-	}
-
-	if tvl.Cmp(expectedTVL) != 0 {
-		t.Errorf("expected TVL %v, got %v", expectedTVL, tvl)
-	}
+	require.NoError(t, err)
+	require.NotNil(t, tvl)
+	require.Equal(t, 0, expectedTVL.Cmp(tvl))
 }
 
-func Test_ReadTVL_WithZeroValue(t *testing.T) {
+// @review should we error when TVL is zero?
+func Test_ReadTVL_withZeroValue(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
 
 	expectedTVL := big.NewInt(0)
@@ -244,11 +205,7 @@ func Test_ReadTVL_WithZeroValue(t *testing.T) {
 	}
 
 	tvl, err := ReadTVL(mockPeer, runtime)
-	if err != nil {
-		t.Fatalf("ReadTVL returned unexpected error: %v", err)
-	}
-
-	if tvl.Cmp(expectedTVL) != 0 {
-		t.Errorf("expected TVL %v, got %v", expectedTVL, tvl)
-	}
+	require.NoError(t, err)
+	require.NotNil(t, tvl)
+	require.Equal(t, 0, expectedTVL.Cmp(tvl))
 }
