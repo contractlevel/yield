@@ -192,7 +192,6 @@ func Test_ReadTVL_withDifferentValues(t *testing.T) {
 	require.Equal(t, 0, expectedTVL.Cmp(tvl))
 }
 
-// @review should we error when TVL is zero?
 func Test_ReadTVL_withZeroValue(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
 
