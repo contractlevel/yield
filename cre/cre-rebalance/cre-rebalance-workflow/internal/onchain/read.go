@@ -20,4 +20,5 @@ func ReadCurrentStrategy(peer ParentPeerInterface, runtime cre.Runtime) (Strateg
 // ReadTVL reads the total value locked from a yield peer using the runtime
 func ReadTVL(peer YieldPeerInterface, runtime cre.Runtime) (*big.Int, error) {
 	return peer.GetTotalValue(runtime, big.NewInt(constants.LatestBlock)).Await()
+	// @review err if tvl == 0
 }

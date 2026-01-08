@@ -62,6 +62,7 @@ func getOptimalStrategyWithDeps(
 		bestSet      bool
 	)
 
+	// @review implement concurrency?
 	for _, strategy := range supportedStrategies {
 		// For the current strategy, we want the APY “as is”, so liquidityAdded = 0.
 		liq := liquidityAdded
