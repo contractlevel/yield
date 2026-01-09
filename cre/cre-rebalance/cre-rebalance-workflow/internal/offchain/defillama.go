@@ -3,7 +3,7 @@ package offchain
 import (
 	"bytes"
 	"compress/gzip"
-
+	"cre-rebalance/cre-rebalance-workflow/internal/helper"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,12 +13,12 @@ import (
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 )
 
-// Get the optimal pool from DefiLlama
-func getOptimalPool(config *Config, runtime cre.Runtime) (*Pool, error) {
+// getOptimalPool manages the orchestration of the off-chain data fetch.
+func getOptimalPool(config *helper.Config, runtime cre.Runtime) (*Pool, error) {
 	logger := runtime.Logger()
 	client := &http.Client{}
 
-	// CRE consensus: identical aggregation of optimal pool
+	// CRE consensus: identical aggregation ensures all nodes agree on the same pool
 	poolPromise := http.SendRequest(config, runtime, client, fetchAndParsePools, cre.ConsensusIdenticalAggregation[*Pool]())
 
 	returnedPool, err := poolPromise.Await()
@@ -27,13 +27,11 @@ func getOptimalPool(config *Config, runtime cre.Runtime) (*Pool, error) {
 	}
 
 	logger.Info("Got highest APY allowed pool", slog.Any("pool", returnedPool))
-
-	// Improvement: Return the pointer directly. No need to reconstruct the struct.
 	return returnedPool, nil
 }
 
 // fetchAndParsePools performs the high-performance token-based streaming.
-func fetchAndParsePools(config *Config, logger *slog.Logger, sendRequester *http.SendRequester) (*Pool, error) {
+func fetchAndParsePools(config *helper.Config, logger *slog.Logger, sendRequester *http.SendRequester) (*Pool, error) {
 	req := &http.Request{
 		Url:     DefiLlamaAPIUrl,
 		Method:  "GET",
@@ -124,67 +122,3 @@ func fetchAndParsePools(config *Config, logger *slog.Logger, sendRequester *http
 
 	return selectedPool, nil
 }
-
-// Streaming JSON parsing approach (commented out for reference)
-/*
-func fetchAndParsePools(config *Config, logger *slog.Logger, sendRequester *http.SendRequester) (*Pool, error) {
-	req := &http.Request{
-		Url:     DefiLlamaAPIUrl,
-		Method:  "GET",
-		Headers: map[string]string{"Accept-Encoding": "gzip"},
-	}
-
-	resp, err := sendRequester.SendRequest(req).Await()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get API response: %w", err)
-	}
-
-	logger.Info("DefiLlama API response", "status", resp.StatusCode)
-
-	if resp.StatusCode != StatusOK {
-		return nil, fmt.Errorf("failed to get API OK response: %d", resp.StatusCode)
-	}
-
-	// Initialize the reader with the response body
-	var reader io.Reader = bytes.NewReader(resp.Body)
-
-	// Wrap with gzip if necessary
-	if resp.Headers["Content-Encoding"] == "gzip" {
-		gz, err := gzip.NewReader(reader)
-		if err != nil {
-			return nil, fmt.Errorf("failed to create gzip reader: %w", err)
-		}
-		defer gz.Close()
-		reader = gz
-	}
-
-	// STREAMING DECODE: Instead of loading all bytes into memory first,
-	// we decode directly from the reader stream.
-	var apiResponse APIResponse
-	if err := json.NewDecoder(reader).Decode(&apiResponse); err != nil {
-		return nil, fmt.Errorf("error decoding JSON stream: %w", err)
-	}
-
-	// Find highest APY pool
-	var maxApy = -1.0
-	var selectedPool *Pool
-
-	for _, pool := range apiResponse.Data {
-		if AllowedSymbol[pool.Symbol] &&
-			AllowedChain[pool.Chain] &&
-			AllowedProject[pool.Project] &&
-			pool.Apy > maxApy {
-
-			maxApy = pool.Apy
-			currentPool := pool
-			selectedPool = &currentPool
-		}
-	}
-
-	if selectedPool == nil {
-		return nil, fmt.Errorf("no approved strategy pool found")
-	}
-
-	return selectedPool, nil
-}
-*/

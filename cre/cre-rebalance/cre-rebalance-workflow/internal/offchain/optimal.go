@@ -1,6 +1,8 @@
 package offchain
 
 import (
+	"cre-rebalance/cre-rebalance-workflow/internal/helper"
+	"cre-rebalance/cre-rebalance-workflow/internal/onchain"
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/crypto"
@@ -8,7 +10,7 @@ import (
 )
 
 // GetOptimalStrategy fetches the optimal pool and transforms it into an on-chain Strategy
-func GetOptimalStrategy(config *Config, runtime cre.Runtime) (*Strategy, error) {
+func GetOptimalStrategy(config *helper.Config, runtime cre.Runtime) (*onchain.Strategy, error) {
 	pool, err := getOptimalPool(config, runtime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get optimal strategy: %w", err)
@@ -25,7 +27,7 @@ func GetOptimalStrategy(config *Config, runtime cre.Runtime) (*Strategy, error) 
 		return nil, fmt.Errorf("invalid strategy configuration: %w", err)
 	}
 
-	return &Strategy{
+	return &onchain.Strategy{
 		ProtocolId:    protocolId,
 		ChainSelector: chainSelector,
 	}, nil
