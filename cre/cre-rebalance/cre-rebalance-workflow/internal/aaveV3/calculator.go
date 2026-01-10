@@ -7,6 +7,7 @@ import (
 
 	"cre-rebalance/contracts/evm/src/generated/default_reserve_interest_rate_strategy_v2"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 )
 
@@ -27,11 +28,44 @@ import (
 // 2. Extracts liquidityRate (Arg0) which is the supply APR in RAY
 // 3. Converts APR (in RAY) to decimal ratio
 // 4. Converts APR to APY using discrete compounding: APY = (1 + APR/SECONDS_PER_YEAR)^SECONDS_PER_YEAR - 1
+
+// @review If needed, we can refactor to Promise-less execution
 func CalculateAPYFromContract(
 	runtime cre.Runtime,
 	strategyContract DefaultReserveInterestRateStrategyV2Interface,
 	params *CalculateInterestRatesParams,
 ) cre.Promise[float64] {
+
+	// Might be redundant but defensive:
+	// Might indicate AAVE shenanigans
+	// Validate inputs - check for nil pointers (uninitialized fields)
+	// Note: 0 values are valid (e.g., Unbacked = 0, LiquidityAdded = 0, etc.)
+	// We only check that pointers are not nil, not that values are non-zero
+	if params == nil {
+		return cre.PromiseFromResult(0.0, fmt.Errorf("params cannot be nil"))
+	}
+	if params.Unbacked == nil {
+		return cre.PromiseFromResult(0.0, fmt.Errorf("params.Unbacked cannot be nil (use big.NewInt(0) for zero value)"))
+	}
+	if params.LiquidityAdded == nil {
+		return cre.PromiseFromResult(0.0, fmt.Errorf("params.LiquidityAdded cannot be nil (use big.NewInt(0) for zero value)"))
+	}
+	if params.LiquidityTaken == nil {
+		return cre.PromiseFromResult(0.0, fmt.Errorf("params.LiquidityTaken cannot be nil (use big.NewInt(0) for zero value)"))
+	}
+	if params.TotalDebt == nil {
+		return cre.PromiseFromResult(0.0, fmt.Errorf("params.TotalDebt cannot be nil (use big.NewInt(0) for zero value)"))
+	}
+	if params.ReserveFactor == nil {
+		return cre.PromiseFromResult(0.0, fmt.Errorf("params.ReserveFactor cannot be nil (use big.NewInt(0) for zero value)"))
+	}
+	if params.VirtualUnderlyingBalance == nil {
+		return cre.PromiseFromResult(0.0, fmt.Errorf("params.VirtualUnderlyingBalance cannot be nil (use big.NewInt(0) for zero value)"))
+	}
+	if params.Reserve == (common.Address{}) {
+		return cre.PromiseFromResult(0.0, fmt.Errorf("params.Reserve cannot be zero address"))
+	}
+
 	logger := runtime.Logger()
 	logger.Info("Calculating APY using contract CalculateInterestRates",
 		"unbacked", params.Unbacked.String(),
@@ -66,10 +100,22 @@ func CalculateAPYFromContract(
 		// Arg1 is variableBorrowRate in RAY
 		liquidityRateRAY := result.Arg0
 
+		// Validate contract response
+		if liquidityRateRAY == nil {
+			return 0.0, fmt.Errorf("contract returned nil liquidityRate")
+		}
+		if liquidityRateRAY.Sign() < 0 {
+			return 0.0, fmt.Errorf("contract returned negative liquidityRate: %s", liquidityRateRAY.String())
+		}
+
 		logger.Info("Got liquidity rate from contract", "liquidityRateRAY", liquidityRateRAY.String())
 
-		// Convert liquidityRate from RAY to decimal ratio
-		// liquidityRateRAY is in RAY (27 decimals), so APR = liquidityRateRAY / RAY
+		// Handle zero liquidity rate (underutilized pool) - return 0 APY
+		if liquidityRateRAY.Sign() == 0 {
+			return 0.0, nil
+		}
+
+		// Note: RAYBigInt is a constant (10^27), so it can never be zero
 		aprRat := new(big.Rat).Quo(
 			new(big.Rat).SetInt(liquidityRateRAY),
 			new(big.Rat).SetInt(RAYBigInt),
@@ -88,14 +134,18 @@ func CalculateAPYFromContract(
 // convertAPRToAPY converts APR to APY using discrete compounding.
 // Formula: APY = (1 + APR/SECONDS_PER_YEAR)^SECONDS_PER_YEAR - 1
 // This compounds interest per second over a year.
-// Returns float64 
+// Returns float64
 func convertAPRToAPY(aprRat *big.Rat) (float64, error) {
+	// Validate input
+	if aprRat == nil {
+		return 0.0, fmt.Errorf("aprRat cannot be nil")
+	}
+
 	// Check for zero or negative APR
 	if aprRat.Sign() <= 0 {
 		return 0.0, nil
 	}
 
-	// Convert APR to float64 for math.Pow (we need exponentiation)
 	aprFloat, _ := aprRat.Float64()
 
 	// Sanity check: very high APR (> 1000%)
@@ -113,14 +163,6 @@ func convertAPRToAPY(aprRat *big.Rat) (float64, error) {
 	// Formula: APY = (1 + APR/SECONDS_PER_YEAR)^SECONDS_PER_YEAR - 1
 	// Subtract 1 to get APY
 	apyFloat := compounded - 1
-
-	// Handle edge cases
-	if apyFloat < 0 {
-		return 0.0, nil
-	}
-	if math.IsNaN(apyFloat) || math.IsInf(apyFloat, 0) {
-		return 0.0, nil
-	}
 
 	return apyFloat, nil
 }
