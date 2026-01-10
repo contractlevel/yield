@@ -118,6 +118,7 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 	if err != nil {
 		return nil, fmt.Errorf("failed to get optimal strategy: %w", err)
 		// @review fallback to onchain.GetOptimalStrategy here instead of erroring?
+		// pass onchain.GetOptimalStrategy(currentStrategy) so that it applies 0 liquidityAdded for that one
 	}
 
 	// If nothing has changed, we can stop early.

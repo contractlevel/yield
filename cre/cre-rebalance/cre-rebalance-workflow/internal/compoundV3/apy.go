@@ -13,6 +13,11 @@ import (
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 )
 
+// @review placeholder
+func GetAPYPromise(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int, chainSelector uint64) cre.Promise[float64] {
+	return nil
+}
+
 // @review pass this stablecoin as an arg when doing modular stable support task
 func GetAPY(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int, chainSelector uint64) (float64, error) {
 	// instantiate client
@@ -33,7 +38,7 @@ func GetAPY(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int,
 	}
 
 	// @review some pseudocode
-	totalSupply, err := cometUSDC.TotalSupply(runtime, big.NewInt(constants.LatestBlock)).Await()
+	totalSupply, err := cometUSDC.TotalSupply(runtime, big.NewInt(constants.LatestFinalizedBlock)).Await()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get total supply: %w", err)
 	}
@@ -41,7 +46,7 @@ func GetAPY(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int,
 		totalSupply = new(big.Int).Add(totalSupply, liquidityAdded) // ok if liquidityAdded == 0
 	}
 
-	totalBorrow, err := cometUSDC.TotalBorrow(runtime, big.NewInt(constants.LatestBlock)).Await()
+	totalBorrow, err := cometUSDC.TotalBorrow(runtime, big.NewInt(constants.LatestFinalizedBlock)).Await()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get total borrow: %w", err)
 	}
@@ -51,7 +56,7 @@ func GetAPY(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int,
 	utilization := new(big.Int).Mul(totalBorrow, big.NewInt(constants.WAD))
 	utilization.Div(utilization, totalSupply)
 
-	supplyRate, err := cometUSDC.GetSupplyRate(runtime, comet.GetSupplyRateInput{Utilization: utilization}, big.NewInt(constants.LatestBlock)).Await()
+	supplyRate, err := cometUSDC.GetSupplyRate(runtime, comet.GetSupplyRateInput{Utilization: utilization}, big.NewInt(constants.LatestFinalizedBlock)).Await()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get supply rate: %w", err)
 	}

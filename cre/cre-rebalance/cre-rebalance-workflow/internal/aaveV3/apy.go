@@ -13,6 +13,11 @@ func GetAPY(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int,
 	return 0, nil
 }
 
+// @review placeholder
+func GetAPYPromise(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int, chainSelector uint64) cre.Promise[float64] {
+	return nil
+}
+
 // func CalculateAPY(config *helper.Config, liquidityAdded *big.Int, reserve common.Address) (*big.Int, error) {
 // 	interestRatesParams, err := getCalculateInterestRatesParams(config, liquidityAdded, reserve)
 // 	if err != nil {

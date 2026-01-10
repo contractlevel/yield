@@ -2,8 +2,6 @@ package onchain
 
 import "github.com/ethereum/go-ethereum/common"
 
-const LatestBlock = int64(-3)
-
 var (
     // These are runtime vars, not compile-time consts.
 	// keccak256("aave-v3")
