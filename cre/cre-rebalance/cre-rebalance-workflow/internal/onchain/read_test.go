@@ -7,6 +7,8 @@ import (
 
 	"cre-rebalance/contracts/evm/src/generated/parent_peer"
 
+	"cre-rebalance/cre-rebalance-workflow/internal/constants"
+
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 	"github.com/smartcontractkit/cre-sdk-go/cre/testutils"
 	"github.com/stretchr/testify/require"
@@ -78,7 +80,7 @@ func Test_ReadCurrentStrategy_success(t *testing.T) {
 
 	mockPeer := &mockParentPeer{
 		getStrategyFunc: func(_ cre.Runtime, blockNumber *big.Int) cre.Promise[parent_peer.IYieldPeerStrategy] {
-			expectedBlock := big.NewInt(LatestBlock)
+			expectedBlock := big.NewInt(constants.LatestFinalizedBlock)
 			require.Equal(t, 0, expectedBlock.Cmp(blockNumber), "expected LatestBlock")
 
 			return cre.PromiseFromResult(expectedStrategy, nil)
@@ -145,7 +147,7 @@ func Test_ReadTVL_success(t *testing.T) {
 
 	mockPeer := &mockYieldPeer{
 		getTotalValueFunc: func(_ cre.Runtime, blockNumber *big.Int) cre.Promise[*big.Int] {
-			expectedBlock := big.NewInt(LatestBlock)
+			expectedBlock := big.NewInt(constants.LatestFinalizedBlock)
 			require.Equal(t, 0, expectedBlock.Cmp(blockNumber), "expected LatestBlock")
 
 			return cre.PromiseFromResult(expectedTVL, nil)

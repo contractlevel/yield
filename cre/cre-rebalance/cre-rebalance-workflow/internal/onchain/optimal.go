@@ -153,7 +153,6 @@ func CalculateAPYForStrategy(
 	return calculateAPYForStrategyWithDeps(config, runtime, strategy, liquidityAdded, defaultAPYDeps)
 }
 
-// @review this should return float64 from both GetAPY()
 // @review scaling for different strategy package GetAPY return values needs to be consistent!
 // ie is the aaveV3 value scaled to RAY when compoundV3 scales to WAD?
 func calculateAPYForStrategyWithDeps(
