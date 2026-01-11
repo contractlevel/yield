@@ -13,12 +13,14 @@ func initSupportedStrategies(cfg *helper.Config) {
 
     // @review do we want to add a bool to config for whether a strategy is supported on that chain?
     for _, evm := range cfg.Evms {
+        // if evm.AaveV3PoolAddressesProviderAddress != "" {}
         // AaveV3 on this chain
         supportedStrategies = append(supportedStrategies, Strategy{
             ProtocolId:    AaveV3ProtocolId,
             ChainSelector: evm.ChainSelector,
         })
 
+        // if evm.CompoundV3CometUSDCAddress != "" {}
         // CompoundV3 on this chain
         supportedStrategies = append(supportedStrategies, Strategy{
             ProtocolId:    CompoundV3ProtocolId,
