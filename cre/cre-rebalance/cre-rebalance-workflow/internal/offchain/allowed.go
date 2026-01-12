@@ -2,9 +2,9 @@ package offchain
 
 // Allowed chains, projects and symbols for DefiLlama pools
 var AllowedChain = map[string]bool{
-	"Ethereum": true,
 	"Arbitrum": true,
 	"Base":     true,
+	"Ethereum": true,
 	"Optimism": true,
 }
 

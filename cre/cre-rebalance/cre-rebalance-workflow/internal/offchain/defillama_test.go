@@ -18,7 +18,7 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-// mockHttpCapability now matches the registry.Capability interface exactly
+// Mock HTTP capability for testing
 type mockHttpCapability struct {
 	id string
 	fn func(ctx context.Context, req *sdk.CapabilityRequest) *sdk.CapabilityResponse
@@ -41,8 +41,7 @@ func compressGzip(data string) []byte {
 	return buf.Bytes()
 }
 
-func TestGetOptimalPool(t *testing.T) {
-	// 1. Define the test table
+func Test_offchain_getOptimalPool(t *testing.T) {
 	tests := []struct {
 		name           string
 		mockFn         func(ctx context.Context, req *sdk.CapabilityRequest) *sdk.CapabilityResponse
@@ -51,10 +50,10 @@ func TestGetOptimalPool(t *testing.T) {
 		expectedSymbol string
 	}{
 		{
-			name: "Success - Orchestration works",
+			name: "success",
 			mockFn: func(ctx context.Context, req *sdk.CapabilityRequest) *sdk.CapabilityResponse {
 				respAny, _ := anypb.New(&http.Response{
-					StatusCode: 200,
+					StatusCode: StatusOK,
 					Body:       []byte(`{"data": [{"symbol": "USDC", "chain": "Ethereum", "project": "aave-v3", "apy": 8.0}]}`),
 				})
 				return &sdk.CapabilityResponse{
@@ -65,7 +64,7 @@ func TestGetOptimalPool(t *testing.T) {
 			expectedSymbol: "USDC",
 		},
 		{
-			name: "Failure - Promise returns error",
+			name: "errorWhen_promiseReturnsError",
 			mockFn: func(ctx context.Context, req *sdk.CapabilityRequest) *sdk.CapabilityResponse {
 				return &sdk.CapabilityResponse{
 					Response: &sdk.CapabilityResponse_Error{Error: "network unreachable"},
@@ -75,10 +74,10 @@ func TestGetOptimalPool(t *testing.T) {
 			errorContains: "failed to await promise",
 		},
 		{
-			name: "Failure - Promise results in nil pool",
+			name: "errorWhen_promiseReturnsNilPool",
 			mockFn: func(ctx context.Context, req *sdk.CapabilityRequest) *sdk.CapabilityResponse {
 				respAny, _ := anypb.New(&http.Response{
-					StatusCode: 200,
+					StatusCode: StatusOK,
 					Body:       []byte(`{"data": []}`),
 				})
 				return &sdk.CapabilityResponse{
@@ -89,23 +88,18 @@ func TestGetOptimalPool(t *testing.T) {
 		},
 	}
 
-	// 2. Execute table
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			// Setup standard infrastructure
 			rt := testutils.NewRuntime(t, nil)
 			config := &helper.Config{}
 
-			// DRY: Centralized registration
 			registry.GetRegistry(t).RegisterCapability(&mockHttpCapability{
 				id: "http-actions@1.0.0-alpha",
 				fn: tc.mockFn,
 			})
 
-			// Execute the function under test
 			result, err := getOptimalPool(config, rt)
 
-			// Assertions
 			if tc.expectError {
 				require.Error(t, err)
 				if tc.errorContains != "" {
@@ -121,7 +115,9 @@ func TestGetOptimalPool(t *testing.T) {
 	}
 }
 
-func TestFetchAndParsePools_TableDriven(t *testing.T) {
+func Test_offchain_fetchAndParsePools(t *testing.T) {
+	var serverError uint32 = 500
+
 	tests := []struct {
 		name                  string
 		statusCode            uint32
@@ -133,101 +129,109 @@ func TestFetchAndParsePools_TableDriven(t *testing.T) {
 		expectedPool          *Pool
 	}{
 		{
-			name:         "Success - Standard JSON",
-			statusCode:   200,
+			name:         "successWhen_standardJSON",
+			statusCode:   StatusOK,
 			body:         []byte(`{"data": [{"symbol": "USDC", "chain": "Ethereum", "project": "aave-v3", "apy": 5.5}]}`),
 			expectError:  false,
 			expectedPool: &Pool{Symbol: "USDC", Apy: 5.5},
 		},
 		{
-			name:         "Success - Gzipped JSON",
-			statusCode:   200,
+			name:         "successWhen_gzippedJSON",
+			statusCode:   StatusOK,
 			headers:      map[string]string{"Content-Encoding": "gzip"},
 			body:         compressGzip(`{"data": [{"symbol": "USDC", "chain": "Ethereum", "project": "aave-v3", "apy": 12.5}]}`),
 			expectError:  false,
 			expectedPool: &Pool{Symbol: "USDC", Apy: 12.5},
 		},
 		{
-			name:          "Failure - HTTP 500 Error",
-			statusCode:    500,
-			body:          []byte(`Internal Server Error`),
-			expectError:   true,
-			errorContains: "failed to get API OK response: 500",
+			name:         "successWhen_gzippedJSON_lowercaseHeader",
+			statusCode:   StatusOK,
+			headers:      map[string]string{"content-encoding": "gzip"},
+			body:         compressGzip(`{"data": [{"symbol": "USDC", "chain": "Ethereum", "project": "aave-v3", "apy": 9.0}]}`),
+			expectError:  false,
+			expectedPool: &Pool{Symbol: "USDC", Apy: 9.0},
 		},
 		{
-			name:          "Failure - Invalid JSON Format",
-			statusCode:    200,
+			name:          "errorWhen_httpError",
+			statusCode:    serverError,
+			body:          []byte(`Internal Server Error`),
+			expectError:   true,
+			errorContains: "failed to get OK response: 500",
+		},
+		{
+			name:          "errorWhen_invalidJSONFormat",
+			statusCode:    StatusOK,
 			body:          []byte(`{"data": [{"apy": "not-a-number"}]}`),
 			expectError:   true,
 			errorContains: "error decoding pool item",
 		},
 		{
-			name:          "Failure - No Allowed Pools Found",
-			statusCode:    200,
+			name:          "errorWhen_noAllowedPoolsFound",
+			statusCode:    StatusOK,
 			body:          []byte(`{"data": [{"symbol": "SHIB", "chain": "DogeChain", "project": "MemeSwap", "apy": 999}]}`),
 			expectError:   true,
 			errorContains: "no approved strategy pool found",
 		},
 		{
-			name:                  "Failure - Capability Invocation Error",
+			name:                  "errorWhen_noApiResponse",
 			expectCapabilityError: true,
 			expectError:           true,
 			errorContains:         "failed to get API response",
 		},
 		{
-			name:          "Failure - Malformed Gzip Header",
-			statusCode:    200,
+			name:          "errorWhen_malformedGzipHeader",
+			statusCode:    StatusOK,
 			headers:       map[string]string{"Content-Encoding": "gzip"},
 			body:          []byte("not gzipped data"),
 			expectError:   true,
 			errorContains: "failed to create gzip reader",
 		},
 		{
-			name:          "Failure - Corrupt Gzip Body",
-			statusCode:    200,
+			name:          "errorWhen_corruptGzipBody",
+			statusCode:    StatusOK,
 			headers:       map[string]string{"Content-Encoding": "gzip"},
 			body:          compressGzip(`{"data": [ {"symbol": "USDC"`),
 			expectError:   true,
 			errorContains: "error decoding pool item",
 		},
 		{
-			name:          "Failure - Missing Data Key",
-			statusCode:    200,
+			name:          "errorWhen_missingDataKey",
+			statusCode:    StatusOK,
 			body:          []byte(`{"metadata": "none"}`),
 			expectError:   true,
 			errorContains: "could not find 'data' key",
 		},
 		{
-			name:          "Failure - Data is not an array",
-			statusCode:    200,
+			name:          "errorWhen_dataIsNotAnArray",
+			statusCode:    StatusOK,
 			body:          []byte(`{"data": "invalid"}`),
 			expectError:   true,
 			errorContains: "expected array start after 'data' key",
 		},
 		{
-			name:          "Failure - Malformed JSON in Stream",
-			statusCode:    200,
+			name:          "errorWhen_malformedJSONInStream",
+			statusCode:    StatusOK,
 			body:          []byte(`{"data": [ {`), // Ends abruptly after object start
 			expectError:   true,
 			errorContains: "error decoding pool item",
 		},
 		{
-			name:          "Failure - Syntax Error in Token Stream",
-			statusCode:    200,
-			body:          []byte(`{"data": [123, @]}`), // @ is invalid JSON
+			name:          "errorWhen_syntaxErrorInTokenStream",
+			statusCode:    StatusOK,
+			body:          []byte(`{"data": [123, @]}`),
 			expectError:   true,
 			errorContains: "error decoding pool item",
 		},
 		{
-			name:          "Failure - Syntax Error Before Data Key",
-			statusCode:    200,
+			name:          "errorWhen_syntaxErrorBeforeDataKey",
+			statusCode:    StatusOK,
 			body:          []byte(`{ "metadata": @@@ }`), // @ is invalid JSON syntax
 			expectError:   true,
 			errorContains: "error decoding JSON stream",
 		},
 		{
-			name:          "Failure - Stream Ends After Data Key",
-			statusCode:    200,
+			name:          "errorWhen_streamEndsAfterDataKey",
+			statusCode:    StatusOK,
 			body:          []byte(`{"data": `), // No value or delimiter follows the colon
 			expectError:   true,
 			errorContains: "error reading array start",

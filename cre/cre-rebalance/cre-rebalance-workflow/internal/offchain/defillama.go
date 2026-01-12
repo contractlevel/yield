@@ -8,48 +8,65 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"strings"
 
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/networking/http"
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 )
 
-// getOptimalPool manages the orchestration of the off-chain data fetch.
+// Manages the orchestration of the off-chain data fetch
 func getOptimalPool(config *helper.Config, runtime cre.Runtime) (*Pool, error) {
+	// Initialize logger and HTTP client
 	logger := runtime.Logger()
 	client := &http.Client{}
 
+	// Send the request via CRE HTTP capability
 	// CRE consensus: identical aggregation ensures all nodes agree on the same pool
 	poolPromise := http.SendRequest(config, runtime, client, fetchAndParsePools, cre.ConsensusIdenticalAggregation[*Pool]())
-
 	returnedPool, err := poolPromise.Await()
 	if err != nil {
 		return nil, fmt.Errorf("failed to await promise: %w", err)
 	}
 
+	// Log and return pool
 	logger.Info("Got highest APY allowed pool", slog.Any("pool", returnedPool))
 	return returnedPool, nil
 }
 
-// fetchAndParsePools performs the high-performance token-based streaming.
+// Fetching func passed into HTTP capability to perform the data retrieval and parsing
+// Performs token-based streaming for minimal memory usage
 func fetchAndParsePools(config *helper.Config, logger *slog.Logger, sendRequester *http.SendRequester) (*Pool, error) {
+	// Initialize HTTP request
 	req := &http.Request{
 		Url:     DefiLlamaAPIUrl,
 		Method:  "GET",
 		Headers: map[string]string{"Accept-Encoding": "gzip"},
 	}
 
+	// Send request and check response
 	resp, err := sendRequester.SendRequest(req).Await()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get API response: %w", err)
 	}
-
 	if resp.StatusCode != StatusOK {
-		return nil, fmt.Errorf("failed to get API OK response: %d", resp.StatusCode)
+		return nil, fmt.Errorf("failed to get OK response: %d", resp.StatusCode)
 	}
 
-	// 1. Setup the reading pipeline (Body -> Gzip Wrapper -> JSON Decoder)
+	// PROCESS RESPONSE
+	// - 1. Set up the response reading pipeline (Body -> Gzip Wrapper -> JSON Decoder)
 	var reader io.Reader = bytes.NewReader(resp.Body)
-	if resp.Headers["Content-Encoding"] == "gzip" {
+
+	// - Header Check: Headers can be lowercase or Title-Case
+	isGzipped := false
+	for k, v := range resp.Headers {
+		if strings.EqualFold(k, "Content-Encoding") && strings.Contains(strings.ToLower(v), "gzip") {
+			isGzipped = true
+			break
+		}
+	}
+
+	// - Gzip Wrapper: Wrap the reader in a gzip reader if needed
+	if isGzipped {
 		gz, err := gzip.NewReader(reader)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create gzip reader: %w", err)
@@ -58,10 +75,10 @@ func fetchAndParsePools(config *helper.Config, logger *slog.Logger, sendRequeste
 		reader = gz
 	}
 
+	// - Create JSON Decoder
 	decoder := json.NewDecoder(reader)
 
-	// 2. Token-based Navigation: Find the "data" key without loading the whole object
-	// This skips any metadata or top-level fields at zero memory cost.
+	// - 2. Token-based Navigation: Find the "data" key without loading the whole object
 	foundData := false
 	for {
 		t, err := decoder.Token()
@@ -83,7 +100,7 @@ func fetchAndParsePools(config *helper.Config, logger *slog.Logger, sendRequeste
 		return nil, fmt.Errorf("could not find 'data' key in response")
 	}
 
-	// 3. Ensure the next token is the start of an array '['
+	// - 3. Ensure the next token is the start of an array '['
 	t, err := decoder.Token()
 	if err != nil {
 		return nil, fmt.Errorf("error reading array start: %w", err)
@@ -92,11 +109,10 @@ func fetchAndParsePools(config *helper.Config, logger *slog.Logger, sendRequeste
 		return nil, fmt.Errorf("expected array start after 'data' key")
 	}
 
+	// - 4. Streaming Loop: Decode one pool at a time
 	var selectedPool *Pool
-	var maxApy = -1.0
+	var maxApy = -1.0 // @review still not sure if this should be 0 instead
 
-	// 4. THE STREAMING LOOP: Decode one pool at a time
-	// This is O(1) memory complexity relative to the size of the pool list.
 	for decoder.More() {
 		var p Pool
 		if err := decoder.Decode(&p); err != nil {
@@ -105,20 +121,21 @@ func fetchAndParsePools(config *helper.Config, logger *slog.Logger, sendRequeste
 
 		// Filter and compare immediately
 		if AllowedSymbol[p.Symbol] &&
-			AllowedChain[p.Chain] &&
 			AllowedProject[p.Project] &&
+			AllowedChain[p.Chain] &&
 			p.Apy > maxApy {
 
 			maxApy = p.Apy
-			// Only copy the "winner" to the heap
-			winner := p
+			winner := p // Only copy the "winner" pool to the heap
 			selectedPool = &winner
 		}
 	}
 
+	// Check if an approved pool found
 	if selectedPool == nil {
 		return nil, fmt.Errorf("no approved strategy pool found")
 	}
 
+	// Return selected pool
 	return selectedPool, nil
 }

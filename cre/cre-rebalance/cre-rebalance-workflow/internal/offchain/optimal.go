@@ -9,41 +9,42 @@ import (
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 )
 
-// GetOptimalStrategy fetches the optimal pool and transforms it into an on-chain Strategy
+// Public func that gets the optimal pool from DefiLlama and transforms it into an on-chain Strategy
 func GetOptimalStrategy(config *helper.Config, runtime cre.Runtime) (*onchain.Strategy, error) {
+	// 1. Get the optimal pool from off-chain
 	pool, err := getOptimalPool(config, runtime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get optimal strategy: %w", err)
 	}
 
-	// 1. Hash protocol name safely
-	// We use 'copy' to ensure we safely move bytes into the fixed-size array
+	// 2. Transform the pool into an on-chain Strategy
 	var protocolId [32]byte
-	copy(protocolId[:], crypto.Keccak256([]byte(pool.Project)))
+	hash := crypto.Keccak256([]byte(pool.Project))
+	copy(protocolId[:], hash)
 
-	// 2. Get chain selector
 	chainSelector, err := chainSelectorFromChainName(pool.Chain)
 	if err != nil {
+		// @review not sure of this error name
 		return nil, fmt.Errorf("invalid strategy configuration: %w", err)
 	}
 
+	// 3. Return the strategy
 	return &onchain.Strategy{
 		ProtocolId:    protocolId,
 		ChainSelector: chainSelector,
 	}, nil
 }
 
-// Helper function to map chain names to CCIP selectors
+// @review better to have a mapping or is this a shared func we can use elsewhere?
+// Helper function to get chain selector from chain name
 func chainSelectorFromChainName(chainName string) (uint64, error) {
-	// Professional Tip: Switch statements are compiled efficiently in Go.
-	// For a small list, this is actually preferred over a global map for simplicity.
 	switch chainName {
-	case "Ethereum":
-		return 5009297550715157269, nil
 	case "Arbitrum":
 		return 4949039107694359620, nil
 	case "Base":
 		return 15971525489660198786, nil
+	case "Ethereum":
+		return 5009297550715157269, nil
 	case "Optimism":
 		return 3734403246176062136, nil
 	default:

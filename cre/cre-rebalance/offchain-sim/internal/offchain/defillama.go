@@ -3,7 +3,6 @@ package offchain
 import (
 	"bytes"
 	"compress/gzip"
-
 	"encoding/json"
 	"fmt"
 	"io"
@@ -107,8 +106,8 @@ func fetchAndParsePools(config *Config, logger *slog.Logger, sendRequester *http
 
 		// Filter and compare immediately
 		if AllowedSymbol[p.Symbol] &&
-			AllowedChain[p.Chain] &&
 			AllowedProject[p.Project] &&
+			AllowedChain[p.Chain] &&
 			p.Apy > maxApy {
 
 			maxApy = p.Apy
@@ -125,8 +124,8 @@ func fetchAndParsePools(config *Config, logger *slog.Logger, sendRequester *http
 	return selectedPool, nil
 }
 
-// Streaming JSON parsing approach (commented out for reference)
 /*
+// Streaming JSON parsing approach (commented out for reference)
 func fetchAndParsePools(config *Config, logger *slog.Logger, sendRequester *http.SendRequester) (*Pool, error) {
 	req := &http.Request{
 		Url:     DefiLlamaAPIUrl,
@@ -183,6 +182,66 @@ func fetchAndParsePools(config *Config, logger *slog.Logger, sendRequester *http
 
 	if selectedPool == nil {
 		return nil, fmt.Errorf("no approved strategy pool found")
+	}
+
+	return selectedPool, nil
+}
+*/
+
+/*
+// fetchAndParse performs a simpler approach by reading the entire body first.
+func fetchAndParsePools(config *Config, logger *slog.Logger, sendRequester *http.SendRequester) (*Pool, error) {
+	req := &http.Request{
+		Url:     "https://yields.llama.fi/pools",
+		Method:  "GET",
+		Headers: map[string]string{"Accept-Encoding": "gzip"},
+	}
+
+	resp, err := sendRequester.SendRequest(req).Await()
+	logger.Info("Response result", "response", resp.StatusCode)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get API response: %w", err)
+	}
+
+	var body []byte
+	if encoding, ok := resp.Headers["Content-Encoding"]; ok && encoding == "gzip" {
+		reader, err := gzip.NewReader(bytes.NewReader(resp.Body))
+		if err != nil {
+			return nil, fmt.Errorf("failed to create gzip reader: %w", err)
+		}
+		defer reader.Close()
+		body, err = io.ReadAll(reader)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decompress body: %w", err)
+		}
+	} else {
+		body = resp.Body
+	}
+
+	var apiResponse APIResponse
+	error := json.Unmarshal(body, &apiResponse)
+	if error != nil {
+		return nil, fmt.Errorf("error unmarshaling JSON: %w", err)
+	}
+
+	// Find highest APY pool
+	var maxApy = -1.0
+	var selectedPool *Pool
+
+	for _, pool := range apiResponse.Data {
+		if AllowedSymbol[pool.Symbol] &&
+			AllowedChain[pool.Chain] &&
+			AllowedProject[pool.Project] &&
+			pool.Apy > maxApy {
+
+			maxApy = pool.Apy
+			currentPool := pool
+			selectedPool = &currentPool
+		}
+	}
+
+	if selectedPool == nil {
+		return nil, fmt.Errorf("no pool with symbol 'USDC' found")
 	}
 
 	return selectedPool, nil

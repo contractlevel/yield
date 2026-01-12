@@ -15,20 +15,14 @@ import (
 	"google.golang.org/protobuf/types/known/anypb"
 )
 
-func TestGetOptimalStrategy_TableDriven(t *testing.T) {
-	// 1. Force-reset global maps to known values for this test suite
-	// This ensures we aren't relying on whatever happens to be in allowed.go
-	// AllowedSymbol = map[string]bool{"USDC": true}
-	// AllowedProject = map[string]bool{"aave-v3": true}
-	// AllowedChain = map[string]bool{
-	//     "Ethereum": true,
-	//     "Arbitrum": true,
-	//     "Base":     true,
-	//     "Optimism": true,
-	//     "Solana":   true, // Needed for the failure case
-	// }
-	AllowedChain["Solana"] = true
+func Test_offchain_GetOptimalStrategy(t *testing.T) {
+	AllowedChain["Solana"] = true        // Temporarily allow Solana for this test
 	defer delete(AllowedChain, "Solana") // Clean up when the test finishes!
+
+	var arbitrumSelector uint64 = 4949039107694359620
+	var baseSelector uint64 = 15971525489660198786
+	var ethereumSelector uint64 = 5009297550715157269
+	var optimismSelector uint64 = 3734403246176062136
 
 	tests := []struct {
 		name                  string
@@ -39,43 +33,43 @@ func TestGetOptimalStrategy_TableDriven(t *testing.T) {
 		expectedChain         uint64
 	}{
 		{
-			name: "Success - Ethereum",
-			// Notice: project is now "aave-v3" to match allowed.go
-			mockJson:      `{"data": [{"symbol": "USDC", "chain": "Ethereum", "project": "aave-v3", "apy": 10.0}]}`,
-			expectedChain: 5009297550715157269,
-		},
-		{
-			name:          "Success - Arbitrum Strategy",
+			name:          "aribitrum_success",
 			mockJson:      `{"data": [{"symbol": "USDC", "chain": "Arbitrum", "project": "aave-v3", "apy": 12.0}]}`,
 			expectError:   false,
-			expectedChain: 4949039107694359620,
+			expectedChain: arbitrumSelector,
 		},
 		{
-			name:          "Success - Base Strategy",
-			mockJson:      `{"data": [{"symbol": "USDC", "chain": "Base", "project": "aave-v3", "apy": 14.5}]}`,
+			name:          "base_success",
+			mockJson:      `{"data": [{"symbol": "USDC", "chain": "Base", "project": "compound-v3", "apy": 14.5}]}`,
 			expectError:   false,
-			expectedChain: 15971525489660198786,
+			expectedChain: baseSelector,
 		},
 		{
-			name:          "Success - Optimism Strategy",
-			mockJson:      `{"data": [{"symbol": "USDC", "chain": "Optimism", "project": "aave-v3", "apy": 11.0}]}`,
+			name:          "ethereum_success",
+			mockJson:      `{"data": [{"symbol": "USDC", "chain": "Ethereum", "project": "aave-v3", "apy": 10.0}]}`,
 			expectError:   false,
-			expectedChain: 3734403246176062136,
+			expectedChain: ethereumSelector,
 		},
 		{
-			name:                  "Failure - Network/Capability Error",
+			name:          "optimism_success",
+			mockJson:      `{"data": [{"symbol": "USDC", "chain": "Optimism", "project": "compound-v3", "apy": 11.0}]}`,
+			expectError:   false,
+			expectedChain: optimismSelector,
+		},
+		{
+			name:                  "errorWhen_noApiResponse",
 			expectCapabilityError: true,
 			expectError:           true,
 			errorContains:         "failed to get API response",
 		},
 		{
-			name:          "Failure - No Pool Found (Wrong Symbol)",
+			name:          "errorWhen_failedToGetStrategy",
 			mockJson:      `{"data": [{"symbol": "LINK", "chain": "Ethereum", "project": "aave-v3", "apy": 5.0}]}`,
 			expectError:   true,
-			errorContains: "no approved strategy pool found",
+			errorContains: "failed to get optimal strategy: failed to await promise: no approved strategy pool found",
 		},
 		{
-			name:          "Failure - Unsupported Chain (Solana is allowed but no selector exists)",
+			name:          "errorWhen_unsupportedChain",
 			mockJson:      `{"data": [{"symbol": "USDC", "chain": "Solana", "project": "aave-v3", "apy": 20.0}]}`,
 			expectError:   true,
 			errorContains: "invalid strategy configuration: chain selector not found for: Solana",

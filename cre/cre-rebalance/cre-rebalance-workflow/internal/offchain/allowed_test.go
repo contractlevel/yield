@@ -6,15 +6,15 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func Test_AllowedChainMapping(t *testing.T) {
+func Test_offchain_allowedChainMapping_tableDriven(t *testing.T) {
 	tests := []struct {
 		name     string
 		chain    string
 		expected bool
 	}{
-		{"Ethereum allowed", "Ethereum", true},
 		{"Arbitrum allowed", "Arbitrum", true},
 		{"Base allowed", "Base", true},
+		{"Ethereum allowed", "Ethereum", true},
 		{"Optimism allowed", "Optimism", true},
 		{"Solana not allowed", "Solana", false},
 		{"Unknown chain not allowed", "abcdefg", false},
@@ -28,7 +28,7 @@ func Test_AllowedChainMapping(t *testing.T) {
 	}
 }
 
-func Test_AllowedProjectMapping(t *testing.T) {
+func Test_offchain_allowedProjectMapping_tableDriven(t *testing.T) {
 	tests := []struct {
 		name     string
 		project  string
@@ -48,7 +48,7 @@ func Test_AllowedProjectMapping(t *testing.T) {
 	}
 }
 
-func Test_AllowedSymbolMapping(t *testing.T) {
+func Test_offchain_allowedSymbolMapping_tableDriven(t *testing.T) {
 	tests := []struct {
 		name     string
 		symbol   string
@@ -67,47 +67,66 @@ func Test_AllowedSymbolMapping(t *testing.T) {
 	}
 }
 
-func Fuzz_AllowedChain(f *testing.F) {
+func Fuzz_offchain_allowedChain(f *testing.F) {
+	f.Add("Arbitrum")
 	f.Add("Ethereum")
-	f.Add("Solana")
-	f.Add("")
+	f.Add("Base")
+	f.Add("Optimism")
 
 	f.Fuzz(func(t *testing.T, chain string) {
 		got, exists := AllowedChain[chain]
+
 		if exists {
-			assert.True(t, got, "Key exists in AllowedChain but returned false")
+			// If it exists in mapping, it MUST be one of the allowed chains
+			// and its value must be true.
+			if !got {
+				t.Errorf("Chain %s exists in map but is set to false", chain)
+			}
 		} else {
-			assert.False(t, got, "Key does not exist in AllowedChain but returned true")
+			// If exists is false, 'got' must be the zero-value (false)
+			if got {
+				t.Errorf("Critical Error: Map returned true for a key %s that doesn't exist", chain)
+			}
 		}
 	})
 }
 
-func Fuzz_AllowedProject(f *testing.F) {
+func Fuzz_offchain_allowedProject(f *testing.F) {
 	f.Add("aave-v3")
-	f.Add("uniswap")
-	f.Add("")
+	f.Add("compound-v3")
 
 	f.Fuzz(func(t *testing.T, project string) {
 		got, exists := AllowedProject[project]
+
 		if exists {
-			assert.True(t, got, "Key exists in AllowedProject but returned false")
+			// Since  map only contains 'true',
+			// any key that 'exists' MUST be true.
+			if !got {
+				t.Errorf("Project %q exists in map but value is false", project)
+			}
 		} else {
-			assert.False(t, got, "Key does not exist in AllowedProject but returned true")
+			// If it doesn't exist, Go's zero-value for bool is false.
+			if got {
+				t.Errorf("Project %q does not exist but map returned true", project)
+			}
 		}
 	})
 }
 
-func Fuzz_AllowedSymbol(f *testing.F) {
+func Fuzz_offchain_allowedSymbol(f *testing.F) {
 	f.Add("USDC")
-	f.Add("ETH")
-	f.Add("")
 
 	f.Fuzz(func(t *testing.T, symbol string) {
 		got, exists := AllowedSymbol[symbol]
+
 		if exists {
-			assert.True(t, got, "Key exists in AllowedSymbol but returned false")
+			if !got {
+				t.Errorf("Symbol %q exists but is false", symbol)
+			}
 		} else {
-			assert.False(t, got, "Key does not exist in AllowedSymbol but returned true")
+			if got {
+				t.Errorf("Symbol %q missing but got true", symbol)
+			}
 		}
 	})
 }

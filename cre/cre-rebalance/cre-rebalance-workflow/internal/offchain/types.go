@@ -7,8 +7,3 @@ type Pool struct {
 	Symbol  string  `json:"symbol"`
 	Apy     float64 `json:"apy"`
 }
-
-// DefiLlama API response structure
-type APIResponse struct {
-	Data []Pool `json:"data"`
-}
