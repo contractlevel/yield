@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/smartcontractkit/cre-sdk-go/capabilities/blockchain/evm"
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/smartcontractkit/cre-sdk-go/capabilities/blockchain/evm"
 )
 
 func Test_NewPoolAddressesProviderBinding_success(t *testing.T) {
@@ -50,6 +50,21 @@ func Test_NewPoolBinding_success(t *testing.T) {
 		t.Fatalf("expected non-nil binding, got nil")
 	}
 	var _ PoolInterface = binding
+}
+
+func Test_NewPoolBinding_errorWhen_zeroAddress(t *testing.T) {
+	var client *evm.Client = nil
+
+	binding, err := NewPoolBinding(client, common.Address{})
+	if err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+	if binding != nil {
+		t.Fatalf("expected nil binding on error, got non-nil")
+	}
+	if !strings.Contains(err.Error(), "invalid Pool address: zero address") {
+		t.Fatalf("unexpected error: %v", err)
+	}
 }
 
 func Test_NewAaveProtocolDataProviderBinding_success(t *testing.T) {

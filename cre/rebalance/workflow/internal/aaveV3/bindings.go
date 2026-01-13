@@ -26,6 +26,9 @@ func NewPoolAddressesProviderBinding(client *evm.Client, addr string) (PoolAddre
 }
 
 func NewPoolBinding(client *evm.Client, poolAddr common.Address) (PoolInterface, error) {
+	if poolAddr == (common.Address{}) {
+		return nil, fmt.Errorf("invalid Pool address: zero address")
+	}
 	return pool.NewPool(client, poolAddr, nil)
 }
 
