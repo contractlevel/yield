@@ -11,24 +11,40 @@ import (
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 )
 
-// @review all comments
-
 type PoolAddressesProviderInterface interface {
 	GetPool(runtime cre.Runtime, blockNumber *big.Int) cre.Promise[common.Address]
+	GetPoolDataProvider(runtime cre.Runtime, blockNumber *big.Int) cre.Promise[common.Address]
 }
 
 type PoolInterface interface {
 	GetReserveData(runtime cre.Runtime, input pool.GetReserveDataInput, blockNumber *big.Int) cre.Promise[pool.GetReserveDataOutput]
-	
 }
 
 // AaveProtocolDataProviderInterface abstracts the Aave Protocol Data Provider contract
 type AaveProtocolDataProviderInterface interface {
-	GetTotalDebt(runtime cre.Runtime, input aave_protocol_data_provider.GetTotalDebtInput, blockNumber *big.Int) cre.Promise[*big.Int]
+	GetReserveData(
+		runtime cre.Runtime,
+		input aave_protocol_data_provider.GetReserveDataInput,
+		blockNumber *big.Int,
+	) cre.Promise[aave_protocol_data_provider.GetReserveDataOutput]
 
-	GetReserveConfigurationData(runtime cre.Runtime, input aave_protocol_data_provider.GetReserveConfigurationDataInput, blockNumber *big.Int) cre.Promise[aave_protocol_data_provider.GetReserveConfigurationDataOutput]
+	GetReserveConfigurationData(
+		runtime cre.Runtime,
+		input aave_protocol_data_provider.GetReserveConfigurationDataInput,
+		blockNumber *big.Int,
+	) cre.Promise[aave_protocol_data_provider.GetReserveConfigurationDataOutput]
 
-	GetVirtualUnderlyingBalance(runtime cre.Runtime, input aave_protocol_data_provider.GetVirtualUnderlyingBalanceInput, blockNumber *big.Int) cre.Promise[*big.Int]
+	GetInterestRateStrategyAddress(
+		runtime cre.Runtime,
+		input aave_protocol_data_provider.GetInterestRateStrategyAddressInput,
+		blockNumber *big.Int,
+	) cre.Promise[common.Address]
+
+	GetVirtualUnderlyingBalance(
+		runtime cre.Runtime,
+		input aave_protocol_data_provider.GetVirtualUnderlyingBalanceInput,
+		blockNumber *big.Int,
+	) cre.Promise[*big.Int]
 }
 
 // DefaultReserveInterestRateStrategyV2Interface abstracts the Interest Rate Strategy contract

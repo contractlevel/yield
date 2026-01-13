@@ -1,5 +1,9 @@
 package aaveV3
 
+import (
+	"math/big"
+)
+
 const (
 	// RAY is Aave's fixed-point math unit (27 decimals)
 	// Aave stores interest rates as integers with 27 decimal places
@@ -24,3 +28,6 @@ const (
 	// e.g., 1000 = 10% = 0.10
 	BASIS_POINTS_DECIMALS = 4
 )
+
+// Using Exp(10, 27) instead of hardcoded String
+var RAYBigInt = new(big.Int).Exp(big.NewInt(10), big.NewInt(27), nil)

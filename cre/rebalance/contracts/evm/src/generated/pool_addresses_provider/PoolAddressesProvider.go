@@ -51,12 +51,15 @@ var (
 )
 
 var PoolAddressesProviderMetaData = &bind.MetaData{
-	ABI: "[{\"inputs\":[],\"name\":\"getPool\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
+	ABI: "[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"marketId\",\"type\":\"address\"}],\"name\":\"getMarketId\",\"outputs\":[{\"internalType\":\"string\",\"name\":\"\",\"type\":\"string\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getPool\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"getPoolDataProvider\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[],\"name\":\"owner\",\"outputs\":[{\"internalType\":\"address\",\"name\":\"\",\"type\":\"address\"}],\"stateMutability\":\"view\",\"type\":\"function\"}]",
 }
 
 // Structs
 
 // Contract Method Inputs
+type GetMarketIdInput struct {
+	MarketId common.Address
+}
 
 // Contract Method Outputs
 
@@ -82,8 +85,14 @@ type PoolAddressesProvider struct {
 }
 
 type PoolAddressesProviderCodec interface {
+	EncodeGetMarketIdMethodCall(in GetMarketIdInput) ([]byte, error)
+	DecodeGetMarketIdMethodOutput(data []byte) (string, error)
 	EncodeGetPoolMethodCall() ([]byte, error)
 	DecodeGetPoolMethodOutput(data []byte) (common.Address, error)
+	EncodeGetPoolDataProviderMethodCall() ([]byte, error)
+	DecodeGetPoolDataProviderMethodOutput(data []byte) (common.Address, error)
+	EncodeOwnerMethodCall() ([]byte, error)
+	DecodeOwnerMethodOutput(data []byte) (common.Address, error)
 }
 
 func NewPoolAddressesProvider(
@@ -120,6 +129,28 @@ func NewCodec() (PoolAddressesProviderCodec, error) {
 	return &Codec{abi: &parsed}, nil
 }
 
+func (c *Codec) EncodeGetMarketIdMethodCall(in GetMarketIdInput) ([]byte, error) {
+	return c.abi.Pack("getMarketId", in.MarketId)
+}
+
+func (c *Codec) DecodeGetMarketIdMethodOutput(data []byte) (string, error) {
+	vals, err := c.abi.Methods["getMarketId"].Outputs.Unpack(data)
+	if err != nil {
+		return *new(string), err
+	}
+	jsonData, err := json.Marshal(vals[0])
+	if err != nil {
+		return *new(string), fmt.Errorf("failed to marshal ABI result: %w", err)
+	}
+
+	var result string
+	if err := json.Unmarshal(jsonData, &result); err != nil {
+		return *new(string), fmt.Errorf("failed to unmarshal to string: %w", err)
+	}
+
+	return result, nil
+}
+
 func (c *Codec) EncodeGetPoolMethodCall() ([]byte, error) {
 	return c.abi.Pack("getPool")
 }
@@ -140,6 +171,88 @@ func (c *Codec) DecodeGetPoolMethodOutput(data []byte) (common.Address, error) {
 	}
 
 	return result, nil
+}
+
+func (c *Codec) EncodeGetPoolDataProviderMethodCall() ([]byte, error) {
+	return c.abi.Pack("getPoolDataProvider")
+}
+
+func (c *Codec) DecodeGetPoolDataProviderMethodOutput(data []byte) (common.Address, error) {
+	vals, err := c.abi.Methods["getPoolDataProvider"].Outputs.Unpack(data)
+	if err != nil {
+		return *new(common.Address), err
+	}
+	jsonData, err := json.Marshal(vals[0])
+	if err != nil {
+		return *new(common.Address), fmt.Errorf("failed to marshal ABI result: %w", err)
+	}
+
+	var result common.Address
+	if err := json.Unmarshal(jsonData, &result); err != nil {
+		return *new(common.Address), fmt.Errorf("failed to unmarshal to common.Address: %w", err)
+	}
+
+	return result, nil
+}
+
+func (c *Codec) EncodeOwnerMethodCall() ([]byte, error) {
+	return c.abi.Pack("owner")
+}
+
+func (c *Codec) DecodeOwnerMethodOutput(data []byte) (common.Address, error) {
+	vals, err := c.abi.Methods["owner"].Outputs.Unpack(data)
+	if err != nil {
+		return *new(common.Address), err
+	}
+	jsonData, err := json.Marshal(vals[0])
+	if err != nil {
+		return *new(common.Address), fmt.Errorf("failed to marshal ABI result: %w", err)
+	}
+
+	var result common.Address
+	if err := json.Unmarshal(jsonData, &result); err != nil {
+		return *new(common.Address), fmt.Errorf("failed to unmarshal to common.Address: %w", err)
+	}
+
+	return result, nil
+}
+
+func (c PoolAddressesProvider) GetMarketId(
+	runtime cre.Runtime,
+	args GetMarketIdInput,
+	blockNumber *big.Int,
+) cre.Promise[string] {
+	calldata, err := c.Codec.EncodeGetMarketIdMethodCall(args)
+	if err != nil {
+		return cre.PromiseFromResult[string](*new(string), err)
+	}
+
+	var bn cre.Promise[*pb.BigInt]
+	if blockNumber == nil {
+		promise := c.client.HeaderByNumber(runtime, &evm.HeaderByNumberRequest{
+			BlockNumber: bindings.FinalizedBlockNumber,
+		})
+
+		bn = cre.Then(promise, func(finalizedBlock *evm.HeaderByNumberReply) (*pb.BigInt, error) {
+			if finalizedBlock == nil || finalizedBlock.Header == nil {
+				return nil, errors.New("failed to get finalized block header")
+			}
+			return finalizedBlock.Header.BlockNumber, nil
+		})
+	} else {
+		bn = cre.PromiseFromResult(pb.NewBigIntFromInt(blockNumber), nil)
+	}
+
+	promise := cre.ThenPromise(bn, func(bn *pb.BigInt) cre.Promise[*evm.CallContractReply] {
+		return c.client.CallContract(runtime, &evm.CallContractRequest{
+			Call:        &evm.CallMsg{To: c.Address.Bytes(), Data: calldata},
+			BlockNumber: bn,
+		})
+	})
+	return cre.Then(promise, func(response *evm.CallContractReply) (string, error) {
+		return c.Codec.DecodeGetMarketIdMethodOutput(response.Data)
+	})
+
 }
 
 func (c PoolAddressesProvider) GetPool(
@@ -175,6 +288,80 @@ func (c PoolAddressesProvider) GetPool(
 	})
 	return cre.Then(promise, func(response *evm.CallContractReply) (common.Address, error) {
 		return c.Codec.DecodeGetPoolMethodOutput(response.Data)
+	})
+
+}
+
+func (c PoolAddressesProvider) GetPoolDataProvider(
+	runtime cre.Runtime,
+	blockNumber *big.Int,
+) cre.Promise[common.Address] {
+	calldata, err := c.Codec.EncodeGetPoolDataProviderMethodCall()
+	if err != nil {
+		return cre.PromiseFromResult[common.Address](*new(common.Address), err)
+	}
+
+	var bn cre.Promise[*pb.BigInt]
+	if blockNumber == nil {
+		promise := c.client.HeaderByNumber(runtime, &evm.HeaderByNumberRequest{
+			BlockNumber: bindings.FinalizedBlockNumber,
+		})
+
+		bn = cre.Then(promise, func(finalizedBlock *evm.HeaderByNumberReply) (*pb.BigInt, error) {
+			if finalizedBlock == nil || finalizedBlock.Header == nil {
+				return nil, errors.New("failed to get finalized block header")
+			}
+			return finalizedBlock.Header.BlockNumber, nil
+		})
+	} else {
+		bn = cre.PromiseFromResult(pb.NewBigIntFromInt(blockNumber), nil)
+	}
+
+	promise := cre.ThenPromise(bn, func(bn *pb.BigInt) cre.Promise[*evm.CallContractReply] {
+		return c.client.CallContract(runtime, &evm.CallContractRequest{
+			Call:        &evm.CallMsg{To: c.Address.Bytes(), Data: calldata},
+			BlockNumber: bn,
+		})
+	})
+	return cre.Then(promise, func(response *evm.CallContractReply) (common.Address, error) {
+		return c.Codec.DecodeGetPoolDataProviderMethodOutput(response.Data)
+	})
+
+}
+
+func (c PoolAddressesProvider) Owner(
+	runtime cre.Runtime,
+	blockNumber *big.Int,
+) cre.Promise[common.Address] {
+	calldata, err := c.Codec.EncodeOwnerMethodCall()
+	if err != nil {
+		return cre.PromiseFromResult[common.Address](*new(common.Address), err)
+	}
+
+	var bn cre.Promise[*pb.BigInt]
+	if blockNumber == nil {
+		promise := c.client.HeaderByNumber(runtime, &evm.HeaderByNumberRequest{
+			BlockNumber: bindings.FinalizedBlockNumber,
+		})
+
+		bn = cre.Then(promise, func(finalizedBlock *evm.HeaderByNumberReply) (*pb.BigInt, error) {
+			if finalizedBlock == nil || finalizedBlock.Header == nil {
+				return nil, errors.New("failed to get finalized block header")
+			}
+			return finalizedBlock.Header.BlockNumber, nil
+		})
+	} else {
+		bn = cre.PromiseFromResult(pb.NewBigIntFromInt(blockNumber), nil)
+	}
+
+	promise := cre.ThenPromise(bn, func(bn *pb.BigInt) cre.Promise[*evm.CallContractReply] {
+		return c.client.CallContract(runtime, &evm.CallContractRequest{
+			Call:        &evm.CallMsg{To: c.Address.Bytes(), Data: calldata},
+			BlockNumber: bn,
+		})
+	})
+	return cre.Then(promise, func(response *evm.CallContractReply) (common.Address, error) {
+		return c.Codec.DecodeOwnerMethodOutput(response.Data)
 	})
 
 }
