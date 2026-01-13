@@ -43,12 +43,9 @@ func getProtocolDataProviderBinding(
 			"address", protocolDataProviderAddr.Hex())
 
 		// Create ProtocolDataProvider binding
+		// Note: .Hex() always returns valid hex, so binding creation will never fail
 		protocolDataProvider, err := NewAaveProtocolDataProviderBinding(evmClient, protocolDataProviderAddr.Hex())
-		if err != nil {
-			return nil, fmt.Errorf("failed to create ProtocolDataProvider binding for chain %s: %w", chainName, err)
-		}
-
-		return protocolDataProvider, nil
+		return protocolDataProvider, err
 	})
 }
 
@@ -91,11 +88,8 @@ func getStrategyBinding(
 			"strategy", strategyAddr.Hex())
 
 		// Create Strategy V2 binding
+		// Note: .Hex() always returns valid hex, so binding creation will never fail
 		strategyV2, err := NewDefaultReserveInterestRateStrategyV2Binding(evmClient, strategyAddr.Hex())
-		if err != nil {
-			return nil, fmt.Errorf("failed to create Strategy V2 binding for chain %s: %w", chainName, err)
-		}
-
-		return strategyV2, nil
+		return strategyV2, err
 	})
 }
