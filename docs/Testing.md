@@ -281,6 +281,8 @@ See coverage:
 
 `go tool cover -html=coverage.out`
 
+`go test -coverprofile=coverage.out ./internal/onchain` - for a specific package
+
 Run single test:
 
 `go test -run Test_funcName`
@@ -298,3 +300,25 @@ We name our tests like so `Test_group_funcName`
 Clean cache:
 
 `go clean -testcache`
+
+Integration tests:
+
+`go test -tags=integration .`
+
+Fuzz tests:
+
+`go test -v -fuzz FuzzTest_name`
+
+Formatting:
+
+`gofmt -w .`
+
+Static analysis:
+
+`go vet .`
+
+`golangci-lint run .`
+
+`gosec .`
+
+`govulncheck .`

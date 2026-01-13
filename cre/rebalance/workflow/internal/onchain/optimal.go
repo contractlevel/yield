@@ -189,12 +189,3 @@ func calculateAPYForStrategyWithDeps(
 
 	return apy, nil
 }
-
-/*//////////////////////////////////////////////////////////////
-                            UTILITY
-//////////////////////////////////////////////////////////////*/
-
-func sameStrategy(a, b Strategy) bool {
-	return a.ProtocolId == b.ProtocolId &&
-		a.ChainSelector == b.ChainSelector
-}
