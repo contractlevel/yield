@@ -15,7 +15,7 @@ import (
 
 // @review placeholder
 func GetAPYPromise(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int, chainSelector uint64) cre.Promise[float64] {
-	return nil
+	return cre.PromiseFromResult(0.0, nil)
 }
 
 // @review pass this stablecoin as an arg when doing modular stable support task

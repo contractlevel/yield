@@ -16,18 +16,6 @@ import (
                      DEPENDENCY INJECTIONS
 //////////////////////////////////////////////////////////////*/
 
-// Synchronous APY deps used by CalculateAPYForStrategy and
-// any other sequential callers.
-type apyDeps struct {
-	AaveV3GetAPY     func(*helper.Config, cre.Runtime, *big.Int, uint64) (float64, error)
-	CompoundV3GetAPY func(*helper.Config, cre.Runtime, *big.Int, uint64) (float64, error)
-}
-
-var defaultAPYDeps = apyDeps{
-	AaveV3GetAPY:     aaveV3.GetAPY,
-	CompoundV3GetAPY: compoundV3.GetAPY,
-}
-
 // Promise-based APY deps used by GetOptimalStrategy to evaluate
 // all candidate strategies in parallel.
 type apyPromiseDeps struct {
@@ -85,25 +73,14 @@ func getOptimalStrategyWithDeps(
 
     // First pass: kick off all APY computations (no Await yet).
     for _, strategy := range supportedStrategies {
-        s := strategy // capture
-
         liq := liquidityAdded
-        if sameStrategy(s, currentStrategy) {
+        if sameStrategy(strategy, currentStrategy) {
             liq = big.NewInt(0)
         }
 
-		// @review moving this switch to a dedicated function
-        var apyPromise cre.Promise[float64]
-        switch s.ProtocolId {
-        case AaveV3ProtocolId:
-            apyPromise = deps.AaveV3GetAPYPromise(config, runtime, liq, s.ChainSelector)
-        case CompoundV3ProtocolId:
-            apyPromise = deps.CompoundV3GetAPYPromise(config, runtime, liq, s.ChainSelector)
-        default:
-            return Strategy{}, fmt.Errorf("unsupported protocolId: %x", s.ProtocolId)
-        }
+	    apyPromise:= getAPYPromiseFromStrategy(config, runtime, strategy, liq, deps)
 
-        strategies = append(strategies, s)
+        strategies = append(strategies, strategy)
         apyPromises = append(apyPromises, apyPromise)
     }
 
@@ -140,52 +117,21 @@ func getOptimalStrategyWithDeps(
     return bestStrategy, nil
 }
 
-/*//////////////////////////////////////////////////////////////
-                   CALCULATE APY FOR STRATEGY
-//////////////////////////////////////////////////////////////*/
-
-func CalculateAPYForStrategy(
+func getAPYPromiseFromStrategy(
 	config *helper.Config,
 	runtime cre.Runtime,
 	strategy Strategy,
-	liquidityAdded *big.Int,
-) (float64, error) {
-	return calculateAPYForStrategyWithDeps(config, runtime, strategy, liquidityAdded, defaultAPYDeps)
-}
-
-// @review scaling for different strategy package GetAPY return values needs to be consistent!
-// ie is the aaveV3 value scaled to RAY when compoundV3 scales to WAD?
-func calculateAPYForStrategyWithDeps(
-	config *helper.Config,
-	runtime cre.Runtime,
-	strategy Strategy,
-	liquidityAdded *big.Int,
-	deps apyDeps,
-) (float64, error) {
-	var (
-		apy float64
-		err error
-	)
-
+	liquidity *big.Int,
+	deps apyPromiseDeps,
+) cre.Promise[float64] {
 	switch strategy.ProtocolId {
 	case AaveV3ProtocolId:
-		apy, err = deps.AaveV3GetAPY(config, runtime, liquidityAdded, strategy.ChainSelector)
-		if err != nil {
-			return 0, fmt.Errorf("getting APY from AaveV3: %w", err)
-		}
+		return deps.AaveV3GetAPYPromise(config, runtime, liquidity, strategy.ChainSelector)
+
 	case CompoundV3ProtocolId:
-		apy, err = deps.CompoundV3GetAPY(config, runtime, liquidityAdded, strategy.ChainSelector)
-		if err != nil {
-			return 0, fmt.Errorf("getting APY from CompoundV3: %w", err)
-		}
+		return deps.CompoundV3GetAPYPromise(config, runtime, liquidity, strategy.ChainSelector)
+
 	default:
-		return 0, fmt.Errorf("unsupported protocolId: %x", strategy.ProtocolId)
+		return cre.PromiseFromResult(0.0, fmt.Errorf("unsupported protocolId: %x", strategy.ProtocolId))
 	}
-
-	// Guard against invalid float64 results.
-	if math.IsNaN(apy) || math.IsInf(apy, 0) {
-		return 0, fmt.Errorf("invalid APY value (NaN/Inf) for protocolId %x: %v", strategy.ProtocolId, apy)
-	}
-
-	return apy, nil
 }
