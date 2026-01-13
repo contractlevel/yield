@@ -14,8 +14,8 @@ import (
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 )
 
-// Manages the orchestration of the off-chain data fetch
-func getOptimalPool(config *helper.Config, runtime cre.Runtime) (*Pool, error) {
+// Gets highest APY approved pool from DefiLlama via CRE HTTP capability
+func getBestPool(config *helper.Config, runtime cre.Runtime) (*Pool, error) {
 	// Initialize logger and HTTP client
 	logger := runtime.Logger()
 	client := &http.Client{}

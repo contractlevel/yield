@@ -12,7 +12,7 @@ import (
 // Public func that gets the optimal pool from DefiLlama and transforms it into an on-chain Strategy
 func GetOptimalStrategy(config *helper.Config, runtime cre.Runtime) (*onchain.Strategy, error) {
 	// 1. Get the optimal pool from off-chain
-	pool, err := getOptimalPool(config, runtime)
+	pool, err := getBestPool(config, runtime)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get optimal strategy: %w", err)
 	}

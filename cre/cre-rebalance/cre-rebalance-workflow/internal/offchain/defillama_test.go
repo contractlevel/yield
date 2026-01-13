@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"encoding/json"
+	"math"
 	"testing"
 
 	"cre-rebalance/cre-rebalance-workflow/internal/helper"
@@ -17,6 +19,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/anypb"
 )
+
+/* MOCK & HELPERS */
 
 // Mock HTTP capability for testing
 type mockHttpCapability struct {
@@ -41,7 +45,8 @@ func compressGzip(data string) []byte {
 	return buf.Bytes()
 }
 
-func Test_offchain_getOptimalPool(t *testing.T) {
+/* UNIT TESTS */
+func Test_offchain_getBestPool(t *testing.T) {
 	tests := []struct {
 		name           string
 		mockFn         func(ctx context.Context, req *sdk.CapabilityRequest) *sdk.CapabilityResponse
@@ -98,7 +103,7 @@ func Test_offchain_getOptimalPool(t *testing.T) {
 				fn: tc.mockFn,
 			})
 
-			result, err := getOptimalPool(config, rt)
+			result, err := getBestPool(config, rt)
 
 			if tc.expectError {
 				require.Error(t, err)
@@ -282,4 +287,82 @@ func Test_offchain_fetchAndParsePools(t *testing.T) {
 			}
 		})
 	}
+}
+
+func Fuzz_offchain_fetchAndParsePools(f *testing.F) {
+	// Seed: f.Add must match the (t, []byte, []byte) signature
+	f.Add([]byte{0}, []byte(`{"data": [{"symbol": "USDC", "chain": "Ethereum", "project": "aave-v3", "apy": 5.5}]}`))
+	f.Add([]byte{1}, []byte(`{"data": []}`))
+
+	f.Fuzz(func(t *testing.T, control []byte, payload []byte) {
+		// 1. Setup Environment
+		if len(control) == 0 {
+			return
+		}
+		rt := testutils.NewRuntime(t, nil)
+
+		var finalBody []byte
+		headers := make(map[string]string)
+
+		// Decide path: 0 = Plain, 1 = Gzip (or any even/odd byte)
+		isGzip := control[0]%2 == 0
+		if isGzip {
+			headers["Content-Encoding"] = "gzip"
+			finalBody = compressGzip(string(payload)) // Using helper
+		} else {
+			finalBody = payload
+		}
+
+		registry.GetRegistry(t).RegisterCapability(&mockHttpCapability{
+			id: "http-actions@1.0.0-alpha",
+			fn: func(ctx context.Context, req *sdk.CapabilityRequest) *sdk.CapabilityResponse {
+				respAny, _ := anypb.New(&http.Response{
+					StatusCode: StatusOK,
+					Body:       finalBody,
+					Headers:    headers,
+				})
+				return &sdk.CapabilityResponse{Response: &sdk.CapabilityResponse_Payload{Payload: respAny}}
+			},
+		})
+
+		// 2. Execute
+		promise := http.SendRequest(&helper.Config{}, rt, &http.Client{}, fetchAndParsePools, cre.ConsensusIdenticalAggregation[*Pool]())
+		result, err := promise.Await()
+
+		// 3. INLINE INVARIANTS
+		if err == nil && result != nil {
+			// Whitelist Invariant
+			if !AllowedChain[result.Chain] || !AllowedProject[result.Project] || !AllowedSymbol[result.Symbol] {
+				t.Errorf("Security Violation: Result contained disallowed values: %+v", result)
+			}
+
+			// Math Invariant
+			if math.IsNaN(result.Apy) || math.IsInf(result.Apy, 0) || result.Apy < -1.0 {
+				t.Errorf("Math Error: Invalid APY detected: %f", result.Apy)
+			}
+		}
+
+		// 4. DIFFERENTIAL INVARIANT (Cross-check)
+		if err == nil {
+			var wrapper struct{ Data []Pool }
+			// We always compare against the raw 'payload', NOT the 'finalBody'
+			if json.Unmarshal(payload, &wrapper) == nil {
+				var best *Pool
+				max := -1.0
+				for _, p := range wrapper.Data {
+					if AllowedChain[p.Chain] && AllowedProject[p.Project] && AllowedSymbol[p.Symbol] && p.Apy > max {
+						max = p.Apy
+						best = &p
+					}
+				}
+
+				// Check if parser and manual loop agree on "winner" presence
+				if (result == nil) != (best == nil) {
+					t.Errorf("Visibility Mismatch: Parser result exists=%v, Manual loop result exists=%v", result != nil, best != nil)
+				} else if result != nil && best != nil && result.Apy != best.Apy {
+					t.Errorf("Logic Mismatch: Parser picked %f, Manual loop found %f", result.Apy, best.Apy)
+				}
+			}
+		}
+	})
 }
