@@ -90,7 +90,7 @@ func fetchAndParsePools(config *helper.Config, logger *slog.Logger, sendRequeste
 		}
 
 		// Look for the key "data"
-		if key, ok := t.(string); ok && key == "data" {
+		if key, ok := t.(string); ok && strings.EqualFold(key, "data") {
 			foundData = true
 			break
 		}
@@ -111,7 +111,7 @@ func fetchAndParsePools(config *helper.Config, logger *slog.Logger, sendRequeste
 
 	// - 4. Streaming Loop: Decode one pool at a time
 	var selectedPool *Pool
-	var maxApy = -1.0 // @review still not sure if this should be 0 instead
+	var maxApy float64 = 0.0
 
 	for decoder.More() {
 		var p Pool
