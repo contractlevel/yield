@@ -38,7 +38,7 @@ func getBestPool(config *helper.Config, runtime cre.Runtime) (*Pool, error) {
 func fetchAndParsePools(config *helper.Config, logger *slog.Logger, sendRequester *http.SendRequester) (*Pool, error) {
 	// Initialize HTTP request
 	req := &http.Request{
-		Url:     DefiLlamaAPIUrl,
+		Url:     DefiLlamaApiUrl,
 		Method:  "GET",
 		Headers: map[string]string{"Accept-Encoding": "gzip"},
 	}

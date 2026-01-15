@@ -1,6 +1,6 @@
 package offchain
 
-// Strategy pool fetched from DefiLlama
+// --- DefiLlama Structs ---
 type Pool struct {
 	Chain   string  `json:"chain"`
 	Project string  `json:"project"`
