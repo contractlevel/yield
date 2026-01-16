@@ -1,8 +1,8 @@
 package offchain
 
 import (
-	"cre-rebalance/cre-rebalance-workflow/internal/helper"
 	"log/slog"
+	"rebalance/workflow/internal/helper"
 
 	"encoding/json"
 	"fmt"

@@ -3,11 +3,11 @@ package offchain
 import (
 	"bytes"
 	"compress/gzip"
-	"cre-rebalance/cre-rebalance-workflow/internal/helper"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
+	"rebalance/workflow/internal/helper"
 	"strings"
 
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/networking/http"

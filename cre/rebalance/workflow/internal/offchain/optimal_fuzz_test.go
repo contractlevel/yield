@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"cre-rebalance/cre-rebalance-workflow/internal/helper"
+	"rebalance/workflow/internal/helper"
 
 	"github.com/smartcontractkit/chainlink-protos/cre/go/sdk"
 	"github.com/smartcontractkit/cre-sdk-go/cre/testutils"

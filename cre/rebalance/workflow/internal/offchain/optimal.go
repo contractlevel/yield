@@ -1,9 +1,9 @@
 package offchain
 
 import (
-	"cre-rebalance/cre-rebalance-workflow/internal/helper"
-	"cre-rebalance/cre-rebalance-workflow/internal/onchain"
 	"fmt"
+	"rebalance/workflow/internal/helper"
+	"rebalance/workflow/internal/onchain"
 
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/smartcontractkit/cre-sdk-go/cre"
