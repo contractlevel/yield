@@ -6,3 +6,7 @@ type Strategy struct {
 	ChainSelector uint64
 }
 
+type StrategyWithAPY struct {
+	Strategy Strategy
+	APY      float64
+}

@@ -45,23 +45,31 @@ func mockAPYPromiseDeps(
 	}
 }
 
-// setupConfigWithStrategies creates a config with the specified chain selectors.
-func setupConfigWithStrategies(chainSelectors ...uint64) *helper.Config {
+// setupConfigWithStrategies creates a config with the specified chain selectors
+// and initializes supportedStrategies. Both protocols (AaveV3 and CompoundV3) are
+// enabled for each chain selector.
+func setupConfigWithStrategies(t *testing.T, chainSelectors ...uint64) *helper.Config {
+	resetState()
 	evms := make([]helper.EvmConfig, len(chainSelectors))
 	for i, cs := range chainSelectors {
 		evms[i] = helper.EvmConfig{
-			ChainSelector: cs,
+			ChainSelector:                         cs,
+			AaveV3PoolAddressesProviderAddress: "0xaave",
+			CompoundV3CometUSDCAddress:         "0xcompound",
 		}
 	}
-	return &helper.Config{Evms: evms}
+	cfg := &helper.Config{Evms: evms}
+	err := InitSupportedStrategies(cfg)
+	require.NoError(t, err, "failed to initialize supported strategies")
+	return cfg
 }
 
 /*//////////////////////////////////////////////////////////////
               GET OPTIMAL STRATEGY - SUCCESS CASES
 //////////////////////////////////////////////////////////////*/
 
-func Test_getOptimalStrategyWithDeps_singleStrategy_success(t *testing.T) {
-	cfg := setupConfigWithStrategies(1)
+func Test_getOptimalAndCurrentStrategyWithAPYWithDeps_singleStrategy_success(t *testing.T) {
+	cfg := setupConfigWithStrategies(t, 1)
 	runtime := testutils.NewRuntime(t, nil)
 	currentStrategy := Strategy{ProtocolId: AaveV3ProtocolId, ChainSelector: 1}
 	liquidityAdded := big.NewInt(1000)
@@ -69,14 +77,18 @@ func Test_getOptimalStrategyWithDeps_singleStrategy_success(t *testing.T) {
 	// Both strategies will be evaluated, so both need non-zero APYs
 	deps := mockAPYPromiseDeps(0.05, 0.03, nil, nil)
 
-	strategy, err := getOptimalStrategyWithDeps(cfg, runtime, currentStrategy, liquidityAdded, deps)
+	optimal, current, err := getOptimalAndCurrentStrategyWithAPYWithDeps(cfg, runtime, currentStrategy, liquidityAdded, deps)
 	require.NoError(t, err)
-	require.Equal(t, AaveV3ProtocolId, strategy.ProtocolId)
-	require.Equal(t, uint64(1), strategy.ChainSelector)
+	require.Equal(t, AaveV3ProtocolId, optimal.Strategy.ProtocolId)
+	require.Equal(t, uint64(1), optimal.Strategy.ChainSelector)
+	require.Equal(t, 0.05, optimal.APY)
+	require.Equal(t, AaveV3ProtocolId, current.Strategy.ProtocolId)
+	require.Equal(t, uint64(1), current.Strategy.ChainSelector)
+	require.Equal(t, 0.05, current.APY)
 }
 
-func Test_getOptimalStrategyWithDeps_multipleStrategies_picksHighestAPY(t *testing.T) {
-	cfg := setupConfigWithStrategies(1)
+func Test_getOptimalAndCurrentStrategyWithAPYWithDeps_multipleStrategies_picksHighestAPY(t *testing.T) {
+	cfg := setupConfigWithStrategies(t, 1)
 	runtime := testutils.NewRuntime(t, nil)
 	currentStrategy := Strategy{ProtocolId: AaveV3ProtocolId, ChainSelector: 1}
 	liquidityAdded := big.NewInt(1000)
@@ -84,14 +96,18 @@ func Test_getOptimalStrategyWithDeps_multipleStrategies_picksHighestAPY(t *testi
 	// Aave has higher APY
 	deps := mockAPYPromiseDeps(0.08, 0.05, nil, nil)
 
-	strategy, err := getOptimalStrategyWithDeps(cfg, runtime, currentStrategy, liquidityAdded, deps)
+	optimal, current, err := getOptimalAndCurrentStrategyWithAPYWithDeps(cfg, runtime, currentStrategy, liquidityAdded, deps)
 	require.NoError(t, err)
-	require.Equal(t, AaveV3ProtocolId, strategy.ProtocolId)
-	require.Equal(t, uint64(1), strategy.ChainSelector)
+	require.Equal(t, AaveV3ProtocolId, optimal.Strategy.ProtocolId)
+	require.Equal(t, uint64(1), optimal.Strategy.ChainSelector)
+	require.Equal(t, 0.08, optimal.APY)
+	require.Equal(t, AaveV3ProtocolId, current.Strategy.ProtocolId)
+	require.Equal(t, uint64(1), current.Strategy.ChainSelector)
+	require.Equal(t, 0.08, current.APY)
 }
 
-func Test_getOptimalStrategyWithDeps_multipleStrategies_picksCompoundWhenHigher(t *testing.T) {
-	cfg := setupConfigWithStrategies(1)
+func Test_getOptimalAndCurrentStrategyWithAPYWithDeps_multipleStrategies_picksCompoundWhenHigher(t *testing.T) {
+	cfg := setupConfigWithStrategies(t, 1)
 	runtime := testutils.NewRuntime(t, nil)
 	currentStrategy := Strategy{ProtocolId: AaveV3ProtocolId, ChainSelector: 1}
 	liquidityAdded := big.NewInt(1000)
@@ -99,14 +115,18 @@ func Test_getOptimalStrategyWithDeps_multipleStrategies_picksCompoundWhenHigher(
 	// Compound has higher APY
 	deps := mockAPYPromiseDeps(0.05, 0.10, nil, nil)
 
-	strategy, err := getOptimalStrategyWithDeps(cfg, runtime, currentStrategy, liquidityAdded, deps)
+	optimal, current, err := getOptimalAndCurrentStrategyWithAPYWithDeps(cfg, runtime, currentStrategy, liquidityAdded, deps)
 	require.NoError(t, err)
-	require.Equal(t, CompoundV3ProtocolId, strategy.ProtocolId)
-	require.Equal(t, uint64(1), strategy.ChainSelector)
+	require.Equal(t, CompoundV3ProtocolId, optimal.Strategy.ProtocolId)
+	require.Equal(t, uint64(1), optimal.Strategy.ChainSelector)
+	require.Equal(t, 0.10, optimal.APY)
+	require.Equal(t, AaveV3ProtocolId, current.Strategy.ProtocolId)
+	require.Equal(t, uint64(1), current.Strategy.ChainSelector)
+	require.Equal(t, 0.05, current.APY)
 }
 
-func Test_getOptimalStrategyWithDeps_multipleChains_picksBestAcrossChains(t *testing.T) {
-	cfg := setupConfigWithStrategies(1, 2)
+func Test_getOptimalAndCurrentStrategyWithAPYWithDeps_multipleChains_picksBestAcrossChains(t *testing.T) {
+	cfg := setupConfigWithStrategies(t, 1, 2)
 	runtime := testutils.NewRuntime(t, nil)
 	currentStrategy := Strategy{ProtocolId: AaveV3ProtocolId, ChainSelector: 1}
 	liquidityAdded := big.NewInt(1000)
@@ -123,7 +143,7 @@ func Test_getOptimalStrategyWithDeps_multipleChains_picksBestAcrossChains(t *tes
 			} else {
 				// Not current strategy, so uses full liquidityAdded
 				requireBigEqual(t, liquidityAdded, liq)
-				apy = 0.07 // Chain 2 has higher APY
+				apy = 0.07 // Chain 2 has highest APY
 			}
 			return cre.PromiseFromResult(apy, nil)
 		},
@@ -140,14 +160,18 @@ func Test_getOptimalStrategyWithDeps_multipleChains_picksBestAcrossChains(t *tes
 		},
 	}
 
-	strategy, err := getOptimalStrategyWithDeps(cfg, runtime, currentStrategy, liquidityAdded, deps)
+	optimal, current, err := getOptimalAndCurrentStrategyWithAPYWithDeps(cfg, runtime, currentStrategy, liquidityAdded, deps)
 	require.NoError(t, err)
-	require.Equal(t, AaveV3ProtocolId, strategy.ProtocolId)
-	require.Equal(t, uint64(2), strategy.ChainSelector) // Chain 2 has highest APY (0.07)
+	require.Equal(t, AaveV3ProtocolId, optimal.Strategy.ProtocolId)
+	require.Equal(t, uint64(2), optimal.Strategy.ChainSelector) // Chain 2 has highest APY (0.07)
+	require.Equal(t, 0.07, optimal.APY)
+	require.Equal(t, AaveV3ProtocolId, current.Strategy.ProtocolId)
+	require.Equal(t, uint64(1), current.Strategy.ChainSelector)
+	require.Equal(t, 0.05, current.APY)
 }
 
-func Test_getOptimalStrategyWithDeps_currentStrategyMatches_usesZeroLiquidity(t *testing.T) {
-	cfg := setupConfigWithStrategies(1)
+func Test_getOptimalAndCurrentStrategyWithAPYWithDeps_currentStrategyMatches_usesZeroLiquidity(t *testing.T) {
+	cfg := setupConfigWithStrategies(t, 1)
 	runtime := testutils.NewRuntime(t, nil)
 	currentStrategy := Strategy{ProtocolId: AaveV3ProtocolId, ChainSelector: 1}
 	liquidityAdded := big.NewInt(1000)
@@ -165,17 +189,38 @@ func Test_getOptimalStrategyWithDeps_currentStrategyMatches_usesZeroLiquidity(t 
 		},
 	}
 
-	strategy, err := getOptimalStrategyWithDeps(cfg, runtime, currentStrategy, liquidityAdded, deps)
+	optimal, current, err := getOptimalAndCurrentStrategyWithAPYWithDeps(cfg, runtime, currentStrategy, liquidityAdded, deps)
 	require.NoError(t, err)
-	require.Equal(t, AaveV3ProtocolId, strategy.ProtocolId)
+	require.Equal(t, AaveV3ProtocolId, optimal.Strategy.ProtocolId)
 	requireBigEqual(t, big.NewInt(0), gotLiquidity)
+	require.Equal(t, AaveV3ProtocolId, current.Strategy.ProtocolId)
+	require.Equal(t, 0.05, current.APY)
+}
+
+func Test_getOptimalAndCurrentStrategyWithAPYWithDeps_currentStrategyNotInSupported_returnsZeroAPY(t *testing.T) {
+	cfg := setupConfigWithStrategies(t, 1)
+	runtime := testutils.NewRuntime(t, nil)
+	// Current strategy is not in supported strategies (different chain selector)
+	currentStrategy := Strategy{ProtocolId: AaveV3ProtocolId, ChainSelector: 999}
+	liquidityAdded := big.NewInt(1000)
+
+	deps := mockAPYPromiseDeps(0.05, 0.03, nil, nil)
+
+	optimal, current, err := getOptimalAndCurrentStrategyWithAPYWithDeps(cfg, runtime, currentStrategy, liquidityAdded, deps)
+	require.NoError(t, err)
+	require.Equal(t, AaveV3ProtocolId, optimal.Strategy.ProtocolId)
+	require.Equal(t, 0.05, optimal.APY)
+	// Current strategy not found in supported strategies, so APY should be 0
+	require.Equal(t, currentStrategy, current.Strategy)
+	require.Equal(t, 0.0, current.APY)
 }
 
 /*//////////////////////////////////////////////////////////////
               GET OPTIMAL STRATEGY - ERROR CASES
 //////////////////////////////////////////////////////////////*/
 
-func Test_getOptimalStrategyWithDeps_errorWhen_noSupportedStrategies(t *testing.T) {
+func Test_getOptimalAndCurrentStrategyWithAPYWithDeps_errorWhen_noSupportedStrategies(t *testing.T) {
+	resetState()
 	cfg := &helper.Config{Evms: []helper.EvmConfig{}}
 	runtime := testutils.NewRuntime(t, nil)
 	currentStrategy := Strategy{ProtocolId: AaveV3ProtocolId, ChainSelector: 1}
@@ -183,27 +228,29 @@ func Test_getOptimalStrategyWithDeps_errorWhen_noSupportedStrategies(t *testing.
 
 	deps := mockAPYPromiseDeps(0.05, 0.0, nil, nil)
 
-	strategy, err := getOptimalStrategyWithDeps(cfg, runtime, currentStrategy, liquidityAdded, deps)
+	optimal, current, err := getOptimalAndCurrentStrategyWithAPYWithDeps(cfg, runtime, currentStrategy, liquidityAdded, deps)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "no supported strategies configured")
-	require.Equal(t, Strategy{}, strategy)
+	require.Equal(t, StrategyWithAPY{}, optimal)
+	require.Equal(t, StrategyWithAPY{}, current)
 }
 
-func Test_getOptimalStrategyWithDeps_errorWhen_nilLiquidityAdded(t *testing.T) {
-	cfg := setupConfigWithStrategies(1)
+func Test_getOptimalAndCurrentStrategyWithAPYWithDeps_errorWhen_nilLiquidityAdded(t *testing.T) {
+	cfg := setupConfigWithStrategies(t, 1)
 	runtime := testutils.NewRuntime(t, nil)
 	currentStrategy := Strategy{ProtocolId: AaveV3ProtocolId, ChainSelector: 1}
 
 	deps := mockAPYPromiseDeps(0.05, 0.0, nil, nil)
 
-	strategy, err := getOptimalStrategyWithDeps(cfg, runtime, currentStrategy, nil, deps)
+	optimal, current, err := getOptimalAndCurrentStrategyWithAPYWithDeps(cfg, runtime, currentStrategy, nil, deps)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "liquidityAdded must not be nil")
-	require.Equal(t, Strategy{}, strategy)
+	require.Equal(t, StrategyWithAPY{}, optimal)
+	require.Equal(t, StrategyWithAPY{}, current)
 }
 
-func Test_getOptimalStrategyWithDeps_errorWhen_unsupportedProtocol(t *testing.T) {
-	cfg := setupConfigWithStrategies(1)
+func Test_getOptimalAndCurrentStrategyWithAPYWithDeps_errorWhen_unsupportedProtocol(t *testing.T) {
+	cfg := setupConfigWithStrategies(t, 1)
 	runtime := testutils.NewRuntime(t, nil)
 	liquidityAdded := big.NewInt(1000)
 
@@ -227,8 +274,8 @@ func Test_getOptimalStrategyWithDeps_errorWhen_unsupportedProtocol(t *testing.T)
 	require.ErrorContains(t, err, "unsupported protocolId")
 }
 
-func Test_getOptimalStrategyWithDeps_errorWhen_aavePromiseAwaitFails(t *testing.T) {
-	cfg := setupConfigWithStrategies(1)
+func Test_getOptimalAndCurrentStrategyWithAPYWithDeps_errorWhen_aavePromiseAwaitFails(t *testing.T) {
+	cfg := setupConfigWithStrategies(t, 1)
 	runtime := testutils.NewRuntime(t, nil)
 	currentStrategy := Strategy{ProtocolId: AaveV3ProtocolId, ChainSelector: 1}
 	liquidityAdded := big.NewInt(1000)
@@ -236,15 +283,16 @@ func Test_getOptimalStrategyWithDeps_errorWhen_aavePromiseAwaitFails(t *testing.
 	expectedErr := fmt.Errorf("aave promise creation failed")
 	deps := mockAPYPromiseDeps(0.05, 0.0, expectedErr, nil)
 
-	strategy, err := getOptimalStrategyWithDeps(cfg, runtime, currentStrategy, liquidityAdded, deps)
+	optimal, current, err := getOptimalAndCurrentStrategyWithAPYWithDeps(cfg, runtime, currentStrategy, liquidityAdded, deps)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "calculate APY for strategy")
 	require.ErrorContains(t, err, "aave promise creation failed")
-	require.Equal(t, Strategy{}, strategy)
+	require.Equal(t, StrategyWithAPY{}, optimal)
+	require.Equal(t, StrategyWithAPY{}, current)
 }
 
-func Test_getOptimalStrategyWithDeps_errorWhen_compoundPromiseAwaitFails(t *testing.T) {
-	cfg := setupConfigWithStrategies(1)
+func Test_getOptimalAndCurrentStrategyWithAPYWithDeps_errorWhen_compoundPromiseAwaitFails(t *testing.T) {
+	cfg := setupConfigWithStrategies(t, 1)
 	runtime := testutils.NewRuntime(t, nil)
 	currentStrategy := Strategy{ProtocolId: AaveV3ProtocolId, ChainSelector: 1}
 	liquidityAdded := big.NewInt(1000)
@@ -252,15 +300,16 @@ func Test_getOptimalStrategyWithDeps_errorWhen_compoundPromiseAwaitFails(t *test
 	expectedErr := fmt.Errorf("compound promise creation failed")
 	deps := mockAPYPromiseDeps(0.05, 0.0, nil, expectedErr)
 
-	strategy, err := getOptimalStrategyWithDeps(cfg, runtime, currentStrategy, liquidityAdded, deps)
+	optimal, current, err := getOptimalAndCurrentStrategyWithAPYWithDeps(cfg, runtime, currentStrategy, liquidityAdded, deps)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "calculate APY for strategy")
 	require.ErrorContains(t, err, "compound promise creation failed")
-	require.Equal(t, Strategy{}, strategy)
+	require.Equal(t, StrategyWithAPY{}, optimal)
+	require.Equal(t, StrategyWithAPY{}, current)
 }
 
-func Test_getOptimalStrategyWithDeps_errorWhen_apyPromiseAwaitFails(t *testing.T) {
-	cfg := setupConfigWithStrategies(1)
+func Test_getOptimalAndCurrentStrategyWithAPYWithDeps_errorWhen_apyPromiseAwaitFails(t *testing.T) {
+	cfg := setupConfigWithStrategies(t, 1)
 	runtime := testutils.NewRuntime(t, nil)
 	currentStrategy := Strategy{ProtocolId: AaveV3ProtocolId, ChainSelector: 1}
 	liquidityAdded := big.NewInt(1000)
@@ -275,29 +324,31 @@ func Test_getOptimalStrategyWithDeps_errorWhen_apyPromiseAwaitFails(t *testing.T
 		},
 	}
 
-	strategy, err := getOptimalStrategyWithDeps(cfg, runtime, currentStrategy, liquidityAdded, deps)
+	optimal, current, err := getOptimalAndCurrentStrategyWithAPYWithDeps(cfg, runtime, currentStrategy, liquidityAdded, deps)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "calculate APY for strategy")
 	require.ErrorContains(t, err, "apy calculation failed")
-	require.Equal(t, Strategy{}, strategy)
+	require.Equal(t, StrategyWithAPY{}, optimal)
+	require.Equal(t, StrategyWithAPY{}, current)
 }
 
-func Test_getOptimalStrategyWithDeps_errorWhen_apyIsZero(t *testing.T) {
-	cfg := setupConfigWithStrategies(1)
+func Test_getOptimalAndCurrentStrategyWithAPYWithDeps_errorWhen_apyIsZero(t *testing.T) {
+	cfg := setupConfigWithStrategies(t, 1)
 	runtime := testutils.NewRuntime(t, nil)
 	currentStrategy := Strategy{ProtocolId: AaveV3ProtocolId, ChainSelector: 1}
 	liquidityAdded := big.NewInt(1000)
 
 	deps := mockAPYPromiseDeps(0.0, 0.0, nil, nil)
 
-	strategy, err := getOptimalStrategyWithDeps(cfg, runtime, currentStrategy, liquidityAdded, deps)
+	optimal, current, err := getOptimalAndCurrentStrategyWithAPYWithDeps(cfg, runtime, currentStrategy, liquidityAdded, deps)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "0 APY returned for strategy")
-	require.Equal(t, Strategy{}, strategy)
+	require.Equal(t, StrategyWithAPY{}, optimal)
+	require.Equal(t, StrategyWithAPY{}, current)
 }
 
-func Test_getOptimalStrategyWithDeps_errorWhen_apyIsNaN(t *testing.T) {
-	cfg := setupConfigWithStrategies(1)
+func Test_getOptimalAndCurrentStrategyWithAPYWithDeps_errorWhen_apyIsNaN(t *testing.T) {
+	cfg := setupConfigWithStrategies(t, 1)
 	runtime := testutils.NewRuntime(t, nil)
 	currentStrategy := Strategy{ProtocolId: AaveV3ProtocolId, ChainSelector: 1}
 	liquidityAdded := big.NewInt(1000)
@@ -311,14 +362,15 @@ func Test_getOptimalStrategyWithDeps_errorWhen_apyIsNaN(t *testing.T) {
 		},
 	}
 
-	strategy, err := getOptimalStrategyWithDeps(cfg, runtime, currentStrategy, liquidityAdded, deps)
+	optimal, current, err := getOptimalAndCurrentStrategyWithAPYWithDeps(cfg, runtime, currentStrategy, liquidityAdded, deps)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "invalid APY value (NaN/Inf)")
-	require.Equal(t, Strategy{}, strategy)
+	require.Equal(t, StrategyWithAPY{}, optimal)
+	require.Equal(t, StrategyWithAPY{}, current)
 }
 
-func Test_getOptimalStrategyWithDeps_errorWhen_apyIsInf(t *testing.T) {
-	cfg := setupConfigWithStrategies(1)
+func Test_getOptimalAndCurrentStrategyWithAPYWithDeps_errorWhen_apyIsInf(t *testing.T) {
+	cfg := setupConfigWithStrategies(t, 1)
 	runtime := testutils.NewRuntime(t, nil)
 	currentStrategy := Strategy{ProtocolId: AaveV3ProtocolId, ChainSelector: 1}
 	liquidityAdded := big.NewInt(1000)
@@ -332,10 +384,11 @@ func Test_getOptimalStrategyWithDeps_errorWhen_apyIsInf(t *testing.T) {
 		},
 	}
 
-	strategy, err := getOptimalStrategyWithDeps(cfg, runtime, currentStrategy, liquidityAdded, deps)
+	optimal, current, err := getOptimalAndCurrentStrategyWithAPYWithDeps(cfg, runtime, currentStrategy, liquidityAdded, deps)
 	require.Error(t, err)
 	require.ErrorContains(t, err, "invalid APY value (NaN/Inf)")
-	require.Equal(t, Strategy{}, strategy)
+	require.Equal(t, StrategyWithAPY{}, optimal)
+	require.Equal(t, StrategyWithAPY{}, current)
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -446,12 +499,12 @@ func Test_getAPYPromiseFromStrategy_compoundV3Error_propagatesError(t *testing.T
               GET OPTIMAL STRATEGY - USES DEFAULT DEPS
 //////////////////////////////////////////////////////////////*/
 
-func Test_GetOptimalStrategy_usesDefaultDeps(t *testing.T) {
+func Test_GetOptimalAndCurrentStrategyWithAPY_usesDefaultDeps(t *testing.T) {
 	// Override the package-level defaultAPYPromiseDeps to avoid calling real protocol code.
 	original := defaultAPYPromiseDeps
 	defer func() { defaultAPYPromiseDeps = original }()
 
-	cfg := setupConfigWithStrategies(1)
+	cfg := setupConfigWithStrategies(t, 1)
 	runtime := testutils.NewRuntime(t, nil)
 	currentStrategy := Strategy{ProtocolId: AaveV3ProtocolId, ChainSelector: 1}
 	liquidityAdded := big.NewInt(1000)
@@ -482,12 +535,16 @@ func Test_GetOptimalStrategy_usesDefaultDeps(t *testing.T) {
 		},
 	}
 
-	strategy, err := GetOptimalStrategy(cfg, runtime, currentStrategy, liquidityAdded)
+	optimal, current, err := GetOptimalAndCurrentStrategyWithAPY(cfg, runtime, currentStrategy, liquidityAdded)
 	require.NoError(t, err)
 	require.True(t, calledAave, "AaveV3GetAPYPromise should be called")
 	require.True(t, calledCompound, "CompoundV3GetAPYPromise should be called")
-	require.Equal(t, AaveV3ProtocolId, strategy.ProtocolId, "should pick AaveV3 with higher APY")
-	require.Equal(t, uint64(1), strategy.ChainSelector)
+	require.Equal(t, AaveV3ProtocolId, optimal.Strategy.ProtocolId, "should pick AaveV3 with higher APY")
+	require.Equal(t, uint64(1), optimal.Strategy.ChainSelector)
+	require.Equal(t, 0.08, optimal.APY)
+	require.Equal(t, AaveV3ProtocolId, current.Strategy.ProtocolId)
+	require.Equal(t, uint64(1), current.Strategy.ChainSelector)
+	require.Equal(t, 0.08, current.APY)
 	requireBigEqual(t, liquidityAdded, gotLiq)
 	require.Equal(t, uint64(1), gotChain)
 }

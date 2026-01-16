@@ -32,39 +32,35 @@ var defaultAPYPromiseDeps = apyPromiseDeps{
                      GET OPTIMAL STRATEGY
 //////////////////////////////////////////////////////////////*/
 
-// GetOptimalStrategy evaluates all supported strategies in parallel using
-// promise-based APY calculations and returns the strategy with the highest APY.
-//
-// It uses the promise-based deps, but the rest of the codebase can continue
-// to use the synchronous CalculateAPYForStrategy.
-func GetOptimalStrategy(
+// GetOptimalAndCurrentStrategyWithAPY evaluates all supported strategies in parallel using
+// promise-based APY calculations and returns the strategy with the highest APY and the current strategy with its APY.
+func GetOptimalAndCurrentStrategyWithAPY(
 	config *helper.Config,
 	runtime cre.Runtime,
 	currentStrategy Strategy,
 	liquidityAdded *big.Int,
-) (Strategy, error) {
-	return getOptimalStrategyWithDeps(config, runtime, currentStrategy, liquidityAdded, defaultAPYPromiseDeps)
+) (StrategyWithAPY, StrategyWithAPY, error) {
+	return getOptimalAndCurrentStrategyWithAPYWithDeps(config, runtime, currentStrategy, liquidityAdded, defaultAPYPromiseDeps)
 }
 
-// getOptimalStrategyWithDeps starts APY calculations for all supported
+// getOptimalAndCurrentStrategyWithAPYWithDeps starts APY calculations for all supported
 // strategies in parallel using promises, then awaits and selects the best.
+// Returns the optimal strategy with its APY and the current strategy with its APY.
 //
 // Error policy: if any strategy’s APY calculation fails or returns an invalid
 // APY, the whole function returns an error.
-func getOptimalStrategyWithDeps(
+func getOptimalAndCurrentStrategyWithAPYWithDeps(
     config *helper.Config,
     runtime cre.Runtime,
     currentStrategy Strategy,
     liquidityAdded *big.Int,
     deps apyPromiseDeps,
-) (Strategy, error) {
-    initSupportedStrategies(config)
-
+) (StrategyWithAPY, StrategyWithAPY, error) {
     if len(supportedStrategies) == 0 {
-        return Strategy{}, fmt.Errorf("no supported strategies configured")
+        return StrategyWithAPY{}, StrategyWithAPY{}, fmt.Errorf("no supported strategies configured")
     }
     if liquidityAdded == nil {
-        return Strategy{}, fmt.Errorf("liquidityAdded must not be nil")
+        return StrategyWithAPY{}, StrategyWithAPY{}, fmt.Errorf("liquidityAdded must not be nil")
     }
 
     // We keep strategies and promises aligned by index.
@@ -78,7 +74,7 @@ func getOptimalStrategyWithDeps(
             liq = big.NewInt(0)
         }
 
-	    apyPromise:= getAPYPromiseFromStrategy(config, runtime, strategy, liq, deps)
+	    apyPromise := getAPYPromiseFromStrategy(config, runtime, strategy, liq, deps)
 
         strategies = append(strategies, strategy)
         apyPromises = append(apyPromises, apyPromise)
@@ -88,6 +84,7 @@ func getOptimalStrategyWithDeps(
         bestStrategy Strategy
         bestAPY      float64
         bestSet      bool
+        currentAPY   float64
     )
 
     // Second pass: Await each APY and pick the best.
@@ -96,14 +93,14 @@ func getOptimalStrategyWithDeps(
 
         apy, err := apyPromise.Await()
         if err != nil {
-            return Strategy{}, fmt.Errorf("calculate APY for strategy %+v: %w", strategy, err)
+            return StrategyWithAPY{}, StrategyWithAPY{}, fmt.Errorf("calculate APY for strategy %+v: %w", strategy, err)
         }
 
         if apy == 0 {
-            return Strategy{}, fmt.Errorf("0 APY returned for strategy %+v", strategy)
+            return StrategyWithAPY{}, StrategyWithAPY{}, fmt.Errorf("0 APY returned for strategy %+v", strategy)
         }
         if math.IsNaN(apy) || math.IsInf(apy, 0) {
-            return Strategy{}, fmt.Errorf("invalid APY value (NaN/Inf) for protocolId %x: %v",
+            return StrategyWithAPY{}, StrategyWithAPY{}, fmt.Errorf("invalid APY value (NaN/Inf) for protocolId %x: %v",
 			strategy.ProtocolId, apy)
         }
 
@@ -112,9 +109,13 @@ func getOptimalStrategyWithDeps(
             bestStrategy = strategy
             bestSet = true
         }
+
+        if sameStrategy(strategy, currentStrategy) {
+            currentAPY = apy
+        }
     }
 
-    return bestStrategy, nil
+    return StrategyWithAPY{Strategy: bestStrategy, APY: bestAPY}, StrategyWithAPY{Strategy: currentStrategy, APY: currentAPY}, nil
 }
 
 func getAPYPromiseFromStrategy(
