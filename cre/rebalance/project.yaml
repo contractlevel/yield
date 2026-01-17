@@ -19,13 +19,13 @@ staging-settings:
     # @review using mainnets or testnets for staging
     - chain-name: ethereum-mainnet
       url: https://ethereum-rpc.publicnode.com
-    - chain-name: polygon-mainnet
+    - chain-name: ethereum-mainnet-arbitrum-1
       url: https://polygon-bor-rpc.publicnode.com
-    - chain-name: arbitrum-mainnet
+    - chain-name: ethereum-mainnet-arbitrum-1
       url: https://arbitrum-one-rpc.publicnode.com
-    - chain-name: optimism-mainnet
+    - chain-name: ethereum-mainnet-optimism-1
       url: https://opt-mainnet.g.alchemy.com/v2/YOUR_API_KEY
-    - chain-name: base-mainnet
+    - chain-name: ethereum-mainnet-base-1
       url: https://base-mainnet.g.alchemy.com/v2/YOUR_API_KEY
     - chain-name: avalanche-mainnet
       url: https://avalanche-c-chain-rpc.publicnode.com
@@ -37,11 +37,11 @@ production-settings:
       url: https://ethereum-rpc.publicnode.com
     - chain-name: polygon-mainnet
       url: https://polygon-bor-rpc.publicnode.com
-    - chain-name: arbitrum-mainnet
+    - chain-name: ethereum-mainnet-arbitrum-1
       url: https://arbitrum-one-rpc.publicnode.com
-    - chain-name: optimism-mainnet
+    - chain-name: ethereum-mainnet-optimism-1
       url: https://opt-mainnet.g.alchemy.com/v2/YOUR_API_KEY
-    - chain-name: base-mainnet
+    - chain-name: ethereum-mainnet-base-1
       url: https://base-mainnet.g.alchemy.com/v2/YOUR_API_KEY
     - chain-name: avalanche-mainnet
       url: https://avalanche-c-chain-rpc.publicnode.com
