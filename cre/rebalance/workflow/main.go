@@ -5,8 +5,9 @@ package main
 import (
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 	"github.com/smartcontractkit/cre-sdk-go/cre/wasm"
+	"rebalance/workflow/internal/helper"
 )
 
 func main() {
-	wasm.NewRunner(cre.ParseJSON[Config]).Run(InitWorkflow)
+	wasm.NewRunner(cre.ParseJSON[helper.Config]).Run(InitWorkflow)
 }

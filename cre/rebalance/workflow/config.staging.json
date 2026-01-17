@@ -2,10 +2,10 @@
   "schedule": "0 */1 * * * *",
   "evms": [
     {
-      "chainName": "ethereum-testnet-sepolia",
-      "chainSelector": 16015286601757825753,
-      "yieldPeerAddress": "0xad024a165c3c973ad74f8b038d386686ec534006",
-      "rebalancerAddress": "0x660f8ab44263347c7704aDa8C016951ecf906A80",
+      "chainName": "ethereum-mainnet",
+      "chainSelector": 5009297550715157269,
+      "yieldPeerAddress": "0x51cceaa25e6700e8c733d3130dbcab75e357b0b2",
+      "rebalancerAddress": "0xa0bc3af937544dddcc20324f834165f905ebccb6",
       "gasLimit": 500000,
       "usdcAddress": "0x1234567890abcdef1234567890abcdef12345678",
       "aaveV3PoolAddressesProviderAddress": "0x1234567890abcdef1234567890abcdef12345678",

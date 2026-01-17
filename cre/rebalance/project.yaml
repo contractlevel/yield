@@ -18,7 +18,8 @@ staging-settings:
   rpcs:
     # @review using mainnets or testnets for staging
     - chain-name: ethereum-mainnet
-      url: https://ethereum-rpc.publicnode.com
+      # url: https://ethereum-rpc.publicnode.com
+      url: http://127.0.0.1:8545
     - chain-name: ethereum-mainnet-arbitrum-1
       url: https://polygon-bor-rpc.publicnode.com
     - chain-name: ethereum-mainnet-arbitrum-1
