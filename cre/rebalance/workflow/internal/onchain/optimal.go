@@ -115,7 +115,8 @@ func getOptimalAndCurrentStrategyWithAPYWithDeps(
         }
 
         logger := runtime.Logger()
-        logger.Info("APY calculated for strategy", "apy", apy, "strategy", strategy)
+        protocolName := protocolIDToString(strategy.ProtocolId)
+        logger.Info("APY calculated for strategy", "apy", apy, "protocol", protocolName, "chainSelector", strategy.ChainSelector)
     }
 
     return StrategyWithAPY{Strategy: bestStrategy, APY: bestAPY}, StrategyWithAPY{Strategy: currentStrategy, APY: currentAPY}, nil
