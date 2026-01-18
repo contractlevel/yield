@@ -5,12 +5,12 @@ import (
 
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 
-	"rebalance/workflow/internal/constants"
+	"rebalance/workflow/internal/helper"
 )
 
 // ReadCurrentStrategy reads the current strategy from a parent peer using the runtime
-func ReadCurrentStrategy(peer ParentPeerInterface, runtime cre.Runtime) (Strategy, error) {
-	strategy, err := peer.GetStrategy(runtime, big.NewInt(constants.LatestFinalizedBlock)).Await()
+func ReadCurrentStrategy(config *helper.Config, runtime cre.Runtime, peer ParentPeerInterface) (Strategy, error) {
+	strategy, err := peer.GetStrategy(runtime, big.NewInt(config.BlockNumber)).Await()
 	if err != nil {
 		return Strategy{}, err
 	}
@@ -18,6 +18,6 @@ func ReadCurrentStrategy(peer ParentPeerInterface, runtime cre.Runtime) (Strateg
 }
 
 // ReadTVL reads the total value locked from a yield peer using the runtime
-func ReadTVL(peer YieldPeerInterface, runtime cre.Runtime) (*big.Int, error) {
-	return peer.GetTotalValue(runtime, big.NewInt(constants.LatestFinalizedBlock)).Await()
+func ReadTVL(config *helper.Config, runtime cre.Runtime, peer YieldPeerInterface) (*big.Int, error) {
+	return peer.GetTotalValue(runtime, big.NewInt(config.BlockNumber)).Await()
 }

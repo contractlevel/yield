@@ -51,14 +51,14 @@ func InitWorkflow(config *helper.Config, logger *slog.Logger, secretsProvider cr
 //////////////////////////////////////////////////////////////*/
 
 type OnCronDeps struct {
-	NewParentPeerBinding    func(client *evm.Client, addr string) (onchain.ParentPeerInterface, error)
-	NewChildPeerBinding     func(client *evm.Client, addr string) (onchain.YieldPeerInterface, error)
-	NewRebalancerBinding    func(client *evm.Client, addr string) (onchain.RebalancerInterface, error)
-	ReadCurrentStrategy     func(peer onchain.ParentPeerInterface, runtime cre.Runtime) (onchain.Strategy, error)
-	ReadTVL                 func(peer onchain.YieldPeerInterface, runtime cre.Runtime) (*big.Int, error)
-	WriteRebalance          func(rb onchain.RebalancerInterface, runtime cre.Runtime, logger *slog.Logger, gasLimit uint64, optimal onchain.Strategy) error
+	NewParentPeerBinding                func(client *evm.Client, addr string) (onchain.ParentPeerInterface, error)
+	NewChildPeerBinding                 func(client *evm.Client, addr string) (onchain.YieldPeerInterface, error)
+	NewRebalancerBinding                func(client *evm.Client, addr string) (onchain.RebalancerInterface, error)
+	ReadCurrentStrategy                 func(config *helper.Config, runtime cre.Runtime, peer onchain.ParentPeerInterface) (onchain.Strategy, error)
+	ReadTVL                             func(config *helper.Config, runtime cre.Runtime, peer onchain.YieldPeerInterface) (*big.Int, error)
+	WriteRebalance                      func(rb onchain.RebalancerInterface, runtime cre.Runtime, logger *slog.Logger, gasLimit uint64, optimal onchain.Strategy) error
 	GetOptimalAndCurrentStrategyWithAPY func(config *helper.Config, runtime cre.Runtime, currentStrategy onchain.Strategy, liquidityAdded *big.Int) (onchain.StrategyWithAPY, onchain.StrategyWithAPY, error)
-	InitSupportedStrategies func(config *helper.Config) error
+	InitSupportedStrategies             func(config *helper.Config) error
 	// GetOptimalStrategy func(config *helper.Config, runtime cre.Runtime) (onchain.Strategy, error)
 	// CalculateAPYForStrategy func(config *helper.Config, runtime cre.Runtime, strategy onchain.Strategy, liquidityAdded *big.Int) (float64, error)
 }
@@ -113,7 +113,7 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 	}
 
 	// Read current strategy from ParentPeer via deps.
-	currentStrategy, err := deps.ReadCurrentStrategy(parentPeer, runtime)
+	currentStrategy, err := deps.ReadCurrentStrategy(config, runtime, parentPeer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read strategy from ParentPeer: %w", err)
 	}
@@ -155,7 +155,7 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 	}
 
 	// Read the TVL from the strategy YieldPeer via deps.
-	tvl, err := deps.ReadTVL(strategyPeer, runtime)
+	tvl, err := deps.ReadTVL(config, runtime, strategyPeer)
 	if err != nil {
 		return nil, fmt.Errorf("failed to get total value from strategy YieldPeer: %w", err)
 	}
@@ -167,7 +167,7 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 	}
 
 	// If the optimal and current strategy are the same, return without updating.
-	if (optimal.Strategy == current.Strategy) {
+	if optimal.Strategy == current.Strategy {
 		logger.Info("Strategy unchanged; no rebalance needed")
 		return &StrategyResult{
 			Current: current.Strategy,

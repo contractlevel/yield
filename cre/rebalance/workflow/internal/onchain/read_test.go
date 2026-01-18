@@ -7,7 +7,7 @@ import (
 
 	"rebalance/contracts/evm/src/generated/parent_peer"
 
-	"rebalance/workflow/internal/constants"
+	"rebalance/workflow/internal/helper"
 
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 	"github.com/smartcontractkit/cre-sdk-go/cre/testutils"
@@ -68,6 +68,7 @@ func (m *mockYieldPeer) GetTotalValue(
 
 func Test_ReadCurrentStrategy_success(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
+	config := &helper.Config{BlockNumber: 12345}
 
 	var expectedProtocolId [32]byte
 	copy(expectedProtocolId[:], []byte("test-protocol-id-123456789012"))
@@ -80,14 +81,14 @@ func Test_ReadCurrentStrategy_success(t *testing.T) {
 
 	mockPeer := &mockParentPeer{
 		getStrategyFunc: func(_ cre.Runtime, blockNumber *big.Int) cre.Promise[parent_peer.IYieldPeerStrategy] {
-			expectedBlock := big.NewInt(constants.LatestFinalizedBlock)
-			require.Equal(t, 0, expectedBlock.Cmp(blockNumber), "expected LatestBlock")
+			expectedBlock := big.NewInt(config.BlockNumber)
+			require.Equal(t, 0, expectedBlock.Cmp(blockNumber), "expected BlockNumber from config")
 
 			return cre.PromiseFromResult(expectedStrategy, nil)
 		},
 	}
 
-	strategy, err := ReadCurrentStrategy(mockPeer, runtime)
+	strategy, err := ReadCurrentStrategy(config, runtime, mockPeer)
 	require.NoError(t, err)
 
 	require.Equal(t, expectedProtocolId, strategy.ProtocolId)
@@ -108,7 +109,8 @@ func Test_ReadCurrentStrategy_error(t *testing.T) {
 		},
 	}
 
-	strategy, err := ReadCurrentStrategy(mockPeer, runtime)
+	config := &helper.Config{BlockNumber: 12345}
+	strategy, err := ReadCurrentStrategy(config, runtime, mockPeer)
 	require.Error(t, err)
 	require.ErrorIs(t, err, expectedError)
 
@@ -133,7 +135,8 @@ func Test_ReadCurrentStrategy_withDifferentValues(t *testing.T) {
 		},
 	}
 
-	strategy, err := ReadCurrentStrategy(mockPeer, runtime)
+	config := &helper.Config{BlockNumber: 12345}
+	strategy, err := ReadCurrentStrategy(config, runtime, mockPeer)
 	require.NoError(t, err)
 
 	require.Equal(t, protocolId, strategy.ProtocolId)
@@ -142,19 +145,20 @@ func Test_ReadCurrentStrategy_withDifferentValues(t *testing.T) {
 
 func Test_ReadTVL_success(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
+	config := &helper.Config{BlockNumber: 12345}
 
 	expectedTVL := big.NewInt(1_000_000_000_000_000_000) // 1 ETH in wei
 
 	mockPeer := &mockYieldPeer{
 		getTotalValueFunc: func(_ cre.Runtime, blockNumber *big.Int) cre.Promise[*big.Int] {
-			expectedBlock := big.NewInt(constants.LatestFinalizedBlock)
-			require.Equal(t, 0, expectedBlock.Cmp(blockNumber), "expected LatestBlock")
+			expectedBlock := big.NewInt(config.BlockNumber)
+			require.Equal(t, 0, expectedBlock.Cmp(blockNumber), "expected BlockNumber from config")
 
 			return cre.PromiseFromResult(expectedTVL, nil)
 		},
 	}
 
-	tvl, err := ReadTVL(mockPeer, runtime)
+	tvl, err := ReadTVL(config, runtime, mockPeer)
 	require.NoError(t, err)
 	require.NotNil(t, tvl)
 	require.Equal(t, 0, expectedTVL.Cmp(tvl))
@@ -171,7 +175,8 @@ func Test_ReadTVL_error(t *testing.T) {
 		},
 	}
 
-	tvl, err := ReadTVL(mockPeer, runtime)
+	config := &helper.Config{BlockNumber: 12345}
+	tvl, err := ReadTVL(config, runtime, mockPeer)
 	require.Error(t, err)
 	require.ErrorIs(t, err, expectedError)
 	require.Nil(t, tvl)
@@ -188,7 +193,8 @@ func Test_ReadTVL_withDifferentValues(t *testing.T) {
 		},
 	}
 
-	tvl, err := ReadTVL(mockPeer, runtime)
+	config := &helper.Config{BlockNumber: 12345}
+	tvl, err := ReadTVL(config, runtime, mockPeer)
 	require.NoError(t, err)
 	require.NotNil(t, tvl)
 	require.Equal(t, 0, expectedTVL.Cmp(tvl))
@@ -196,6 +202,7 @@ func Test_ReadTVL_withDifferentValues(t *testing.T) {
 
 func Test_ReadTVL_withZeroValue(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
+	config := &helper.Config{BlockNumber: 12345}
 
 	expectedTVL := big.NewInt(0)
 
@@ -205,7 +212,7 @@ func Test_ReadTVL_withZeroValue(t *testing.T) {
 		},
 	}
 
-	tvl, err := ReadTVL(mockPeer, runtime)
+	tvl, err := ReadTVL(config, runtime, mockPeer)
 	require.NoError(t, err)
 	require.NotNil(t, tvl)
 	require.Equal(t, 0, expectedTVL.Cmp(tvl))

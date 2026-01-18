@@ -115,10 +115,10 @@ package main
 // 			NewRebalancerBinding: func(_ *evm.Client, _ string) (onchain.RebalancerInterface, error) {
 // 				return nil, nil
 // 			},
-// 			ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
+// 			ReadCurrentStrategy: func(_ *helper.Config, _ cre.Runtime, _ onchain.ParentPeerInterface) (onchain.Strategy, error) {
 // 				return currentStrategy, nil
 // 			},
-// 			ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
+// 			ReadTVL: func(_ *helper.Config, _ cre.Runtime, _ onchain.YieldPeerInterface) (*big.Int, error) {
 // 				// TVL doesn't affect the rebalance decision in workflow.go in this model.
 // 				return big.NewInt(1_000), nil
 // 			},
@@ -215,10 +215,10 @@ package main
 // 				}
 // 				return nil, nil
 // 			},
-// 			ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
+// 			ReadCurrentStrategy: func(_ *helper.Config, _ cre.Runtime, _ onchain.ParentPeerInterface) (onchain.Strategy, error) {
 // 				return currentStrategy, nil
 // 			},
-// 			ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
+// 			ReadTVL: func(_ *helper.Config, _ cre.Runtime, _ onchain.YieldPeerInterface) (*big.Int, error) {
 // 				tvlCalled = true
 // 				if equal {
 // 					t.Fatalf("ReadTVL should not be called when strategies are equal")
@@ -319,10 +319,10 @@ package main
 // 				rebalancerCalled = true
 // 				return nil, nil
 // 			},
-// 			ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
+// 			ReadCurrentStrategy: func(_ *helper.Config, _ cre.Runtime, _ onchain.ParentPeerInterface) (onchain.Strategy, error) {
 // 				return currentStrategy, nil
 // 			},
-// 			ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
+// 			ReadTVL: func(_ *helper.Config, _ cre.Runtime, _ onchain.YieldPeerInterface) (*big.Int, error) {
 // 				readTVLCalls++
 // 				return big.NewInt(1_000), nil
 // 			},
@@ -409,10 +409,10 @@ package main
 // 				t.Fatalf("NewRebalancerBinding should not be called in APY wiring fuzz")
 // 				return nil, nil
 // 			},
-// 			ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
+// 			ReadCurrentStrategy: func(_ *helper.Config, _ cre.Runtime, _ onchain.ParentPeerInterface) (onchain.Strategy, error) {
 // 				return currentStrategy, nil
 // 			},
-// 			ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
+// 			ReadTVL: func(_ *helper.Config, _ cre.Runtime, _ onchain.YieldPeerInterface) (*big.Int, error) {
 // 				// Return a copy so mutations won't affect our tvl variable.
 // 				return new(big.Int).Set(tvl), nil
 // 			},
@@ -504,10 +504,10 @@ package main
 // 				NewRebalancerBinding: func(_ *evm.Client, _ string) (onchain.RebalancerInterface, error) {
 // 					return nil, nil
 // 				},
-// 				ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
+// 				ReadCurrentStrategy: func(_ *helper.Config, _ cre.Runtime, _ onchain.ParentPeerInterface) (onchain.Strategy, error) {
 // 					return currentStrategy, nil
 // 				},
-// 				ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
+// 				ReadTVL: func(_ *helper.Config, _ cre.Runtime, _ onchain.YieldPeerInterface) (*big.Int, error) {
 // 					// TVL is irrelevant for the APY model here.
 // 					return big.NewInt(1_000), nil
 // 				},

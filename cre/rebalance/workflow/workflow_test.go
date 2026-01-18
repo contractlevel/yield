@@ -64,7 +64,7 @@ func Test_onCronTriggerWithDeps_errorWhen_InitSupportedStrategiesFails(t *testin
 			require.FailNow(t, "NewParentPeerBinding should not be called when InitSupportedStrategies fails")
 			return nil, nil
 		},
-		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
+		ReadCurrentStrategy: func(_ *helper.Config, _ cre.Runtime, _ onchain.ParentPeerInterface) (onchain.Strategy, error) {
 			require.FailNow(t, "ReadCurrentStrategy should not be called when InitSupportedStrategies fails")
 			return onchain.Strategy{}, nil
 		},
@@ -120,7 +120,7 @@ func Test_onCronTriggerWithDeps_errorWhen_ReadCurrentStrategyFails(t *testing.T)
 		NewParentPeerBinding: func(_ *evm.Client, _ string) (onchain.ParentPeerInterface, error) {
 			return nil, nil
 		},
-		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
+		ReadCurrentStrategy: func(_ *helper.Config, _ cre.Runtime, _ onchain.ParentPeerInterface) (onchain.Strategy, error) {
 			return onchain.Strategy{}, fmt.Errorf("read-strategy-failed")
 		},
 	}
@@ -151,10 +151,10 @@ func Test_onCronTriggerWithDeps_errorWhen_GetOptimalAndCurrentStrategyWithAPYFai
 		NewParentPeerBinding: func(_ *evm.Client, _ string) (onchain.ParentPeerInterface, error) {
 			return nil, nil
 		},
-		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
+		ReadCurrentStrategy: func(_ *helper.Config, _ cre.Runtime, _ onchain.ParentPeerInterface) (onchain.Strategy, error) {
 			return cur, nil
 		},
-		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
+		ReadTVL: func(_ *helper.Config, _ cre.Runtime, _ onchain.YieldPeerInterface) (*big.Int, error) {
 			return big.NewInt(1000), nil
 		},
 		GetOptimalAndCurrentStrategyWithAPY: func(_ *helper.Config, _ cre.Runtime, _ onchain.Strategy, _ *big.Int) (onchain.StrategyWithAPY, onchain.StrategyWithAPY, error) {
@@ -192,10 +192,10 @@ func Test_onCronTriggerWithDeps_success_noRebalanceWhenStrategyUnchanged(t *test
 		NewParentPeerBinding: func(_ *evm.Client, _ string) (onchain.ParentPeerInterface, error) {
 			return nil, nil
 		},
-		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
+		ReadCurrentStrategy: func(_ *helper.Config, _ cre.Runtime, _ onchain.ParentPeerInterface) (onchain.Strategy, error) {
 			return strat, nil
 		},
-		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
+		ReadTVL: func(_ *helper.Config, _ cre.Runtime, _ onchain.YieldPeerInterface) (*big.Int, error) {
 			return big.NewInt(1000), nil
 		},
 		GetOptimalAndCurrentStrategyWithAPY: func(_ *helper.Config, _ cre.Runtime, _ onchain.Strategy, _ *big.Int) (onchain.StrategyWithAPY, onchain.StrategyWithAPY, error) {
@@ -239,10 +239,10 @@ func Test_onCronTriggerWithDeps_errorWhen_NoConfigForStrategyChain(t *testing.T)
 		NewParentPeerBinding: func(_ *evm.Client, _ string) (onchain.ParentPeerInterface, error) {
 			return nil, nil
 		},
-		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
+		ReadCurrentStrategy: func(_ *helper.Config, _ cre.Runtime, _ onchain.ParentPeerInterface) (onchain.Strategy, error) {
 			return cur, nil
 		},
-		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
+		ReadTVL: func(_ *helper.Config, _ cre.Runtime, _ onchain.YieldPeerInterface) (*big.Int, error) {
 			require.FailNow(t, "ReadTVL should not be called when no EVM config exists for strategy chain")
 			return nil, nil
 		},
@@ -295,10 +295,10 @@ func Test_onCronTriggerWithDeps_errorWhen_ChildPeerBindingFails(t *testing.T) {
 		NewChildPeerBinding: func(_ *evm.Client, _ string) (onchain.YieldPeerInterface, error) {
 			return nil, fmt.Errorf("child-binding-failed")
 		},
-		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
+		ReadCurrentStrategy: func(_ *helper.Config, _ cre.Runtime, _ onchain.ParentPeerInterface) (onchain.Strategy, error) {
 			return cur, nil
 		},
-		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
+		ReadTVL: func(_ *helper.Config, _ cre.Runtime, _ onchain.YieldPeerInterface) (*big.Int, error) {
 			require.FailNow(t, "ReadTVL should not be called when ChildPeer binding fails")
 			return nil, nil
 		},
@@ -341,10 +341,10 @@ func Test_onCronTriggerWithDeps_errorWhen_ReadTVLFails_sameChain(t *testing.T) {
 		NewParentPeerBinding: func(_ *evm.Client, _ string) (onchain.ParentPeerInterface, error) {
 			return nil, nil
 		},
-		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
+		ReadCurrentStrategy: func(_ *helper.Config, _ cre.Runtime, _ onchain.ParentPeerInterface) (onchain.Strategy, error) {
 			return cur, nil
 		},
-		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
+		ReadTVL: func(_ *helper.Config, _ cre.Runtime, _ onchain.YieldPeerInterface) (*big.Int, error) {
 			return nil, fmt.Errorf("tvl-failed")
 		},
 		GetOptimalAndCurrentStrategyWithAPY: func(_ *helper.Config, _ cre.Runtime, _ onchain.Strategy, _ *big.Int) (onchain.StrategyWithAPY, onchain.StrategyWithAPY, error) {
@@ -383,10 +383,10 @@ func Test_onCronTriggerWithDeps_errorWhen_GetOptimalAndCurrentStrategyWithAPYFai
 		NewParentPeerBinding: func(_ *evm.Client, _ string) (onchain.ParentPeerInterface, error) {
 			return nil, nil
 		},
-		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
+		ReadCurrentStrategy: func(_ *helper.Config, _ cre.Runtime, _ onchain.ParentPeerInterface) (onchain.Strategy, error) {
 			return cur, nil
 		},
-		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
+		ReadTVL: func(_ *helper.Config, _ cre.Runtime, _ onchain.YieldPeerInterface) (*big.Int, error) {
 			return big.NewInt(123), nil
 		},
 		GetOptimalAndCurrentStrategyWithAPY: func(_ *helper.Config, _ cre.Runtime, _ onchain.Strategy, _ *big.Int) (onchain.StrategyWithAPY, onchain.StrategyWithAPY, error) {
@@ -428,10 +428,10 @@ func Test_onCronTriggerWithDeps_success_noRebalanceWhenDeltaBelowThreshold(t *te
 		NewParentPeerBinding: func(_ *evm.Client, _ string) (onchain.ParentPeerInterface, error) {
 			return nil, nil
 		},
-		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
+		ReadCurrentStrategy: func(_ *helper.Config, _ cre.Runtime, _ onchain.ParentPeerInterface) (onchain.Strategy, error) {
 			return cur, nil
 		},
-		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
+		ReadTVL: func(_ *helper.Config, _ cre.Runtime, _ onchain.YieldPeerInterface) (*big.Int, error) {
 			return big.NewInt(1000), nil
 		},
 		// delta = 0.01 - 0.02 = -0.01 < threshold(0.01)
@@ -480,10 +480,10 @@ func Test_onCronTriggerWithDeps_errorWhen_RebalancerBindingFails(t *testing.T) {
 		NewParentPeerBinding: func(_ *evm.Client, _ string) (onchain.ParentPeerInterface, error) {
 			return nil, nil
 		},
-		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
+		ReadCurrentStrategy: func(_ *helper.Config, _ cre.Runtime, _ onchain.ParentPeerInterface) (onchain.Strategy, error) {
 			return cur, nil
 		},
-		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
+		ReadTVL: func(_ *helper.Config, _ cre.Runtime, _ onchain.YieldPeerInterface) (*big.Int, error) {
 			return big.NewInt(1000), nil
 		},
 		// delta = 0.02 - 0.01 = 0.01 >= threshold(0.01)
@@ -528,10 +528,10 @@ func Test_onCronTriggerWithDeps_errorWhen_WriteRebalanceFails(t *testing.T) {
 		NewParentPeerBinding: func(_ *evm.Client, _ string) (onchain.ParentPeerInterface, error) {
 			return nil, nil
 		},
-		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
+		ReadCurrentStrategy: func(_ *helper.Config, _ cre.Runtime, _ onchain.ParentPeerInterface) (onchain.Strategy, error) {
 			return cur, nil
 		},
-		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
+		ReadTVL: func(_ *helper.Config, _ cre.Runtime, _ onchain.YieldPeerInterface) (*big.Int, error) {
 			return big.NewInt(1000), nil
 		},
 		// delta = 0.02 - 0.01 = 0.01 >= threshold(0.01)
@@ -579,10 +579,10 @@ func Test_onCronTriggerWithDeps_success_rebalanceWhenStrategyChanges_sameChain(t
 		NewParentPeerBinding: func(_ *evm.Client, _ string) (onchain.ParentPeerInterface, error) {
 			return nil, nil
 		},
-		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
+		ReadCurrentStrategy: func(_ *helper.Config, _ cre.Runtime, _ onchain.ParentPeerInterface) (onchain.Strategy, error) {
 			return cur, nil
 		},
-		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
+		ReadTVL: func(_ *helper.Config, _ cre.Runtime, _ onchain.YieldPeerInterface) (*big.Int, error) {
 			return big.NewInt(1000), nil
 		},
 		// delta = 0.02 - 0.01 = 0.01 >= threshold(0.01)
@@ -649,10 +649,10 @@ func Test_onCronTriggerWithDeps_success_rebalanceWhenStrategyChanges_differentCh
 		NewChildPeerBinding: func(_ *evm.Client, _ string) (onchain.YieldPeerInterface, error) {
 			return nil, nil
 		},
-		ReadCurrentStrategy: func(_ onchain.ParentPeerInterface, _ cre.Runtime) (onchain.Strategy, error) {
+		ReadCurrentStrategy: func(_ *helper.Config, _ cre.Runtime, _ onchain.ParentPeerInterface) (onchain.Strategy, error) {
 			return cur, nil
 		},
-		ReadTVL: func(_ onchain.YieldPeerInterface, _ cre.Runtime) (*big.Int, error) {
+		ReadTVL: func(_ *helper.Config, _ cre.Runtime, _ onchain.YieldPeerInterface) (*big.Int, error) {
 			return big.NewInt(1000), nil
 		},
 		// delta = 0.03 - 0.01 = 0.02 >= threshold(0.01)

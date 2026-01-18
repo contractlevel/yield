@@ -19,8 +19,9 @@ import (
 //	  ]
 //	}
 type Config struct {
-	Schedule string      `json:"schedule"`
-	Evms     []EvmConfig `json:"evms"` // Parent chain is Evms[0]
+	Schedule    string      `json:"schedule"`
+	BlockNumber int64       `json:"blockNumber"`
+	Evms        []EvmConfig `json:"evms"` // Parent chain is Evms[0]
 }
 
 // EvmConfig:

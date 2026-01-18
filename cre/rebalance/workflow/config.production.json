@@ -1,14 +1,16 @@
 {
-  "schedule": "*/30 * * * * *",
-  "url": "https://api.real-time-reserves.verinumus.io/v1/chainlink/proof-of-reserves/TrueUSD",
+  "schedule": "0 */1 * * * *",
+  "blockNumber": -3,
   "evms": [
     {
-      "tokenAddress": "0x4700A50d858Cb281847ca4Ee0938F80DEfB3F1dd",
-      "reserveManagerAddress": "0x51933aD3A79c770cb6800585325649494120401a",
-      "balanceReaderAddress": "0x4b0739c94C1389B55481cb7506c62430cA7211Cf",
-      "messageEmitterAddress": "0x1d598672486ecB50685Da5497390571Ac4E93FDc",
-      "chainName": "ethereum-testnet-sepolia",
-      "gasLimit": 1000000
+      "chainName": "ethereum-mainnet",
+      "chainSelector": 5009297550715157269,
+      "yieldPeerAddress": "0x51cceaa25e6700e8c733d3130dbcab75e357b0b2",
+      "rebalancerAddress": "0xa0bc3af937544dddcc20324f834165f905ebccb6",
+      "gasLimit": 500000,
+      "usdcAddress": "0x1234567890abcdef1234567890abcdef12345678",
+      "aaveV3PoolAddressesProviderAddress": "0x1234567890abcdef1234567890abcdef12345678",
+      "compoundV3CometUSDCAddress": "0x1234567890abcdef1234567890abcdef12345678"
     }
   ]
 }
