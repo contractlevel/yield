@@ -21,6 +21,16 @@
       "usdcAddress": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
       "aaveV3PoolAddressesProviderAddress": "0x2f39d218133afab8f2b819b1066c7e434ad94e9e",
       "compoundV3CometUSDCAddress": "0x16069A855203F6058331f3c911c72A96851e5844"
+    },
+    {
+      "chainName": "ethereum-mainnet-base-1",
+      "chainSelector": 15971525489660198786,
+      "yieldPeerAddress": "0x22bb25d7e2eface01e2c1d72e2a33af81708cff3",
+      "rebalancerAddress": "0x6c29cb59da879a0ee0c785c590d5556967719d93",
+      "gasLimit": 500000,
+      "usdcAddress": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "aaveV3PoolAddressesProviderAddress": "0xe20fCBdBfFC4Dd138cE8b2E6FBb6CB49777ad64D",
+      "compoundV3CometUSDCAddress": "0xb125E6687d4313864e53df431d5425969c15Eb2F"
     }
   ]
 }

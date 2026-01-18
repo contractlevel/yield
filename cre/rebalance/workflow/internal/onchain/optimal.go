@@ -113,6 +113,9 @@ func getOptimalAndCurrentStrategyWithAPYWithDeps(
         if sameStrategy(strategy, currentStrategy) {
             currentAPY = apy
         }
+
+        logger := runtime.Logger()
+        logger.Info("APY calculated for strategy", "apy", apy, "strategy", strategy)
     }
 
     return StrategyWithAPY{Strategy: bestStrategy, APY: bestAPY}, StrategyWithAPY{Strategy: currentStrategy, APY: currentAPY}, nil
