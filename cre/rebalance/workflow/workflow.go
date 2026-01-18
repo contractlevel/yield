@@ -169,6 +169,8 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 	// If the optimal and current strategy are the same, return without updating.
 	if optimal.Strategy == current.Strategy {
 		logger.Info("Strategy unchanged; no rebalance needed")
+		logger.Info("Optimal.APY", optimal.APY)
+		logger.Info("Current.APY", current.APY)
 		return &StrategyResult{
 			Current: current.Strategy,
 			Optimal: optimal.Strategy,

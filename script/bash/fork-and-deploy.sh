@@ -22,48 +22,87 @@ if [ -f .env ]; then
   set +a
 fi
 
+: "${AVALANCHE_MAINNET_RPC_URL:?AVALANCHE_MAINNET_RPC_URL must be set}"
 : "${ETH_MAINNET_RPC_URL:?ETH_MAINNET_RPC_URL must be set}"
 : "${DEFAULT_ANVIL_PRIVATE_KEY:?DEFAULT_ANVIL_PRIVATE_KEY must be set}"
 
 ############################################################
-# 2) Start mainnet fork on 8545 (kept running)
+# 2) Start Avalanche fork on 8545
 ############################################################
 
-anvil --fork-url "$ETH_MAINNET_RPC_URL" --port 8545 > anvil.log 2>&1 &
-ANVIL_PID=$!
+echo "Starting Avalanche fork on port 8545..."
+anvil --fork-url "$AVALANCHE_MAINNET_RPC_URL" --port 8545 > anvil-avalanche.log 2>&1 &
+ANVIL_AVALANCHE_PID=$!
 
 # Give Anvil a moment to start
 sleep 3
 
 ############################################################
-# 3) Deploy ParentPeer + Rebalancer to the fork
+# 3) Deploy ParentPeer + Rebalancer to Avalanche fork (8545)
 ############################################################
 
+echo "Deploying ParentPeer and Rebalancer to Avalanche fork (port 8545)..."
 forge script script/deploy/DeployParent.s.sol \
   --rpc-url http://127.0.0.1:8545 \
+  --private-key "$DEFAULT_ANVIL_PRIVATE_KEY" \
+  --broadcast \
+  --chain-id 43114
+
+############################################################
+# 4) Start Ethereum fork on 8546
+############################################################
+
+echo "Starting Ethereum fork on port 8546..."
+anvil --fork-url "$ETH_MAINNET_RPC_URL" --port 8546 > anvil-ethereum.log 2>&1 &
+ANVIL_ETHEREUM_PID=$!
+
+# Give Anvil a moment to start
+sleep 3
+
+############################################################
+# 5) Deploy ChildPeer to Ethereum fork (8546)
+############################################################
+
+echo "Deploying ChildPeer to Ethereum fork (port 8546)..."
+forge script script/deploy/DeployChild.s.sol \
+  --rpc-url http://127.0.0.1:8546 \
   --private-key "$DEFAULT_ANVIL_PRIVATE_KEY" \
   --broadcast \
   --chain-id 1
 
 ############################################################
-# 4) Mine 32 blocks so the deployment becomes finalized
+# 6) Read deployed addresses from Foundry broadcast artifacts
 ############################################################
 
-echo "Mining 32 blocks on Anvil to advance finality..."
-cast rpc anvil_mine 0x20 --rpc-url http://127.0.0.1:8545 >/dev/null
-echo "Mined 32 blocks."
+AVALANCHE_DEPLOY_FILE="broadcast/DeployParent.s.sol/43114/run-latest.json"
+ETHEREUM_DEPLOY_FILE="broadcast/DeployChild.s.sol/1/run-latest.json"
+
+PARENT_PEER_ADDRESS=$(jq -r '.transactions[] | select(.contractName=="ParentPeer") | .contractAddress' "$AVALANCHE_DEPLOY_FILE")
+REBALANCER_ADDRESS=$(jq -r '.transactions[] | select(.contractName=="Rebalancer") | .contractAddress' "$AVALANCHE_DEPLOY_FILE")
+CHILD_PEER_ADDRESS=$(jq -r '.transactions[] | select(.contractName=="ChildPeer") | .contractAddress' "$ETHEREUM_DEPLOY_FILE")
 
 ############################################################
-# 5) Read deployed addresses from Foundry broadcast artifacts
+# 7) Display deployment summary
 ############################################################
 
-DEPLOY_FILE="broadcast/DeployParent.s.sol/1/run-latest.json"
-
-PARENT_PEER_ADDRESS=$(jq -r '.transactions[] | select(.contractName=="ParentPeer") | .contractAddress' "$DEPLOY_FILE")
-REBALANCER_ADDRESS=$(jq -r '.transactions[] | select(.contractName=="Rebalancer") | .contractAddress' "$DEPLOY_FILE")
-
-echo "ParentPeer deployed at:  $PARENT_PEER_ADDRESS"
-echo "Rebalancer deployed at:  $REBALANCER_ADDRESS"
 echo
-echo "Anvil mainnet fork is running on http://127.0.0.1:8545 (PID: $ANVIL_PID)"
-echo "Stop it manually when you are done (e.g.: kill $ANVIL_PID)"
+echo "=========================================="
+echo "  DEPLOYMENT SUMMARY"
+echo "=========================================="
+echo
+echo "AVALANCHE (Chain ID: 43114) - Port 8545:"
+echo "  ParentPeer:  $PARENT_PEER_ADDRESS"
+echo "  Rebalancer:  $REBALANCER_ADDRESS"
+echo
+echo "ETHEREUM (Chain ID: 1) - Port 8546:"
+echo "  ChildPeer:   $CHILD_PEER_ADDRESS"
+echo
+echo "=========================================="
+echo
+echo "Anvil forks are running:"
+echo "  Avalanche: http://127.0.0.1:8545 (PID: $ANVIL_AVALANCHE_PID)"
+echo "  Ethereum:  http://127.0.0.1:8546 (PID: $ANVIL_ETHEREUM_PID)"
+echo
+echo "Stop them manually when you are done:"
+echo "  kill $ANVIL_AVALANCHE_PID  # Avalanche fork"
+echo "  kill $ANVIL_ETHEREUM_PID   # Ethereum fork"

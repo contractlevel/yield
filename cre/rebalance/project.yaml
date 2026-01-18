@@ -17,9 +17,11 @@
 staging-settings:
   rpcs:
     # @review using mainnets or testnets for staging
+    - chain-name: avalanche-mainnet
+      url: http://127.0.0.1:8545
     - chain-name: ethereum-mainnet
       # url: https://ethereum-rpc.publicnode.com
-      url: http://127.0.0.1:8545
+      url: http://127.0.0.1:8546
     - chain-name: ethereum-mainnet-arbitrum-1
       url: https://polygon-bor-rpc.publicnode.com
     - chain-name: ethereum-mainnet-arbitrum-1
@@ -28,8 +30,6 @@ staging-settings:
       url: https://opt-mainnet.g.alchemy.com/v2/YOUR_API_KEY
     - chain-name: ethereum-mainnet-base-1
       url: https://base-mainnet.g.alchemy.com/v2/YOUR_API_KEY
-    - chain-name: avalanche-mainnet
-      url: https://avalanche-c-chain-rpc.publicnode.com
 
 # ==========================================================================
 production-settings:
