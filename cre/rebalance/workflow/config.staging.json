@@ -20,7 +20,7 @@
       "gasLimit": 500000,
       "usdcAddress": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
       "aaveV3PoolAddressesProviderAddress": "0x2f39d218133afab8f2b819b1066c7e434ad94e9e",
-      "compoundV3CometUSDCAddress": "0x16069A855203F6058331f3c911c72A96851e5844"
+      "compoundV3CometUSDCAddress": "0xc3d688B66703497DAA19211EEdff47f25384cdc3"
     },
     {
       "chainName": "ethereum-mainnet-base-1",

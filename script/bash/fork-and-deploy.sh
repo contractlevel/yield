@@ -3,11 +3,6 @@
 # kill <PID>
 # bash ./script/bash/kill.sh
 
-# cast code 0x51cceaa25e6700e8c733d3130dbcab75e357b0b2 --rpc-url http://127.0.0.1:8545
-# cast call 0x51cceaa25e6700e8c733d3130dbcab75e357b0b2 "getStrategy()" --rpc-url http://127.0.0.1:8545
-
-
-
 #!/usr/bin/env bash
 set -euo pipefail
 

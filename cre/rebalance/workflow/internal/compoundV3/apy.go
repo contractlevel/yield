@@ -13,10 +13,10 @@ import (
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 )
 
-// @review placeholder
-func GetAPYPromise(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int, chainSelector uint64) cre.Promise[float64] {
-	return cre.PromiseFromResult(0.0, nil)
-}
+// // @review placeholder
+// func GetAPYPromise(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int, chainSelector uint64) cre.Promise[float64] {
+// 	return cre.PromiseFromResult(0.0, nil)
+// }
 
 // @review pass this stablecoin as an arg when doing modular stable support task
 func GetAPY(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int, chainSelector uint64) (float64, error) {
@@ -67,9 +67,9 @@ func GetAPY(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int,
 	return apy, nil
 }
 
-// @review placeholder
-func APYFromSupplyRate(supplyRateInWad uint64) float64 {
-	return 1
-}
+// // @review placeholder
+// func APYFromSupplyRate(supplyRateInWad uint64) float64 {
+// 	return 1
+// }
 
 // convert supply rate from WAD to RAY
