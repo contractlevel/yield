@@ -43,6 +43,7 @@ forge test
   - [Mutation tests](#mutation-tests-2)
 - [Go the extra mile](#go-the-extra-mile)
 - [Golang](#golang)
+- [CRE](#cre)
 
 # Commands
 
@@ -322,3 +323,20 @@ Static analysis:
 `gosec .`
 
 `govulncheck .`
+
+# CRE
+
+From project root:
+
+Fork mainnets and deploy infrastructure: 
+
+`bash ./script/bash/fork-and-deploy.sh`
+
+Kill anvil nodes:
+
+`bash ./script/bash/kill.sh`
+
+From `./cre/rebalance`:
+
+`cre workflow simulate workflow`
+
