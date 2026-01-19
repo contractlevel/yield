@@ -23,7 +23,7 @@ import (
 //   - Promise of APY as float64 (e.g., 0.0523 = 5.23%)
 //   - Error will be returned when Promise is awaited if chain not found or APY calculation fails
 func GetAPYPromise(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int, chainSelector uint64) cre.Promise[float64] {
-	logger := runtime.Logger()
+	// logger := runtime.Logger()
 
 	// Find the chain config by chainSelector
 	evmCfg, err := helper.FindEvmConfigByChainSelector(config.Evms, chainSelector)
@@ -44,11 +44,11 @@ func GetAPYPromise(config *helper.Config, runtime cre.Runtime, liquidityAdded *b
 		return cre.PromiseFromResult(0.0, fmt.Errorf("liquidityAdded cannot be nil (use big.NewInt(0) for zero value)"))
 	}
 
-	logger.Info("GetAPYPromise: Starting APY calculation",
-		"chain", evmCfg.ChainName,
-		"chainSelector", chainSelector,
-		"asset", evmCfg.USDCAddress,
-		"liquidityAdded", liquidityAdded.String())
+	// logger.Info("GetAPYPromise: Starting APY calculation",
+	// 	"chain", evmCfg.ChainName,
+	// 	"chainSelector", chainSelector,
+	// 	"asset", evmCfg.USDCAddress,
+	// 	"liquidityAdded", liquidityAdded.String())
 
 	// Step 1: Create EVM client for this chain
 	evmClient := &evm.Client{
@@ -84,10 +84,10 @@ func GetAPYPromise(config *helper.Config, runtime cre.Runtime, liquidityAdded *b
 
 			// Step 8: Calculate APY using the strategy contract
 			return cre.ThenPromise(paramsPromise, func(params *CalculateInterestRatesParams) cre.Promise[float64] {
-				logger.Info("GetAPYPromise: Got CalculateInterestRatesParams",
-					"chain", evmCfg.ChainName,
-					"totalDebt", params.TotalDebt.String(),
-					"virtualUnderlyingBalance", params.VirtualUnderlyingBalance.String())
+				// logger.Info("GetAPYPromise: Got CalculateInterestRatesParams",
+				// 	"chain", evmCfg.ChainName,
+				// 	"totalDebt", params.TotalDebt.String(),
+				// 	"virtualUnderlyingBalance", params.VirtualUnderlyingBalance.String())
 
 				return CalculateAPYFromContract(runtime, strategyV2, params)
 			})

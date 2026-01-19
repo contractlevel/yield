@@ -15,7 +15,7 @@
     {
       "chainName": "ethereum-mainnet",
       "chainSelector": 5009297550715157269,
-      "yieldPeerAddress": "0x6c29cb59da879a0ee0c785c590d5556967719d93",
+      "yieldPeerAddress": "0xd502ca09efeee0894bac57445717fa2a92d5125d",
       "rebalancerAddress": "0x6c29cb59da879a0ee0c785c590d5556967719d93",
       "gasLimit": 500000,
       "usdcAddress": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
@@ -25,7 +25,7 @@
     {
       "chainName": "ethereum-mainnet-base-1",
       "chainSelector": 15971525489660198786,
-      "yieldPeerAddress": "0x22bb25d7e2eface01e2c1d72e2a33af81708cff3",
+      "yieldPeerAddress": "0xb6634570c72880fa159157bbfb3ced19701d0109",
       "rebalancerAddress": "0x6c29cb59da879a0ee0c785c590d5556967719d93",
       "gasLimit": 500000,
       "usdcAddress": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
@@ -35,12 +35,32 @@
     {
       "chainName": "ethereum-mainnet-arbitrum-1",
       "chainSelector": 4949039107694359620,
-      "yieldPeerAddress": "0x7f759f18ef1a45a3698dd5068f739ec14cc0b452",
+      "yieldPeerAddress": "0x60a787ae1112b2aced6724a0a105a68da258acdd",
       "rebalancerAddress": "0x6c29cb59da879a0ee0c785c590d5556967719d93",
       "gasLimit": 500000,
       "usdcAddress": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
       "aaveV3PoolAddressesProviderAddress": "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb",
       "compoundV3CometUSDCAddress": "0x9c4ec768c28520B50860ea7a15bd7213a9fF58bf"
+    },
+    {
+      "chainName": "ethereum-mainnet-optimism-1",
+      "chainSelector": 3734403246176062136,
+      "yieldPeerAddress": "0x2a2842021613a9c5f9ceab8abfa4f390372938c5",
+      "rebalancerAddress": "0x6c29cb59da879a0ee0c785c590d5556967719d93",
+      "gasLimit": 500000,
+      "usdcAddress": "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
+      "aaveV3PoolAddressesProviderAddress": "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb",
+      "compoundV3CometUSDCAddress": "0x2e44e174f7D53F0212823acC11C01A11d58c5bCB"
+    },
+    {
+      "chainName": "polygon-mainnet",
+      "chainSelector": 4051577828743386545,
+      "yieldPeerAddress": "0x51d80a27491047e6509de389d7e183fec954913a",
+      "rebalancerAddress": "0x6c29cb59da879a0ee0c785c590d5556967719d93",
+      "gasLimit": 500000,
+      "usdcAddress": "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+      "aaveV3PoolAddressesProviderAddress": "0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb",
+      "compoundV3CometUSDCAddress": "0xF25212E676D1F7F89Cd72fFEe66158f541246445"
     }
   ]
 }

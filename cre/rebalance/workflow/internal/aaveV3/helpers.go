@@ -27,7 +27,7 @@ func getProtocolDataProviderBinding(
 	poolProvider PoolAddressesProviderInterface,
 	chainName string,
 ) cre.Promise[AaveProtocolDataProviderInterface] {
-	logger := runtime.Logger()
+	// logger := runtime.Logger()
 
 	// Fetch ProtocolDataProvider address
 	protocolDataProviderAddrPromise := poolProvider.GetPoolDataProvider(runtime, nil)
@@ -38,9 +38,9 @@ func getProtocolDataProviderBinding(
 			return nil, fmt.Errorf("invalid ProtocolDataProvider address: zero address for chain %s", chainName)
 		}
 
-		logger.Info("Got ProtocolDataProvider address",
-			"chain", chainName,
-			"address", protocolDataProviderAddr.Hex())
+		// logger.Info("Got ProtocolDataProvider address",
+		// 	"chain", chainName,
+		// 	"address", protocolDataProviderAddr.Hex())
 
 		// Create ProtocolDataProvider binding
 		// Note: .Hex() always returns valid hex, so binding creation will never fail
@@ -68,7 +68,7 @@ func getStrategyBinding(
 	assetAddress common.Address,
 	chainName string,
 ) cre.Promise[DefaultReserveInterestRateStrategyV2Interface] {
-	logger := runtime.Logger()
+	// logger := runtime.Logger()
 
 	// Fetch strategy address
 	strategyAddrPromise := protocolProvider.GetInterestRateStrategyAddress(
@@ -83,9 +83,9 @@ func getStrategyBinding(
 			return nil, fmt.Errorf("invalid Strategy address: zero address for chain %s", chainName)
 		}
 
-		logger.Info("Got strategy address",
-			"chain", chainName,
-			"strategy", strategyAddr.Hex())
+		// logger.Info("Got strategy address",
+		// 	"chain", chainName,
+		// 	"strategy", strategyAddr.Hex())
 
 		// Create Strategy V2 binding
 		// Note: .Hex() always returns valid hex, so binding creation will never fail

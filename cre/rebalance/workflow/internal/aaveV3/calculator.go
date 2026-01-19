@@ -34,16 +34,16 @@ func CalculateAPYFromContract(
 	strategyContract DefaultReserveInterestRateStrategyV2Interface,
 	params *CalculateInterestRatesParams,
 ) cre.Promise[float64] {
-	logger := runtime.Logger()
-	logger.Info("Calculating APY using contract CalculateInterestRates",
-		"unbacked", params.Unbacked.String(),
-		"liquidityAdded", params.LiquidityAdded.String(),
-		"liquidityTaken", params.LiquidityTaken.String(),
-		"totalDebt", params.TotalDebt.String(),
-		"reserveFactor", params.ReserveFactor.String(),
-		"reserve", params.Reserve.Hex(),
-		"usingVirtualBalance", params.UsingVirtualBalance,
-		"virtualUnderlyingBalance", params.VirtualUnderlyingBalance.String())
+	// logger := runtime.Logger()
+	// logger.Info("Calculating APY using contract CalculateInterestRates",
+	// 	"unbacked", params.Unbacked.String(),
+	// 	"liquidityAdded", params.LiquidityAdded.String(),
+	// 	"liquidityTaken", params.LiquidityTaken.String(),
+	// 	"totalDebt", params.TotalDebt.String(),
+	// 	"reserveFactor", params.ReserveFactor.String(),
+	// 	"reserve", params.Reserve.Hex(),
+	// 	"usingVirtualBalance", params.UsingVirtualBalance,
+	// 	"virtualUnderlyingBalance", params.VirtualUnderlyingBalance.String())
 
 	// Build input struct for CalculateInterestRates
 	input := default_reserve_interest_rate_strategy_v2.CalculateInterestRatesInput{
@@ -68,7 +68,7 @@ func CalculateAPYFromContract(
 		// Arg1 is variableBorrowRate in RAY
 		liquidityRateRAY := result.Arg0
 
-		logger.Info("Got liquidity rate from contract", "liquidityRateRAY", liquidityRateRAY.String())
+		// logger.Info("Got liquidity rate from contract", "liquidityRateRAY", liquidityRateRAY.String())
 
 		// Handle zero liquidity rate (underutilized pool) - return 0 APY
 		if liquidityRateRAY.Sign() == 0 {

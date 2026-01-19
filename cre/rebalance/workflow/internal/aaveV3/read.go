@@ -27,8 +27,8 @@ func FetchCalculateInterestRatesParams(
 	reserveAddress common.Address,
 	liquidityAdded *big.Int,
 ) cre.Promise[*CalculateInterestRatesParams] {
-	logger := runtime.Logger()
-	logger.Info("Fetching CalculateInterestRatesParams", "reserve", reserveAddress.Hex(), "liquidityAdded", liquidityAdded.String())
+	// logger := runtime.Logger()
+	// logger.Info("Fetching CalculateInterestRatesParams", "reserve", reserveAddress.Hex(), "liquidityAdded", liquidityAdded.String())
 
 	// Get reserve data from ProtocolDataProvider
 	// Arg0 is unbacked
@@ -46,9 +46,9 @@ func FetchCalculateInterestRatesParams(
 
 		totalDebt := new(big.Int).Add(totalStableDebt, totalVariableDebt)
 
-		logger.Info("Got reserve data from ProtocolDataProvider",
-			"unbacked", unbacked.String(),
-			"totalDebt", totalDebt.String())
+		// logger.Info("Got reserve data from ProtocolDataProvider",
+		// 	"unbacked", unbacked.String(),
+		// 	"totalDebt", totalDebt.String())
 
 		// Get virtualUnderlyingBalance from ProtocolDataProvider contract
 		virtualBalancePromise := protocolDataProvider.GetVirtualUnderlyingBalance(
@@ -58,8 +58,8 @@ func FetchCalculateInterestRatesParams(
 		)
 
 		return cre.ThenPromise(virtualBalancePromise, func(virtualUnderlyingBalance *big.Int) cre.Promise[*CalculateInterestRatesParams] {
-			logger.Info("Got virtualUnderlyingBalance from contract",
-				"virtualUnderlyingBalance", virtualUnderlyingBalance.String())
+			// logger.Info("Got virtualUnderlyingBalance from contract",
+			// 	"virtualUnderlyingBalance", virtualUnderlyingBalance.String())
 
 			// Get reserve configuration (for reserveFactor)
 			configPromise := protocolDataProvider.GetReserveConfigurationData(
@@ -71,7 +71,7 @@ func FetchCalculateInterestRatesParams(
 			return cre.Then(configPromise, func(configResult aave_protocol_data_provider.GetReserveConfigurationDataOutput) (*CalculateInterestRatesParams, error) {
 				reserveFactor := configResult.ReserveFactor
 
-				logger.Info("Got reserve configuration", "reserveFactor", reserveFactor.String())
+				// logger.Info("Got reserve configuration", "reserveFactor", reserveFactor.String())
 
 				// Build CalculateInterestRatesParams
 				// IMPORTANT: usingVirtualBalance must be true for non-mintable assets (like USDC)

@@ -31,4 +31,4 @@ test/PoC.t.sol
 .DS_STORE
 collect.json
 anvil.log
-*.log
+script/bash/logs/*
