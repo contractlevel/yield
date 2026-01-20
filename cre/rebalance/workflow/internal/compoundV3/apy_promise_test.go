@@ -19,10 +19,17 @@ import (
 //////////////////////////////////////////////////////////////*/
 
 type fakeComet struct {
+	// happy-path fields
 	totalSupply *big.Int
 	totalBorrow *big.Int
 	supplyRate  uint64
 
+	// optional error injection for sync / promise tests
+	totalSupplyErr error
+	totalBorrowErr error
+	supplyRateErr  error
+
+	// observability for tests
 	lastTotalSupplyBlock   *big.Int
 	lastTotalBorrowBlock   *big.Int
 	lastGetSupplyRateBlock *big.Int
@@ -33,12 +40,18 @@ func (f *fakeComet) TotalSupply(runtime cre.Runtime, blockNumber *big.Int) cre.P
 	if blockNumber != nil {
 		f.lastTotalSupplyBlock = new(big.Int).Set(blockNumber)
 	}
+	if f.totalSupplyErr != nil {
+		return cre.PromiseFromResult[*big.Int](nil, f.totalSupplyErr)
+	}
 	return cre.PromiseFromResult(new(big.Int).Set(f.totalSupply), nil)
 }
 
 func (f *fakeComet) TotalBorrow(runtime cre.Runtime, blockNumber *big.Int) cre.Promise[*big.Int] {
 	if blockNumber != nil {
 		f.lastTotalBorrowBlock = new(big.Int).Set(blockNumber)
+	}
+	if f.totalBorrowErr != nil {
+		return cre.PromiseFromResult[*big.Int](nil, f.totalBorrowErr)
 	}
 	return cre.PromiseFromResult(new(big.Int).Set(f.totalBorrow), nil)
 }
@@ -49,6 +62,9 @@ func (f *fakeComet) GetSupplyRate(runtime cre.Runtime, input comet.GetSupplyRate
 	}
 	if blockNumber != nil {
 		f.lastGetSupplyRateBlock = new(big.Int).Set(blockNumber)
+	}
+	if f.supplyRateErr != nil {
+		return cre.PromiseFromResult[uint64](0, f.supplyRateErr)
 	}
 	return cre.PromiseFromResult(f.supplyRate, nil)
 }
@@ -125,9 +141,9 @@ func TestGetAPYPromise_error_whenCometBindingFails(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
 
 	// Ensure we use the real binding for this test.
-	orig := injectedNewCometBinding
-	injectedNewCometBinding = newCometBinding
-	defer func() { injectedNewCometBinding = orig }()
+	orig := newCometBindingFunc
+	newCometBindingFunc = newCometBinding
+	defer func() { newCometBindingFunc = orig }()
 
 	p := GetAPYPromise(cfg, runtime, big.NewInt(0), 1)
 	apy, err := p.Await()
@@ -156,11 +172,11 @@ func TestGetAPYPromise_error_whenTotalSupplyZero(t *testing.T) {
 		supplyRate:  0,
 	}
 
-	orig := injectedNewCometBinding
-	injectedNewCometBinding = func(_ *evm.Client, _ string) (CometInterface, error) {
+	orig := newCometBindingFunc
+	newCometBindingFunc = func(_ *evm.Client, _ string) (CometInterface, error) {
 		return fc, nil
 	}
-	defer func() { injectedNewCometBinding = orig }()
+	defer func() { newCometBindingFunc = orig }()
 
 	p := GetAPYPromise(cfg, runtime, big.NewInt(0), 1)
 	apy, err := p.Await()
@@ -197,11 +213,11 @@ func TestGetAPYPromise_success_noExtraLiquidity(t *testing.T) {
 		supplyRate:  supplyRate,
 	}
 
-	orig := injectedNewCometBinding
-	injectedNewCometBinding = func(_ *evm.Client, _ string) (CometInterface, error) {
+	orig := newCometBindingFunc
+	newCometBindingFunc = func(_ *evm.Client, _ string) (CometInterface, error) {
 		return fc, nil
 	}
-	defer func() { injectedNewCometBinding = orig }()
+	defer func() { newCometBindingFunc = orig }()
 
 	liquidityAdded := big.NewInt(0)
 
@@ -251,11 +267,11 @@ func TestGetAPYPromise_success_withExtraLiquidity(t *testing.T) {
 		supplyRate:  supplyRate,
 	}
 
-	orig := injectedNewCometBinding
-	injectedNewCometBinding = func(_ *evm.Client, _ string) (CometInterface, error) {
+	orig := newCometBindingFunc
+	newCometBindingFunc = func(_ *evm.Client, _ string) (CometInterface, error) {
 		return fc, nil
 	}
-	defer func() { injectedNewCometBinding = orig }()
+	defer func() { newCometBindingFunc = orig }()
 
 	p := GetAPYPromise(cfg, runtime, liquidityAdded, 99)
 	apy, err := p.Await()

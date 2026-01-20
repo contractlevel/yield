@@ -27,7 +27,7 @@ func GetAPY(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int,
 	}
 
 	// instantiate comet
-	cometUSDC, err := newCometBinding(evmClient, evmConfig.CompoundV3CometUSDCAddress) // @review CometAddr will depend on stablecoin
+	cometUSDC, err := newCometBindingFunc(evmClient, evmConfig.CompoundV3CometUSDCAddress) // @review CometAddr will depend on stablecoin
 	if err != nil {
 		return 0, fmt.Errorf("failed to create comet binding: %w", err)
 	}

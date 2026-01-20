@@ -11,15 +11,6 @@ import (
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 )
 
-// Overridable in tests.
-var (
-	newPoolAddressesProviderBindingFunc = newPoolAddressesProviderBinding
-	getProtocolDataProviderBindingFunc  = getProtocolDataProviderBinding
-	getStrategyBindingFunc              = getStrategyBinding
-	getCalculateInterestRatesParamsFunc = getCalculateInterestRatesParams
-	calculateAPYFromContractFunc        = calculateAPYFromContract
-)
-
 // GetAPYPromise calculates the APY for AaveV3 on a specific chain and returns a Promise.
 // This version returns a Promise instead of awaiting, allowing callers to chain or await as needed. [Needs .Await() after this is called ]
 // Parameters:

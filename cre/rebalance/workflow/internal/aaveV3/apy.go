@@ -55,13 +55,13 @@ func GetAPY(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int,
 	}
 
 	// Step 2: Create PoolAddressesProvider binding
-	poolAddressesProvider, err := newPoolAddressesProviderBinding(evmClient, evmCfg.AaveV3PoolAddressesProviderAddress)
+	poolAddressesProvider, err := newPoolAddressesProviderBindingFunc(evmClient, evmCfg.AaveV3PoolAddressesProviderAddress)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create PoolAddressesProvider binding for chain %s: %w", evmCfg.ChainName, err)
 	}
 
 	// Step 3: Get ProtocolDataProvider binding
-	protocolDataProviderPromise := getProtocolDataProviderBinding(runtime, evmClient, poolAddressesProvider, evmCfg.ChainName)
+	protocolDataProviderPromise := getProtocolDataProviderBindingFunc(runtime, evmClient, poolAddressesProvider, evmCfg.ChainName)
 	protocolDataProvider, err := protocolDataProviderPromise.Await()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get ProtocolDataProvider for chain %s: %w", evmCfg.ChainName, err)
@@ -71,14 +71,14 @@ func GetAPY(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int,
 	usdcAddress := common.HexToAddress(evmCfg.USDCAddress)
 
 	// Step 5: Get Strategy binding
-	strategyPromise := getStrategyBinding(runtime, evmClient, protocolDataProvider, usdcAddress, evmCfg.ChainName)
+	strategyPromise := getStrategyBindingFunc(runtime, evmClient, protocolDataProvider, usdcAddress, evmCfg.ChainName)
 	strategyV2, err := strategyPromise.Await()
 	if err != nil {
 		return 0, fmt.Errorf("failed to get Strategy binding for chain %s: %w", evmCfg.ChainName, err)
 	}
 
 	// Step 6: Fetch CalculateInterestRatesParams
-	paramsPromise := getCalculateInterestRatesParams(
+	paramsPromise := getCalculateInterestRatesParamsFunc(
 		runtime,
 		protocolDataProvider,
 		usdcAddress,
@@ -95,7 +95,7 @@ func GetAPY(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int,
 		"virtualUnderlyingBalance", params.VirtualUnderlyingBalance.String())
 
 	// Step 7: Calculate APY using the strategy contract
-	apyPromise := calculateAPYFromContract(runtime, strategyV2, params)
+	apyPromise := calculateAPYFromContractFunc(runtime, strategyV2, params)
 	apy, err := apyPromise.Await()
 	if err != nil {
 		return 0, fmt.Errorf("failed to calculate APY for chain %s: %w", evmCfg.ChainName, err)

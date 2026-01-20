@@ -12,9 +12,6 @@ import (
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 )
 
-// Allow tests to replace the binding constructor.
-var injectedNewCometBinding = newCometBinding
-
 // GetAPYPromise calculates the APY for Compound V3 (Comet) on a specific chain
 // and returns a Promise.
 // This version returns a Promise instead of awaiting, allowing callers to
@@ -54,7 +51,7 @@ func GetAPYPromise(config *helper.Config, runtime cre.Runtime, liquidityAdded *b
 	}
 
 	// Step 2: Create Comet binding
-	cometUSDC, err := injectedNewCometBinding(evmClient, evmCfg.CompoundV3CometUSDCAddress) // @review CometAddr will depend on stablecoin
+	cometUSDC, err := newCometBindingFunc(evmClient, evmCfg.CompoundV3CometUSDCAddress) // @review CometAddr will depend on stablecoin
 	if err != nil {
 		return cre.PromiseFromResult(0.0, fmt.Errorf("failed to create Comet binding for chain %s: %w", evmCfg.ChainName, err))
 	}
