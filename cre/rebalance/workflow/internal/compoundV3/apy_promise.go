@@ -12,6 +12,9 @@ import (
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 )
 
+// Allow tests to replace the binding constructor.
+var injectedNewCometBinding = newCometBinding
+
 // GetAPYPromise calculates the APY for Compound V3 (Comet) on a specific chain
 // and returns a Promise.
 // This version returns a Promise instead of awaiting, allowing callers to
@@ -51,14 +54,12 @@ func GetAPYPromise(config *helper.Config, runtime cre.Runtime, liquidityAdded *b
 	}
 
 	// Step 2: Create Comet binding
-	cometUSDC, err := NewCometBinding(evmClient, evmCfg.CompoundV3CometUSDCAddress)
+	cometUSDC, err := injectedNewCometBinding(evmClient, evmCfg.CompoundV3CometUSDCAddress)
 	if err != nil {
 		return cre.PromiseFromResult(0.0, fmt.Errorf("failed to create Comet binding for chain %s: %w", evmCfg.ChainName, err))
 	}
 
-	// @review: this assumes you have config.BlockNumber where negatives/relative
-	// values are resolved earlier in the pipeline.
-	blockNumber := big.NewInt(int64(config.BlockNumber))
+	blockNumber := big.NewInt(config.BlockNumber)
 
 	// Step 3: TotalSupply at the configured block
 	totalSupplyPromise := cometUSDC.TotalSupply(runtime, blockNumber)
@@ -95,7 +96,7 @@ func GetAPYPromise(config *helper.Config, runtime cre.Runtime, liquidityAdded *b
 			supplyRatePromise := cometUSDC.GetSupplyRate(runtime, input, blockNumber)
 
 			return cre.ThenPromise(supplyRatePromise, func(supplyRate uint64) cre.Promise[float64] {
-				apy := APYFromSupplyRate(supplyRate)
+				apy := calculateAPYFromSupplyRate(supplyRate)
 				return cre.PromiseFromResult(apy, nil)
 			})
 		})

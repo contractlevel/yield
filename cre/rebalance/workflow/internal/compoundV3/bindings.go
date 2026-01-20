@@ -9,7 +9,7 @@ import (
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/blockchain/evm"
 )
 
-func NewCometBinding(client *evm.Client, addr string) (CometInterface, error) {
+func newCometBinding(client *evm.Client, addr string) (CometInterface, error) {
 	if !common.IsHexAddress(addr) {
 		return nil, fmt.Errorf("invalid Comet address: %s", addr)
 	}

@@ -284,6 +284,8 @@ See coverage:
 
 `go test -coverprofile=coverage.out ./internal/onchain` - for a specific package
 
+`go test -coverprofile=coverage.out ./workflow/internal/compoundV3` - for a specific package
+
 Run single test:
 
 `go test -run Test_funcName`
