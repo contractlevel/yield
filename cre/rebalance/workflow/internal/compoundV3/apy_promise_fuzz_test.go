@@ -13,12 +13,34 @@ import (
 )
 
 /*//////////////////////////////////////////////////////////////
+                          FUZZ CONSTANTS
+//////////////////////////////////////////////////////////////*/
+
+const (
+	// Base on-chain state used by the fuzz harness.
+	fuzzBaseSupplyWadless = int64(1_000_000_000) // 1e9
+	fuzzBaseBorrowWadless = int64(400_000_000)   // arbitrary positive borrow
+
+	// Maximum extra liquidity we add on top of the base supply.
+	// liquidityAdded ∈ [0, fuzzMaxExtraLiquidity].
+	fuzzMaxExtraLiquidity = uint64(2_000_000_000) // up to +2e9
+
+	// Arbitrary but fixed block/chain identifiers for the test.
+	fuzzBlockNumber  = int64(42)
+	fuzzChainSelector = uint64(123)
+)
+
+/*//////////////////////////////////////////////////////////////
                           FUZZ SETUP
 //////////////////////////////////////////////////////////////*/
 
 // Global pointer used by the fuzz binding override.
 // Kept simple on purpose.
 var currentComet *fakeComet
+
+/*//////////////////////////////////////////////////////////////
+                           FUZZ TESTS
+//////////////////////////////////////////////////////////////*/
 
 // Fuzz_GetAPYPromise_LiquidityAndSupplyRate fuzzes both supplyRate and
 // non-negative liquidityAdded and asserts:
@@ -61,28 +83,27 @@ func Fuzz_GetAPYPromise_LiquidityAndSupplyRate(f *testing.F) {
 			supplyRate = supplyRate % maxFuzzSupplyRateInWad
 		}
 
-		// Bound liquidityAdded to a reasonable non-negative range.
-		// We keep totalSupply + liquidityAdded in [baseSupply, baseSupply+maxExtra].
-		baseSupply := big.NewInt(1_000_000_000) // 1e9
-		maxExtra := uint64(2_000_000_000)       // up to +2e9 // @review magic numbers
-		liqBound := rawLiq % (maxExtra + 1)
-
+		// Bound liquidityAdded to [0, fuzzMaxExtraLiquidity].
+		liqBound := rawLiq % (fuzzMaxExtraLiquidity + 1)
 		liquidityAdded := new(big.Int).SetUint64(liqBound)
+
+		baseSupply := big.NewInt(fuzzBaseSupplyWadless)
+		baseBorrow := big.NewInt(fuzzBaseBorrowWadless)
 
 		// Build a fresh fakeComet for this fuzz input.
 		comet := &fakeComet{
 			totalSupply: new(big.Int).Set(baseSupply),
-			totalBorrow: big.NewInt(400_000_000), // arbitrary positive borrow
+			totalBorrow: new(big.Int).Set(baseBorrow),
 			supplyRate:  supplyRate,
 		}
 		currentComet = comet
 
 		cfg := &helper.Config{
-			BlockNumber: 42, // arbitrary; fakeComet just records it
+			BlockNumber: fuzzBlockNumber,
 			Evms: []helper.EvmConfig{
 				{
 					ChainName:                  "test-chain",
-					ChainSelector:              123,        // arbitrary
+					ChainSelector:              fuzzChainSelector,
 					CompoundV3CometUSDCAddress: "ignored", // not used by fakeComet
 				},
 			},
