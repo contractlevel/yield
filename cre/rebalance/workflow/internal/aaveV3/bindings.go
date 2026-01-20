@@ -5,14 +5,15 @@ import (
 
 	"rebalance/contracts/evm/src/generated/aave_protocol_data_provider"
 	"rebalance/contracts/evm/src/generated/default_reserve_interest_rate_strategy_v2"
-	"rebalance/contracts/evm/src/generated/pool"
 	"rebalance/contracts/evm/src/generated/pool_addresses_provider"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/blockchain/evm"
 )
 
-func NewPoolAddressesProviderBinding(client *evm.Client, addr string) (PoolAddressesProviderInterface, error) {
+// newPoolAddressesProviderBinding constructs the Pool Addresses Provider binding.
+// It validates the address and returns an interface for testability.
+func newPoolAddressesProviderBinding(client *evm.Client, addr string) (PoolAddressesProviderInterface, error) {
 	if !common.IsHexAddress(addr) {
 		return nil, fmt.Errorf("invalid PoolAddressesProvider address: %s", addr)
 	}
@@ -25,16 +26,9 @@ func NewPoolAddressesProviderBinding(client *evm.Client, addr string) (PoolAddre
 	)
 }
 
-func NewPoolBinding(client *evm.Client, poolAddr common.Address) (PoolInterface, error) {
-	if poolAddr == (common.Address{}) {
-		return nil, fmt.Errorf("invalid Pool address: zero address")
-	}
-	return pool.NewPool(client, poolAddr, nil)
-}
-
-// NewAaveProtocolDataProviderBinding constructs the Aave Protocol Data Provider binding.
+// newAaveProtocolDataProviderBinding constructs the Aave Protocol Data Provider binding.
 // It validates the address and returns an interface for testability.
-func NewAaveProtocolDataProviderBinding(client *evm.Client, addr string) (AaveProtocolDataProviderInterface, error) {
+func newAaveProtocolDataProviderBinding(client *evm.Client, addr string) (AaveProtocolDataProviderInterface, error) {
 	if !common.IsHexAddress(addr) {
 		return nil, fmt.Errorf("invalid AaveProtocolDataProvider address: %s", addr)
 	}
@@ -43,13 +37,13 @@ func NewAaveProtocolDataProviderBinding(client *evm.Client, addr string) (AavePr
 	return aave_protocol_data_provider.NewAaveProtocolDataProvider(
 		client,
 		providerAddr,
-		nil, // No filter options needed for reads // @review - what does this mean???
+		nil,
 	)
 }
 
-// NewDefaultReserveInterestRateStrategyV2Binding constructs the Interest Rate Strategy binding.
+// newDefaultReserveInterestRateStrategyV2Binding constructs the Interest Rate Strategy binding.
 // It validates the address and returns an interface for testability.
-func NewDefaultReserveInterestRateStrategyV2Binding(client *evm.Client, addr string) (DefaultReserveInterestRateStrategyV2Interface, error) {
+func newDefaultReserveInterestRateStrategyV2Binding(client *evm.Client, addr string) (DefaultReserveInterestRateStrategyV2Interface, error) {
 	if !common.IsHexAddress(addr) {
 		return nil, fmt.Errorf("invalid DefaultReserveInterestRateStrategyV2 address: %s", addr)
 	}
@@ -58,6 +52,6 @@ func NewDefaultReserveInterestRateStrategyV2Binding(client *evm.Client, addr str
 	return default_reserve_interest_rate_strategy_v2.NewDefaultReserveInterestRateStrategyV2(
 		client,
 		strategyAddr,
-		nil, // No filter options needed for reads
+		nil,
 	)
 }

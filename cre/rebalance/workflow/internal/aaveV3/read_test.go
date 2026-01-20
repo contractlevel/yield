@@ -56,7 +56,7 @@ func (m *mockProtocolDataProviderForRead) GetVirtualUnderlyingBalance(runtime cr
          FETCH CALCULATE INTEREST RATES PARAMS TESTS
 //////////////////////////////////////////////////////////////*/
 
-func Test_FetchCalculateInterestRatesParams_success(t *testing.T) {
+func Test_getCalculateInterestRatesParams_success(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
 	reserveAddress := common.HexToAddress("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48")
 	liquidityAdded := big.NewInt(1000000) // 1 USDC (6 decimals)
@@ -88,7 +88,7 @@ func Test_FetchCalculateInterestRatesParams_success(t *testing.T) {
 		},
 	}
 
-	promise := FetchCalculateInterestRatesParams(runtime, mockProvider, reserveAddress, liquidityAdded)
+	promise := getCalculateInterestRatesParams(runtime, mockProvider, reserveAddress, liquidityAdded)
 	params, err := promise.Await()
 
 	require.NoError(t, err)
@@ -103,7 +103,7 @@ func Test_FetchCalculateInterestRatesParams_success(t *testing.T) {
 	require.Equal(t, virtualUnderlyingBalance, params.VirtualUnderlyingBalance)
 }
 
-func Test_FetchCalculateInterestRatesParams_zeroLiquidityAdded(t *testing.T) {
+func Test_getCalculateInterestRatesParams_zeroLiquidityAdded(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
 	reserveAddress := common.HexToAddress("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48")
 	liquidityAdded := big.NewInt(0) // Current APY scenario
@@ -132,7 +132,7 @@ func Test_FetchCalculateInterestRatesParams_zeroLiquidityAdded(t *testing.T) {
 		},
 	}
 
-	promise := FetchCalculateInterestRatesParams(runtime, mockProvider, reserveAddress, liquidityAdded)
+	promise := getCalculateInterestRatesParams(runtime, mockProvider, reserveAddress, liquidityAdded)
 	params, err := promise.Await()
 
 	require.NoError(t, err)
@@ -140,7 +140,7 @@ func Test_FetchCalculateInterestRatesParams_zeroLiquidityAdded(t *testing.T) {
 	require.Equal(t, big.NewInt(0), params.LiquidityAdded)
 }
 
-func Test_FetchCalculateInterestRatesParams_zeroDebt(t *testing.T) {
+func Test_getCalculateInterestRatesParams_zeroDebt(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
 	reserveAddress := common.HexToAddress("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48")
 	liquidityAdded := big.NewInt(1000000)
@@ -167,7 +167,7 @@ func Test_FetchCalculateInterestRatesParams_zeroDebt(t *testing.T) {
 		},
 	}
 
-	promise := FetchCalculateInterestRatesParams(runtime, mockProvider, reserveAddress, liquidityAdded)
+	promise := getCalculateInterestRatesParams(runtime, mockProvider, reserveAddress, liquidityAdded)
 	params, err := promise.Await()
 
 	require.NoError(t, err)
@@ -175,7 +175,7 @@ func Test_FetchCalculateInterestRatesParams_zeroDebt(t *testing.T) {
 	require.Equal(t, big.NewInt(0), params.TotalDebt)
 }
 
-func Test_FetchCalculateInterestRatesParams_getReserveDataError(t *testing.T) {
+func Test_getCalculateInterestRatesParams_getReserveDataError(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
 	reserveAddress := common.HexToAddress("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48")
 	liquidityAdded := big.NewInt(1000000)
@@ -186,7 +186,7 @@ func Test_FetchCalculateInterestRatesParams_getReserveDataError(t *testing.T) {
 		},
 	}
 
-	promise := FetchCalculateInterestRatesParams(runtime, mockProvider, reserveAddress, liquidityAdded)
+	promise := getCalculateInterestRatesParams(runtime, mockProvider, reserveAddress, liquidityAdded)
 	params, err := promise.Await()
 
 	require.Error(t, err)
@@ -194,7 +194,7 @@ func Test_FetchCalculateInterestRatesParams_getReserveDataError(t *testing.T) {
 	require.ErrorContains(t, err, "contract call failed")
 }
 
-func Test_FetchCalculateInterestRatesParams_getVirtualUnderlyingBalanceError(t *testing.T) {
+func Test_getCalculateInterestRatesParams_getVirtualUnderlyingBalanceError(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
 	reserveAddress := common.HexToAddress("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48")
 	liquidityAdded := big.NewInt(1000000)
@@ -216,7 +216,7 @@ func Test_FetchCalculateInterestRatesParams_getVirtualUnderlyingBalanceError(t *
 		},
 	}
 
-	promise := FetchCalculateInterestRatesParams(runtime, mockProvider, reserveAddress, liquidityAdded)
+	promise := getCalculateInterestRatesParams(runtime, mockProvider, reserveAddress, liquidityAdded)
 	params, err := promise.Await()
 
 	require.Error(t, err)
@@ -224,7 +224,7 @@ func Test_FetchCalculateInterestRatesParams_getVirtualUnderlyingBalanceError(t *
 	require.ErrorContains(t, err, "virtual balance call failed")
 }
 
-func Test_FetchCalculateInterestRatesParams_getReserveConfigurationDataError(t *testing.T) {
+func Test_getCalculateInterestRatesParams_getReserveConfigurationDataError(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
 	reserveAddress := common.HexToAddress("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48")
 	liquidityAdded := big.NewInt(1000000)
@@ -250,7 +250,7 @@ func Test_FetchCalculateInterestRatesParams_getReserveConfigurationDataError(t *
 		},
 	}
 
-	promise := FetchCalculateInterestRatesParams(runtime, mockProvider, reserveAddress, liquidityAdded)
+	promise := getCalculateInterestRatesParams(runtime, mockProvider, reserveAddress, liquidityAdded)
 	params, err := promise.Await()
 
 	require.Error(t, err)

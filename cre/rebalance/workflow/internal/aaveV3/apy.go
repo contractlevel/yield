@@ -55,7 +55,7 @@ func GetAPY(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int,
 	}
 
 	// Step 2: Create PoolAddressesProvider binding
-	poolAddressesProvider, err := NewPoolAddressesProviderBinding(evmClient, evmCfg.AaveV3PoolAddressesProviderAddress)
+	poolAddressesProvider, err := newPoolAddressesProviderBinding(evmClient, evmCfg.AaveV3PoolAddressesProviderAddress)
 	if err != nil {
 		return 0, fmt.Errorf("failed to create PoolAddressesProvider binding for chain %s: %w", evmCfg.ChainName, err)
 	}
@@ -78,7 +78,7 @@ func GetAPY(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int,
 	}
 
 	// Step 6: Fetch CalculateInterestRatesParams
-	paramsPromise := FetchCalculateInterestRatesParams(
+	paramsPromise := getCalculateInterestRatesParams(
 		runtime,
 		protocolDataProvider,
 		usdcAddress,
@@ -95,7 +95,7 @@ func GetAPY(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int,
 		"virtualUnderlyingBalance", params.VirtualUnderlyingBalance.String())
 
 	// Step 7: Calculate APY using the strategy contract
-	apyPromise := CalculateAPYFromContract(runtime, strategyV2, params)
+	apyPromise := calculateAPYFromContract(runtime, strategyV2, params)
 	apy, err := apyPromise.Await()
 	if err != nil {
 		return 0, fmt.Errorf("failed to calculate APY for chain %s: %w", evmCfg.ChainName, err)

@@ -140,7 +140,7 @@ func (m *mockStrategyContract) CalculateInterestRates(
 	)
 }
 
-func Test_CalculateAPYFromContract_success(t *testing.T) {
+func Test_calculateAPYFromContract_success(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
 
 	// 5% APR in RAY = 0.05 * 1e27 = 5e25
@@ -167,14 +167,14 @@ func Test_CalculateAPYFromContract_success(t *testing.T) {
 		VirtualUnderlyingBalance: big.NewInt(1000000),
 	}
 
-	apyPromise := CalculateAPYFromContract(runtime, mockStrategy, params)
+	apyPromise := calculateAPYFromContract(runtime, mockStrategy, params)
 	apy, err := apyPromise.Await()
 
 	require.NoError(t, err)
 	require.InDelta(t, expectedAPY, apy, 0.01) // Allow 1% tolerance
 }
 
-func Test_CalculateAPYFromContract_zeroLiquidityRate(t *testing.T) {
+func Test_calculateAPYFromContract_zeroLiquidityRate(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
 
 	// Zero liquidityRate is valid (underutilized pool) - should return 0 APY
@@ -198,14 +198,14 @@ func Test_CalculateAPYFromContract_zeroLiquidityRate(t *testing.T) {
 		VirtualUnderlyingBalance: big.NewInt(1000000),
 	}
 
-	apyPromise := CalculateAPYFromContract(runtime, mockStrategy, params)
+	apyPromise := calculateAPYFromContract(runtime, mockStrategy, params)
 	apy, err := apyPromise.Await()
 
 	require.NoError(t, err)
 	require.Equal(t, 0.0, apy)
 }
 
-func Test_CalculateAPYFromContract_veryHighAPR(t *testing.T) {
+func Test_calculateAPYFromContract_veryHighAPR(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
 
 	// 1100% APR in RAY = 11.0 * 1e27 = 11e27
@@ -231,7 +231,7 @@ func Test_CalculateAPYFromContract_veryHighAPR(t *testing.T) {
 		VirtualUnderlyingBalance: big.NewInt(1000000),
 	}
 
-	apyPromise := CalculateAPYFromContract(runtime, mockStrategy, params)
+	apyPromise := calculateAPYFromContract(runtime, mockStrategy, params)
 	apy, err := apyPromise.Await()
 
 	require.Error(t, err)
@@ -239,7 +239,7 @@ func Test_CalculateAPYFromContract_veryHighAPR(t *testing.T) {
 	require.Equal(t, 0.0, apy)
 }
 
-func Test_CalculateAPYFromContract_contractError(t *testing.T) {
+func Test_calculateAPYFromContract_contractError(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
 
 	mockStrategy := &mockStrategyContract{
@@ -262,14 +262,14 @@ func Test_CalculateAPYFromContract_contractError(t *testing.T) {
 		VirtualUnderlyingBalance: big.NewInt(1000000),
 	}
 
-	apyPromise := CalculateAPYFromContract(runtime, mockStrategy, params)
+	apyPromise := calculateAPYFromContract(runtime, mockStrategy, params)
 	apy, err := apyPromise.Await()
 
 	require.Error(t, err)
 	require.Equal(t, 0.0, apy)
 }
 
-func Test_CalculateAPYFromContract_conversionError(t *testing.T) {
+func Test_calculateAPYFromContract_conversionError(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
 
 	// Test that conversion error is properly wrapped
@@ -295,7 +295,7 @@ func Test_CalculateAPYFromContract_conversionError(t *testing.T) {
 		VirtualUnderlyingBalance: big.NewInt(1000000),
 	}
 
-	apyPromise := CalculateAPYFromContract(runtime, mockStrategy, params)
+	apyPromise := calculateAPYFromContract(runtime, mockStrategy, params)
 	apy, err := apyPromise.Await()
 
 	require.Error(t, err)

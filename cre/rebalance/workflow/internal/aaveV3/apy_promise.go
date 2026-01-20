@@ -11,6 +11,15 @@ import (
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 )
 
+// Overridable in tests.
+var (
+	newPoolAddressesProviderBindingFunc = newPoolAddressesProviderBinding
+	getProtocolDataProviderBindingFunc  = getProtocolDataProviderBinding
+	getStrategyBindingFunc              = getStrategyBinding
+	getCalculateInterestRatesParamsFunc = getCalculateInterestRatesParams
+	calculateAPYFromContractFunc        = calculateAPYFromContract
+)
+
 // GetAPYPromise calculates the APY for AaveV3 on a specific chain and returns a Promise.
 // This version returns a Promise instead of awaiting, allowing callers to chain or await as needed. [Needs .Await() after this is called ]
 // Parameters:
@@ -56,13 +65,13 @@ func GetAPYPromise(config *helper.Config, runtime cre.Runtime, liquidityAdded *b
 	}
 
 	// Step 2: Create PoolAddressesProvider binding
-	poolAddressesProvider, err := NewPoolAddressesProviderBinding(evmClient, evmCfg.AaveV3PoolAddressesProviderAddress)
+	poolAddressesProvider, err := newPoolAddressesProviderBindingFunc(evmClient, evmCfg.AaveV3PoolAddressesProviderAddress)
 	if err != nil {
 		return cre.PromiseFromResult(0.0, fmt.Errorf("failed to create PoolAddressesProvider binding for chain %s: %w", evmCfg.ChainName, err))
 	}
 
 	// Step 3: Get ProtocolDataProvider binding
-	protocolDataProviderPromise := getProtocolDataProviderBinding(runtime, evmClient, poolAddressesProvider, evmCfg.ChainName)
+	protocolDataProviderPromise := getProtocolDataProviderBindingFunc(runtime, evmClient, poolAddressesProvider, evmCfg.ChainName)
 
 	// Step 4: Chain promises to build the full calculation pipeline
 	return cre.ThenPromise(protocolDataProviderPromise, func(protocolDataProvider AaveProtocolDataProviderInterface) cre.Promise[float64] {
@@ -70,12 +79,12 @@ func GetAPYPromise(config *helper.Config, runtime cre.Runtime, liquidityAdded *b
 		usdcAddress := common.HexToAddress(evmCfg.USDCAddress)
 
 		// Step 5: Get Strategy binding
-		strategyPromise := getStrategyBinding(runtime, evmClient, protocolDataProvider, usdcAddress, evmCfg.ChainName)
+		strategyPromise := getStrategyBindingFunc(runtime, evmClient, protocolDataProvider, usdcAddress, evmCfg.ChainName)
 
 		// Step 6: Fetch params and calculate APY
 		return cre.ThenPromise(strategyPromise, func(strategyV2 DefaultReserveInterestRateStrategyV2Interface) cre.Promise[float64] {
 			// Step 7: Fetch CalculateInterestRatesParams
-			paramsPromise := FetchCalculateInterestRatesParams(
+			paramsPromise := getCalculateInterestRatesParamsFunc(
 				runtime,
 				protocolDataProvider,
 				usdcAddress,
@@ -89,7 +98,7 @@ func GetAPYPromise(config *helper.Config, runtime cre.Runtime, liquidityAdded *b
 				// 	"totalDebt", params.TotalDebt.String(),
 				// 	"virtualUnderlyingBalance", params.VirtualUnderlyingBalance.String())
 
-				return CalculateAPYFromContract(runtime, strategyV2, params)
+				return calculateAPYFromContractFunc(runtime, strategyV2, params)
 			})
 		})
 	})

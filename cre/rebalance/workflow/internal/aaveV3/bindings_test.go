@@ -4,15 +4,14 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/ethereum/go-ethereum/common"
 	"github.com/smartcontractkit/cre-sdk-go/capabilities/blockchain/evm"
 )
 
-func Test_NewPoolAddressesProviderBinding_success(t *testing.T) {
+func Test_newPoolAddressesProviderBinding_success(t *testing.T) {
 	var client *evm.Client = nil
 	addr := "0x0000000000000000000000000000000000000001"
 
-	binding, err := NewPoolAddressesProviderBinding(client, addr)
+	binding, err := newPoolAddressesProviderBinding(client, addr)
 	if err != nil {
 		t.Fatalf("expected nil error, got: %v", err)
 	}
@@ -22,11 +21,11 @@ func Test_NewPoolAddressesProviderBinding_success(t *testing.T) {
 	var _ PoolAddressesProviderInterface = binding
 }
 
-func Test_NewPoolAddressesProviderBinding_errorWhen_invalidAddress(t *testing.T) {
+func Test_newPoolAddressesProviderBinding_errorWhen_invalidAddress(t *testing.T) {
 	var client *evm.Client = nil
 	addr := "not-an-address"
 
-	binding, err := NewPoolAddressesProviderBinding(client, addr)
+	binding, err := newPoolAddressesProviderBinding(client, addr)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -38,40 +37,11 @@ func Test_NewPoolAddressesProviderBinding_errorWhen_invalidAddress(t *testing.T)
 	}
 }
 
-func Test_NewPoolBinding_success(t *testing.T) {
+func Test_newAaveProtocolDataProviderBinding_success(t *testing.T) {
 	var client *evm.Client = nil
 	addr := "0x0000000000000000000000000000000000000001"
 
-	binding, err := NewPoolBinding(client, common.HexToAddress(addr))
-	if err != nil {
-		t.Fatalf("expected nil error, got: %v", err)
-	}
-	if binding == nil {
-		t.Fatalf("expected non-nil binding, got nil")
-	}
-	var _ PoolInterface = binding
-}
-
-func Test_NewPoolBinding_errorWhen_zeroAddress(t *testing.T) {
-	var client *evm.Client = nil
-
-	binding, err := NewPoolBinding(client, common.Address{})
-	if err == nil {
-		t.Fatalf("expected error, got nil")
-	}
-	if binding != nil {
-		t.Fatalf("expected nil binding on error, got non-nil")
-	}
-	if !strings.Contains(err.Error(), "invalid Pool address: zero address") {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
-func Test_NewAaveProtocolDataProviderBinding_success(t *testing.T) {
-	var client *evm.Client = nil
-	addr := "0x0000000000000000000000000000000000000001"
-
-	binding, err := NewAaveProtocolDataProviderBinding(client, addr)
+	binding, err := newAaveProtocolDataProviderBinding(client, addr)
 	if err != nil {
 		t.Fatalf("expected nil error, got: %v", err)
 	}
@@ -82,11 +52,11 @@ func Test_NewAaveProtocolDataProviderBinding_success(t *testing.T) {
 	var _ AaveProtocolDataProviderInterface = binding
 }
 
-func Test_NewAaveProtocolDataProviderBinding_errorWhen_invalidAddress(t *testing.T) {
+func Test_newAaveProtocolDataProviderBinding_errorWhen_invalidAddress(t *testing.T) {
 	var client *evm.Client = nil
 	addr := "not-an-address"
 
-	binding, err := NewAaveProtocolDataProviderBinding(client, addr)
+	binding, err := newAaveProtocolDataProviderBinding(client, addr)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}
@@ -98,11 +68,11 @@ func Test_NewAaveProtocolDataProviderBinding_errorWhen_invalidAddress(t *testing
 	}
 }
 
-func Test_NewDefaultReserveInterestRateStrategyV2Binding_success(t *testing.T) {
+func Test_newDefaultReserveInterestRateStrategyV2Binding_success(t *testing.T) {
 	var client *evm.Client = nil
 	addr := "0x0000000000000000000000000000000000000002"
 
-	binding, err := NewDefaultReserveInterestRateStrategyV2Binding(client, addr)
+	binding, err := newDefaultReserveInterestRateStrategyV2Binding(client, addr)
 	if err != nil {
 		t.Fatalf("expected nil error, got: %v", err)
 	}
@@ -112,11 +82,11 @@ func Test_NewDefaultReserveInterestRateStrategyV2Binding_success(t *testing.T) {
 	var _ DefaultReserveInterestRateStrategyV2Interface = binding
 }
 
-func Test_NewDefaultReserveInterestRateStrategyV2Binding_errorWhen_invalidAddress(t *testing.T) {
+func Test_newDefaultReserveInterestRateStrategyV2Binding_errorWhen_invalidAddress(t *testing.T) {
 	var client *evm.Client = nil
 	addr := "still-not-an-address"
 
-	binding, err := NewDefaultReserveInterestRateStrategyV2Binding(client, addr)
+	binding, err := newDefaultReserveInterestRateStrategyV2Binding(client, addr)
 	if err == nil {
 		t.Fatalf("expected error, got nil")
 	}

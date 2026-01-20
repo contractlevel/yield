@@ -54,7 +54,7 @@ func GetAPYPromise(config *helper.Config, runtime cre.Runtime, liquidityAdded *b
 	}
 
 	// Step 2: Create Comet binding
-	cometUSDC, err := injectedNewCometBinding(evmClient, evmCfg.CompoundV3CometUSDCAddress)
+	cometUSDC, err := injectedNewCometBinding(evmClient, evmCfg.CompoundV3CometUSDCAddress) // @review CometAddr will depend on stablecoin
 	if err != nil {
 		return cre.PromiseFromResult(0.0, fmt.Errorf("failed to create Comet binding for chain %s: %w", evmCfg.ChainName, err))
 	}

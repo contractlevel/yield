@@ -8,7 +8,7 @@ import (
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 )
 
-// FetchCalculateInterestRatesParams fetches all data needed to build CalculateInterestRatesParams
+// getCalculateInterestRatesParams fetches all data needed to build CalculateInterestRatesParams
 // for calling the strategy contract's CalculateInterestRates function.
 //
 // This function:
@@ -21,7 +21,7 @@ import (
 // liquidity internally as: unbacked + liquidityAdded - liquidityTaken.
 //
 // The liquidityAdded parameter is the deposit amount (0 for current APY, deposit amount for projected APY).
-func FetchCalculateInterestRatesParams(
+func getCalculateInterestRatesParams(
 	runtime cre.Runtime,
 	protocolDataProvider AaveProtocolDataProviderInterface,
 	reserveAddress common.Address,

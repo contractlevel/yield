@@ -44,7 +44,7 @@ func getProtocolDataProviderBinding(
 
 		// Create ProtocolDataProvider binding
 		// Note: .Hex() always returns valid hex, so binding creation will never fail
-		protocolDataProvider, err := NewAaveProtocolDataProviderBinding(evmClient, protocolDataProviderAddr.Hex())
+		protocolDataProvider, err := newAaveProtocolDataProviderBinding(evmClient, protocolDataProviderAddr.Hex())
 		return protocolDataProvider, err
 	})
 }
@@ -89,7 +89,7 @@ func getStrategyBinding(
 
 		// Create Strategy V2 binding
 		// Note: .Hex() always returns valid hex, so binding creation will never fail
-		strategyV2, err := NewDefaultReserveInterestRateStrategyV2Binding(evmClient, strategyAddr.Hex())
+		strategyV2, err := newDefaultReserveInterestRateStrategyV2Binding(evmClient, strategyAddr.Hex())
 		return strategyV2, err
 	})
 }

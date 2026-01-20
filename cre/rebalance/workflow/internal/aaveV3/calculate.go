@@ -7,8 +7,13 @@ import (
 
 	"rebalance/contracts/evm/src/generated/default_reserve_interest_rate_strategy_v2"
 
+	"rebalance/workflow/internal/constants"
+
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 )
+
+// Using Exp(10, 27) instead of hardcoded String
+var RAYBigInt = new(big.Int).Exp(big.NewInt(10), big.NewInt(27), nil)
 
 // CalculateAPYFromContract calculates APY using the contract's CalculateInterestRates function.
 // This is the preferred method as it uses the exact on-chain calculation logic.
@@ -27,9 +32,7 @@ import (
 // 2. Extracts liquidityRate (Arg0) which is the supply APR in RAY
 // 3. Converts APR (in RAY) to decimal ratio
 // 4. Converts APR to APY using discrete compounding: APY = (1 + APR/SECONDS_PER_YEAR)^SECONDS_PER_YEAR - 1
-
-// @review If needed, we can refactor to Promise-less execution
-func CalculateAPYFromContract(
+func calculateAPYFromContract(
 	runtime cre.Runtime,
 	strategyContract DefaultReserveInterestRateStrategyV2Interface,
 	params *CalculateInterestRatesParams,
@@ -114,11 +117,11 @@ func convertAPRToAPY(aprRat *big.Rat) (float64, error) {
 	}
 
 	// Calculate per-second rate: APR / SECONDS_PER_YEAR
-	perSecondRate := aprFloat / float64(SECONDS_PER_YEAR)
+	perSecondRate := aprFloat / float64(constants.SecondsPerYear)
 	onePlusRate := 1.0 + perSecondRate
 
 	// Calculate (1 + APR/SECONDS_PER_YEAR)^SECONDS_PER_YEAR
-	compounded := math.Pow(onePlusRate, float64(SECONDS_PER_YEAR))
+	compounded := math.Pow(onePlusRate, float64(constants.SecondsPerYear))
 
 	// Formula: APY = (1 + APR/SECONDS_PER_YEAR)^SECONDS_PER_YEAR - 1
 	// Subtract 1 to get APY
