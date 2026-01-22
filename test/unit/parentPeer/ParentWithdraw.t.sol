@@ -170,53 +170,6 @@ contract ParentWithdrawTest is BaseTest {
         );
     }
 
-    /// @notice Scenario: Withdraw made on Parent chain, where the Strategy is, and the Strategy Protocol is Aave
-    /// @notice but the withdrawal is sent to a different chain
-    function test_yield_parent_withdraw_strategyIsParent_aave_withdrawToDifferentChain() public {
-        /// @dev arrange
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
-        /// @dev sanity checks
-        uint256 expectedShareBalance = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
-        assertEq(baseShare.balanceOf(withdrawer), expectedShareBalance);
-        address aUsdc = _getATokenAddress(baseNetworkConfig.protocols.aavePoolAddressesProvider, address(baseUsdc));
-        assertApproxEqAbs(
-            IERC20(aUsdc).balanceOf(address(baseAaveV3Adapter)),
-            DEPOSIT_AMOUNT,
-            BALANCE_TOLERANCE,
-            "USDC balance should be approximately equal to deposit amount"
-        );
-
-        bytes memory encodedWithdrawChainSelector = abi.encode(optChainSelector);
-
-        /// @dev act
-        baseShare.transferAndCall(address(baseParentPeer), expectedShareBalance, encodedWithdrawChainSelector);
-        assertEq(baseShare.balanceOf(withdrawer), 0);
-        assertEq(baseShare.totalSupply(), 0);
-
-        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
-        /// @dev assert
-        assertApproxEqAbs(
-            optUsdc.balanceOf(withdrawer),
-            DEPOSIT_AMOUNT,
-            BALANCE_TOLERANCE,
-            "USDC balance should be approximately equal to deposit amount"
-        );
-    }
-
-    function test_yield_parent_onTokenTransfer_revertsWhen_withdrawChainNotAllowed() public {
-        /// @dev arrange
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
-        /// @dev sanity checks
-        uint256 expectedShareBalance = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
-        assertEq(baseShare.balanceOf(withdrawer), expectedShareBalance);
-
-        bytes memory invalidWithdrawChainSelector = abi.encode(1);
-
-        /// @dev act/assert
-        vm.expectRevert(abi.encodeWithSignature("YieldPeer__ChainNotAllowed(uint64)", uint64(1)));
-        baseShare.transferAndCall(address(baseParentPeer), expectedShareBalance, invalidWithdrawChainSelector);
-    }
-
     //----------------------------------------------------------//
     function test_withdrawIntegrity_multipleUsers() public {
         address user1 = makeAddr("user1");

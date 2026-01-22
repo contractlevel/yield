@@ -369,20 +369,6 @@ abstract contract YieldPeer is
         i_share.burn(amount);
     }
 
-    /// @notice Decodes the chain selector to withdraw USDC to from the data
-    /// @param data The data to decode
-    /// @return withdrawChainSelector The chain selector to withdraw USDC to
-    /// @dev Revert if the chain selector is not allowed
-    /// @dev If the data is empty, the withdrawn USDC will be sent back to the chain the withdrawal was initiated on
-    function _decodeWithdrawChainSelector(bytes calldata data) internal view returns (uint64 withdrawChainSelector) {
-        if (data.length > 0) {
-            withdrawChainSelector = abi.decode(data, (uint64));
-            if (!s_allowedChains[withdrawChainSelector]) revert YieldPeer__ChainNotAllowed(withdrawChainSelector);
-        } else {
-            withdrawChainSelector = i_thisChainSelector;
-        }
-    }
-
     /*//////////////////////////////////////////////////////////////
                              INTERNAL VIEW
     //////////////////////////////////////////////////////////////*/

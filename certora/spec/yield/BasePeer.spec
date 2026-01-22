@@ -541,29 +541,6 @@ rule onTokenTransfer_revertsWhen_zeroAmount() {
     assert lastReverted;
 }
 
-rule onTokenTransfer_revertsWhen_chainNotAllowed() {
-    /// @dev variables
-    env e;
-    address withdrawer;
-    uint256 shareBurnAmount;
-    uint64 chainSelector;
-    bytes encodedWithdrawChainSelector = encodeUint64(chainSelector);
-
-    /// @dev revert condition being verified
-    require !getAllowedChain(chainSelector) && chainSelector != getThisChainSelector(), 
-        "onTokenTransfer should revert when chain selector is not allowed";
-
-    /// @dev revert conditions not being verified
-    require e.msg.sender == currentContract.i_share, "msg.sender must be the share token";
-    require shareBurnAmount > 0, "shareBurnAmount must be greater than 0";
-    require e.msg.value == 0;
-    require !paused();
-
-    /// @dev action
-    onTokenTransfer@withrevert(e, withdrawer, shareBurnAmount, encodedWithdrawChainSelector); 
-    assert lastReverted;
-}
-
 rule onTokenTransfer_emits_WithdrawInitiated_and_SharesBurned() {
     env e;
     calldataarg args;
