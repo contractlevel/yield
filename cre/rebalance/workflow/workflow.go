@@ -21,7 +21,6 @@ import (
 // threshold is the minimum APY improvement (in the same units that
 // CalculateAPYForStrategy returns, e.g. 0.05 for 5% APY) required
 // before we rebalance.
-// @review check the units are actually returned as described above.
 // @review TODO: set a sensible threshold and determine scaling. 0.01 = 1 percentage point.
 const threshold = 0.01
 

@@ -252,6 +252,8 @@ https://docs.certora.com/en/latest/docs/user-guide/tutorials.html#stanford-defi-
 
 https://docs.certora.com/projects/tutorials/en/latest/ certora tutorials
 
+https://rasengansec.hashnode.dev/learning-certora-prover-part-1 4 part article series
+
 ## Mutation tests
 
 https://docs.certora.com/en/latest/docs/gambit/mutation-verifier.html

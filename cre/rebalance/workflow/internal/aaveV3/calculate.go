@@ -2,12 +2,12 @@ package aaveV3
 
 import (
 	"fmt"
-	"math"
 	"math/big"
 
 	"rebalance/contracts/evm/src/generated/default_reserve_interest_rate_strategy_v2"
 
 	"rebalance/workflow/internal/constants"
+	"rebalance/workflow/internal/helper"
 
 	"github.com/smartcontractkit/cre-sdk-go/cre"
 )
@@ -31,7 +31,7 @@ var RAYBigInt = new(big.Int).Exp(big.NewInt(10), big.NewInt(27), nil)
 // 1. Calls CalculateInterestRates on the contract (returns liquidityRate and variableBorrowRate in RAY)
 // 2. Extracts liquidityRate (Arg0) which is the supply APR in RAY
 // 3. Converts APR (in RAY) to decimal ratio
-// 4. Converts APR to APY using discrete compounding: APY = (1 + APR/SECONDS_PER_YEAR)^SECONDS_PER_YEAR - 1
+// 4. Converts APR to APY using discrete compounding via helper.APYFromPerSecondRate.
 func calculateAPYFromContract(
 	runtime cre.Runtime,
 	strategyContract DefaultReserveInterestRateStrategyV2Interface,
@@ -84,7 +84,7 @@ func calculateAPYFromContract(
 			new(big.Rat).SetInt(RAYBigInt),
 		)
 
-		// Convert APR to APY using discrete compounding: APY = (1 + APR/SECONDS_PER_YEAR)^SECONDS_PER_YEAR - 1
+		// Convert APR to APY using discrete compounding helper
 		apyFloat, err := convertAPRToAPY(aprRat)
 		if err != nil {
 			return 0.0, fmt.Errorf("failed to convert APR to APY: %w", err)
@@ -94,10 +94,10 @@ func calculateAPYFromContract(
 	})
 }
 
-// convertAPRToAPY converts APR to APY using discrete compounding.
-// Formula: APY = (1 + APR/SECONDS_PER_YEAR)^SECONDS_PER_YEAR - 1
-// This compounds interest per second over a year.
-// Returns float64
+// convertAPRToAPY converts APR (as a big.Rat in decimal form, e.g. 0.05 for 5%)
+// to APY using discrete compounding via helper.APYFromPerSecondRate.
+// Formula: perSecondRate = APR / SECONDS_PER_YEAR
+//          APY = (1 + perSecondRate)^SECONDS_PER_YEAR - 1
 func convertAPRToAPY(aprRat *big.Rat) (float64, error) {
 	// Validate input
 	if aprRat == nil {
@@ -116,16 +116,11 @@ func convertAPRToAPY(aprRat *big.Rat) (float64, error) {
 		return 0.0, fmt.Errorf("APR exceeds 1000%%: %v", aprFloat)
 	}
 
-	// Calculate per-second rate: APR / SECONDS_PER_YEAR
+	// Convert APR to per-second rate
 	perSecondRate := aprFloat / float64(constants.SecondsPerYear)
-	onePlusRate := 1.0 + perSecondRate
 
-	// Calculate (1 + APR/SECONDS_PER_YEAR)^SECONDS_PER_YEAR
-	compounded := math.Pow(onePlusRate, float64(constants.SecondsPerYear))
-
-	// Formula: APY = (1 + APR/SECONDS_PER_YEAR)^SECONDS_PER_YEAR - 1
-	// Subtract 1 to get APY
-	apyFloat := compounded - 1
+	// Delegate to shared helper
+	apyFloat := helper.APYFromPerSecondRate(perSecondRate)
 
 	return apyFloat, nil
 }

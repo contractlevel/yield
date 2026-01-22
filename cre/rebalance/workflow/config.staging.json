@@ -15,7 +15,7 @@
     {
       "chainName": "ethereum-mainnet",
       "chainSelector": 5009297550715157269,
-      "yieldPeerAddress": "0xd502ca09efeee0894bac57445717fa2a92d5125d",
+      "yieldPeerAddress": "0x3b827220209e553a54b16b329fb3501061512f8c",
       "rebalancerAddress": "0x6c29cb59da879a0ee0c785c590d5556967719d93",
       "gasLimit": 500000,
       "usdcAddress": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
@@ -25,7 +25,7 @@
     {
       "chainName": "ethereum-mainnet-base-1",
       "chainSelector": 15971525489660198786,
-      "yieldPeerAddress": "0xb6634570c72880fa159157bbfb3ced19701d0109",
+      "yieldPeerAddress": "0x14a1fee5dac2f2b5a13a305a46531328c9992b49",
       "rebalancerAddress": "0x6c29cb59da879a0ee0c785c590d5556967719d93",
       "gasLimit": 500000,
       "usdcAddress": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
@@ -35,7 +35,7 @@
     {
       "chainName": "ethereum-mainnet-arbitrum-1",
       "chainSelector": 4949039107694359620,
-      "yieldPeerAddress": "0x60a787ae1112b2aced6724a0a105a68da258acdd",
+      "yieldPeerAddress": "0xa775662f3faf8df2aa80c636cf0597971ddc6468",
       "rebalancerAddress": "0x6c29cb59da879a0ee0c785c590d5556967719d93",
       "gasLimit": 500000,
       "usdcAddress": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831",
@@ -45,7 +45,7 @@
     {
       "chainName": "ethereum-mainnet-optimism-1",
       "chainSelector": 3734403246176062136,
-      "yieldPeerAddress": "0x2a2842021613a9c5f9ceab8abfa4f390372938c5",
+      "yieldPeerAddress": "0xf22320abe1a9bfbd8aa87f62f81dd2b35eaed0a2",
       "rebalancerAddress": "0x6c29cb59da879a0ee0c785c590d5556967719d93",
       "gasLimit": 500000,
       "usdcAddress": "0x0b2C639c533813f4Aa9D7837CAf62653d097Ff85",
@@ -55,7 +55,7 @@
     {
       "chainName": "polygon-mainnet",
       "chainSelector": 4051577828743386545,
-      "yieldPeerAddress": "0x51d80a27491047e6509de389d7e183fec954913a",
+      "yieldPeerAddress": "0x14d3f9472953d52a88cca39243b05421dab18649",
       "rebalancerAddress": "0x6c29cb59da879a0ee0c785c590d5556967719d93",
       "gasLimit": 500000,
       "usdcAddress": "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",

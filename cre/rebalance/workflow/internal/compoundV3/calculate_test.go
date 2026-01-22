@@ -11,7 +11,7 @@ import (
 
 func Test_calculateAPYFromSupplyRate_Zero(t *testing.T) {
 	apy := calculateAPYFromSupplyRate(0)
-	require.Equal(t, 0.0, apy)
+	require.Equal(t, 0.0, apy, "zero supply rate should yield zero APY")
 }
 
 func Test_calculateAPYFromSupplyRate_PositiveMatchesFormula(t *testing.T) {
@@ -22,18 +22,18 @@ func Test_calculateAPYFromSupplyRate_PositiveMatchesFormula(t *testing.T) {
 	rPerSecond := targetSimple / float64(constants.SecondsPerYear)
 
 	// Convert to WAD-scaled per-second rate
-	supplyRateInWad := uint64(rPerSecond * float64(constants.WAD))
+	supplyRateInWad := uint64(rPerSecond * constants.WAD)
 
 	// Call function under test
 	apy := calculateAPYFromSupplyRate(supplyRateInWad)
 
-	// Expected value using the same documented formula:
-	// (1 + r)^secondsPerYear - 1, where r = supplyRateInWad / WAD.
-	rFromWad := float64(supplyRateInWad) / float64(constants.WAD)
-	expected := math.Exp(float64(constants.SecondsPerYear)*math.Log1p(rFromWad)) - 1
+	// Expected value using the SAME formula as implementation:
+	// APY = (1 + r)^secondsPerYear - 1, where r = supplyRateInWad / WAD.
+	rFromWad := float64(supplyRateInWad) / constants.WAD
+	expected := math.Pow(1.0+rFromWad, float64(constants.SecondsPerYear)) - 1
 
-	require.InEpsilon(t, expected, apy, 1e-12)
-	require.Greater(t, apy, 0.0)
+	require.InDelta(t, expected, apy, 1e-15, "APY should match discrete compounding formula")
+	require.Greater(t, apy, 0.0, "APY should be positive for positive rate")
 }
 
 func Test_calculateAPYFromSupplyRate_CompoundingBeatsSimpleRate(t *testing.T) {
@@ -41,15 +41,15 @@ func Test_calculateAPYFromSupplyRate_CompoundingBeatsSimpleRate(t *testing.T) {
 	targetSimple := 0.01 // 1% simple annual
 
 	rPerSecond := targetSimple / float64(constants.SecondsPerYear)
-	supplyRateInWad := uint64(rPerSecond * float64(constants.WAD))
+	supplyRateInWad := uint64(rPerSecond * constants.WAD)
 
 	apy := calculateAPYFromSupplyRate(supplyRateInWad)
 
 	// For a positive per-second rate, compounded APY should be > simple rate
-	require.Greater(t, apy, targetSimple)
+	require.Greater(t, apy, targetSimple, "compounded APY should exceed simple rate for positive r")
 
-	// But still in the same ballpark (within about 1% relative error)
-	require.InEpsilon(t, targetSimple, apy, 1e-2)
+	// And still be in the same ballpark (within about 1% relative error)
+	require.InEpsilon(t, targetSimple, apy, 1e-2, "compounded APY should be close to simple rate for small r")
 }
 
 func Test_calculateAPYFromSupplyRate_MonotonicIncreasing(t *testing.T) {
@@ -60,5 +60,5 @@ func Test_calculateAPYFromSupplyRate_MonotonicIncreasing(t *testing.T) {
 	apyLower := calculateAPYFromSupplyRate(lowerRate)
 	apyHigher := calculateAPYFromSupplyRate(higherRate)
 
-	require.Greater(t, apyHigher, apyLower)
+	require.Greater(t, apyHigher, apyLower, "APY should be monotonic in the supply rate")
 }
