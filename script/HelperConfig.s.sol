@@ -285,7 +285,7 @@ contract HelperConfig is Script {
                 aavePoolAddressesProvider: 0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb,
                 comet: 0x0000000000000000000000000000000000000000 // @review
             }),
-            cre: CREConfig({keystoneForwarder: 0x0000000000000000000000000000000000000000}),
+            cre: CREConfig({keystoneForwarder: 0xDc21E279934fF6721CaDfDD112DAfb3261f09A2C}), // @review simulation forwarder
             peers: PeersConfig({
                 localPeer: 0x0000000000000000000000000000000000000000,
                 localChainSelector: 0,

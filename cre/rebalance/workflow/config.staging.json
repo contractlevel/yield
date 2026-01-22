@@ -15,7 +15,7 @@
     {
       "chainName": "ethereum-mainnet",
       "chainSelector": 5009297550715157269,
-      "yieldPeerAddress": "0x3b827220209e553a54b16b329fb3501061512f8c",
+      "yieldPeerAddress": "0x1a31b818c79ed8d28bc15af0d5c8d2db584293fe",
       "rebalancerAddress": "0x6c29cb59da879a0ee0c785c590d5556967719d93",
       "gasLimit": 500000,
       "usdcAddress": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
