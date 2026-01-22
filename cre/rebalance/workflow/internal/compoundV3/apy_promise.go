@@ -27,8 +27,6 @@ import (
 //   - Promise of APY as float64 (e.g., 0.0523 = 5.23%)
 //   - Error will be returned when Promise is awaited if chain not found or APY calculation fails
 func GetAPYPromise(config *helper.Config, runtime cre.Runtime, liquidityAdded *big.Int, chainSelector uint64) cre.Promise[float64] {
-	logger := runtime.Logger()
-	logger.Info("COMPOUND V3: GetAPYPromise: Starting APY calculation")
 	// Find the chain config by chainSelector
 	evmCfg, err := helper.FindEvmConfigByChainSelector(config.Evms, chainSelector)
 	if err != nil {
