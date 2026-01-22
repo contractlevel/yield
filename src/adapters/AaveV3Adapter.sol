@@ -2,9 +2,9 @@
 pragma solidity 0.8.26;
 
 import {StrategyAdapter} from "../modules/StrategyAdapter.sol";
-import {IPoolAddressesProvider} from "@aave/core-v3/contracts/interfaces/IPoolAddressesProvider.sol";
-import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
-import {DataTypes} from "@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol";
+import {IPoolAddressesProvider} from "@aave/v3-origin/src/contracts/interfaces/IPoolAddressesProvider.sol";
+import {IPool} from "@aave/v3-origin/src/contracts/interfaces/IPool.sol";
+import {DataTypes} from "@aave/v3-origin/src/contracts/protocol/libraries/types/DataTypes.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /// @title AaveV3Adapter
@@ -77,7 +77,7 @@ contract AaveV3Adapter is StrategyAdapter {
     /// @return totalValue The total value of the USDC in the Aave V3 pool
     function getTotalValue(address usdc) external view returns (uint256 totalValue) {
         address aavePool = _getAavePool();
-        DataTypes.ReserveData memory reserveData = IPool(aavePool).getReserveData(usdc);
+        DataTypes.ReserveDataLegacy memory reserveData = IPool(aavePool).getReserveData(usdc);
         address aTokenAddress = reserveData.aTokenAddress;
         totalValue = IERC20(aTokenAddress).balanceOf(address(this));
     }

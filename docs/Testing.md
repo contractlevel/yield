@@ -43,6 +43,7 @@ forge test
   - [Mutation tests](#mutation-tests-2)
 - [Go the extra mile](#go-the-extra-mile)
 - [Golang](#golang)
+- [CRE](#cre)
 
 # Commands
 
@@ -251,6 +252,8 @@ https://docs.certora.com/en/latest/docs/user-guide/tutorials.html#stanford-defi-
 
 https://docs.certora.com/projects/tutorials/en/latest/ certora tutorials
 
+https://rasengansec.hashnode.dev/learning-certora-prover-part-1 4 part article series
+
 ## Mutation tests
 
 https://docs.certora.com/en/latest/docs/gambit/mutation-verifier.html
@@ -281,6 +284,10 @@ See coverage:
 
 `go tool cover -html=coverage.out`
 
+`go test -coverprofile=coverage.out ./internal/onchain` - for a specific package
+
+`go test -coverprofile=coverage.out ./workflow/internal/compoundV3` - for a specific package
+
 Run single test:
 
 `go test -run Test_funcName`
@@ -298,3 +305,42 @@ We name our tests like so `Test_group_funcName`
 Clean cache:
 
 `go clean -testcache`
+
+Integration tests:
+
+`go test -tags=integration .`
+
+Fuzz tests:
+
+`go test -v -fuzz FuzzTest_name`
+
+Formatting:
+
+`gofmt -w .`
+
+Static analysis:
+
+`go vet .`
+
+`golangci-lint run .`
+
+`gosec .`
+
+`govulncheck .`
+
+# CRE
+
+From project root:
+
+Fork mainnets and deploy infrastructure: 
+
+`bash ./script/bash/fork-and-deploy.sh`
+
+Kill anvil nodes:
+
+`bash ./script/bash/kill.sh`
+
+From `./cre/rebalance`:
+
+`cre workflow simulate workflow`
+

@@ -106,6 +106,8 @@ contract HelperConfig is Script {
         else if (block.chainid == 10) activeNetworkConfig = getOptimismConfig();
         else if (block.chainid == 42161) activeNetworkConfig = getArbitrumConfig();
         else if (block.chainid == 8453) activeNetworkConfig = getBaseConfig();
+        else if (block.chainid == 43114) activeNetworkConfig = getAvalancheConfig();
+        else if (block.chainid == 137) activeNetworkConfig = getPolygonConfig();
         else if (block.chainid == 11155111) activeNetworkConfig = getEthSepoliaConfig();
         else if (block.chainid == 84532) activeNetworkConfig = getBaseSepoliaConfig();
         else if (block.chainid == 43113) activeNetworkConfig = getAvalancheFujiConfig();
@@ -249,6 +251,76 @@ contract HelperConfig is Script {
                 comet: 0xb125E6687d4313864e53df431d5425969c15Eb2F
             }),
             cre: CREConfig({keystoneForwarder: 0xF8344CFd5c43616a4366C34E3EEE75af79a74482}),
+            peers: PeersConfig({
+                localPeer: 0x0000000000000000000000000000000000000000,
+                localChainSelector: 0,
+                remotePeers: new address[](0),
+                remoteChainSelectors: new uint64[](0),
+                localSharePool: 0x0000000000000000000000000000000000000000,
+                remoteSharePools: new address[](0),
+                localShare: 0x0000000000000000000000000000000000000000,
+                remoteShares: new address[](0)
+            })
+        });
+    }
+
+    function getAvalancheConfig() public pure returns (NetworkConfig memory) {
+        return NetworkConfig({
+            ccip: CCIPConfig({
+                ccipRouter: 0xF4c7E640EdA248ef95972845a62bdC74237805dB,
+                thisChainSelector: 6433500567565415381,
+                parentChainSelector: MAINNET_PARENT_CHAIN_SELECTOR,
+                rmnProxy: 0xcBD48A8eB077381c3c4Eb36b402d7283aB2b11Bc,
+                usdcTokenPool: 0x966519C334D895121B61584CAdeBc15571b62983,
+                cctpMessageTransmitter: 0x8186359aF5F57FbB40c6b14A588d2A59C0C29880,
+                tokenAdminRegistry: 0xc8df5D618c6a59Cc6A311E96a39450381001464F,
+                registryModuleOwnerCustom: 0x76Aa17dCda9E8529149E76e9ffaE4aD1C4AD701B
+            }),
+            tokens: TokensConfig({
+                link: 0x5947BB275c521040051D82396192181b413227A3,
+                usdc: 0xB97EF9Ef8734C71904D8002F8b6Bc66Dd9c48a6E,
+                share: address(0) // needs to be deployed
+            }),
+            protocols: ProtocolsConfig({
+                aavePoolAddressesProvider: 0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb,
+                comet: 0x0000000000000000000000000000000000000000 // @review
+            }),
+            cre: CREConfig({keystoneForwarder: 0x0000000000000000000000000000000000000000}),
+            peers: PeersConfig({
+                localPeer: 0x0000000000000000000000000000000000000000,
+                localChainSelector: 0,
+                remotePeers: new address[](0),
+                remoteChainSelectors: new uint64[](0),
+                localSharePool: 0x0000000000000000000000000000000000000000,
+                remoteSharePools: new address[](0),
+                localShare: 0x0000000000000000000000000000000000000000,
+                remoteShares: new address[](0)
+            })
+        });
+    }
+
+    function getPolygonConfig() public pure returns (NetworkConfig memory) {
+        return NetworkConfig({
+            ccip: CCIPConfig({
+                ccipRouter: 0x849c5ED5a80F5B408Dd4969b78c2C8fdf0565Bfe,
+                thisChainSelector: 4051577828743386545,
+                parentChainSelector: MAINNET_PARENT_CHAIN_SELECTOR,
+                rmnProxy: 0xf1ceAa46D8d13Cac9fC38aaEF3d3d14754C5A9c2,
+                usdcTokenPool: 0x60A97bd9ACf755954Ff0fE85837224f2920a57F3,
+                cctpMessageTransmitter: 0x81D40F21F12A8F0E3252Bccb954D722d4c464B64,
+                tokenAdminRegistry: 0x00F027eA6D0fb03256A15E9182B2B9227A4931d8,
+                registryModuleOwnerCustom: 0xc751E86208F0F8aF2d5CD0e29716cA7AD98B5eF5
+            }),
+            tokens: TokensConfig({
+                link: 0xb0897686c545045aFc77CF20eC7A532E3120E0F1,
+                usdc: 0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359,
+                share: address(0) // needs to be deployed
+            }),
+            protocols: ProtocolsConfig({
+                aavePoolAddressesProvider: 0xa97684ead0e402dC232d5A977953DF7ECBaB3CDb,
+                comet: 0xF25212E676D1F7F89Cd72fFEe66158f541246445
+            }),
+            cre: CREConfig({keystoneForwarder: 0x0000000000000000000000000000000000000000}),
             peers: PeersConfig({
                 localPeer: 0x0000000000000000000000000000000000000000,
                 localChainSelector: 0,

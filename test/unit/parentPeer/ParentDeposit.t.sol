@@ -2,8 +2,8 @@
 pragma solidity 0.8.26;
 
 import {BaseTest, IERC20, Vm, console2} from "../../BaseTest.t.sol";
-import {IPool} from "@aave/core-v3/contracts/interfaces/IPool.sol";
-import {DataTypes} from "@aave/core-v3/contracts/protocol/libraries/types/DataTypes.sol";
+import {IPool} from "@aave/v3-origin/src/contracts/interfaces/IPool.sol";
+import {DataTypes} from "@aave/v3-origin/src/contracts/protocol/libraries/types/DataTypes.sol";
 import {IComet} from "../../../src/interfaces/IComet.sol";
 import {IYieldPeer} from "../../../src/interfaces/IYieldPeer.sol";
 import {USDCTokenPool} from "@chainlink/contracts/src/v0.8/ccip/pools/USDC/USDCTokenPool.sol";

@@ -1,9 +1,0 @@
-{
-    "schedule": "0 */1 * * * *",
-    "evms": [
-        {
-            "simpleParentAddress": "0x660f8ab44263347c7704aDa8C016951ecf906A80",
-            "chainName": "ethereum-testnet-sepolia"
-        }
-    ]
-}
