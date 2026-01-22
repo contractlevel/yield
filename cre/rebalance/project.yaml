@@ -16,7 +16,6 @@
 # ==========================================================================
 staging-settings:
   rpcs:
-    # @review using mainnets or testnets for staging
     - chain-name: avalanche-mainnet
       url: http://127.0.0.1:8545
     - chain-name: ethereum-mainnet

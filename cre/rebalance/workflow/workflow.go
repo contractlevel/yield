@@ -80,7 +80,6 @@ func onCronTrigger(config *helper.Config, runtime cre.Runtime, trigger *cron.Pay
 	return onCronTriggerWithDeps(config, runtime, trigger, defaultOnCronDeps)
 }
 
-// @review logging or removing trigger
 func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *cron.Payload, deps OnCronDeps) (*StrategyResult, error) {
 	logger := runtime.Logger()
 

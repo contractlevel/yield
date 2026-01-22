@@ -5,6 +5,8 @@ import (
 	"rebalance/workflow/internal/helper"
 )
 
+const numberOfProtocols = 2 // @review this needs to be updated when new protocols are added
+
 var supportedStrategies []Strategy
 var initialized bool
 
@@ -17,8 +19,8 @@ func InitSupportedStrategies(cfg *helper.Config) error {
     }
     initialized = true
 
-    // 2 protocols right now; pre-allocate capacity for less GC.
-    supportedStrategies = make([]Strategy, 0, len(cfg.Evms)*2) // @review hardcoded number of protocols
+    // pre-allocate capacity for less GC.
+    supportedStrategies = make([]Strategy, 0, len(cfg.Evms)*numberOfProtocols)
 
     for _, evm := range cfg.Evms {
         if evm.AaveV3PoolAddressesProviderAddress != "" {

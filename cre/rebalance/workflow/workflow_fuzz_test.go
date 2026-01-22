@@ -28,7 +28,6 @@ const (
 	childYieldAddr      = "0xchild"
 )
 
-// @review should this move to the helper package?
 func newTestConfig() *helper.Config {
 	return &helper.Config{
 		Evms: []helper.EvmConfig{
