@@ -96,9 +96,9 @@ func getOptimalAndCurrentStrategyWithAPYWithDeps(
             return StrategyWithAPY{}, StrategyWithAPY{}, fmt.Errorf("calculate APY for strategy %+v: %w", strategy, err)
         }
 
-        // if apy == 0 {
-        //     return StrategyWithAPY{}, StrategyWithAPY{}, fmt.Errorf("0 APY returned for strategy %+v", strategy)
-        // }
+        if apy == 0 {
+            return StrategyWithAPY{}, StrategyWithAPY{}, fmt.Errorf("0 APY returned for strategy %+v", strategy)
+        }
         if math.IsNaN(apy) || math.IsInf(apy, 0) {
             return StrategyWithAPY{}, StrategyWithAPY{}, fmt.Errorf("invalid APY value (NaN/Inf) for protocolId %x: %v",
 			strategy.ProtocolId, apy)

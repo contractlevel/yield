@@ -55,11 +55,9 @@ type OnCronDeps struct {
 	NewRebalancerBinding                func(client *evm.Client, addr string) (onchain.RebalancerInterface, error)
 	ReadCurrentStrategy                 func(config *helper.Config, runtime cre.Runtime, peer onchain.ParentPeerInterface) (onchain.Strategy, error)
 	ReadTVL                             func(config *helper.Config, runtime cre.Runtime, peer onchain.YieldPeerInterface) (*big.Int, error)
-	WriteRebalance                      func(rb onchain.RebalancerInterface, runtime cre.Runtime, logger *slog.Logger, gasLimit uint64, optimal onchain.Strategy) error
+	WriteRebalance                      func(rb onchain.RebalancerInterface, runtime cre.Runtime, gasLimit uint64, optimal onchain.Strategy) error
 	GetOptimalAndCurrentStrategyWithAPY func(config *helper.Config, runtime cre.Runtime, currentStrategy onchain.Strategy, liquidityAdded *big.Int) (onchain.StrategyWithAPY, onchain.StrategyWithAPY, error)
 	InitSupportedStrategies             func(config *helper.Config) error
-	// GetOptimalStrategy func(config *helper.Config, runtime cre.Runtime) (onchain.Strategy, error)
-	// CalculateAPYForStrategy func(config *helper.Config, runtime cre.Runtime, strategy onchain.Strategy, liquidityAdded *big.Int) (float64, error)
 }
 
 // defaultOnCronDeps are the real onchain/offchain implementations.
@@ -72,8 +70,6 @@ var defaultOnCronDeps = OnCronDeps{
 	WriteRebalance:                      onchain.WriteRebalance,
 	GetOptimalAndCurrentStrategyWithAPY: onchain.GetOptimalAndCurrentStrategyWithAPY,
 	InitSupportedStrategies:             onchain.InitSupportedStrategies,
-	// GetOptimalStrategy:               offchain.GetOptimalStrategy,
-	// CalculateAPYForStrategy:          onchain.CalculateAPYForStrategy,
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -208,7 +204,7 @@ func onCronTriggerWithDeps(config *helper.Config, runtime cre.Runtime, trigger *
 		return nil, fmt.Errorf("failed to create parent Rebalancer binding: %w", err)
 	}
 
-	if err := deps.WriteRebalance(parentRebalancer, runtime, logger, rebalanceGasLimit, optimal.Strategy); err != nil {
+	if err := deps.WriteRebalance(parentRebalancer, runtime, rebalanceGasLimit, optimal.Strategy); err != nil {
 		return nil, fmt.Errorf("failed to rebalance: %w", err)
 	}
 

@@ -2,7 +2,6 @@ package onchain
 
 import (
 	"fmt"
-	"log/slog"
 
 	"rebalance/contracts/evm/src/generated/rebalancer"
 
@@ -13,7 +12,6 @@ import (
 func WriteRebalance(
 	rb RebalancerInterface,
 	runtime cre.Runtime,
-	logger *slog.Logger,
 	gasLimit uint64,
 	optimal Strategy,
 ) error {
@@ -29,6 +27,7 @@ func WriteRebalance(
 		return fmt.Errorf("failed to update strategy on Rebalancer: %w", err)
 	}
 
+	logger := runtime.Logger()
 	logger.Info(
 		"Rebalancer update transaction submitted",
 		"txHash", fmt.Sprintf("0x%x", resp.TxHash),

@@ -38,7 +38,6 @@ func (m *mockRebalancer) WriteReportFromIYieldPeerStrategy(
 
 func Test_WriteRebalance_success(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
-	logger := runtime.Logger()
 
 	gasLimit := uint64(500_000)
 	optimal := Strategy{
@@ -63,13 +62,12 @@ func Test_WriteRebalance_success(t *testing.T) {
 		},
 	}
 
-	err := WriteRebalance(mockRb, runtime, logger, gasLimit, optimal)
+	err := WriteRebalance(mockRb, runtime, gasLimit, optimal)
 	require.NoError(t, err, "WriteRebalance should not return error in success case")
 }
 
 func Test_WriteRebalance_error(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
-	logger := runtime.Logger()
 
 	gasLimit := uint64(500_000)
 	optimal := Strategy{
@@ -85,7 +83,7 @@ func Test_WriteRebalance_error(t *testing.T) {
 		},
 	}
 
-	err := WriteRebalance(mockRb, runtime, logger, gasLimit, optimal)
+	err := WriteRebalance(mockRb, runtime, gasLimit, optimal)
 	require.Error(t, err, "WriteRebalance should return error when underlying call fails")
 	require.ErrorIs(t, err, expectedError, "error should wrap the underlying transaction error")
 	require.Contains(t, err.Error(), "failed to update strategy on Rebalancer", "error message should include context")
@@ -93,7 +91,6 @@ func Test_WriteRebalance_error(t *testing.T) {
 
 func Test_WriteRebalance_withDifferentStrategy(t *testing.T) {
 	runtime := testutils.NewRuntime(t, nil)
-	logger := runtime.Logger()
 
 	gasLimit := uint64(1_000_000)
 
@@ -120,6 +117,6 @@ func Test_WriteRebalance_withDifferentStrategy(t *testing.T) {
 		},
 	}
 
-	err := WriteRebalance(mockRb, runtime, logger, gasLimit, optimal)
+	err := WriteRebalance(mockRb, runtime, gasLimit, optimal)
 	require.NoError(t, err, "WriteRebalance should succeed with different strategy values")
 }
