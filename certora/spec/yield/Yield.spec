@@ -345,21 +345,3 @@ rule withdrawFromStrategy_withdrawsFromStrategy(env e) {
     assert strategyAdapter == compoundV3Adapter => 
          compound.balanceOf(e, strategyAdapter) == compoundBalanceBefore - amount;
 }
-
-// --- decodeWithdrawChainSelector --- //
-rule decodeWithdrawChainSelector_revertsWhen_chainNotAllowed() {
-    env e;
-    uint64 chainSelector;
-    bytes data = encodeUint64(chainSelector);
-
-    require !getAllowedChain(chainSelector);
-
-    decodeWithdrawChainSelector@withrevert(e, data);
-    assert lastReverted;
-}
-
-rule decodeWithdrawChainSelector_returns_allowedChainSelector() {
-    env e;
-    calldataarg args;
-    assert getAllowedChain(decodeWithdrawChainSelector(e, args)) || decodeWithdrawChainSelector(e, args) == getThisChainSelector();
-}

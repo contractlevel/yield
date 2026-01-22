@@ -242,14 +242,12 @@ contract Handler is Test {
     /// @param addressSeed the seed used to create or get the withdrawer
     /// @notice If the withdrawer has no shares, the function will deposit some USDC to get shares
     /// @param shareBurnAmount the amount of shares to burn
-    /// @param initiateChainSelectorSeed the chain selector of the chain the withdrawal is initiated on
-    /// @param withdrawChainSelectorSeed the chain selector of the chain the withdrawal is received on
+    /// @param chainSelectorSeed the seed used to get the withdraw chain selector
     /// @param usdcDepositAmount the amount of USDC to deposit if the withdrawer has no shares
     function withdraw(
         uint256 addressSeed,
         uint256 shareBurnAmount,
-        uint256 initiateChainSelectorSeed,
-        uint256 withdrawChainSelectorSeed,
+        uint256 chainSelectorSeed,
         uint256 usdcDepositAmount
     ) public {
         /// @dev ensure the pools have enough liquidity
@@ -261,23 +259,21 @@ contract Handler is Test {
 
         /// @dev if the withdrawer has no shares, deposit some USDC to get shares
         if (withdrawerShareBalance == 0) {
-            withdrawer = deposit(true, addressSeed, usdcDepositAmount, initiateChainSelectorSeed);
+            withdrawer = deposit(true, addressSeed, usdcDepositAmount, chainSelectorSeed);
             withdrawerShareBalance = share.balanceOf(withdrawer);
         }
 
         /// @dev bind the fuzzed withdraw amount to the range of valid values
         shareBurnAmount = bound(shareBurnAmount, 1, withdrawerShareBalance);
         /// @dev bind the fuzzed chain selectors to the range of valid values
-        uint64 initiateChainSelector = uint64(bound(initiateChainSelectorSeed, 1, 3));
-        uint64 withdrawChainSelector = uint64(bound(withdrawChainSelectorSeed, 1, 3));
+        uint64 chainSelector = uint64(bound(chainSelectorSeed, 1, 3));
 
         vm.recordLogs();
 
         /// @dev withdraw the shares from the peer
-        address peer = chainSelectorsToPeers[initiateChainSelector];
-        bytes memory encodedWithdrawChainSelector = abi.encode(withdrawChainSelector);
+        address peer = chainSelectorsToPeers[chainSelector];
         _changePrank(withdrawer);
-        share.transferAndCall(peer, shareBurnAmount, encodedWithdrawChainSelector);
+        share.transferAndCall(peer, shareBurnAmount, "");
         console2.log("withdrawer:", withdrawer);
         console2.log("shareBurnAmount:", shareBurnAmount);
 

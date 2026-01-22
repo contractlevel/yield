@@ -125,15 +125,17 @@ contract ParentPeer is YieldPeer {
     /// @notice This function is used to withdraw USDC from the system
     /// @param withdrawer The address that transferred the YieldCoin to withdraw their USDC from the system
     /// @param shareBurnAmount The amount of YieldCoin transferred to be burned
-    /// @param encodedWithdrawChainSelector The encoded chain selector to withdraw USDC to. If this is empty, the withdrawn USDC will be sent back to this chain
-    /// @dev Revert if encodedWithdrawChainSelector doesn't decode to an allowed chain selector
     /// @dev Revert if msg.sender is not the YieldCoin/share token
     /// @dev Revert if shareBurnAmount is 0
     /// @dev Revert if peer is paused
     /// @dev Update s_totalShares and burn shares from msg.sender
     /// @dev Handle the case where the parent is the strategy
     /// @dev Handle the case where the parent is not the strategy
-    function onTokenTransfer(address withdrawer, uint256 shareBurnAmount, bytes calldata encodedWithdrawChainSelector)
+    function onTokenTransfer(
+        address withdrawer,
+        uint256 shareBurnAmount,
+        bytes calldata /* data */
+    )
         external
         override
         whenNotPaused
@@ -141,8 +143,6 @@ contract ParentPeer is YieldPeer {
         _revertIfMsgSenderIsNotShare();
 
         _revertIfZeroAmount(shareBurnAmount);
-
-        uint64 withdrawChainSelector = _decodeWithdrawChainSelector(encodedWithdrawChainSelector);
 
         /// @dev cache totalShares before updating
         uint256 totalShares = s_totalShares;
@@ -169,23 +169,14 @@ contract ParentPeer is YieldPeer {
             //slither-disable-next-line reentrancy-events
             if (usdcWithdrawAmount != 0) _withdrawFromStrategy(activeStrategyAdapter, usdcWithdrawAmount);
 
-            if (withdrawChainSelector == i_thisChainSelector) {
-                /// @dev we emit this event when we complete the withdrawal and transfer the stablecoin to the withdrawer
-                /// @dev it gets emitted in the WithdrawCallback too
-                emit WithdrawCompleted(withdrawer, usdcWithdrawAmount);
-                if (usdcWithdrawAmount != 0) _transferUsdcTo(withdrawer, usdcWithdrawAmount);
-            } else {
-                WithdrawData memory withdrawData =
-                    _buildWithdrawData(withdrawer, shareBurnAmount, withdrawChainSelector);
-                withdrawData.usdcWithdrawAmount = usdcWithdrawAmount;
-                _ccipSend(
-                    withdrawChainSelector, CcipTxType.WithdrawCallback, abi.encode(withdrawData), usdcWithdrawAmount
-                );
-            }
+            /// @dev we emit this event when we complete the withdrawal and transfer the stablecoin to the withdrawer
+            /// @dev it gets emitted in the WithdrawCallback too
+            emit WithdrawCompleted(withdrawer, usdcWithdrawAmount);
+            if (usdcWithdrawAmount != 0) _transferUsdcTo(withdrawer, usdcWithdrawAmount);
         }
         // 2. This Parent is not the Strategy. Therefore the shareBurnAmount is sent to the strategy and the USDC tokens usdcWithdrawAmount is sent back.
         else {
-            WithdrawData memory withdrawData = _buildWithdrawData(withdrawer, shareBurnAmount, withdrawChainSelector);
+            WithdrawData memory withdrawData = _buildWithdrawData(withdrawer, shareBurnAmount, i_thisChainSelector);
             withdrawData.totalShares = totalShares;
             _ccipSend(
                 strategy.chainSelector, CcipTxType.WithdrawToStrategy, abi.encode(withdrawData), ZERO_BRIDGE_AMOUNT
@@ -314,7 +305,6 @@ contract ParentPeer is YieldPeer {
 
     /// @notice This function handles a withdraw tx that initiated on another chain.
     /// If this Parent is the strategy, we withdraw and send the USDC back to the withdrawer
-    /// If this Parent is the strategy AND the withdrawer wants the USDC on this chain, we transfer it directly
     /// If this Parent is not the strategy, we forward the withdrawData to the strategy
     /// @dev Updates s_totalShares and emits ShareBurnUpdate
     /// @param data The encoded WithdrawData
@@ -343,18 +333,12 @@ contract ParentPeer is YieldPeer {
                 withdrawData.usdcWithdrawAmount =
                     _withdrawFromStrategyAndGetUsdcWithdrawAmount(activeStrategyAdapter, withdrawData);
 
-                if (withdrawData.chainSelector == i_thisChainSelector) {
-                    //slither-disable-next-line reentrancy-events
-                    emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
-                    _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
-                } else {
-                    _ccipSend(
-                        withdrawData.chainSelector,
-                        CcipTxType.WithdrawCallback,
-                        abi.encode(withdrawData),
-                        withdrawData.usdcWithdrawAmount
-                    );
-                }
+                _ccipSend(
+                    withdrawData.chainSelector,
+                    CcipTxType.WithdrawCallback,
+                    abi.encode(withdrawData),
+                    withdrawData.usdcWithdrawAmount
+                );
             } else {
                 emit WithdrawPingPongToChild(withdrawData.shareBurnAmount, withdrawData.chainSelector);
                 /// @dev Encode the updated withdrawData (with correct totalShares) instead of using stale encodedWithdrawData

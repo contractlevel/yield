@@ -47,10 +47,6 @@ contract YieldHarness is YieldPeer, HelperHarness {
     function withdrawFromStrategy(address strategyAdapter, uint256 amount) public {
         _withdrawFromStrategy(strategyAdapter, amount);
     }
-    
-    function decodeWithdrawChainSelector(bytes calldata data) public view returns (uint64) {
-        return _decodeWithdrawChainSelector(data);
-    }
 
     function calculateFee(uint256 stablecoinDepositAmount) public view returns (uint256) {
         return _calculateFee(stablecoinDepositAmount);
