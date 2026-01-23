@@ -184,6 +184,18 @@ contract ParentPeer is YieldPeer {
         }
     }
 
+    /// @notice Called by Rebalancer::_onReport after getting CRE report from Keystone Forwarder
+    /// @notice This function is called by the rebalancer to rebalance the strategy
+    /// @notice It updates state with the new strategy
+    /// @param newStrategy The new strategy to rebalance to
+    /// @dev Revert if msg.sender is not the rebalancer
+    function rebalance(Strategy calldata newStrategy) external {
+        if (msg.sender != s_rebalancer) revert ParentPeer__OnlyRebalancer();
+        Strategy memory oldStrategy = s_strategy;
+        _setStrategy(oldStrategy, newStrategy);
+        _rebalance(oldStrategy, newStrategy);
+    }
+
     /*//////////////////////////////////////////////////////////////
                                 INTERNAL
     //////////////////////////////////////////////////////////////*/
@@ -367,25 +379,28 @@ contract ParentPeer is YieldPeer {
         _handleCCIPWithdraw(s_strategy, withdrawData);
     }
 
-    /// @notice This function sets the strategy on the parent and triggers appropriate strategy change
-    /// @notice Called by Rebalancer::_onReport after getting CRE report from Keystone Forwarder
-    /// @notice Triggers appropriate strategy rebalance (local, parent to child, child to other)
-    /// @param chainSelector The chain selector of the new strategy
-    /// @param protocolId The protocol ID of the new strategy
-    function _setAndHandleStrategyChange(uint64 chainSelector, bytes32 protocolId) internal {
-        Strategy memory oldStrategy = s_strategy;
-        Strategy memory newStrategy = Strategy({chainSelector: chainSelector, protocolId: protocolId});
-
-        /// @dev Compare strategies and return early if optimal
-        if (oldStrategy.chainSelector == newStrategy.chainSelector && oldStrategy.protocolId == newStrategy.protocolId)
-        {
-            emit CurrentStrategyOptimal(newStrategy.chainSelector, newStrategy.protocolId);
-            return;
-        }
-
+    /// @dev Update Strategy state and emit StrategyUpdated event
+    /// @param oldStrategy The old strategy
+    /// @param newStrategy The new strategy
+    function _setStrategy(Strategy memory oldStrategy, Strategy calldata newStrategy) internal {
         /// @dev Update Strategy state and emit StrategyUpdated event
         s_strategy = newStrategy;
         emit StrategyUpdated(newStrategy.chainSelector, newStrategy.protocolId, oldStrategy.chainSelector);
+    }
+
+    /// @notice This function sets the strategy on the parent and triggers appropriate strategy change
+    /// @notice Called by Rebalancer::_onReport after getting CRE report from Keystone Forwarder
+    /// @notice Triggers appropriate strategy rebalance (local, parent to child, child to other)
+    /// @param oldStrategy The old strategy
+    /// @param newStrategy The new strategy
+    function _rebalance(Strategy memory oldStrategy, Strategy calldata newStrategy) internal {
+        /// @dev Compare strategies and return early if optimal
+        if (oldStrategy.chainSelector == newStrategy.chainSelector && oldStrategy.protocolId == newStrategy.protocolId)
+        {
+            // @review should we be reverting here?
+            emit CurrentStrategyOptimal(newStrategy.chainSelector, newStrategy.protocolId);
+            return;
+        }
 
         /// @dev Handle local strategy change on this parent chain
         if (newStrategy.chainSelector == i_thisChainSelector && oldStrategy.chainSelector == i_thisChainSelector) {
@@ -402,18 +417,20 @@ contract ParentPeer is YieldPeer {
     }
 
     /// @notice Handles strategy change when both old and new strategies are on this chain
+    /// @notice Called when the strategy is on this chain and is being rebalanced to another strategy on this chain
     /// @param newStrategy The new strategy
-    function _rebalanceParentToParent(Strategy memory newStrategy) internal {
+    function _rebalanceParentToParent(Strategy calldata newStrategy) internal {
         address oldActiveStrategyAdapter = _getActiveStrategyAdapter();
 
         address newActiveStrategyAdapter =
             _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
 
         uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, address(i_usdc));
-        if (totalValue != 0) _withdrawFromStrategy(oldActiveStrategyAdapter, totalValue);
-
-        //slither-disable-next-line reentrancy-events
-        _depositToStrategy(newActiveStrategyAdapter, totalValue);
+        if (totalValue != 0) {
+            _withdrawFromStrategy(oldActiveStrategyAdapter, totalValue);
+            //slither-disable-next-line reentrancy-events
+            _depositToStrategy(newActiveStrategyAdapter, totalValue);
+        }
     }
 
     /// @dev Handle moving strategy (both funds & new strategy info) from this parent chain to a child chain
@@ -461,20 +478,6 @@ contract ParentPeer is YieldPeer {
     /*//////////////////////////////////////////////////////////////
                                  SETTER
     //////////////////////////////////////////////////////////////*/
-    /// @notice Called by Rebalancer::_onReport when it gets a CRE report from a Keystone Forwarder
-    /// @notice _setAndHandleStrategyChange() will do the following:
-    /// @notice 1. Update the active s_strategy and emit StrategyUpdated() event
-    /// @notice 2. Trigger appropriate strategy change (local, parent to child, child to other)
-    /// @dev Revert if msg.sender is not the Rebalancer
-    /// @dev Set the strategy
-    /// @param chainSelector The chain selector of the new strategy
-    /// @param protocolId The protocol ID of the new strategy
-    // @review Do we want to make this Pausable?
-    function setStrategy(uint64 chainSelector, bytes32 protocolId) external {
-        if (msg.sender != s_rebalancer) revert ParentPeer__OnlyRebalancer();
-        _setAndHandleStrategyChange(chainSelector, protocolId);
-    }
-
     /// @notice Sets the initial active strategy
     /// @notice Can only be called once by the owner
     /// @notice This is needed because the strategy adapters are deployed separately from the parent peer

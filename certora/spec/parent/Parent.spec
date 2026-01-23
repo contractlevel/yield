@@ -798,53 +798,56 @@ rule handleCCIPWithdraw_forwardsToStrategy_and_emits_WithdrawPingPongToChild_whe
     assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;
 }
 
-// --- setStrategy --- //
-rule setStrategy_revertsWhen_notRebalancer() {
+// --- rebalance --- //
+rule rebalance_revertsWhen_notRebalancer() {
     env e;
     calldataarg args;
 
     require e.msg.sender != currentContract.s_rebalancer;
+    require e.msg.value == 0;
 
-    setStrategy@withrevert(e, args);
+    rebalance@withrevert(e, args);
     assert lastReverted;
 }
 
-rule setStrategy_emits_CurrentStrategyOptimal_when_currentStrategy_is_optimal() {
+rule rebalance_emits_CurrentStrategyOptimal_when_currentStrategy_is_optimal() {
     env e;
     uint64 chainSelector;
     bytes32 protocolId;
+    IYieldPeer.Strategy newStrategy = createStrategy(chainSelector, protocolId);
 
     IYieldPeer.Strategy oldStrategy = getStrategy();
 
     require oldStrategy.chainSelector == chainSelector && oldStrategy.protocolId == protocolId;
 
     require ghost_currentStrategyOptimal_eventCount == 0;
-    setStrategy(e, chainSelector, protocolId);
+    rebalance(e, newStrategy);
     assert ghost_currentStrategyOptimal_eventCount == 1;
     assert getStrategy() == oldStrategy;
 }
 
-rule setStrategy_updatesStrategy_when_newStrategy_is_different() {
+rule rebalance_updatesStrategy_when_newStrategy_is_different() {
     env e;
     uint64 chainSelector;
     bytes32 protocolId;
-
+    IYieldPeer.Strategy newStrategy = createStrategy(chainSelector, protocolId);
     IYieldPeer.Strategy oldStrategy = getStrategy();
 
     require oldStrategy.chainSelector != chainSelector || oldStrategy.protocolId != protocolId;
 
     require ghost_currentStrategyOptimal_eventCount == 0;
     require ghost_strategyUpdated_eventCount == 0;
-    setStrategy(e, chainSelector, protocolId);
+    rebalance(e, newStrategy);
     assert ghost_currentStrategyOptimal_eventCount == 0;
     assert ghost_strategyUpdated_eventCount == 1;
     assert getStrategy() != oldStrategy;
 }
 
-rule setStrategy_handles_rebalanceParentToParent() {
+rule rebalance_handles_rebalanceParentToParent() {
     env e;
     uint64 chainSelector;
     bytes32 protocolId;
+    IYieldPeer.Strategy newStrategy = createStrategy(chainSelector, protocolId);
     bytes32 aaveV3ProtocolId;
     bytes32 compoundV3ProtocolId;
 
@@ -887,7 +890,7 @@ rule setStrategy_handles_rebalanceParentToParent() {
     require newStrategyPoolBalanceBefore + totalValue <= max_uint256;
 
     /// @dev act
-    setStrategy(e, chainSelector, protocolId);
+    rebalance(e, newStrategy);
 
     /// @dev assert correct balance changes
     assert usdc.balanceOf(oldStrategyPool) == oldStrategyPoolBalanceBefore - totalValue;
@@ -895,7 +898,7 @@ rule setStrategy_handles_rebalanceParentToParent() {
 }
 
 // @review rule vacuous - was before too
-rule setStrategy_handles_rebalanceParentToChild() {
+rule rebalance_handles_rebalanceParentToChild() {
     env e;
     uint64 chainSelector;
     bytes32 protocolId;
@@ -914,7 +917,7 @@ rule setStrategy_handles_rebalanceParentToChild() {
     require usdc.balanceOf(currentContract) == 0;
 
     require ghost_ccipMessageSent_eventCount == 0;
-    setStrategy(e, newStrategy.chainSelector, newStrategy.protocolId);
+    rebalance(e, newStrategy);
     assert ghost_ccipMessageSent_eventCount == 1;
     assert ghost_ccipMessageSent_txType_emitted == 8; // RebalanceNewStrategy
     assert ghost_ccipMessageSent_bridgeAmount_emitted == totalValue;
@@ -922,7 +925,7 @@ rule setStrategy_handles_rebalanceParentToChild() {
     assert usdc.balanceOf(strategyPool) == strategyPoolBalanceBefore - totalValue;
 }
 
-rule setStrategy_handles_rebalanceChildToOther() {
+rule rebalance_handles_rebalanceChildToOther() {
     env e;
     uint64 chainSelector;
     bytes32 protocolId;
@@ -934,7 +937,7 @@ rule setStrategy_handles_rebalanceChildToOther() {
     IYieldPeer.Strategy newStrategy = createStrategy(chainSelector, protocolId);
 
     require ghost_ccipMessageSent_eventCount == 0;
-    setStrategy(e, newStrategy.chainSelector, newStrategy.protocolId);
+    rebalance(e, newStrategy);
     assert ghost_ccipMessageSent_eventCount == 1;
     assert ghost_ccipMessageSent_txType_emitted == 7; // RebalanceOldStrategy
     assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;

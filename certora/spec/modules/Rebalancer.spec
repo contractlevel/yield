@@ -35,6 +35,7 @@ methods {
     function _.transfer(address, uint256) external => DISPATCHER(true);
     function _.deposit(address, uint256) external => DISPATCHER(true);
     function _.getTotalValue(address) external => DISPATCHER(true);
+    function _.getStrategyAdapter(bytes32 protocolId) external => DISPATCHER(true);
 
     // Harness helper methods
     function bytes32ToAddress(bytes32) external returns (address) envfree;

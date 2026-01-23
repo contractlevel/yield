@@ -229,9 +229,11 @@ contract RebalanceTest is BaseTest {
         );
     }
 
-    function test_yield_parentPeer_setStrategy_revetsWhen_notRebalancer() public {
+    function test_yield_parentPeer_rebalance_revertsWhen_notRebalancer() public {
         _changePrank(holder);
         vm.expectRevert(abi.encodeWithSignature("ParentPeer__OnlyRebalancer()"));
-        baseParentPeer.setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
+        baseParentPeer.rebalance(
+            IYieldPeer.Strategy({chainSelector: baseChainSelector, protocolId: keccak256(abi.encodePacked("aave-v3"))})
+        );
     }
 }

@@ -155,8 +155,8 @@ hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
 /*//////////////////////////////////////////////////////////////
                              RULES
 //////////////////////////////////////////////////////////////*/
-// --- OnReport --- //
-rule OnReport_decodes_reportMetadata() {
+// --- onReport --- //
+rule onReport_decodes_reportMetadata() {
     env e;
     bytes report;
     bytes32 workflowId;
@@ -175,7 +175,7 @@ rule OnReport_decodes_reportMetadata() {
     assert ghost_onReportSecurityChecksPassed_emittedWorkflowName == workflowName;
 }
 
-rule OnReport_revertsWhen_notKeystoneForwarder() {
+rule onReport_revertsWhen_notKeystoneForwarder() {
     env e;
     calldataarg args;
 
@@ -186,7 +186,7 @@ rule OnReport_revertsWhen_notKeystoneForwarder() {
     assert lastReverted;
 }
 
-rule OnReport_revertsWhen_zeroMetadata() {
+rule onReport_revertsWhen_zeroMetadata() {
     env e;
     bytes report;
     bytes32 workflowId;
@@ -206,7 +206,7 @@ rule OnReport_revertsWhen_zeroMetadata() {
     assert lastReverted;
 }
 
-rule OnReport_revertsWhen_zeroWorkflowId() {
+rule onReport_revertsWhen_zeroWorkflowId() {
     env e;
     bytes report;
     bytes32 workflowId;
@@ -226,7 +226,7 @@ rule OnReport_revertsWhen_zeroWorkflowId() {
     assert lastReverted;
 }
 
-rule OnReport_revertsWhen_zeroWorkflowOwner() {
+rule onReport_revertsWhen_zeroWorkflowOwner() {
     env e;
     bytes report;
     bytes32 workflowId;
@@ -246,7 +246,7 @@ rule OnReport_revertsWhen_zeroWorkflowOwner() {
     assert lastReverted;
 }
 
-rule OnReport_revertsWhen_zeroWorkflowName() {
+rule onReport_revertsWhen_zeroWorkflowName() {
     env e;
     bytes report;
     bytes32 workflowId;
@@ -266,7 +266,7 @@ rule OnReport_revertsWhen_zeroWorkflowName() {
     assert lastReverted;
 }
 
-rule OnReport_revertsWhen_invalidWorkflowId() {
+rule onReport_revertsWhen_invalidWorkflowId() {
     env e;
     bytes report;
 
@@ -290,7 +290,7 @@ rule OnReport_revertsWhen_invalidWorkflowId() {
     assert lastReverted;
 }
 
-rule OnReport_revertsWhen_invalidWorkflowOwner() {
+rule onReport_revertsWhen_invalidWorkflowOwner() {
     env e;
     bytes report;
 
@@ -314,7 +314,7 @@ rule OnReport_revertsWhen_invalidWorkflowOwner() {
     assert lastReverted;
 }
 
-rule OnReport_revertsWhen_invalidWorkflowName() {
+rule onReport_revertsWhen_invalidWorkflowName() {
     env e;
     bytes report;
 
