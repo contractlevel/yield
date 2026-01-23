@@ -104,14 +104,14 @@ func getOptimalAndCurrentStrategyWithAPYWithDeps(
 			strategy.ProtocolId, apy)
         }
 
+        if sameStrategy(strategy, currentStrategy) {
+            currentAPY = apy
+        }
+
         if !bestSet || apy > bestAPY {
             bestAPY = apy
             bestStrategy = strategy
             bestSet = true
-        }
-
-        if sameStrategy(strategy, currentStrategy) {
-            currentAPY = apy
         }
 
         logger := runtime.Logger()
