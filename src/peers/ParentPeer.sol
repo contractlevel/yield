@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {YieldPeer, Client, IRouterClient, CCIPOperations, IERC20, SafeERC20, Roles} from "./YieldPeer.sol";
 
 /// @title YieldCoin ParentPeer
@@ -9,7 +11,7 @@ import {YieldPeer, Client, IRouterClient, CCIPOperations, IERC20, SafeERC20, Rol
 /// @notice This contract is deployed on only one chain
 /// @notice Users can deposit and withdraw USDC to/from the system via this contract
 /// @notice This contract tracks system wide state and acts as a system wide hub for forwarding CCIP messages to the Strategy
-contract ParentPeer is YieldPeer {
+contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS
     //////////////////////////////////////////////////////////////*/
@@ -25,18 +27,45 @@ contract ParentPeer is YieldPeer {
     error ParentPeer__InactiveStrategyAdapter();
 
     /*//////////////////////////////////////////////////////////////
-                               VARIABLES
+                           NAMESPACED STORAGE
     //////////////////////////////////////////////////////////////*/
-    /// @dev total share tokens (YieldCoin) minted across all chains
-    // @invariant s_totalShares == ghost_totalSharesMinted - ghost_totalSharesBurned
-    uint256 internal s_totalShares;
-    /// @dev The current strategy: chainSelector and protocol
-    Strategy internal s_strategy;
-    /// @dev This address handles automated CCIP rebalance calls with Log-trigger Automation, based on Function request callbacks
-    /// @notice See ./src/modules/Rebalancer.sol
-    address internal s_rebalancer;
-    /// @dev Whether the initial active strategy adapter has been set
-    bool internal s_initialActiveStrategySet;
+    /// @custom:storage-location erc7201:yieldcoin.storage.ParentPeer
+    struct ParentPeerStorage {
+        /// @dev total share tokens (YieldCoin) minted across all chains
+        // @invariant s_totalShares == ghost_totalSharesMinted - ghost_totalSharesBurned
+        uint256 s_totalShares;
+        /// @dev This address handles automated CCIP rebalance calls with Log-trigger Automation, based on Function request callbacks
+        /// @notice See ./src/modules/Rebalancer.sol
+        address s_rebalancer;
+        /// @dev Whether the initial active strategy adapter has been set
+        bool s_initialActiveStrategySet;
+    }
+
+    /// @custom:storage-location erc7201:yieldcoin.storage.StrategyStorage
+    struct StrategyStorage {
+        /// @dev The current strategy: chainSelector and protocol
+        Strategy s_strategy;
+    }
+
+    // keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.ParentPeer")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant ParentPeerStorageLocation =
+        0x603686382b15940b5fa7ef449162bde228a5948ce3b6bdf08bd833ec6ae79500; // @review double check the hash
+
+    // keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.StrategyStorage")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant StrategyStorageLocation =
+        0x5202e425b34b6c95645915a460de54125f03aa25697774e32ad8f29e0d7eab00; // @review double check the hash
+
+    function _getParentPeerStorage() private pure returns (ParentPeerStorage storage $) {
+        assembly {
+            $.slot := ParentPeerStorageLocation
+        }
+    }
+
+    function _getStrategyStorage() private pure returns (StrategyStorage storage $) {
+        assembly {
+            $.slot := StrategyStorageLocation
+        }
+    }
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -70,7 +99,29 @@ contract ParentPeer is YieldPeer {
     /// @param share The address of the share token native to this system that is minted in exchange for USDC deposits (YieldCoin)
     constructor(address ccipRouter, address link, uint64 thisChainSelector, address usdc, address share)
         YieldPeer(ccipRouter, link, thisChainSelector, usdc, share)
-    {}
+    {
+        _disableInitializers();
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                              INITIALIZER
+    //////////////////////////////////////////////////////////////*/
+    /// @notice Initializes the contract and its abstracts
+    /// @dev This replaces the logic that would normally be in a constructor for state variables
+    function initialize(address owner) external initializer {
+        // This sets up AccessControl, Pausable, and YieldFees
+        __YieldPeer_init(owner);
+        _grantRole(Roles.UPGRADER_ROLE, owner);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           UUPS AUTHORIZATION
+    //////////////////////////////////////////////////////////////*/
+    /// @notice Authorizes an upgrade to a new implementation
+    /// @param newImplementation The address of the new implementation
+    /// @dev Revert if msg.sender does not have UPGRADER_ROLE
+    /// @dev Required by UUPSUpgradeable
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(Roles.UPGRADER_ROLE) {}
 
     /*//////////////////////////////////////////////////////////////
                                 EXTERNAL
@@ -86,10 +137,15 @@ contract ParentPeer is YieldPeer {
         /// @dev takes a fee
         amountToDeposit = _initiateDeposit(amountToDeposit);
 
-        Strategy memory strategy = s_strategy;
+        /// @dev load StrategyStorage
+        StrategyStorage storage $ = _getStrategyStorage();
+        Strategy memory strategy = $.s_strategy;
 
         // 1. This Parent is the Strategy. Therefore the deposit is handled here and shares can be minted here.
         if (strategy.chainSelector == i_thisChainSelector) {
+            /// @dev load ParentPeerStorage
+            ParentPeerStorage storage p$ = _getParentPeerStorage(); // @review p$ because $ already declared earlier
+
             /// @dev cache active strategy adapter
             address activeStrategyAdapter = _getActiveStrategyAdapter();
             /// @dev this is for the edgecase activeStrategyAdapter hasn't been updated yet, even though Parent state says it is strategy,
@@ -103,8 +159,8 @@ contract ParentPeer is YieldPeer {
             uint256 shareMintAmount = _calculateMintAmount(totalValue, amountToDeposit);
 
             /// @dev update total shares (only once)
-            s_totalShares += shareMintAmount;
-            emit ShareMintUpdate(shareMintAmount, i_thisChainSelector, s_totalShares);
+            p$.s_totalShares += shareMintAmount;
+            emit ShareMintUpdate(shareMintAmount, i_thisChainSelector, p$.s_totalShares);
 
             /// @dev deposit to strategy
             //slither-disable-next-line reentrancy-events
@@ -144,16 +200,21 @@ contract ParentPeer is YieldPeer {
 
         _revertIfZeroAmount(shareBurnAmount);
 
+        /// @dev load StrategyStorage
+        StrategyStorage storage $ = _getStrategyStorage();
+        /// @dev load ParentPeerStorage
+        ParentPeerStorage storage p$ = _getParentPeerStorage();
+
         /// @dev cache totalShares before updating
-        uint256 totalShares = s_totalShares;
+        uint256 totalShares = p$.s_totalShares;
 
         /// @dev update s_totalShares and burn shares from msg.sender
-        s_totalShares -= shareBurnAmount;
+        p$.s_totalShares -= shareBurnAmount;
         emit ShareBurnUpdate(shareBurnAmount, i_thisChainSelector, totalShares - shareBurnAmount);
         emit WithdrawInitiated(withdrawer, shareBurnAmount, i_thisChainSelector);
         _burnShares(withdrawer, shareBurnAmount);
 
-        Strategy memory strategy = s_strategy;
+        Strategy memory strategy = $.s_strategy;
 
         // 1. This Parent is the Strategy. Therefore the usdcWithdrawAmount is calculated and withdrawal is handled here.
         if (strategy.chainSelector == i_thisChainSelector) {
@@ -225,8 +286,11 @@ contract ParentPeer is YieldPeer {
     function _handleCCIPDepositToParent(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory encodedDepositData)
         internal
     {
+        /// @dev load StrategyStorage
+        StrategyStorage storage $ = _getStrategyStorage();
+
         DepositData memory depositData = abi.decode(encodedDepositData, (DepositData));
-        Strategy memory strategy = s_strategy;
+        Strategy memory strategy = $.s_strategy;
 
         CCIPOperations._validateTokenAmounts(tokenAmounts, address(i_usdc), depositData.amount);
 
@@ -236,12 +300,15 @@ contract ParentPeer is YieldPeer {
             address activeStrategyAdapter = _getActiveStrategyAdapter();
 
             if (activeStrategyAdapter != address(0)) {
+                /// @dev load ParentPeerStorage
+                ParentPeerStorage storage p$ = _getParentPeerStorage();
+
                 /// @dev get total value from strategy and calculate share mint amount
                 depositData.totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, address(i_usdc));
                 depositData.shareMintAmount = _calculateMintAmount(depositData.totalValue, depositData.amount);
                 /// @dev update s_totalShares
-                s_totalShares += depositData.shareMintAmount;
-                emit ShareMintUpdate(depositData.shareMintAmount, depositData.chainSelector, s_totalShares);
+                p$.s_totalShares += depositData.shareMintAmount;
+                emit ShareMintUpdate(depositData.shareMintAmount, depositData.chainSelector, p$.s_totalShares);
                 /// @dev deposit to strategy
                 _depositToStrategy(activeStrategyAdapter, depositData.amount);
 
@@ -274,17 +341,20 @@ contract ParentPeer is YieldPeer {
     /// 2. Deposit was made on a child chain, so calculated shareMintAmount is passed to that child after getting totalValue from strategy
     /// @param data The encoded DepositData
     function _handleCCIPDepositCallbackParent(bytes memory data) internal {
+        /// @dev load ParentPeerStorage
+        ParentPeerStorage storage p$ = _getParentPeerStorage();
+
         /// @dev decode the deposit data and total value in the system
         DepositData memory depositData = _decodeDepositData(data);
 
         /// @dev calculate shareMintAmount based on depositData.totalValue and depositData.amount
         depositData.shareMintAmount = _calculateMintAmount(depositData.totalValue, depositData.amount);
         /// @dev update s_totalShares += shareMintAmount
-        s_totalShares += depositData.shareMintAmount;
+        p$.s_totalShares += depositData.shareMintAmount;
 
         /// @dev emit ShareMintUpdate to help track system wide mints for formal verification later
         /// @dev emitted regardless of if the mint happens on this parent or a child
-        emit ShareMintUpdate(depositData.shareMintAmount, depositData.chainSelector, s_totalShares);
+        emit ShareMintUpdate(depositData.shareMintAmount, depositData.chainSelector, p$.s_totalShares);
 
         /// @dev handle the case where the deposit was made on this parent chain
         if (depositData.chainSelector == i_thisChainSelector) {
@@ -310,15 +380,21 @@ contract ParentPeer is YieldPeer {
     /// @param data The encoded WithdrawData
     /// @param sourceChainSelector The chain selector of the chain where the withdraw originated from and shares were burned
     function _handleCCIPWithdrawToParent(bytes memory data, uint64 sourceChainSelector) internal {
+        /// @dev load StrategyStorage
+        StrategyStorage storage $ = _getStrategyStorage();
+
+        /// @dev load ParentPeerStorage
+        ParentPeerStorage storage p$ = _getParentPeerStorage();
+
         WithdrawData memory withdrawData = _decodeWithdrawData(data);
-        withdrawData.totalShares = s_totalShares;
-        s_totalShares -= withdrawData.shareBurnAmount;
+        withdrawData.totalShares = p$.s_totalShares;
+        p$.s_totalShares -= withdrawData.shareBurnAmount;
 
         emit ShareBurnUpdate(
             withdrawData.shareBurnAmount, sourceChainSelector, withdrawData.totalShares - withdrawData.shareBurnAmount
         );
 
-        _handleCCIPWithdraw(s_strategy, withdrawData);
+        _handleCCIPWithdraw($.s_strategy, withdrawData);
     }
 
     /// @notice This function handles the withdraw flow logic that is used by both _handleCCIPWithdrawToParent and _handleCCIPWithdrawPingPong
@@ -363,8 +439,9 @@ contract ParentPeer is YieldPeer {
     /// @notice Forwards withdraw to active strategy without updating state (already updated in original flow)
     /// @notice This only happens when parent is NOT the strategy (if parent were strategy, withdraw would complete in _handleCCIPWithdrawToParent)
     function _handleCCIPWithdrawPingPong(bytes memory data) internal {
+        StrategyStorage storage $ = _getStrategyStorage();
         WithdrawData memory withdrawData = _decodeWithdrawData(data);
-        _handleCCIPWithdraw(s_strategy, withdrawData);
+        _handleCCIPWithdraw($.s_strategy, withdrawData);
     }
 
     /// @notice This function sets the strategy on the parent and triggers appropriate strategy change
@@ -373,7 +450,10 @@ contract ParentPeer is YieldPeer {
     /// @param chainSelector The chain selector of the new strategy
     /// @param protocolId The protocol ID of the new strategy
     function _setAndHandleStrategyChange(uint64 chainSelector, bytes32 protocolId) internal {
-        Strategy memory oldStrategy = s_strategy;
+        /// @dev load StrategyStorage
+        StrategyStorage storage $ = _getStrategyStorage();
+
+        Strategy memory oldStrategy = $.s_strategy;
         Strategy memory newStrategy = Strategy({chainSelector: chainSelector, protocolId: protocolId});
 
         /// @dev Compare strategies and return early if optimal
@@ -384,7 +464,7 @@ contract ParentPeer is YieldPeer {
         }
 
         /// @dev Update Strategy state and emit StrategyUpdated event
-        s_strategy = newStrategy;
+        $.s_strategy = newStrategy;
         emit StrategyUpdated(newStrategy.chainSelector, newStrategy.protocolId, oldStrategy.chainSelector);
 
         /// @dev Handle local strategy change on this parent chain
@@ -447,7 +527,9 @@ contract ParentPeer is YieldPeer {
     /// @return shareMintAmount The amount of shares/YieldCoin to mint
     /// @notice Returns amount * (SHARE_DECIMALS / USDC_DECIMALS) if there are no shares minted yet
     function _calculateMintAmount(uint256 totalValue, uint256 amount) internal view returns (uint256 shareMintAmount) {
-        uint256 totalShares = s_totalShares;
+        /// @dev load ParentPeerStorage
+        ParentPeerStorage storage p$ = _getParentPeerStorage();
+        uint256 totalShares = p$.s_totalShares;
 
         if (totalShares != 0) {
             shareMintAmount = (_convertUsdcToShare(amount) * totalShares) / _convertUsdcToShare(totalValue);
@@ -471,7 +553,9 @@ contract ParentPeer is YieldPeer {
     /// @param protocolId The protocol ID of the new strategy
     // @review Do we want to make this Pausable?
     function setStrategy(uint64 chainSelector, bytes32 protocolId) external {
-        if (msg.sender != s_rebalancer) revert ParentPeer__OnlyRebalancer();
+        /// @dev load ParentPeerStorage
+        ParentPeerStorage storage p$ = _getParentPeerStorage();
+        if (msg.sender != p$.s_rebalancer) revert ParentPeer__OnlyRebalancer();
         _setAndHandleStrategyChange(chainSelector, protocolId);
     }
 
@@ -483,9 +567,14 @@ contract ParentPeer is YieldPeer {
     /// @dev Called in deploy script, immediately after deploying initial strategy adapters, and setting them in YieldPeer::setStrategyAdapter
     /// @param protocolId The protocol ID of the initial active strategy
     function setInitialActiveStrategy(bytes32 protocolId) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (s_initialActiveStrategySet) revert ParentPeer__InitialActiveStrategyAlreadySet();
-        s_initialActiveStrategySet = true;
-        s_strategy = Strategy({chainSelector: i_thisChainSelector, protocolId: protocolId});
+        /// @dev load StrategyStorage
+        StrategyStorage storage $ = _getStrategyStorage();
+        /// @dev load ParentPeerStorage
+        ParentPeerStorage storage p$ = _getParentPeerStorage();
+
+        if (p$.s_initialActiveStrategySet) revert ParentPeer__InitialActiveStrategyAlreadySet();
+        p$.s_initialActiveStrategySet = true;
+        $.s_strategy = Strategy({chainSelector: i_thisChainSelector, protocolId: protocolId});
         // @review unused-return, returns newActiveStrategyAdapter
         _updateActiveStrategyAdapter(i_thisChainSelector, protocolId);
     }
@@ -495,7 +584,10 @@ contract ParentPeer is YieldPeer {
     /// @param rebalancer The address of the rebalancer
     //slither-disable-next-line missing-zero-check
     function setRebalancer(address rebalancer) external onlyRole(Roles.CONFIG_ADMIN_ROLE) {
-        s_rebalancer = rebalancer;
+        /// @dev load ParentPeerStorage
+        ParentPeerStorage storage p$ = _getParentPeerStorage();
+
+        p$.s_rebalancer = rebalancer;
         emit RebalancerSet(rebalancer);
     }
 
@@ -505,18 +597,24 @@ contract ParentPeer is YieldPeer {
     /// @notice Get the current strategy
     /// @return strategy The current strategy - chainSelector and protocol
     function getStrategy() external view returns (Strategy memory) {
-        return s_strategy;
+        /// @dev load StrategyStorage
+        StrategyStorage storage $ = _getStrategyStorage();
+        return $.s_strategy;
     }
 
     /// @notice Get the total shares minted across all chains
     /// @return totalShares The total shares minted across all chains
     function getTotalShares() external view returns (uint256) {
-        return s_totalShares;
+        /// @dev load ParentPeerStorage
+        ParentPeerStorage storage p$ = _getParentPeerStorage();
+        return p$.s_totalShares;
     }
 
     /// @notice Get the current rebalancer
     /// @return rebalancer The current rebalancer
     function getRebalancer() external view returns (address) {
-        return s_rebalancer;
+        /// @dev load ParentPeerStorage
+        ParentPeerStorage storage p$ = _getParentPeerStorage();
+        return p$.s_rebalancer;
     }
 }

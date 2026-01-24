@@ -2,18 +2,21 @@
 pragma solidity 0.8.26;
 
 import {
-    AccessControlDefaultAdminRules
-} from "@openzeppelin/contracts/access/extensions/AccessControlDefaultAdminRules.sol";
+    AccessControlDefaultAdminRulesUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
+
 import {IAccessControlEnumerable} from "@openzeppelin/contracts/access/extensions/IAccessControlEnumerable.sol";
-import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {IPausable} from "src/interfaces/IPausable.sol";
 import {Roles} from "src/libraries/Roles.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 /// @notice Abstract base contract that enables pausing and access control functionality.
 abstract contract PausableWithAccessControl is
-    Pausable,
-    AccessControlDefaultAdminRules,
+    Initializable,
+    PausableUpgradeable,
+    AccessControlDefaultAdminRulesUpgradeable,
     IPausable,
     IAccessControlEnumerable
 {
@@ -26,17 +29,38 @@ abstract contract PausableWithAccessControl is
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
     /// @notice The initial delay for transferring the admin role
-    uint48 internal constant INITIAL_DEFAULT_ADMIN_ROLE_TRANSFER_DELAY = 259200 seconds; // 3 days
-
-    /// @notice The set of members in each role
-    mapping(bytes32 role => EnumerableSet.AddressSet) private s_roleMembers;
+    uint48 internal constant INITIAL_DEFAULT_ADMIN_ROLE_TRANSFER_DELAY = 259200 seconds; // 3 days // @review do we want another time delay later?
 
     /*//////////////////////////////////////////////////////////////
-                              CONSTRUCTOR
+                           NAMESPACED STORAGE
     //////////////////////////////////////////////////////////////*/
-    constructor(address admin) AccessControlDefaultAdminRules(INITIAL_DEFAULT_ADMIN_ROLE_TRANSFER_DELAY, admin) {}
+    /// @custom:storage-location erc7201:yieldcoin.storage.PausableWithAccessControl
+    struct PausableWithAccessControlStorage {
+        /// @notice The set of members in each role
+        mapping(bytes32 role => EnumerableSet.AddressSet) s_roleMembers;
+    }
+
+    // keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.PausableWithAccessControl")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant PausableWithAccessControlStorageLocation =
+        0xf31030139dc5ab9c02ef44394b5ae7391974390930648b2264297c3b013d0e00;
+
+    function _getPausableWithAccessControlStorage() private pure returns (PausableWithAccessControlStorage storage $) {
+        assembly {
+            $.slot := PausableWithAccessControlStorageLocation
+        }
+    }
 
     /*//////////////////////////////////////////////////////////////
+                              INITIALIZER
+    //////////////////////////////////////////////////////////////*/
+    // Replaces the constructor.
+    // Uses 'onlyInitializing' because this is an abstract parent contract.
+    function __PausableWithAccessControl_init(address owner) internal onlyInitializing {
+        __Pausable_init();
+        __AccessControlDefaultAdminRules_init(INITIAL_DEFAULT_ADMIN_ROLE_TRANSFER_DELAY, owner);
+    }
+
+    /*/////////////////////////////////////////////////////////////
                                 EXTERNAL
     //////////////////////////////////////////////////////////////*/
     /// @notice This function pauses the contract
@@ -56,44 +80,50 @@ abstract contract PausableWithAccessControl is
     /*//////////////////////////////////////////////////////////////
                                 INTERNAL
     //////////////////////////////////////////////////////////////*/
-    /// @inheritdoc AccessControlDefaultAdminRules
+    /// @inheritdoc AccessControlDefaultAdminRulesUpgradeable
     function _grantRole(bytes32 role, address account) internal virtual override returns (bool granted) {
         granted = super._grantRole(role, account);
-        // @review unused-return, add() returns bool
-        // slither . --filter-path lib
-        if (granted) s_roleMembers[role].add(account);
+        if (granted) {
+            // Access storage via the accessor function
+            PausableWithAccessControlStorage storage $ = _getPausableWithAccessControlStorage();
+            $.s_roleMembers[role].add(account);
+        }
     }
 
-    /// @inheritdoc AccessControlDefaultAdminRules
+    /// @inheritdoc AccessControlDefaultAdminRulesUpgradeable
     function _revokeRole(bytes32 role, address account) internal virtual override returns (bool revoked) {
         revoked = super._revokeRole(role, account);
-        // @review unused-return, remove() returns bool
-        // slither . --filter-path lib
-        if (revoked) s_roleMembers[role].remove(account);
+        if (revoked) {
+            PausableWithAccessControlStorage storage $ = _getPausableWithAccessControlStorage();
+            $.s_roleMembers[role].remove(account);
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
                                  GETTER
     //////////////////////////////////////////////////////////////*/
-    /// @inheritdoc AccessControlDefaultAdminRules
+    // @inheritdoc AccessControlDefaultAdminRulesUpgradeable
     function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {
         return interfaceId == type(IAccessControlEnumerable).interfaceId || super.supportsInterface(interfaceId);
     }
 
     /// @inheritdoc IAccessControlEnumerable
     function getRoleMember(bytes32 role, uint256 index) external view override returns (address roleMember) {
-        roleMember = s_roleMembers[role].at(index);
+        PausableWithAccessControlStorage storage $ = _getPausableWithAccessControlStorage();
+        roleMember = $.s_roleMembers[role].at(index);
     }
 
     /// @inheritdoc IAccessControlEnumerable
     function getRoleMemberCount(bytes32 role) external view override returns (uint256 roleMemberCount) {
-        roleMemberCount = s_roleMembers[role].length();
+        PausableWithAccessControlStorage storage $ = _getPausableWithAccessControlStorage();
+        roleMemberCount = $.s_roleMembers[role].length();
     }
 
     /// @notice This function returns the members of a role
     /// @param role The role to get the members of
     /// @return roleMembers members of the role
     function getRoleMembers(bytes32 role) public view virtual returns (address[] memory roleMembers) {
-        roleMembers = s_roleMembers[role].values();
+        PausableWithAccessControlStorage storage $ = _getPausableWithAccessControlStorage();
+        roleMembers = $.s_roleMembers[role].values();
     }
 }

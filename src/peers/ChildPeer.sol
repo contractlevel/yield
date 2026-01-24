@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {YieldPeer, Client, IRouterClient, CCIPOperations} from "./YieldPeer.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {YieldPeer, Client, IRouterClient, CCIPOperations, Roles} from "./YieldPeer.sol";
 
 /// @title CLY ChildPeer
 /// @author @contractlevel
 /// @notice This contract is a ChildPeer of the Contract Level Yield system
 /// @notice This contract is deployed on every chain in the system except for the one the ParentPeer is deployed on
 /// @notice Users can deposit and withdraw USDC to/from the system via this contract
-contract ChildPeer is YieldPeer {
+contract ChildPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
@@ -40,7 +42,31 @@ contract ChildPeer is YieldPeer {
         uint64 parentChainSelector
     ) YieldPeer(ccipRouter, link, thisChainSelector, usdc, share) {
         i_parentChainSelector = parentChainSelector;
+
+        // 2. LOCK THE IMPLEMENTATION
+        // This prevents the implementation contract from being initialized directly.
+        _disableInitializers();
     }
+
+    /*//////////////////////////////////////////////////////////////
+                              INITIALIZER
+    //////////////////////////////////////////////////////////////*/
+    /// @notice Initializes the contract and its abstracts
+    /// @dev This replaces the logic that would normally be in a constructor for state variables
+    function initialize(address owner) external initializer {
+        // This sets up AccessControl, Pausable, and YieldFees
+        __YieldPeer_init(owner);
+        _grantRole(Roles.UPGRADER_ROLE, owner);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                           UUPS AUTHORIZATION
+    //////////////////////////////////////////////////////////////*/
+    /// @notice Authorizes an upgrade to a new implementation
+    /// @param newImplementation The address of the new implementation
+    /// @dev Revert if msg.sender does not have UPGRADER_ROLE
+    /// @dev Required by UUPSUpgradeable
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(Roles.UPGRADER_ROLE) {}
 
     /*//////////////////////////////////////////////////////////////
                                 EXTERNAL

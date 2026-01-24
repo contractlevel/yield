@@ -127,6 +127,9 @@ contract BaseTest is Test {
     bool internal constant SET_CROSS_CHAIN = true;
     bool internal constant NO_CROSS_CHAIN = false;
 
+    // Add this constant at the top of BaseTest
+    bytes32 internal constant IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+
     /*//////////////////////////////////////////////////////////////
                                  SETUP
     //////////////////////////////////////////////////////////////*/
@@ -167,6 +170,10 @@ contract BaseTest is Test {
         vm.makePersistent(address(baseParentPeer));
         vm.makePersistent(address(baseRebalancer));
 
+        // 2. NEW: Persist the hidden Implementation
+        address baseImpl = address(uint160(uint256(vm.load(address(baseDeploy.parentPeer), IMPLEMENTATION_SLOT))));
+        vm.makePersistent(baseImpl);
+
         baseNetworkConfig = baseConfig.getActiveNetworkConfig();
         baseChainSelector = baseNetworkConfig.ccip.thisChainSelector;
         baseUsdc = ERC20(baseNetworkConfig.tokens.usdc);
@@ -178,11 +185,18 @@ contract BaseTest is Test {
         assertEq(block.chainid, OPTIMISM_MAINNET_CHAIN_ID);
 
         DeployChild optDeployChild = new DeployChild();
-        (optShare, optSharePool, optChildPeer, optConfig, optStrategyRegistry, optAaveV3Adapter, optCompoundV3Adapter) =
-            optDeployChild.run();
+        DeployChild.ChildDeploymentConfig memory optDeploy = optDeployChild.run();
+        optShare = optDeploy.share;
+        optSharePool = optDeploy.sharePool;
+        optChildPeer = optDeploy.childPeer;
+        optConfig = optDeploy.config;
+        optStrategyRegistry = optDeploy.strategyRegistry;
+        optAaveV3Adapter = optDeploy.aaveV3Adapter;
+        optCompoundV3Adapter = optDeploy.compoundV3Adapter;
         vm.makePersistent(address(optShare));
         vm.makePersistent(address(optSharePool));
         vm.makePersistent(address(optChildPeer));
+        vm.makePersistent(optDeploy.childPeerImpl);
 
         optNetworkConfig = optConfig.getActiveNetworkConfig();
         optChainSelector = optNetworkConfig.ccip.thisChainSelector;
@@ -195,11 +209,18 @@ contract BaseTest is Test {
         assertEq(block.chainid, ETHEREUM_MAINNET_CHAIN_ID);
 
         DeployChild ethDeployChild = new DeployChild();
-        (ethShare, ethSharePool, ethChildPeer, ethConfig, ethStrategyRegistry, ethAaveV3Adapter, ethCompoundV3Adapter) =
-            ethDeployChild.run();
+        DeployChild.ChildDeploymentConfig memory ethDeploy = ethDeployChild.run();
+        ethShare = ethDeploy.share;
+        ethSharePool = ethDeploy.sharePool;
+        ethChildPeer = ethDeploy.childPeer;
+        ethConfig = ethDeploy.config;
+        ethStrategyRegistry = ethDeploy.strategyRegistry;
+        ethAaveV3Adapter = ethDeploy.aaveV3Adapter;
+        ethCompoundV3Adapter = ethDeploy.compoundV3Adapter;
         vm.makePersistent(address(ethShare));
         vm.makePersistent(address(ethSharePool));
         vm.makePersistent(address(ethChildPeer));
+        vm.makePersistent(ethDeploy.childPeerImpl);
 
         ethNetworkConfig = ethConfig.getActiveNetworkConfig();
         ethChainSelector = ethNetworkConfig.ccip.thisChainSelector;

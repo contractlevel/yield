@@ -17,12 +17,14 @@ import {IYieldPeer} from "../../src/interfaces/IYieldPeer.sol";
 import {StrategyRegistry} from "../../src/modules/StrategyRegistry.sol";
 import {Roles} from "../../src/libraries/Roles.sol";
 import {console2} from "forge-std/console2.sol";
+import {ParentProxy} from "../../src/proxies/ParentProxy.sol";
 
 contract DeployParent is Script {
     struct DeploymentConfig {
         Share share;
         SharePool sharePool;
-        ParentPeer parentPeer;
+        ParentPeer parentPeer; // parent peer interfaced through proxy
+        address parentPeerImpl;
         Rebalancer rebalancer;
         HelperConfig config;
         StrategyRegistry strategyRegistry;
@@ -50,13 +52,27 @@ contract DeployParent is Script {
             .setPool(address(deploy.share), address(deploy.sharePool));
 
         deploy.rebalancer = new Rebalancer();
-        deploy.parentPeer = new ParentPeer(
+
+        // 1 - deploy parent impl
+        ParentPeer parentPeerImpl = new ParentPeer(
             networkConfig.ccip.ccipRouter,
             networkConfig.tokens.link,
             networkConfig.ccip.thisChainSelector,
             networkConfig.tokens.usdc,
             address(deploy.share)
         );
+
+        // 2 - make init data
+        bytes memory parentInitData = abi.encodeWithSelector(ParentPeer.initialize.selector, tx.origin);
+        /// @dev tx.origin is used to send the "deployer" into intialize and set owner
+
+        // 3 - deploy parent proxy
+        ParentProxy parentProxy = new ParentProxy(address(parentPeerImpl), parentInitData);
+
+        // 4 - set parent peer interfaced through proxy
+        deploy.parentPeer = ParentPeer(address(parentProxy));
+
+        deploy.parentPeerImpl = address(parentPeerImpl);
 
         deploy.share.grantMintAndBurnRoles(address(deploy.sharePool));
         deploy.share.grantMintAndBurnRoles(address(deploy.parentPeer));
