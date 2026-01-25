@@ -225,9 +225,7 @@ contract ParentWithdrawTest is BaseTest {
 
     /// @notice Withdraw Scenario: Withdraw on Parent, TVL in transit
     function test_yield_parent_withdraw_revertsWhen_strategyPointsToParent_butActiveAdapterIsZero() public {
-        /// @dev Arrange: Set strategy to parent with Aave and make a deposit first
-        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")), SET_CROSS_CHAIN);
-        _selectFork(baseFork);
+        /// @dev Arrange: Strategy is on parent with Aave and make a deposit first
         _changePrank(withdrawer);
         baseParentPeer.deposit(DEPOSIT_AMOUNT);
 

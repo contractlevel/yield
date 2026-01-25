@@ -23,7 +23,6 @@ contract ChildWithdrawPingPongTest is BaseTest {
     /// @notice Scenario: Withdrawal is initiated from a child chain, StrategyAdapter == 0 in ChildPeer, Withdrawal is forwarded to Parent, s_strategy on Parent points at Child chain, ping-pongs back to Child chain, Withdrawal ping-pongs back to Parent -> Child, Withdrawal is completed
     function test_yield_child_withdraw_pingpong_twoChains_aave() public {
         /// arrange for initial deposit setup, strategy is on Parent for deposit
-        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")), NO_CROSS_CHAIN);
         _selectFork(baseFork);
         _changePrank(withdrawer);
 

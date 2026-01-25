@@ -137,6 +137,8 @@ contract Invariant is StdInvariant, BaseTest {
         /// @dev temp config admin role granted to deployer/owner to set necessary configs
         parent.grantRole(Roles.CONFIG_ADMIN_ROLE, parent.owner());
         parent.setRebalancer(address(rebalancer));
+        parent.setSupportedProtocol(keccak256(abi.encodePacked("aave-v3")), true);
+        parent.setSupportedProtocol(keccak256(abi.encodePacked("compound-v3")), true);
         _changePrank(rebalancer.owner());
         rebalancer.setParentPeer(address(parent));
         _stopPrank();
@@ -149,9 +151,7 @@ contract Invariant is StdInvariant, BaseTest {
         strategyRegistryParent.setStrategyAdapter(
             keccak256(abi.encodePacked("compound-v3")), address(compoundV3AdapterParent)
         );
-        _changePrank(rebalancer.owner());
-        rebalancer.setStrategyRegistry(address(strategyRegistryParent));
-        _stopPrank();
+
         parent.setStrategyRegistry(address(strategyRegistryParent));
         parent.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")));
         parent.revokeRole(Roles.CONFIG_ADMIN_ROLE, parent.owner());

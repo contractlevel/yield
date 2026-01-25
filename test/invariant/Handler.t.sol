@@ -287,7 +287,6 @@ contract Handler is Test {
     /// @param protocolIdSeed the seed used to set the protocol id in the report
     function onReport(uint256 chainSelectorSeed, uint256 protocolIdSeed) public {
         /// @dev ensure the pools have enough liquidity
-        // uint256 totalValue =
         _dealPoolsUsdc();
 
         /// @dev bind the chain selector and protocol enum to the range of valid values
@@ -298,9 +297,13 @@ contract Handler is Test {
 
         /// @dev workflow report setup
         bytes memory report = WorkflowHelpers.createWorkflowReport(chainSelector, protocolId);
+        IYieldPeer.Strategy memory currentStrategy = parent.getStrategy();
+        if (currentStrategy.chainSelector == chainSelector && currentStrategy.protocolId == protocolId) {
+            return; // @review wasted run
+        }
 
         /// @dev simulate the passing of time
-        /// @notice we are simulating time based automation triggering once per day
+        /// @notice we are simulating CRE workflow triggering once per day
         vm.warp(block.timestamp + 1 days);
 
         /// @dev store previous(current) strategy before onReport changes it

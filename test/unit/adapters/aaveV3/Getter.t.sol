@@ -10,4 +10,9 @@ contract GetStrategyPoolTest is BaseTest {
         address aavePool = IPoolAddressesProvider(aavePoolAddressesProvider).getPool();
         assertEq(baseAaveV3Adapter.getStrategyPool(), aavePool);
     }
+
+    function test_yield_aaveV3Adapter_getPoolAddressesProvider_success() public view {
+        address aavePoolAddressesProvider = baseNetworkConfig.protocols.aavePoolAddressesProvider;
+        assertEq(baseAaveV3Adapter.getPoolAddressesProvider(), aavePoolAddressesProvider);
+    }
 }

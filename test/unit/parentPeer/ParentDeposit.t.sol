@@ -254,8 +254,6 @@ contract ParentDepositTest is BaseTest {
     /// 2. But activeStrategyAdapter is 0 (simulating the rebalance window)
     /// 3. User tries to deposit on parent
     function test_yield_parent_deposit_revertsWhen_strategyPointsToParent_butActiveAdapterIsZero() public {
-        /// @dev Arrange: Set strategy to parent with Aave (this sets both s_strategy and activeStrategyAdapter)
-        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")), SET_CROSS_CHAIN);
         _selectFork(baseFork);
         _changePrank(depositor);
 
