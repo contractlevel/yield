@@ -505,6 +505,7 @@ contract ParentPeer is YieldPeer {
     /// @dev Called in deploy script, immediately after deploying initial strategy adapters, and setting them in YieldPeer::setStrategyAdapter
     /// @param protocolId The protocol ID of the initial active strategy
     function setInitialActiveStrategy(bytes32 protocolId) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        // @review reverting if protocolId is not supported?
         if (s_initialActiveStrategySet) revert ParentPeer__InitialActiveStrategyAlreadySet();
         s_initialActiveStrategySet = true;
         s_strategy = Strategy({chainSelector: i_thisChainSelector, protocolId: protocolId});
