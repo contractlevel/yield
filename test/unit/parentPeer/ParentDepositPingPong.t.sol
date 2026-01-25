@@ -22,9 +22,8 @@ contract ParentDepositPingPongTest is BaseTest {
     /// @notice Flow: Child deposit -> Parent (strategy but adapter=0) -> Ping-pong back
     /// @notice The key is that when strategy is on parent and adapter is 0, parent ping-pongs
     function test_yield_parent_handleCCIPDepositToParent_pingPongsWhen_activeStrategyAdapterIsZero() public {
-        /// @dev arrange: Strategy on parent, but adapter is 0 (rebalance in transit)
-        /// @dev First set strategy normally, then manually set adapter to 0
-        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")), NO_CROSS_CHAIN);
+        /// @dev arrange: Strategy is on parent, but adapter is 0 (rebalance in transit)
+        /// @dev Select Parent fork
         _selectFork(baseFork);
 
         /// @dev Now manually set adapter to 0 to simulate rebalance in transit

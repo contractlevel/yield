@@ -17,44 +17,32 @@ contract RebalanceTest is BaseTest {
         baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
     }
 
+    function test_yield_parentPeer_rebalance_revertsWhen_strategyNotSupported() public {
+        _changePrank(address(baseRebalancer));
+        vm.expectRevert(
+            abi.encodeWithSignature("ParentPeer__StrategyNotSupported(bytes32)", keccak256(abi.encodePacked("invalid")))
+        );
+        baseParentPeer.rebalance(
+            IYieldPeer.Strategy({chainSelector: baseChainSelector, protocolId: keccak256(abi.encodePacked("invalid"))})
+        );
+    }
+
+    function test_yield_parentPeer_rebalance_revertsWhen_chainNotAllowed() public {
+        _changePrank(address(baseRebalancer));
+        vm.expectRevert(abi.encodeWithSignature("YieldPeer__ChainNotAllowed(uint64)", 9999));
+        baseParentPeer.rebalance(
+            IYieldPeer.Strategy({chainSelector: 9999, protocolId: keccak256(abi.encodePacked("aave-v3"))})
+        );
+    }
+
     /// @notice Scenario: New Strategy is same as the old
-    function test_yield_parentPeer_rebalance_sameStrategy() public {
-        /// @dev arrange
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
-        /// @dev sanity check
-        address aUsdc = _getATokenAddress(baseNetworkConfig.protocols.aavePoolAddressesProvider, address(baseUsdc));
-        assertApproxEqAbs(
-            IERC20(aUsdc).balanceOf(address(baseAaveV3Adapter)),
-            DEPOSIT_AMOUNT,
-            BALANCE_TOLERANCE,
-            "Aave balance should be approximately equal to deposit amount"
-        );
+    function test_yield_parentPeer_rebalance_revertsWhen_sameStrategy() public {
+        IYieldPeer.Strategy memory currentStrategy = baseParentPeer.getStrategy();
 
-        vm.recordLogs();
-
-        /// @dev act
-        /// @notice the strategy chain and protocol are the same as the old strategy
-        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")), SET_CROSS_CHAIN);
-
-        /// @dev assert
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        bytes32 eventSignature = keccak256("CurrentStrategyOptimal(uint64,bytes32)");
-        uint64 emittedChainSelector;
-        bytes32 emittedProtocolId;
-        for (uint256 i = 0; i < logs.length; i++) {
-            if (logs[i].topics[0] == eventSignature) {
-                emittedChainSelector = uint64(uint256(logs[i].topics[1]));
-                emittedProtocolId = logs[i].topics[2];
-            }
-        }
-        assertEq(emittedChainSelector, baseChainSelector);
-        assertEq(emittedProtocolId, keccak256(abi.encodePacked("aave-v3")));
-        assertApproxEqAbs(
-            IERC20(aUsdc).balanceOf(address(baseAaveV3Adapter)),
-            DEPOSIT_AMOUNT,
-            BALANCE_TOLERANCE,
-            "Aave balance should be approximately equal to deposit amount"
-        );
+        /// @dev act and assert revert
+        _changePrank(address(baseRebalancer));
+        vm.expectRevert(abi.encodeWithSignature("ParentPeer__CurrentStrategyOptimal()"));
+        baseParentPeer.rebalance(currentStrategy);
     }
 
     /// @notice Scenario: Old Strategy and New are both on Parent, but different protocols
@@ -123,7 +111,6 @@ contract RebalanceTest is BaseTest {
 
     /// @notice Scenario: Old Strategy is on Parent, New Strategy is on child chain
     function test_yield_parentPeer_rebalance_oldParent_newChild() public {
-        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")), SET_CROSS_CHAIN);
         _selectFork(baseFork);
         _changePrank(depositor);
 
@@ -229,9 +216,11 @@ contract RebalanceTest is BaseTest {
         );
     }
 
-    function test_yield_parentPeer_setStrategy_revetsWhen_notRebalancer() public {
+    function test_yield_parentPeer_rebalance_revertsWhen_notRebalancer() public {
         _changePrank(holder);
         vm.expectRevert(abi.encodeWithSignature("ParentPeer__OnlyRebalancer()"));
-        baseParentPeer.setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
+        baseParentPeer.rebalance(
+            IYieldPeer.Strategy({chainSelector: baseChainSelector, protocolId: keccak256(abi.encodePacked("aave-v3"))})
+        );
     }
 }

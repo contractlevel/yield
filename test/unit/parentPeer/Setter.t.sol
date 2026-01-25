@@ -42,4 +42,22 @@ contract SetterTest is BaseTest {
     function test_yield_parentPeer_setInitialActiveStrategy_success() public view {
         assertEq(baseParentPeer.getStrategy().protocolId, keccak256(abi.encodePacked("aave-v3")));
     }
+
+    // --- setSupportedProtocol --- //
+    function test_yield_parentPeer_setSupportedProtocol_revertsWhen_notConfigAdmin() public {
+        _changePrank(holder);
+        vm.expectRevert(
+            abi.encodeWithSignature(
+                "AccessControlUnauthorizedAccount(address,bytes32)", holder, Roles.CONFIG_ADMIN_ROLE
+            )
+        );
+        baseParentPeer.setSupportedProtocol(keccak256(abi.encodePacked("aave-v3")), true);
+    }
+
+    function test_yield_parentPeer_setSupportedProtocol_success() public {
+        bytes32 protocolId = keccak256("protocolId");
+        _changePrank(configAdmin);
+        baseParentPeer.setSupportedProtocol(protocolId, true);
+        assertEq(baseParentPeer.getSupportedProtocol(protocolId), true);
+    }
 }

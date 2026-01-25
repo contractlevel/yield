@@ -12,14 +12,6 @@ contract GetterTest is BaseTest {
         assertEq(returnedParentPeer, address(baseParentPeer));
     }
 
-    function test_yield_rebalancer_getStrategyRegistry_returnsStrategyRegistry() public view {
-        // Arrange & Act
-        address returnedStrategyRegistry = baseRebalancer.getStrategyRegistry();
-
-        // Assert
-        assertEq(returnedStrategyRegistry, address(baseStrategyRegistry));
-    }
-
     function test_yield_rebalancer_getCurrentStrategy_returnsStrategy() public view {
         // Arrange & Act
         IYieldPeer.Strategy memory returnedStrategy = baseRebalancer.getCurrentStrategy();

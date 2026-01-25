@@ -13,7 +13,7 @@ contract OnReportTest is BaseTest {
     function test_yield_creReceiver_onReport_success_emitsSecurityChecksPassed() public {
         // Arrange
         bytes memory report =
-            WorkflowHelpers.createWorkflowReport(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
+            WorkflowHelpers.createWorkflowReport(baseChainSelector, keccak256(abi.encodePacked("compound-v3")));
         vm.recordLogs();
 
         // Act

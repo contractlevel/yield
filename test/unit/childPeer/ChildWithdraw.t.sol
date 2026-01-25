@@ -99,7 +99,6 @@ contract ChildWithdrawTest is BaseTest {
 
     /// @notice Scenario: Withdrawal is initiated from a child chain, Strategy chain is Parent chain, Strategy Protocol is Aave.
     function test_yield_child_withdraw_strategyIsParent_aave() public {
-        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")), SET_CROSS_CHAIN);
         _selectFork(optFork);
         _changePrank(withdrawer);
 

@@ -131,64 +131,6 @@ contract OnReportTest is BaseTest {
         assertEq(strategyState.protocolId, emittedStrategyProtocolId);
     }
 
-    function test_yield_rebalancer_onReport_emitsEventWhen_invalidChainSelector() public {
-        /// @dev Arrange - invalid chain selector in strategy
-        uint64 invalidChainSelector = 9999;
-        IYieldPeer.Strategy memory newStrategy =
-            IYieldPeer.Strategy({chainSelector: invalidChainSelector, protocolId: compoundV3ProtocolId});
-        bytes memory encodedReport =
-            WorkflowHelpers.createWorkflowReport(newStrategy.chainSelector, newStrategy.protocolId);
-
-        /// @dev Act
-        vm.recordLogs();
-        vm.prank(keystoneForwarder);
-        baseRebalancer.onReport(workflowMetadata, encodedReport);
-
-        // Handle log for InvalidChainSelectorInReport event
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        bool invalidChainSelectorEventFound = false;
-        uint64 emittedChainSelector;
-        for (uint256 i = 0; i < logs.length; i++) {
-            if (logs[i].topics[0] == invalidChainSelectorEvent) {
-                emittedChainSelector = uint64(uint256(logs[i].topics[1]));
-                invalidChainSelectorEventFound = true;
-            }
-        }
-
-        /// @dev Assert
-        assertTrue(invalidChainSelectorEventFound);
-        assertEq(emittedChainSelector, newStrategy.chainSelector);
-    }
-
-    function test_yield_rebalancer_onReport_emitsEventWhen_invalidProtocolId() public {
-        /// @dev Arrange - invalid protocol id in strategy
-        bytes32 invalidProtocolId = keccak256(abi.encodePacked("invalid"));
-        IYieldPeer.Strategy memory newStrategy =
-            IYieldPeer.Strategy({chainSelector: baseChainSelector, protocolId: invalidProtocolId});
-        bytes memory encodedReport =
-            WorkflowHelpers.createWorkflowReport(newStrategy.chainSelector, newStrategy.protocolId);
-
-        /// @dev Act
-        vm.recordLogs();
-        vm.prank(keystoneForwarder);
-        baseRebalancer.onReport(workflowMetadata, encodedReport);
-
-        // Handle log for InvalidProtocolIdInReport event
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        bool invalidProtocolIdEventFound = false;
-        bytes32 emittedProtocolId;
-        for (uint256 i = 0; i < logs.length; i++) {
-            if (logs[i].topics[0] == invalidProtocolIdEvent) {
-                emittedProtocolId = bytes32(logs[i].topics[1]);
-                invalidProtocolIdEventFound = true;
-            }
-        }
-
-        /// @dev Assert
-        assertTrue(invalidProtocolIdEventFound);
-        assertEq(emittedProtocolId, newStrategy.protocolId);
-    }
-
     function test_yield_rebalancer_onReport_rebalanceParentToParent() public {
         /// @dev Arrange: Strategy on Parent, deposit to have TVL
         _selectFork(baseFork);

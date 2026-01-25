@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {Rebalancer, IParentPeer, IYieldPeer, IStrategyRegistry} from "../../src/modules/Rebalancer.sol";
+import {Rebalancer, IParentPeer, IYieldPeer} from "../../src/modules/Rebalancer.sol";
 import {HelperHarness} from "./HelperHarness.sol";
 
 contract RebalancerHarness is Rebalancer, HelperHarness {

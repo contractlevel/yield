@@ -74,7 +74,8 @@ contract DeployParent is Script {
         deploy.strategyRegistry
             .setStrategyAdapter(keccak256(abi.encodePacked("compound-v3")), address(deploy.compoundV3Adapter));
         deploy.parentPeer.setStrategyRegistry(address(deploy.strategyRegistry));
-        deploy.rebalancer.setStrategyRegistry(address(deploy.strategyRegistry));
+        deploy.parentPeer.setSupportedProtocol(keccak256(abi.encodePacked("aave-v3")), true);
+        deploy.parentPeer.setSupportedProtocol(keccak256(abi.encodePacked("compound-v3")), true);
         deploy.parentPeer.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")));
 
         /// @dev revoke config admin role from deployer after necessary configs set
