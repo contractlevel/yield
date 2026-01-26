@@ -526,8 +526,9 @@ contract Handler is Test {
                 decodedProtocolId = logs[i].topics[2];
 
                 /// @dev store the decoded strategy in ghost state
-                ghost_event_lastCREReceivedStrategy =
-                    IYieldPeer.Strategy({protocolId: decodedProtocolId, stablecoinId: USDC_ID, chainSelector: decodedChainSelector});
+                ghost_event_lastCREReceivedStrategy = IYieldPeer.Strategy({
+                    protocolId: decodedProtocolId, stablecoinId: USDC_ID, chainSelector: decodedChainSelector
+                });
                 /// @dev log decoded strategy for debugging
                 console2.log("Decoded Report - chainSelector:", decodedChainSelector);
                 console2.log("Decoded Report - protocolId:");

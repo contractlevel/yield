@@ -57,6 +57,7 @@ contract ChildPeer is YieldPeer {
         /// @dev transfer stablecoin from user and take fee
         amount = _initiateDeposit(stablecoinId, amount);
 
+        // @review - wtf?
         /// @dev swap to USDC if needed (CCIP only bridges USDC)
         if (stablecoinId != USDC_ID) {
             address stablecoin = _getStablecoinAddress(stablecoinId);

@@ -23,7 +23,11 @@ contract RebalanceTest is BaseTest {
             abi.encodeWithSignature("ParentPeer__StrategyNotSupported(bytes32)", keccak256(abi.encodePacked("invalid")))
         );
         baseParentPeer.rebalance(
-            IYieldPeer.Strategy({protocolId: keccak256(abi.encodePacked("invalid")), stablecoinId: USDC_ID, chainSelector: baseChainSelector})
+            IYieldPeer.Strategy({
+                protocolId: keccak256(abi.encodePacked("invalid")),
+                stablecoinId: USDC_ID,
+                chainSelector: baseChainSelector
+            })
         );
     }
 
@@ -31,7 +35,9 @@ contract RebalanceTest is BaseTest {
         _changePrank(address(baseRebalancer));
         vm.expectRevert(abi.encodeWithSignature("YieldPeer__ChainNotAllowed(uint64)", 9999));
         baseParentPeer.rebalance(
-            IYieldPeer.Strategy({protocolId: keccak256(abi.encodePacked("aave-v3")), stablecoinId: USDC_ID, chainSelector: 9999})
+            IYieldPeer.Strategy({
+                protocolId: keccak256(abi.encodePacked("aave-v3")), stablecoinId: USDC_ID, chainSelector: 9999
+            })
         );
     }
 
@@ -220,7 +226,11 @@ contract RebalanceTest is BaseTest {
         _changePrank(holder);
         vm.expectRevert(abi.encodeWithSignature("ParentPeer__OnlyRebalancer()"));
         baseParentPeer.rebalance(
-            IYieldPeer.Strategy({protocolId: keccak256(abi.encodePacked("aave-v3")), stablecoinId: USDC_ID, chainSelector: baseChainSelector})
+            IYieldPeer.Strategy({
+                protocolId: keccak256(abi.encodePacked("aave-v3")),
+                stablecoinId: USDC_ID,
+                chainSelector: baseChainSelector
+            })
         );
     }
 }

@@ -31,8 +31,9 @@ contract OnReportTest is BaseTest {
     /// @dev when the report is valid and decoded successfully
     function test_yield_rebalancer_onReport_decodesReport() public {
         // Arrange
-        IYieldPeer.Strategy memory newStrategy =
-            IYieldPeer.Strategy({protocolId: compoundV3ProtocolId, stablecoinId: USDC_ID, chainSelector: baseChainSelector});
+        IYieldPeer.Strategy memory newStrategy = IYieldPeer.Strategy({
+            protocolId: compoundV3ProtocolId, stablecoinId: USDC_ID, chainSelector: baseChainSelector
+        });
         bytes memory encodedReport =
             WorkflowHelpers.createWorkflowReport(newStrategy.chainSelector, newStrategy.protocolId);
 
@@ -67,8 +68,9 @@ contract OnReportTest is BaseTest {
     /// @dev 3. Check if strategy updated event matches strategy state
     function test_yield_rebalancer_onReport_strategyConsistency() public {
         /// @dev Arrange
-        IYieldPeer.Strategy memory newStrategy =
-            IYieldPeer.Strategy({protocolId: compoundV3ProtocolId, stablecoinId: USDC_ID, chainSelector: optChainSelector});
+        IYieldPeer.Strategy memory newStrategy = IYieldPeer.Strategy({
+            protocolId: compoundV3ProtocolId, stablecoinId: USDC_ID, chainSelector: optChainSelector
+        });
         bytes memory encodedReport =
             WorkflowHelpers.createWorkflowReport(newStrategy.chainSelector, newStrategy.protocolId);
 
@@ -141,8 +143,9 @@ contract OnReportTest is BaseTest {
         baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
 
         // Create workflow report
-        IYieldPeer.Strategy memory newStrategy =
-            IYieldPeer.Strategy({protocolId: compoundV3ProtocolId, stablecoinId: USDC_ID, chainSelector: baseChainSelector});
+        IYieldPeer.Strategy memory newStrategy = IYieldPeer.Strategy({
+            protocolId: compoundV3ProtocolId, stablecoinId: USDC_ID, chainSelector: baseChainSelector
+        });
         bytes memory encodedReport =
             WorkflowHelpers.createWorkflowReport(newStrategy.chainSelector, newStrategy.protocolId);
 
