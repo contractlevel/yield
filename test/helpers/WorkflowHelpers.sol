@@ -8,6 +8,9 @@ library WorkflowHelpers {
     /*//////////////////////////////////////////////////////////////
                             WORKFLOW HELPERS
     //////////////////////////////////////////////////////////////*/
+    /// @dev USDC stablecoin ID - keccak256("USDC")
+    bytes32 internal constant USDC_ID = 0xd6aca1be9729c13d677335161321649cccae6a591554772516700f986f942eaa;
+
     /// @notice Helper function to create a Keystone workflow report
     /// @param chainSelector The chain selector of the strategy
     /// @param protocolId The protocol ID of the strategy
@@ -17,8 +20,21 @@ library WorkflowHelpers {
         pure
         returns (bytes memory workflowReport)
     {
+        return createWorkflowReport(chainSelector, protocolId, USDC_ID);
+    }
+
+    /// @notice Helper function to create a Keystone workflow report with stablecoin
+    /// @param chainSelector The chain selector of the strategy
+    /// @param protocolId The protocol ID of the strategy
+    /// @param stablecoinId The stablecoin ID of the strategy
+    /// @return workflowReport The Keystone workflow report
+    function createWorkflowReport(uint64 chainSelector, bytes32 protocolId, bytes32 stablecoinId)
+        public
+        pure
+        returns (bytes memory workflowReport)
+    {
         IYieldPeer.Strategy memory strategy =
-            IYieldPeer.Strategy({chainSelector: chainSelector, protocolId: protocolId});
+            IYieldPeer.Strategy({chainSelector: chainSelector, protocolId: protocolId, stablecoinId: stablecoinId});
 
         workflowReport = abi.encode(strategy);
     }

@@ -24,7 +24,7 @@ contract ParentWithdrawPingPongTest is BaseTest {
         /// @dev arrange: Strategy on BASE parent, deposit on OPT child so shares live on child chain
         _selectFork(optFork);
         _changePrank(withdrawer);
-        optChildPeer.deposit(DEPOSIT_AMOUNT);
+        optChildPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
 
         /// @dev Complete deposit flow (OPT -> BASE strategy -> OPT shares)
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
@@ -73,7 +73,7 @@ contract ParentWithdrawPingPongTest is BaseTest {
         /// @dev arrange: Deposit on OPT child
         _selectFork(optFork);
         _changePrank(withdrawer);
-        optChildPeer.deposit(DEPOSIT_AMOUNT);
+        optChildPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
 
         /// @dev Complete deposit flow: OPT -> Parent -> Parent (strategy on parent)
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);

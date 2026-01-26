@@ -33,7 +33,7 @@ contract ParentDepositTest is BaseTest {
 
     function test_yield_parent_deposit_revertsWhen_insufficientAmount() public {
         vm.expectRevert(abi.encodeWithSignature("YieldPeer__InsufficientAmount()"));
-        baseParentPeer.deposit(1e6 - 1);
+        baseParentPeer.deposit(USDC_ID, 1e6 - 1);
     }
 
     function test_yield_parent_deposit_revertsWhen_parentPaused() public {
@@ -41,7 +41,7 @@ contract ParentDepositTest is BaseTest {
         baseParentPeer.emergencyPause();
         _changePrank(depositor);
         vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
     }
 
     /// @notice Scenario: Deposit made on Parent chain, where the Strategy is, and the Strategy Protocol is Aave
@@ -54,7 +54,7 @@ contract ParentDepositTest is BaseTest {
         uint256 baseParentUsdcBalanceBefore = baseUsdc.balanceOf(address(baseParentPeer));
 
         /// @dev act
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
 
         /// @dev assert depositor's USDC balance reduced by the deposit amount
         uint256 usdcBalanceAfter = baseUsdc.balanceOf(depositor);
@@ -90,7 +90,7 @@ contract ParentDepositTest is BaseTest {
         uint256 baseParentUsdcBalanceBefore = baseUsdc.balanceOf(address(baseParentPeer));
 
         /// @dev act
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
 
         /// @dev assert depositor's USDC balance reduced by the deposit amount
         uint256 usdcBalanceAfter = baseUsdc.balanceOf(depositor);
@@ -130,7 +130,7 @@ contract ParentDepositTest is BaseTest {
         uint256 baseParentUsdcBalanceBefore = baseUsdc.balanceOf(address(baseParentPeer));
 
         /// @dev act
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
 
         /// @dev assert depositor's USDC balance reduced by the deposit amount on parent chain
         uint256 usdcBalanceAfter = baseUsdc.balanceOf(depositor);
@@ -172,7 +172,7 @@ contract ParentDepositTest is BaseTest {
         uint256 baseParentUsdcBalanceBefore = baseUsdc.balanceOf(address(baseParentPeer));
 
         /// @dev act
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
 
         /// @dev assert depositor's USDC balance reduced by the deposit amount on parent chain
         uint256 usdcBalanceAfter = baseUsdc.balanceOf(depositor);
@@ -214,7 +214,7 @@ contract ParentDepositTest is BaseTest {
         uint256 baseParentUsdcBalanceBefore = baseUsdc.balanceOf(address(baseParentPeer));
 
         _changePrank(depositor);
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
         /// @dev assert correct amount of shares minted
         uint256 expectedShareMintAmount = userPrincipal * INITIAL_SHARE_PRECISION;
         assertEq(baseShare.totalSupply(), expectedShareMintAmount);
@@ -223,7 +223,7 @@ contract ParentDepositTest is BaseTest {
 
         /// @dev act
         _changePrank(depositor2);
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
 
         /// @dev assert correct amount of shares minted for second deposit
         uint256 totalValue = baseParentPeer.getTotalValue();
@@ -283,7 +283,7 @@ contract ParentDepositTest is BaseTest {
         uint256 initialTotalShares = baseParentPeer.getTotalShares();
 
         vm.expectRevert(abi.encodeWithSelector(ParentPeer.ParentPeer__InactiveStrategyAdapter.selector));
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
 
         /// @dev Assert: No shares should be minted (deposit should revert)
         assertEq(baseShare.balanceOf(depositor), initialShareBalance, "No shares should be minted");

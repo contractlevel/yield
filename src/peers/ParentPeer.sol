@@ -79,49 +79,46 @@ contract ParentPeer is YieldPeer {
     /*//////////////////////////////////////////////////////////////
                                 EXTERNAL
     //////////////////////////////////////////////////////////////*/
-    /// @notice Users can deposit USDC into the system via this function
+    /// @notice Users can deposit any supported stablecoin into the system
     /// @notice As this is the ParentPeer, we handle two deposit cases:
     /// 1. This Parent is the Strategy
     /// 2. This Parent is not the Strategy
-    /// @param amountToDeposit The amount of USDC to deposit into the system
-    /// @dev Revert if amountToDeposit is less than 1e6 (1 USDC)
+    /// @param stablecoinId The stablecoin ID (e.g., keccak256("USDC"), keccak256("USDT"))
+    /// @param amount The amount of stablecoin to deposit
+    /// @dev Revert if amount is less than 1e6 (1 stablecoin unit)
     /// @dev Revert if peer is paused
-    function deposit(uint256 amountToDeposit) external override whenNotPaused {
-        /// @dev takes a fee
-        amountToDeposit = _initiateDeposit(amountToDeposit);
+    function deposit(bytes32 stablecoinId, uint256 amount) external override whenNotPaused {
+        /// @dev transfer stablecoin from user and take fee
+        amount = _initiateDeposit(stablecoinId, amount);
+
+        /// @dev swap to USDC if needed (CCIP only bridges USDC)
+        if (stablecoinId != USDC_ID) {
+            address stablecoin = _getStablecoinAddress(stablecoinId);
+            amount = _swapStablecoins(stablecoin, address(i_usdc), amount);
+        }
 
         Strategy memory strategy = s_strategy;
 
-        // 1. This Parent is the Strategy. Therefore the deposit is handled here and shares can be minted here.
+        // 1. This Parent is the Strategy
         if (strategy.chainSelector == i_thisChainSelector) {
-            /// @dev cache active strategy adapter
             address activeStrategyAdapter = _getActiveStrategyAdapter();
-            /// @dev this is for the edgecase activeStrategyAdapter hasn't been updated yet, even though Parent state says it is strategy,
-            /// TVL rebalance is still in transit
             if (activeStrategyAdapter == address(0)) revert ParentPeer__InactiveStrategyAdapter();
 
-            /// @dev get total value from strategy
             uint256 totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, address(i_usdc));
+            uint256 shareMintAmount = _calculateMintAmount(totalValue, amount);
 
-            /// @dev calculate share mint amount for total deposit (includes storage read of s_totalShares)
-            uint256 shareMintAmount = _calculateMintAmount(totalValue, amountToDeposit);
-
-            /// @dev update total shares (only once)
             s_totalShares += shareMintAmount;
             emit ShareMintUpdate(shareMintAmount, i_thisChainSelector, s_totalShares);
 
-            /// @dev deposit to strategy
             //slither-disable-next-line reentrancy-events
-            _depositToStrategy(activeStrategyAdapter, amountToDeposit);
-
-            /// @dev mint share tokens (YieldCoin) to msg.sender based on amount deposited and total value of the system
+            _depositToStrategy(activeStrategyAdapter, amount);
             _mintShares(msg.sender, shareMintAmount);
         }
-        // 2. This Parent is not the Strategy. Therefore the deposit must be sent to the strategy and get totalValue.
+        // 2. This Parent is not the Strategy
         else {
-            DepositData memory depositData = _buildDepositData(amountToDeposit);
-            emit DepositForwardedToStrategy(amountToDeposit, strategy.chainSelector);
-            _ccipSend(strategy.chainSelector, CcipTxType.DepositToStrategy, abi.encode(depositData), amountToDeposit);
+            DepositData memory depositData = _buildDepositData(amount);
+            emit DepositForwardedToStrategy(amount, strategy.chainSelector);
+            _ccipSend(strategy.chainSelector, CcipTxType.DepositToStrategy, abi.encode(depositData), amount);
         }
     }
 
@@ -390,10 +387,12 @@ contract ParentPeer is YieldPeer {
     /// @dev Update Strategy state and emit StrategyUpdated event
     /// @param oldStrategy The old strategy
     /// @param newStrategy The new strategy
-    /// @dev Revert if the current strategy is optimal
+    /// @dev Revert if the current strategy is optimal (same chain, protocol, and stablecoin)
     function _setStrategy(Strategy memory oldStrategy, Strategy calldata newStrategy) internal {
-        if (oldStrategy.chainSelector == newStrategy.chainSelector && oldStrategy.protocolId == newStrategy.protocolId)
-        {
+        if (
+            oldStrategy.chainSelector == newStrategy.chainSelector && oldStrategy.protocolId == newStrategy.protocolId
+                && oldStrategy.stablecoinId == newStrategy.stablecoinId
+        ) {
             revert ParentPeer__CurrentStrategyOptimal();
         }
 
@@ -410,11 +409,11 @@ contract ParentPeer is YieldPeer {
     function _rebalance(Strategy memory oldStrategy, Strategy calldata newStrategy) internal {
         /// @dev Handle local strategy change on this parent chain
         if (newStrategy.chainSelector == i_thisChainSelector && oldStrategy.chainSelector == i_thisChainSelector) {
-            _rebalanceParentToParent(newStrategy);
+            _rebalanceParentToParent(oldStrategy, newStrategy);
         }
         /// @dev Handle strategy change from parent to child
         else if (newStrategy.chainSelector != i_thisChainSelector && oldStrategy.chainSelector == i_thisChainSelector) {
-            _rebalanceParentToChild(newStrategy);
+            _rebalanceParentToChild(oldStrategy, newStrategy);
         }
         /// @dev Handle strategy change from a child to other
         else if (oldStrategy.chainSelector != i_thisChainSelector) {
@@ -424,34 +423,63 @@ contract ParentPeer is YieldPeer {
 
     /// @notice Handles strategy change when both old and new strategies are on this chain
     /// @notice Called when the strategy is on this chain and is being rebalanced to another strategy on this chain
+    /// @notice Handles stablecoin swaps if the new strategy uses a different stablecoin
+    /// @param oldStrategy The old strategy (needed for stablecoinId comparison)
     /// @param newStrategy The new strategy
-    function _rebalanceParentToParent(Strategy calldata newStrategy) internal {
+    function _rebalanceParentToParent(Strategy memory oldStrategy, Strategy calldata newStrategy) internal {
         address oldActiveStrategyAdapter = _getActiveStrategyAdapter();
 
         address newActiveStrategyAdapter =
             _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
 
-        uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, address(i_usdc));
+        // Update active stablecoin ID
+        _updateActiveStablecoinId(newStrategy.chainSelector, newStrategy.stablecoinId);
+
+        // Get the stablecoin addresses
+        address oldStablecoin = _getStablecoinAddress(oldStrategy.stablecoinId);
+        address newStablecoin = _getStablecoinAddress(newStrategy.stablecoinId);
+
+        uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, oldStablecoin);
         if (totalValue != 0) {
             _withdrawFromStrategy(oldActiveStrategyAdapter, totalValue);
+
+            // Swap stablecoins if needed
+            uint256 amountToDeposit = totalValue;
+            if (oldStablecoin != newStablecoin) {
+                amountToDeposit = _swapStablecoins(oldStablecoin, newStablecoin, totalValue);
+            }
+
             //slither-disable-next-line reentrancy-events
-            _depositToStrategy(newActiveStrategyAdapter, totalValue);
+            _depositToStrategy(newActiveStrategyAdapter, amountToDeposit);
         }
     }
 
     /// @dev Handle moving strategy (both funds & new strategy info) from this parent chain to a child chain
     /// @notice Called when the strategy is on this chain and is being moved to a child chain
+    /// @notice Swaps to USDC before CCIP bridging if the old strategy's stablecoin is not USDC
+    /// @param oldStrategy The old strategy (needed for stablecoinId)
     /// @param newStrategy The new strategy
-    function _rebalanceParentToChild(Strategy memory newStrategy) internal {
+    function _rebalanceParentToChild(Strategy memory oldStrategy, Strategy memory newStrategy) internal {
         address oldActiveStrategyAdapter = _getActiveStrategyAdapter();
-        uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, address(i_usdc));
+        address oldStablecoin = _getStablecoinAddress(oldStrategy.stablecoinId);
+        uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, oldStablecoin);
 
         // @review unused-return, returns newActiveStrategyAdapter
         _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
 
-        if (totalValue != 0) _withdrawFromStrategy(oldActiveStrategyAdapter, totalValue);
+        if (totalValue != 0) {
+            _withdrawFromStrategy(oldActiveStrategyAdapter, totalValue);
 
-        _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, abi.encode(newStrategy), totalValue);
+            // CCIP bridges USDC, so swap to USDC if the old stablecoin is different
+            uint256 bridgeAmount = totalValue;
+            if (oldStrategy.stablecoinId != USDC_ID) {
+                bridgeAmount = _swapStablecoins(oldStablecoin, address(i_usdc), totalValue);
+            }
+
+            _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, abi.encode(newStrategy), bridgeAmount);
+        } else {
+            _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, abi.encode(newStrategy), 0);
+        }
     }
 
     /// @dev Handle rebalancing on a child chain by sending it new Strategy info
@@ -504,13 +532,20 @@ contract ParentPeer is YieldPeer {
     /// @dev Revert if already called
     /// @dev Called in deploy script, immediately after deploying initial strategy adapters, and setting them in YieldPeer::setStrategyAdapter
     /// @param protocolId The protocol ID of the initial active strategy
-    function setInitialActiveStrategy(bytes32 protocolId) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    /// @param stablecoinId The stablecoin ID of the initial active strategy (defaults to USDC_ID if bytes32(0))
+    function setInitialActiveStrategy(bytes32 protocolId, bytes32 stablecoinId) external onlyRole(DEFAULT_ADMIN_ROLE) {
         // @review reverting if protocolId is not supported?
         if (s_initialActiveStrategySet) revert ParentPeer__InitialActiveStrategyAlreadySet();
         s_initialActiveStrategySet = true;
-        s_strategy = Strategy({chainSelector: i_thisChainSelector, protocolId: protocolId});
+
+        // Default to USDC if no stablecoinId provided
+        bytes32 effectiveStablecoinId = stablecoinId == bytes32(0) ? USDC_ID : stablecoinId;
+
+        s_strategy =
+            Strategy({chainSelector: i_thisChainSelector, protocolId: protocolId, stablecoinId: effectiveStablecoinId});
         // @review unused-return, returns newActiveStrategyAdapter
         _updateActiveStrategyAdapter(i_thisChainSelector, protocolId);
+        _updateActiveStablecoinId(i_thisChainSelector, effectiveStablecoinId);
     }
 
     /// @notice Sets the rebalancer

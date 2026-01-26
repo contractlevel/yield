@@ -45,36 +45,37 @@ contract ChildPeer is YieldPeer {
     /*//////////////////////////////////////////////////////////////
                                 EXTERNAL
     //////////////////////////////////////////////////////////////*/
-    /// @notice Users can deposit USDC into the system via this function
+    /// @notice Users can deposit any supported stablecoin into the system
     /// @notice As this is a ChildPeer, we handle two deposit cases:
     /// 1. This Child is the Strategy
     /// 2. This Child is not the Strategy
-    /// @param amountToDeposit The amount of USDC to deposit into the system
-    /// @dev Revert if amountToDeposit is less than 1e6 (1 USDC)
+    /// @param stablecoinId The stablecoin ID (e.g., keccak256("USDC"), keccak256("USDT"))
+    /// @param amount The amount of stablecoin to deposit
+    /// @dev Revert if amount is less than 1e6 (1 stablecoin unit)
     /// @dev Revert if peer is paused
-    /// @notice User must approve this contract to spend their stablecoin
-    function deposit(uint256 amountToDeposit) external override whenNotPaused {
-        /// @dev takes a fee
-        /// same var name ==== confusing!
-        amountToDeposit = _initiateDeposit(amountToDeposit);
+    function deposit(bytes32 stablecoinId, uint256 amount) external override whenNotPaused {
+        /// @dev transfer stablecoin from user and take fee
+        amount = _initiateDeposit(stablecoinId, amount);
+
+        /// @dev swap to USDC if needed (CCIP only bridges USDC)
+        if (stablecoinId != USDC_ID) {
+            address stablecoin = _getStablecoinAddress(stablecoinId);
+            amount = _swapStablecoins(stablecoin, address(i_usdc), amount);
+        }
 
         address activeStrategyAdapter = _getActiveStrategyAdapter();
-        DepositData memory depositData = _buildDepositData(amountToDeposit);
+        DepositData memory depositData = _buildDepositData(amount);
 
         // 1. This Child is the Strategy
         if (activeStrategyAdapter != address(0)) {
-            /// @dev deposit USDC in strategy pool and get totalValue
-            depositData.totalValue = _depositToStrategyAndGetTotalValue(activeStrategyAdapter, amountToDeposit);
-
-            /// @dev send a message to parent contract to request shareMintAmount
+            depositData.totalValue = _depositToStrategyAndGetTotalValue(activeStrategyAdapter, amount);
             _ccipSend(
                 i_parentChainSelector, CcipTxType.DepositCallbackParent, abi.encode(depositData), ZERO_BRIDGE_AMOUNT
             );
         }
         // 2. This Child is not the Strategy
         else {
-            /// @dev send a message to parent contract to deposit to strategy and request shareMintAmount
-            _ccipSend(i_parentChainSelector, CcipTxType.DepositToParent, abi.encode(depositData), amountToDeposit);
+            _ccipSend(i_parentChainSelector, CcipTxType.DepositToParent, abi.encode(depositData), amount);
         }
     }
 
@@ -133,7 +134,7 @@ contract ChildPeer is YieldPeer {
         }
         if (txType == CcipTxType.WithdrawCallback) _handleCCIPWithdrawCallback(tokenAmounts, data);
         //slither-disable-next-line reentrancy-no-eth
-        if (txType == CcipTxType.RebalanceOldStrategy) _handleCCIPRebalanceOldStrategy(data);
+        if (txType == CcipTxType.RebalanceOldStrategy) _handleCCIPRebalanceOldStrategy(data, _getActiveStablecoinId());
         if (txType == CcipTxType.RebalanceNewStrategy) _handleCCIPRebalanceNewStrategy(tokenAmounts, data);
     }
 
@@ -204,11 +205,14 @@ contract ChildPeer is YieldPeer {
     /// @notice Handles the CCIP message for a rebalance old strategy
     /// @notice The message this function handles is sent by the Parent when the Strategy is updated
     /// @notice This function should only be executed when this chain is the (old) strategy
+    /// @notice Handles stablecoin swaps when changing stablecoins
     /// @dev Rebalances funds from the old strategy to the new strategy
-    /// @param data The data to decode - decodes to Strategy (chainSelector, protocolId)
-    function _handleCCIPRebalanceOldStrategy(bytes memory data) internal {
+    /// @param data The data to decode - decodes to Strategy (chainSelector, protocolId, stablecoinId)
+    /// @param oldStablecoinId The stablecoin ID of the current (old) strategy
+    function _handleCCIPRebalanceOldStrategy(bytes memory data, bytes32 oldStablecoinId) internal {
         /// @dev cache the old active strategy adapter
         address oldActiveStrategyAdapter = _getActiveStrategyAdapter();
+        address oldStablecoin = _getStablecoinAddress(oldStablecoinId);
 
         /// @dev update strategy pool to either protocol on this chain or address(0) if on a different chain
         Strategy memory newStrategy = abi.decode(data, (Strategy));
@@ -216,17 +220,31 @@ contract ChildPeer is YieldPeer {
             _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
 
         /// @dev withdraw from the old strategy
-        uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, address(i_usdc));
+        uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, oldStablecoin);
         if (totalValue != 0) _withdrawFromStrategy(oldActiveStrategyAdapter, totalValue);
 
-        // if the new strategy is this chain, but different protocol, then we need to deposit to the new strategy
+        // if the new strategy is this chain, but different protocol or stablecoin
         if (newStrategy.chainSelector == i_thisChainSelector) {
+            // Update active stablecoin ID
+            _updateActiveStablecoinId(newStrategy.chainSelector, newStrategy.stablecoinId);
+
+            // Swap stablecoins if needed
+            address newStablecoin = _getStablecoinAddress(newStrategy.stablecoinId);
+            uint256 amountToDeposit = totalValue;
+            if (oldStablecoin != newStablecoin && totalValue != 0) {
+                amountToDeposit = _swapStablecoins(oldStablecoin, newStablecoin, totalValue);
+            }
             //slither-disable-next-line reentrancy-events
-            _depositToStrategy(newActiveStrategyAdapter, totalValue);
+            if (amountToDeposit != 0) _depositToStrategy(newActiveStrategyAdapter, amountToDeposit);
         }
-        // if the new strategy is a different chain, then we need to send the usdc we just withdrew to the new strategy
+        // if the new strategy is a different chain, swap to USDC for CCIP bridge and send
         else {
-            _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, data, totalValue);
+            uint256 bridgeAmount = totalValue;
+            // CCIP bridges USDC, so swap to USDC if the old stablecoin is different
+            if (oldStablecoinId != USDC_ID && totalValue != 0) {
+                bridgeAmount = _swapStablecoins(oldStablecoin, address(i_usdc), totalValue);
+            }
+            _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, data, bridgeAmount);
         }
     }
 

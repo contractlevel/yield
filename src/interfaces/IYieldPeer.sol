@@ -6,6 +6,7 @@ import {IYieldFees} from "./IYieldFees.sol";
 interface IYieldPeer is IYieldFees {
     struct Strategy {
         bytes32 protocolId; // ie keccak256("aave-v3") or keccak256("compound-v3")
+        bytes32 stablecoinId; // ie keccak256("USDC"), keccak256("USDT"), keccak256("GHO")
         uint64 chainSelector;
     }
 
@@ -39,7 +40,7 @@ interface IYieldPeer is IYieldFees {
         uint64 chainSelector; // chain selector of the chain the withdrawn stablecoins are sent to
     }
 
-    function deposit(uint256 amountToDeposit) external;
+    function deposit(bytes32 stablecoinId, uint256 amount) external;
     function getTotalValue() external view returns (uint256);
     function getStrategyAdapter(bytes32 protocolId) external view returns (address);
     function setCCIPGasLimit(uint256 gasLimit) external;
@@ -49,4 +50,6 @@ interface IYieldPeer is IYieldFees {
     function getAllowedPeer(uint64 chainSelector) external view returns (address);
     function getActiveStrategyAdapter() external view returns (address);
     function getStrategyRegistry() external view returns (address);
+    function getStablecoinRegistry() external view returns (address);
+    function getSwapper() external view returns (address);
 }

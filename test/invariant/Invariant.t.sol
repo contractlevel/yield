@@ -153,7 +153,7 @@ contract Invariant is StdInvariant, BaseTest {
         );
 
         parent.setStrategyRegistry(address(strategyRegistryParent));
-        parent.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")));
+        parent.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")), USDC_ID);
         parent.revokeRole(Roles.CONFIG_ADMIN_ROLE, parent.owner());
 
         /// @dev deploy at least 2 child peers to cover all CCIP tx types

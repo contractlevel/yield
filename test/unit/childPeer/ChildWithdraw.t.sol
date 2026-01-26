@@ -22,7 +22,7 @@ contract ChildWithdrawTest is BaseTest {
 
     function test_yield_child_onTokenTransfer_revertsWhen_notShare() public {
         /// @dev arrange
-        optChildPeer.deposit(DEPOSIT_AMOUNT);
+        optChildPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
@@ -46,7 +46,7 @@ contract ChildWithdrawTest is BaseTest {
         _changePrank(withdrawer);
 
         /// @dev arrange
-        optChildPeer.deposit(DEPOSIT_AMOUNT);
+        optChildPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
@@ -75,7 +75,7 @@ contract ChildWithdrawTest is BaseTest {
         _changePrank(withdrawer);
 
         /// @dev arrange
-        optChildPeer.deposit(DEPOSIT_AMOUNT);
+        optChildPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
@@ -103,7 +103,7 @@ contract ChildWithdrawTest is BaseTest {
         _changePrank(withdrawer);
 
         /// @dev arrange
-        optChildPeer.deposit(DEPOSIT_AMOUNT);
+        optChildPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
@@ -132,7 +132,7 @@ contract ChildWithdrawTest is BaseTest {
         _changePrank(withdrawer);
 
         /// @dev arrange
-        optChildPeer.deposit(DEPOSIT_AMOUNT);
+        optChildPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
@@ -161,7 +161,7 @@ contract ChildWithdrawTest is BaseTest {
         _changePrank(withdrawer);
 
         /// @dev arrange
-        optChildPeer.deposit(DEPOSIT_AMOUNT);
+        optChildPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(ethFork, attesters, attesterPks);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
@@ -193,7 +193,7 @@ contract ChildWithdrawTest is BaseTest {
         _changePrank(withdrawer);
 
         /// @dev arrange
-        optChildPeer.deposit(DEPOSIT_AMOUNT);
+        optChildPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(ethFork, attesters, attesterPks);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);

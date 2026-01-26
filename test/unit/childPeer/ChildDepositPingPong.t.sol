@@ -40,7 +40,7 @@ contract ChildDepositPingPongTest is BaseTest {
 
         // Act: Deposit from/on OPT child
         _changePrank(depositor);
-        optChildPeer.deposit(DEPOSIT_AMOUNT);
+        optChildPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
 
         // Get initial balance before any routing (sanity check)
         address aUsdcOpt = _getATokenAddress(optNetworkConfig.protocols.aavePoolAddressesProvider, address(optUsdc));

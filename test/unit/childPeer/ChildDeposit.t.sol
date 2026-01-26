@@ -21,7 +21,7 @@ contract ChildDepositTest is BaseTest {
 
     function test_yield_child_deposit_revertsWhen_insufficientAmount() public {
         vm.expectRevert(abi.encodeWithSignature("YieldPeer__InsufficientAmount()"));
-        optChildPeer.deposit(1e6 - 1);
+        optChildPeer.deposit(USDC_ID, 1e6 - 1);
     }
 
     function test_yield_child_deposit_revertsWhen_ChildPaused() public {
@@ -29,7 +29,7 @@ contract ChildDepositTest is BaseTest {
         optChildPeer.emergencyPause();
         _changePrank(depositor);
         vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
-        optChildPeer.deposit(DEPOSIT_AMOUNT);
+        optChildPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
     }
 
     // - child/deposit is strategy
@@ -48,7 +48,7 @@ contract ChildDepositTest is BaseTest {
         uint256 optChildUsdcBalanceBefore = optUsdc.balanceOf(address(optChildPeer));
 
         /// @dev act
-        optChildPeer.deposit(DEPOSIT_AMOUNT);
+        optChildPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
 
         /// @dev assert depositor's USDC balance reduced by the deposit amount
         uint256 usdcBalanceAfter = optUsdc.balanceOf(depositor);
@@ -89,7 +89,7 @@ contract ChildDepositTest is BaseTest {
         uint256 optChildUsdcBalanceBefore = optUsdc.balanceOf(address(optChildPeer));
 
         /// @dev act
-        optChildPeer.deposit(DEPOSIT_AMOUNT);
+        optChildPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
 
         /// @dev assert depositor's USDC balance reduced by the deposit amount
         uint256 usdcBalanceAfter = optUsdc.balanceOf(depositor);
@@ -129,7 +129,7 @@ contract ChildDepositTest is BaseTest {
         uint256 optChildUsdcBalanceBefore = optUsdc.balanceOf(address(optChildPeer));
 
         /// @dev act
-        optChildPeer.deposit(DEPOSIT_AMOUNT);
+        optChildPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
 
         /// @dev assert depositor's USDC balance reduced by the deposit amount
         uint256 usdcBalanceAfter = optUsdc.balanceOf(depositor);
@@ -172,7 +172,7 @@ contract ChildDepositTest is BaseTest {
         uint256 optChildUsdcBalanceBefore = optUsdc.balanceOf(address(optChildPeer));
 
         /// @dev act
-        optChildPeer.deposit(DEPOSIT_AMOUNT);
+        optChildPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
 
         /// @dev assert depositor's USDC balance reduced by the deposit amount
         uint256 usdcBalanceAfter = optUsdc.balanceOf(depositor);
@@ -221,7 +221,7 @@ contract ChildDepositTest is BaseTest {
         uint256 optChildUsdcBalanceBefore = optUsdc.balanceOf(address(optChildPeer));
 
         /// @dev act
-        optChildPeer.deposit(DEPOSIT_AMOUNT);
+        optChildPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
 
         /// @dev assert depositor's USDC balance reduced by the deposit amount
         uint256 usdcBalanceAfter = optUsdc.balanceOf(depositor);
@@ -267,7 +267,7 @@ contract ChildDepositTest is BaseTest {
         uint256 optChildUsdcBalanceBefore = optUsdc.balanceOf(address(optChildPeer));
 
         /// @dev act
-        optChildPeer.deposit(DEPOSIT_AMOUNT);
+        optChildPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
 
         /// @dev assert depositor's USDC balance reduced by the deposit amount
         uint256 usdcBalanceAfter = optUsdc.balanceOf(depositor);

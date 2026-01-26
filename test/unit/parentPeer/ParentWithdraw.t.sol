@@ -26,7 +26,7 @@ contract ParentWithdrawTest is BaseTest {
 
     function test_yield_parent_onTokenTransfer_revertsWhen_notShare() public {
         /// @dev arrange
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
         /// @dev act and assert
         vm.expectRevert(abi.encodeWithSignature("YieldPeer__OnlyShare()"));
         baseParentPeer.onTokenTransfer(msg.sender, DEPOSIT_AMOUNT, "");
@@ -43,7 +43,7 @@ contract ParentWithdrawTest is BaseTest {
     /// @notice Scenario: Withdraw made on Parent chain, where the Strategy is, and the Strategy Protocol is Aave
     function test_yield_parent_withdraw_strategyIsParent_aave_withdrawToLocalChain() public {
         /// @dev arrange
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
         /// @dev sanity checks
         uint256 expectedShareBalance = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
         assertEq(baseShare.balanceOf(withdrawer), expectedShareBalance);
@@ -75,7 +75,7 @@ contract ParentWithdrawTest is BaseTest {
         _changePrank(withdrawer);
 
         /// @dev arrange
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
         /// @dev sanity checks
         uint256 expectedShareBalance = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
         assertEq(baseShare.balanceOf(withdrawer), expectedShareBalance);
@@ -107,7 +107,7 @@ contract ParentWithdrawTest is BaseTest {
         _changePrank(withdrawer);
 
         /// @dev arrange
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
         /// @dev switch to child chain and route ccip message with USDC to deposit to strategy
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
         /// @dev switch back to parent chain and route ccip message with totalValue to calculate shareMintAmount
@@ -142,7 +142,7 @@ contract ParentWithdrawTest is BaseTest {
         _changePrank(withdrawer);
 
         /// @dev arrange
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
         /// @dev switch to child chain and route ccip message with USDC to deposit to strategy
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
         /// @dev switch back to parent chain and route ccip message with totalValue to calculate shareMintAmount
@@ -184,7 +184,7 @@ contract ParentWithdrawTest is BaseTest {
 
         _changePrank(user1);
         baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
 
         uint256 expectedShareBalance = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
         assertEq(baseShare.balanceOf(user1), expectedShareBalance);
@@ -192,12 +192,12 @@ contract ParentWithdrawTest is BaseTest {
 
         _changePrank(user2);
         baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
         console2.log("user2 share balance", baseShare.balanceOf(user2));
 
         _changePrank(user3);
         baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
         console2.log("user3 share balance", baseShare.balanceOf(user3));
 
         uint256 user3ShareBalance = baseShare.balanceOf(user3);
@@ -219,7 +219,7 @@ contract ParentWithdrawTest is BaseTest {
         deal(address(baseUsdc), user4, user4Deposit);
         _changePrank(user4);
         baseUsdc.approve(address(baseParentPeer), user4Deposit);
-        baseParentPeer.deposit(user4Deposit);
+        baseParentPeer.deposit(USDC_ID, user4Deposit);
         console2.log("user4 share balance", baseShare.balanceOf(user4));
     }
 
@@ -227,7 +227,7 @@ contract ParentWithdrawTest is BaseTest {
     function test_yield_parent_withdraw_revertsWhen_strategyPointsToParent_butActiveAdapterIsZero() public {
         /// @dev Arrange: Strategy is on parent with Aave and make a deposit first
         _changePrank(withdrawer);
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
 
         /// @dev Get shares
         uint256 shareBalance = baseShare.balanceOf(withdrawer);

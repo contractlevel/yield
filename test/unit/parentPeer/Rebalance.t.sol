@@ -23,7 +23,7 @@ contract RebalanceTest is BaseTest {
             abi.encodeWithSignature("ParentPeer__StrategyNotSupported(bytes32)", keccak256(abi.encodePacked("invalid")))
         );
         baseParentPeer.rebalance(
-            IYieldPeer.Strategy({chainSelector: baseChainSelector, protocolId: keccak256(abi.encodePacked("invalid"))})
+            IYieldPeer.Strategy({protocolId: keccak256(abi.encodePacked("invalid")), stablecoinId: USDC_ID, chainSelector: baseChainSelector})
         );
     }
 
@@ -31,7 +31,7 @@ contract RebalanceTest is BaseTest {
         _changePrank(address(baseRebalancer));
         vm.expectRevert(abi.encodeWithSignature("YieldPeer__ChainNotAllowed(uint64)", 9999));
         baseParentPeer.rebalance(
-            IYieldPeer.Strategy({chainSelector: 9999, protocolId: keccak256(abi.encodePacked("aave-v3"))})
+            IYieldPeer.Strategy({protocolId: keccak256(abi.encodePacked("aave-v3")), stablecoinId: USDC_ID, chainSelector: 9999})
         );
     }
 
@@ -49,7 +49,7 @@ contract RebalanceTest is BaseTest {
     function test_yield_parentPeer_rebalance_oldParent_newParent() public {
         /// @dev arrange
         /// @notice the current/old strategy chain is the parent (base) whereas the protocl is Aave
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
         /// @dev sanity check
         address aUsdc = _getATokenAddress(baseNetworkConfig.protocols.aavePoolAddressesProvider, address(baseUsdc));
         assertApproxEqAbs(
@@ -82,7 +82,7 @@ contract RebalanceTest is BaseTest {
 
         /// @dev arrange
         /// @notice the current/old strategy chain is the child (opt) and the protocol is Aave
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
         /// @dev sanity check
         address aUsdc = _getATokenAddress(optNetworkConfig.protocols.aavePoolAddressesProvider, address(optUsdc));
@@ -116,7 +116,7 @@ contract RebalanceTest is BaseTest {
 
         /// @dev arrange
         /// @notice strategy chain selector here is the parent (base)
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
         /// @dev sanity check
         address aUsdc = _getATokenAddress(baseNetworkConfig.protocols.aavePoolAddressesProvider, address(baseUsdc));
         assertApproxEqAbs(
@@ -149,7 +149,7 @@ contract RebalanceTest is BaseTest {
 
         /// @dev arrange
         /// @notice the current/old strategy chain is the child (opt) and the protocol is Aave
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
         /// @dev sanity check
         address aUsdc = _getATokenAddress(optNetworkConfig.protocols.aavePoolAddressesProvider, address(optUsdc));
@@ -187,7 +187,7 @@ contract RebalanceTest is BaseTest {
 
         /// @dev arrange
         /// @notice the current/old strategy chain is the child (opt) and the protocol is Aave
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
         /// @dev sanity check
         address aUsdc = _getATokenAddress(optNetworkConfig.protocols.aavePoolAddressesProvider, address(optUsdc));
@@ -220,7 +220,7 @@ contract RebalanceTest is BaseTest {
         _changePrank(holder);
         vm.expectRevert(abi.encodeWithSignature("ParentPeer__OnlyRebalancer()"));
         baseParentPeer.rebalance(
-            IYieldPeer.Strategy({chainSelector: baseChainSelector, protocolId: keccak256(abi.encodePacked("aave-v3"))})
+            IYieldPeer.Strategy({protocolId: keccak256(abi.encodePacked("aave-v3")), stablecoinId: USDC_ID, chainSelector: baseChainSelector})
         );
     }
 }

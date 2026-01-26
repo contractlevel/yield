@@ -24,7 +24,7 @@ contract TokenTest is BaseTest {
         deal(address(baseUsdc), holder, DEPOSIT_AMOUNT);
         _changePrank(holder);
         baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
 
         uint256 fee = _getFee(DEPOSIT_AMOUNT);
         uint256 userPrincipal = DEPOSIT_AMOUNT - fee;

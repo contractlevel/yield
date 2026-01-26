@@ -45,7 +45,7 @@ contract CCIPOperationsTest is BaseTest {
         uint256 fees = IRouterClient(ccipRouter).getFee(optChainSelector, evm2AnyMessage);
         /// @dev act/assert
         vm.expectRevert(abi.encodeWithSignature("CCIPOperations__NotEnoughLink(uint256,uint256)", 0, fees));
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
     }
 
     function test_yield_ccipOperations_validateTokenAmounts_revertsWhen_invalidToken() public {

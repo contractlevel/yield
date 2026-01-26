@@ -28,7 +28,7 @@ contract WithdrawFeesTest is BaseTest {
         /// @dev arrange
         _changePrank(depositor);
         baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
 
         uint256 feeWithdrawerBalanceBefore = baseUsdc.balanceOf(feeWithdrawer);
 

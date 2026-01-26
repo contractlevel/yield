@@ -32,7 +32,7 @@ contract OnReportTest is BaseTest {
     function test_yield_rebalancer_onReport_decodesReport() public {
         // Arrange
         IYieldPeer.Strategy memory newStrategy =
-            IYieldPeer.Strategy({chainSelector: baseChainSelector, protocolId: compoundV3ProtocolId});
+            IYieldPeer.Strategy({protocolId: compoundV3ProtocolId, stablecoinId: USDC_ID, chainSelector: baseChainSelector});
         bytes memory encodedReport =
             WorkflowHelpers.createWorkflowReport(newStrategy.chainSelector, newStrategy.protocolId);
 
@@ -68,7 +68,7 @@ contract OnReportTest is BaseTest {
     function test_yield_rebalancer_onReport_strategyConsistency() public {
         /// @dev Arrange
         IYieldPeer.Strategy memory newStrategy =
-            IYieldPeer.Strategy({chainSelector: optChainSelector, protocolId: compoundV3ProtocolId});
+            IYieldPeer.Strategy({protocolId: compoundV3ProtocolId, stablecoinId: USDC_ID, chainSelector: optChainSelector});
         bytes memory encodedReport =
             WorkflowHelpers.createWorkflowReport(newStrategy.chainSelector, newStrategy.protocolId);
 
@@ -138,11 +138,11 @@ contract OnReportTest is BaseTest {
 
         _changePrank(depositor);
         baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
 
         // Create workflow report
         IYieldPeer.Strategy memory newStrategy =
-            IYieldPeer.Strategy({chainSelector: baseChainSelector, protocolId: compoundV3ProtocolId});
+            IYieldPeer.Strategy({protocolId: compoundV3ProtocolId, stablecoinId: USDC_ID, chainSelector: baseChainSelector});
         bytes memory encodedReport =
             WorkflowHelpers.createWorkflowReport(newStrategy.chainSelector, newStrategy.protocolId);
 
@@ -185,11 +185,11 @@ contract OnReportTest is BaseTest {
         deal(address(baseUsdc), depositor, DEPOSIT_AMOUNT);
         _changePrank(depositor);
         baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
 
         // Create workflow report & cache TVL to verify in event
         IYieldPeer.Strategy memory newStrategy =
-            IYieldPeer.Strategy({chainSelector: optChainSelector, protocolId: aaveV3ProtocolId});
+            IYieldPeer.Strategy({protocolId: aaveV3ProtocolId, stablecoinId: USDC_ID, chainSelector: optChainSelector});
         bytes memory encodedReport =
             WorkflowHelpers.createWorkflowReport(newStrategy.chainSelector, newStrategy.protocolId);
         uint256 totalValue = baseParentPeer.getTotalValue();
@@ -231,7 +231,7 @@ contract OnReportTest is BaseTest {
 
         // Create workflow report
         IYieldPeer.Strategy memory newStrategy =
-            IYieldPeer.Strategy({chainSelector: optChainSelector, protocolId: aaveV3ProtocolId});
+            IYieldPeer.Strategy({protocolId: aaveV3ProtocolId, stablecoinId: USDC_ID, chainSelector: optChainSelector});
         bytes memory encodedReport =
             WorkflowHelpers.createWorkflowReport(newStrategy.chainSelector, newStrategy.protocolId);
 

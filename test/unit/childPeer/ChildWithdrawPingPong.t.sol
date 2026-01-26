@@ -28,7 +28,7 @@ contract ChildWithdrawPingPongTest is BaseTest {
 
         /// @dev arrange
         /// @notice strategy chain selector here is the parent (base)
-        baseParentPeer.deposit(DEPOSIT_AMOUNT);
+        baseParentPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
         uint256 expectedShareBalance = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
         /// @dev sanity check
         address aUsdc = _getATokenAddress(baseNetworkConfig.protocols.aavePoolAddressesProvider, address(baseUsdc));

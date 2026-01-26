@@ -42,7 +42,7 @@ contract ParentDepositPingPongTest is BaseTest {
         uint256 userPrincipal = DEPOSIT_AMOUNT - fee;
 
         /// @dev act: Deposit on OPT child
-        optChildPeer.deposit(DEPOSIT_AMOUNT);
+        optChildPeer.deposit(USDC_ID, DEPOSIT_AMOUNT);
 
         /// @dev Route: OPT -> Parent (DepositToParent)
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);

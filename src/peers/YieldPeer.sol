@@ -14,6 +14,8 @@ import {DataStructures} from "../libraries/DataStructures.sol";
 import {CCIPOperations} from "../libraries/CCIPOperations.sol";
 import {IStrategyAdapter} from "../interfaces/IStrategyAdapter.sol";
 import {IStrategyRegistry} from "../interfaces/IStrategyRegistry.sol";
+import {IStablecoinRegistry} from "../interfaces/IStablecoinRegistry.sol";
+import {ISwapper} from "../interfaces/ISwapper.sol";
 import {YieldFees} from "../modules/YieldFees.sol";
 
 /// @title YieldPeer
@@ -54,6 +56,12 @@ abstract contract YieldPeer is
     uint256 internal constant SHARE_DECIMALS = 1e18;
     /// @dev Constant for the initial share precision used to calculate the mint amount for first deposit
     uint256 internal constant INITIAL_SHARE_PRECISION = SHARE_DECIMALS / USDC_DECIMALS;
+    /// @dev Constant for the USDC stablecoin ID - keccak256("USDC")
+    bytes32 internal constant USDC_ID = 0xd6aca1be9729c13d677335161321649cccae6a591554772516700f986f942eaa;
+    /// @dev Maximum slippage in basis points for stablecoin swaps (50 bps = 0.5%)
+    uint256 internal constant MAX_SLIPPAGE_BPS = 50;
+    /// @dev Basis points denominator
+    uint256 internal constant BPS_DENOMINATOR = 10_000;
 
     /// @dev Chainlink token
     LinkTokenInterface internal immutable i_link;
@@ -76,6 +84,12 @@ abstract contract YieldPeer is
     address internal s_strategyRegistry;
     /// @dev The active strategy adapter
     address internal s_activeStrategyAdapter;
+    /// @dev The stablecoin registry
+    address internal s_stablecoinRegistry;
+    /// @dev The swapper contract for stablecoin swaps
+    address internal s_swapper;
+    /// @dev The active stablecoin ID for the current strategy (tracked for rebalancing)
+    bytes32 internal s_activeStablecoinId;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -88,6 +102,12 @@ abstract contract YieldPeer is
     event CCIPGasLimitSet(uint256 indexed gasLimit);
     /// @notice Emitted when the strategy registry is set
     event StrategyRegistrySet(address indexed strategyRegistry);
+    /// @notice Emitted when the stablecoin registry is set
+    event StablecoinRegistrySet(address indexed stablecoinRegistry);
+    /// @notice Emitted when the swapper is set
+    event SwapperSet(address indexed swapper);
+    /// @notice Emitted when stablecoins are swapped
+    event StablecoinsSwapped(address indexed tokenIn, address indexed tokenOut, uint256 amountIn, uint256 amountOut);
 
     /// @notice Emitted when the strategy pool is updated
     event ActiveStrategyAdapterUpdated(address indexed activeStrategyAdapter);
@@ -150,10 +170,12 @@ abstract contract YieldPeer is
     /*//////////////////////////////////////////////////////////////
                                 EXTERNAL
     //////////////////////////////////////////////////////////////*/
-    /// @dev Depositors must approve address(this) for spending on USDC contract
+    /// @notice Deposit any supported stablecoin into the system
+    /// @dev Depositors must approve address(this) for spending the stablecoin
     /// @notice This function is overridden and implemented in the ChildPeer and ParentPeer contracts
-    /// @dev Revert if amountToDeposit is less than 1e6 (1 USDC)
-    function deposit(uint256 amountToDeposit) external virtual;
+    /// @param stablecoinId The stablecoin ID (e.g., keccak256("USDC"))
+    /// @param amount The amount of stablecoin to deposit
+    function deposit(bytes32 stablecoinId, uint256 amount) external virtual;
 
     /// @notice ERC677Receiver interface implementation
     /// @dev This function is called when the Share token is transferAndCall'd to this contract
@@ -238,18 +260,31 @@ abstract contract YieldPeer is
     /// @notice Handles the CCIP message for a rebalance new strategy
     /// @notice The message this function handles is sent by the old strategy when the strategy is updated
     /// @dev Updates the strategy pool to the new strategy
-    /// @dev Deposits USDC totalValue of the system into the new strategy
-    /// @param tokenAmounts The token amounts received in the CCIP message
-    /// @param data The data to decode - decodes to Strategy (chainSelector, protocolId)
+    /// @dev Swaps USDC to target stablecoin if needed, then deposits into the new strategy
+    /// @param tokenAmounts The token amounts received in the CCIP message (USDC from CCIP bridge)
+    /// @param data The data to decode - decodes to Strategy (chainSelector, protocolId, stablecoinId)
     function _handleCCIPRebalanceNewStrategy(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data) internal {
         /// @dev update strategy pool to protocol on this chain
         Strategy memory newStrategy = abi.decode(data, (Strategy));
         address newActiveStrategyAdapter =
             _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
 
+        /// @dev update active stablecoin ID
+        _updateActiveStablecoinId(newStrategy.chainSelector, newStrategy.stablecoinId);
+
         /// @dev compare 0 amounts for the scenario a strategy rebalance occurs when there have been no deposits
-        /// @dev deposit to the new strategy
-        if (tokenAmounts.length > 0) _depositToStrategy(newActiveStrategyAdapter, tokenAmounts[0].amount);
+        if (tokenAmounts.length > 0 && tokenAmounts[0].amount > 0) {
+            uint256 amountToDeposit = tokenAmounts[0].amount;
+
+            /// @dev CCIP bridges USDC, so swap to target stablecoin if needed
+            if (newStrategy.stablecoinId != USDC_ID) {
+                address targetStablecoin = _getStablecoinAddress(newStrategy.stablecoinId);
+                amountToDeposit = _swapStablecoins(address(i_usdc), targetStablecoin, amountToDeposit);
+            }
+
+            /// @dev deposit to the new strategy
+            _depositToStrategy(newActiveStrategyAdapter, amountToDeposit);
+        }
     }
 
     /// @notice Internal helper to handle active strategy adapter updates
@@ -268,6 +303,23 @@ abstract contract YieldPeer is
         }
 
         emit ActiveStrategyAdapterUpdated(newActiveStrategyAdapter);
+    }
+
+    /// @notice Internal helper to update the active stablecoin ID
+    /// @param chainSelector The chain selector for the strategy
+    /// @param stablecoinId The stablecoin ID for the strategy
+    function _updateActiveStablecoinId(uint64 chainSelector, bytes32 stablecoinId) internal {
+        if (chainSelector == i_thisChainSelector) {
+            s_activeStablecoinId = stablecoinId;
+        } else {
+            s_activeStablecoinId = bytes32(0);
+        }
+    }
+
+    /// @notice Get the active stablecoin ID
+    /// @return activeStablecoinId The active stablecoin ID
+    function _getActiveStablecoinId() internal view returns (bytes32 activeStablecoinId) {
+        activeStablecoinId = s_activeStablecoinId;
     }
 
     /// @notice Internal helper to deposit to the strategy
@@ -289,6 +341,47 @@ abstract contract YieldPeer is
     function _withdrawFromStrategy(address strategyAdapter, uint256 amount) internal {
         emit WithdrawFromStrategy(strategyAdapter, amount);
         IStrategyAdapter(strategyAdapter).withdraw(address(i_usdc), amount);
+    }
+
+    /// @notice Internal helper to swap stablecoins using the configured swapper
+    /// @param tokenIn The address of the token to swap from
+    /// @param tokenOut The address of the token to swap to
+    /// @param amountIn The amount of tokenIn to swap
+    /// @return amountOut The actual amount of tokenOut received
+    function _swapStablecoins(address tokenIn, address tokenOut, uint256 amountIn)
+        internal
+        returns (uint256 amountOut)
+    {
+        if (tokenIn == tokenOut || amountIn == 0) return amountIn;
+
+        address swapper = s_swapper;
+        if (swapper == address(0)) revert YieldPeer__NoZeroAmount(); // Using existing error for missing swapper
+
+        // Calculate minimum amount out with slippage protection
+        uint256 amountOutMin = (amountIn * (BPS_DENOMINATOR - MAX_SLIPPAGE_BPS)) / BPS_DENOMINATOR;
+
+        // Approve swapper to spend tokens
+        IERC20(tokenIn).safeIncreaseAllowance(swapper, amountIn);
+
+        // Execute swap
+        amountOut = ISwapper(swapper).swapAssets(tokenIn, tokenOut, amountIn, amountOutMin);
+
+        emit StablecoinsSwapped(tokenIn, tokenOut, amountIn, amountOut);
+    }
+
+    /// @notice Internal helper to get a stablecoin address from its ID
+    /// @param stablecoinId The stablecoin ID (e.g., keccak256("usdc"))
+    /// @return stablecoin The stablecoin address
+    function _getStablecoinAddress(bytes32 stablecoinId) internal view returns (address stablecoin) {
+        // If it's USDC, return the immutable USDC address
+        if (stablecoinId == USDC_ID) {
+            return address(i_usdc);
+        }
+        // Otherwise, look it up in the stablecoin registry
+        address registry = s_stablecoinRegistry;
+        if (registry != address(0)) {
+            stablecoin = IStablecoinRegistry(registry).getStablecoin(stablecoinId);
+        }
     }
 
     /// @notice Deposits USDC to the strategy and returns the total value of the system
@@ -317,24 +410,23 @@ abstract contract YieldPeer is
         if (usdcWithdrawAmount != 0) _withdrawFromStrategy(activeStrategyAdapter, usdcWithdrawAmount);
     }
 
-    /// @notice Initiates a deposit
-    /// @param amountToDeposit The amount of USDC to deposit
-    /// @dev Revert if amountToDeposit is less than 1e6 (1 USDC)
-    /// @dev Transfer USDC from msg.sender to this contract
-    /// @dev Emit DepositInitiated event
-    /// @dev Takes a fee and emits FeeTaken event (if fee rate is not 0)
-    /// @return amountToDepositMinusFee The amount of USDC deposited by the user minus the fee
-    function _initiateDeposit(uint256 amountToDeposit) internal returns (uint256 amountToDepositMinusFee) {
-        if (amountToDeposit < USDC_DECIMALS) revert YieldPeer__InsufficientAmount();
-        _transferUsdcFrom(msg.sender, address(this), amountToDeposit);
+    /// @notice Initiates a deposit with any supported stablecoin
+    /// @param stablecoinId The stablecoin ID (e.g., keccak256("USDC"))
+    /// @param amount The amount of stablecoin to deposit
+    /// @return amountMinusFee The amount to deposit after fee deduction
+    function _initiateDeposit(bytes32 stablecoinId, uint256 amount) internal returns (uint256 amountMinusFee) {
+        if (amount < USDC_DECIMALS) revert YieldPeer__InsufficientAmount();
 
-        /// @dev take fee
-        uint256 fee = _calculateFee(amountToDeposit);
-        // @review gas optimize here? do calculation inside conditional?
-        amountToDepositMinusFee = amountToDeposit - fee;
+        address stablecoin = _getStablecoinAddress(stablecoinId);
+        if (stablecoin == address(0)) revert YieldPeer__ChainNotAllowed(0);
+
+        IERC20(stablecoin).safeTransferFrom(msg.sender, address(this), amount);
+
+        uint256 fee = _calculateFee(amount);
+        amountMinusFee = amount - fee;
         if (fee > 0) emit FeeTaken(fee);
 
-        emit DepositInitiated(msg.sender, amountToDepositMinusFee, i_thisChainSelector);
+        emit DepositInitiated(msg.sender, amountMinusFee, i_thisChainSelector);
     }
 
     // @review:stablecoins we will update 2 helpers these in the additional/modular stablecoins task
@@ -524,6 +616,24 @@ abstract contract YieldPeer is
         emit StrategyRegistrySet(strategyRegistry);
     }
 
+    /// @notice Set the stablecoin registry
+    /// @param stablecoinRegistry The stablecoin registry to set
+    /// @dev Access control: CONFIG_ADMIN_ROLE
+    //slither-disable-next-line missing-zero-check
+    function setStablecoinRegistry(address stablecoinRegistry) external onlyRole(Roles.CONFIG_ADMIN_ROLE) {
+        s_stablecoinRegistry = stablecoinRegistry;
+        emit StablecoinRegistrySet(stablecoinRegistry);
+    }
+
+    /// @notice Set the swapper contract
+    /// @param swapper The swapper contract to set
+    /// @dev Access control: CONFIG_ADMIN_ROLE
+    //slither-disable-next-line missing-zero-check
+    function setSwapper(address swapper) external onlyRole(Roles.CONFIG_ADMIN_ROLE) {
+        s_swapper = swapper;
+        emit SwapperSet(swapper);
+    }
+
     /*//////////////////////////////////////////////////////////////
                                  GETTER
     //////////////////////////////////////////////////////////////*/
@@ -600,6 +710,18 @@ abstract contract YieldPeer is
     /// @return strategyRegistry The strategy registry address
     function getStrategyRegistry() external view returns (address strategyRegistry) {
         strategyRegistry = s_strategyRegistry;
+    }
+
+    /// @notice Get the stablecoin registry
+    /// @return stablecoinRegistry The stablecoin registry address
+    function getStablecoinRegistry() external view returns (address stablecoinRegistry) {
+        stablecoinRegistry = s_stablecoinRegistry;
+    }
+
+    /// @notice Get the swapper contract
+    /// @return swapper The swapper contract address
+    function getSwapper() external view returns (address swapper) {
+        swapper = s_swapper;
     }
 
     /// @dev Used to override/resolve conflict of multiple contracts implementing this.

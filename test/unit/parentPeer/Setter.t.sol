@@ -30,13 +30,13 @@ contract SetterTest is BaseTest {
         vm.expectRevert(
             abi.encodeWithSignature("AccessControlUnauthorizedAccount(address,bytes32)", holder, DEFAULT_ADMIN_ROLE)
         );
-        baseParentPeer.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")));
+        baseParentPeer.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")), USDC_ID);
     }
 
     function test_yield_parentPeer_setInitialActiveStrategy_revertsWhen_alreadySet() public {
         _changePrank(baseParentPeer.owner());
         vm.expectRevert(abi.encodeWithSignature("ParentPeer__InitialActiveStrategyAlreadySet()"));
-        baseParentPeer.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")));
+        baseParentPeer.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")), USDC_ID);
     }
 
     function test_yield_parentPeer_setInitialActiveStrategy_success() public view {

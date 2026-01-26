@@ -33,6 +33,8 @@ contract Handler is Test {
     uint256 internal constant MIN_DEPOSIT_AMOUNT = 1_000_000;
     uint256 internal constant INITIAL_DEPOSIT_AMOUNT = 100_000_000;
     uint256 internal constant POOL_DEAL_AMOUNT = 1_000_000_000_000_000_000; // 1T USDC
+    /// @dev USDC stablecoin ID - keccak256("USDC")
+    bytes32 internal constant USDC_ID = 0xd6aca1be9729c13d677335161321649cccae6a591554772516700f986f942eaa;
 
     ParentPeer internal parent;
     ChildPeer internal child1;
@@ -368,7 +370,7 @@ contract Handler is Test {
     function _deposit(address depositor, uint256 depositAmount, address peer) internal {
         _changePrank(depositor);
         usdc.approve(peer, depositAmount);
-        IYieldPeer(peer).deposit(depositAmount);
+        IYieldPeer(peer).deposit(USDC_ID, depositAmount);
         _stopPrank();
     }
 
@@ -525,7 +527,7 @@ contract Handler is Test {
 
                 /// @dev store the decoded strategy in ghost state
                 ghost_event_lastCREReceivedStrategy =
-                    IYieldPeer.Strategy({chainSelector: decodedChainSelector, protocolId: decodedProtocolId});
+                    IYieldPeer.Strategy({protocolId: decodedProtocolId, stablecoinId: USDC_ID, chainSelector: decodedChainSelector});
                 /// @dev log decoded strategy for debugging
                 console2.log("Decoded Report - chainSelector:", decodedChainSelector);
                 console2.log("Decoded Report - protocolId:");
@@ -636,7 +638,7 @@ contract Handler is Test {
         _changePrank(admin);
         deal(address(usdc), admin, INITIAL_DEPOSIT_AMOUNT);
         usdc.approve(address(parent), INITIAL_DEPOSIT_AMOUNT);
-        parent.deposit(INITIAL_DEPOSIT_AMOUNT);
+        parent.deposit(USDC_ID, INITIAL_DEPOSIT_AMOUNT);
         _updateDepositGhosts(admin, INITIAL_DEPOSIT_AMOUNT);
         _handleDepositLogs();
     }
