@@ -49,15 +49,32 @@ contract AaveV3Adapter is StrategyAdapter {
 
     /// @notice Withdraws USDC from the Aave V3 pool
     /// @param usdc The USDC token address
-    /// @param amount The amount of USDC to withdraw
-    /// @dev Transfers the USDC to the yield peer
+    /// @param amount The amount of USDC to withdraw (use type(uint256).max to withdraw all)
+    /// @dev Transfers the actual withdrawn amount to the yield peer
     function withdraw(address usdc, uint256 amount) external onlyYieldPeer {
-        emit Withdraw(usdc, amount);
-
         address aavePool = _getAavePool();
-        uint256 withdrawnAmount = IPool(aavePool).withdraw(usdc, amount, address(this));
-        if (withdrawnAmount != amount) revert AaveV3Adapter__IncorrectWithdrawAmount();
-        _transferTokenTo(usdc, i_yieldPeer, amount);
+        uint256 withdrawnAmount;
+
+        // Case 1: Rebalance Withdraw (MAX sentinel)
+        if (amount == type(uint256).max) {
+            // Get expected balance before withdraw
+            uint256 totalValue = _getTotalValue(usdc, aavePool);
+
+            // Aave handles MAX sentinel internally and withdraws all available balance
+            withdrawnAmount = IPool(aavePool).withdraw(usdc, amount, address(this));
+
+            // Verify we got at least the expected total value (allows for interest accrual)
+            // Aave should return exactly totalValue, but we allow >= to handle edge cases
+            if (withdrawnAmount < totalValue) revert AaveV3Adapter__IncorrectWithdrawAmount();
+        }
+        // Case 2: User Withdraw
+        else {
+            withdrawnAmount = IPool(aavePool).withdraw(usdc, amount, address(this));
+            // Only revert if we got less than requested (allows for interest accrual)
+            if (withdrawnAmount < amount) revert AaveV3Adapter__IncorrectWithdrawAmount();
+        }
+        emit Withdraw(usdc, withdrawnAmount);
+        _transferTokenTo(usdc, i_yieldPeer, withdrawnAmount);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -69,6 +86,16 @@ contract AaveV3Adapter is StrategyAdapter {
         aavePool = IPoolAddressesProvider(i_aavePoolAddressesProvider).getPool();
     }
 
+    /// @notice Internal function to get total value
+    /// @param usdc The USDC token address
+    /// @param aavePool The Aave pool address
+    /// @return totalValue The total value of USDC in the Aave V3 pool
+    function _getTotalValue(address usdc, address aavePool) internal view returns (uint256 totalValue) {
+        DataTypes.ReserveDataLegacy memory reserveData = IPool(aavePool).getReserveData(usdc);
+        address aTokenAddress = reserveData.aTokenAddress;
+        totalValue = IERC20(aTokenAddress).balanceOf(address(this));
+    }
+
     /*//////////////////////////////////////////////////////////////
                                  GETTER
     //////////////////////////////////////////////////////////////*/
@@ -76,10 +103,7 @@ contract AaveV3Adapter is StrategyAdapter {
     /// @param usdc The USDC token address
     /// @return totalValue The total value of the USDC in the Aave V3 pool
     function getTotalValue(address usdc) external view returns (uint256 totalValue) {
-        address aavePool = _getAavePool();
-        DataTypes.ReserveDataLegacy memory reserveData = IPool(aavePool).getReserveData(usdc);
-        address aTokenAddress = reserveData.aTokenAddress;
-        totalValue = IERC20(aTokenAddress).balanceOf(address(this));
+        totalValue = _getTotalValue(usdc, _getAavePool());
     }
 
     /// @notice Gets the pool addresses provider

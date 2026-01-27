@@ -217,4 +217,59 @@ contract ChildWithdrawTest is BaseTest {
             "USDC balance should be approximately equal to deposit amount"
         );
     }
+
+    // Scenario: Strategy is on the same chain as the child the withdrawal was initiated. Strategy is Aave.
+    // Withdraw chain selector is a different chain
+    function test_yield_child_withdraw_strategyIsChild_aave_withdrawToDifferentChain() public {
+        _setStrategy(optChainSelector, keccak256(abi.encodePacked("aave-v3")), SET_CROSS_CHAIN);
+        _selectFork(optFork);
+        _changePrank(withdrawer);
+
+        /// @dev arrange
+        optChildPeer.deposit(DEPOSIT_AMOUNT);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
+
+        uint256 expectedShareBalance = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
+
+        bytes memory encodedWithdrawChainSelector = abi.encode(baseChainSelector);
+
+        /// @dev act
+        optShare.transferAndCall(address(optChildPeer), expectedShareBalance, encodedWithdrawChainSelector);
+        assertEq(optShare.balanceOf(withdrawer), 0);
+        assertEq(optShare.totalSupply(), 0);
+
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
+
+        /// @dev assert
+        assertApproxEqAbs(
+            baseUsdc.balanceOf(withdrawer),
+            DEPOSIT_AMOUNT,
+            BALANCE_TOLERANCE,
+            "USDC balance should be approximately equal to deposit amount"
+        );
+    }
+
+    function test_yield_child_onTokenTransfer_revertsWhen_withdrawChainNotAllowed() public {
+        _setStrategy(optChainSelector, keccak256(abi.encodePacked("compound-v3")), SET_CROSS_CHAIN);
+        _selectFork(optFork);
+        _changePrank(withdrawer);
+
+        /// @dev arrange
+        optChildPeer.deposit(DEPOSIT_AMOUNT);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
+
+        /// @dev sanity checks
+        uint256 expectedShareBalance = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
+        assertEq(optShare.balanceOf(withdrawer), expectedShareBalance);
+
+        bytes memory invalidWithdrawChainSelector = abi.encode(1);
+
+        /// @dev act/assert
+        vm.expectRevert(abi.encodeWithSignature("YieldPeer__ChainNotAllowed(uint64)", uint64(1)));
+        optShare.transferAndCall(address(optChildPeer), expectedShareBalance, invalidWithdrawChainSelector);
+    }
 }

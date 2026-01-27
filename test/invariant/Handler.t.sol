@@ -16,6 +16,7 @@ import {
     WorkflowHelpers
 } from "../BaseTest.t.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {IStrategyAdapter} from "../../src/interfaces/IStrategyAdapter.sol";
 
 /// @notice This contract is used to handle fuzzed interactions with the external functions of the system to test invariants.
 contract Handler is Test {
@@ -97,6 +98,13 @@ contract Handler is Test {
     uint256 public ghost_event_depositInitiated_emissions;
     /// @dev incremented by 1 everytime a ShareMintUpdate event is emitted
     uint256 public ghost_event_shareMintUpdate_emissions;
+
+    // MAX Sentinel Testing Ghost Variables
+    uint256 public ghost_maxSentinelWithdrawals;
+    uint256 public ghost_maxSentinelFailures;
+    uint256 public ghost_maxSentinelReceived; // actualWithdrawn amount
+    uint256 public ghost_maxSentinelExpected; // totalValue that was checked
+    uint256 public ghost_maxSentinelAdapterBalanceAfter; // adapter balance after MAX withdrawal
 
     /// @dev incremented by 1 everytime a WithdrawCompleted event is emitted
     uint256 public ghost_event_withdrawCompleted_emissions;
@@ -280,6 +288,64 @@ contract Handler is Test {
         /// @dev update the ghost state
         _updateWithdrawGhosts(withdrawer, shareBurnAmount);
         _handleWithdrawLogs();
+    }
+
+    /// @notice This function tests MAX sentinel withdrawal through YieldPeer
+    /// @param chainSelectorSeed the seed used to get the chain selector
+    function testMaxSentinelWithdraw(uint256 chainSelectorSeed) public {
+        uint64 chainSelector = uint64(bound(chainSelectorSeed, 1, 3));
+        this._testMaxSentinelWithdrawInternal(chainSelector);
+    }
+
+    function _testMaxSentinelWithdrawInternal(uint64 chainSelector) external {
+        /// @dev ensure the pools have enough liquidity
+        _dealPoolsUsdc();
+
+        /// @dev only test MAX sentinel for the active chain selector
+        if (chainSelector != parent.getStrategy().chainSelector) return;
+
+        address peer = chainSelectorsToPeers[chainSelector];
+        if (peer == address(0)) return;
+
+        /// @dev get the active adapter for this yield peer
+        IYieldPeer yieldPeer = IYieldPeer(peer);
+        address activeAdapter = yieldPeer.getActiveStrategyAdapter();
+        if (activeAdapter == address(0)) return;
+
+        /// @dev check adapter has funds before attempting MAX sentinel withdrawal
+        uint256 totalValueBefore = IStrategyAdapter(activeAdapter).getTotalValue(address(usdc));
+        if (totalValueBefore == 0) return;
+
+        uint256 peerUsdcBefore = usdc.balanceOf(peer);
+        this._executeMaxSentinelWithdraw(peer, activeAdapter, totalValueBefore, peerUsdcBefore);
+    }
+
+    function _executeMaxSentinelWithdraw(
+        address peer,
+        address activeAdapter,
+        uint256 totalValueBefore,
+        uint256 peerUsdcBefore
+    ) external {
+        _changePrank(peer);
+
+        /// @dev execute MAX sentinel withdrawal - should withdraw all protocol balance
+        IStrategyAdapter(activeAdapter).withdraw(address(usdc), type(uint256).max);
+
+        /// @dev update the ghost state for invariant verification
+        ghost_maxSentinelWithdrawals++;
+        ghost_maxSentinelExpected = totalValueBefore;
+
+        /// @dev calculate actual amount withdrawn by comparing peer balances
+        uint256 peerUsdcAfter = usdc.balanceOf(peer);
+        uint256 actualWithdrawn = peerUsdcAfter > peerUsdcBefore ? peerUsdcAfter - peerUsdcBefore : 0;
+
+        ghost_maxSentinelReceived = actualWithdrawn;
+
+        /// @dev verify adapter balance after MAX sentinel withdrawal (should be 0)
+        uint256 adapterBalanceAfter = IStrategyAdapter(activeAdapter).getTotalValue(address(usdc));
+        ghost_maxSentinelAdapterBalanceAfter = adapterBalanceAfter;
+
+        _stopPrank();
     }
 
     /// @notice This function handles rebalancer cre reports

@@ -18,6 +18,7 @@ contract MockAavePool {
 
     error InvalidInterestRate();
     error InvalidAmount();
+    error NotEnoughAvailableUserBalance();
 
     function supply(address asset, uint256 amount, address onBehalfOf, uint16) external {
         // if (amount == 0) revert InvalidAmount();
@@ -33,21 +34,34 @@ contract MockAavePool {
     }
 
     function withdraw(address asset, uint256 amount, address to) external returns (uint256) {
-        // Calculate interest accrued
-        uint256 interestAccrued = _calculateInterest(to);
-        s_balances[to] += interestAccrued;
+    
+        // Calculate interest accrued for the caller
+        uint256 interestAccrued = _calculateInterest(msg.sender);
+        s_balances[msg.sender] += interestAccrued;
 
-        // Check if user has enough balance
-        require(s_balances[to] >= amount, "Insufficient balance");
+        // Get caller's balance
+        uint256 userBalance = s_balances[msg.sender];
 
-        // Update balances and timestamp
-        s_balances[to] -= amount;
-        s_lastUpdateTimestamp[to] = block.timestamp;
+        // Handle MAX sentinel like real Aave V3
+        uint256 amountToWithdraw = amount;
+        if (amount == type(uint256).max) {
+            amountToWithdraw = userBalance;
+        }
 
-        // Transfer asset back to user
-        IERC20(asset).transfer(to, amount);
+        // Revert if insufficient balance (like real Aave V3)
+        if (amountToWithdraw > userBalance) {
+            revert NotEnoughAvailableUserBalance();
+        }
 
-        return amount;
+        // Update caller's balance and timestamp
+        s_balances[msg.sender] -= amountToWithdraw;
+        s_lastUpdateTimestamp[msg.sender] = block.timestamp;
+
+        // Transfer asset to recipient (to)
+        IERC20(asset).transfer(to, amountToWithdraw);
+
+        
+        return amountToWithdraw;
     }
 
     function getReserveData(address) external view returns (DataTypes.ReserveDataLegacy memory) {
