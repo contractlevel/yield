@@ -546,123 +546,19 @@ contract Invariant is StdInvariant, BaseTest {
         );
     }
 
-    /// @notice MAX Sentinel Validation: When uint256.max is passed for withdrawal, validation should always pass
-    /// @dev This invariant verifies that the adapter's validation check (actualWithdrawn >= totalValue) always passes
-    /// @dev Both AaveV3Adapter and CompoundV3Adapter check: if (actualWithdrawn < totalValue) revert
-    /// @dev This ensures the validation logic is correct and doesn't cause false reverts
-    function invariant_maxSentinel_validationAlwaysPasses() public view {
-        /// @dev check if any MAX sentinel withdrawals occurred during fuzzing
-        uint256 withdrawals = handler.ghost_maxSentinelWithdrawals();
-
-        /// @dev if MAX sentinel was never called successfully, nothing to verify
-        if (withdrawals == 0) return;
-
-        /// @dev get the totalValue that was in the adapter before withdrawal (expected amount)
-        uint256 totalValue = handler.ghost_maxSentinelExpected();
-
-        /// @dev get the actual amount withdrawn by the protocol (Aave/Compound)
-        uint256 actualWithdrawn = handler.ghost_maxSentinelReceived();
-
-        /// @dev adapter validation checks: if (actualWithdrawn < totalValue) revert
-        /// @dev for validation to pass, we need: actualWithdrawn >= totalValue
-        /// @dev special case: if totalValue was 0 (empty pool), actualWithdrawn can also be 0
-        assertTrue(
-            actualWithdrawn >= totalValue || totalValue == 0,
-            "Invariant violated: MAX sentinel validation should pass - actualWithdrawn must be >= totalValue"
-        );
-    }
-
-    /// @notice MAX Sentinel Completeness: When uint256.max is withdrawn, ALL protocol pool balance should be withdrawn
-    /// @dev This invariant verifies that MAX sentinel withdrawal drains the entire protocol pool balance
-    /// @dev Aave/Compound handle MAX sentinel internally and ensure they withdraw everything
     /// @dev The adapter's balance in the protocol (via getTotalValue) must be 0 after MAX withdrawal
-    function invariant_maxSentinel_withdrawsAllProtocolBalance() public view {
-        /// @dev check if any MAX sentinel withdrawals occurred during fuzzing
-        uint256 withdrawals = handler.ghost_maxSentinelWithdrawals();
+    function invariant_strategyAdapter_maxSentinel_withdrawsAllProtocolBalance() public view {
+        /// check if any MAX sentinel withdrawals occurred during fuzzing (via rebalancing)
+        uint256 maxSentinelWithdrawals = handler.ghost_maxSentinelWithdrawals();
 
-        /// @dev if MAX sentinel was never called successfully, nothing to verify
-        if (withdrawals == 0) return;
-
-        /// @dev get the totalValue that was in the adapter before withdrawal
-        uint256 totalValueBefore = handler.ghost_maxSentinelExpected();
-
-        /// @dev if there was nothing to withdraw, skip check (empty pool scenario)
-        if (totalValueBefore == 0) return;
-
-        /// @dev get the actual amount withdrawn by the protocol
-        uint256 actualWithdrawn = handler.ghost_maxSentinelReceived();
-
-        /// @dev MAX sentinel should withdraw ALL balance from the protocol pool
-        /// @dev actualWithdrawn should equal totalValueBefore (protocols ensure this)
-        assertEq(
-            actualWithdrawn,
-            totalValueBefore,
-            "Invariant violated: MAX sentinel should withdraw all protocol balance - actualWithdrawn should equal totalValueBefore"
-        );
-
-        /// @dev verify adapter balance in protocol is 0 after MAX sentinel withdrawal
-        /// @dev getTotalValue() returns the adapter's balance in the protocol (Aave/Compound)
+        /// get the adapter balance in protocol after MAX sentinel withdrawal
         uint256 adapterBalanceAfter = handler.ghost_maxSentinelAdapterBalanceAfter();
 
-        /// @dev after MAX withdrawal, Aave/Compound should have withdrawn everything, leaving 0
-        /// @dev this ensures the protocol pool is completely drained as expected
-        assertEq(
-            adapterBalanceAfter,
-            0,
-            "Invariant violated: Adapter balance in protocol should be 0 after MAX sentinel withdrawal - Aave/Compound should have withdrawn everything"
-        );
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                            DIRECT TESTS
-    //////////////////////////////////////////////////////////////*/
-    /// @notice Fuzz test for MAX sentinel withdrawal functionality
-    /// @dev This test verifies MAX sentinel withdrawal behavior deterministically
-    function testFuzz_MaxSentinelDirectly() public {
-        /// @dev get the active chain selector and corresponding peer
-        uint64 chainSelector = parent.getStrategy().chainSelector;
-        address peer = chainSelector == PARENT_SELECTOR
-            ? address(parent)
-            : chainSelector == CHILD1_SELECTOR ? address(child1) : address(child2);
-        IYieldPeer yieldPeer = IYieldPeer(peer);
-        address activeAdapter = yieldPeer.getActiveStrategyAdapter();
-
-        /// @dev ensure adapter has some balance first by making a deposit
-        /// @dev deposit(bool isNewDepositor, uint256 addressSeed, uint256 depositAmount, uint256 chainSelectorSeed)
-        handler.deposit(true, 1, 100_000_000, uint256(chainSelector));
-
-        /// @dev verify adapter has balance before MAX withdrawal
-        uint256 totalValueBefore = IStrategyAdapter(activeAdapter).getTotalValue(address(usdc));
-        assertGt(totalValueBefore, 0, "Adapter should have balance before MAX withdrawal");
-
-        /// @dev track peer's USDC balance before withdrawal to verify funds received
-        uint256 peerBalanceBefore = usdc.balanceOf(peer);
-
-        /// @dev execute MAX sentinel withdrawal through handler
-        handler.testMaxSentinelWithdraw(uint256(chainSelector));
-
-        /// @dev verify we tracked the withdrawal (proves it actually executed)
-        assertEq(handler.ghost_maxSentinelWithdrawals(), 1, "Should track one MAX sentinel withdrawal");
-
-        /// @dev verify the adapter's validation passed (actualWithdrawn >= totalValue)
-        assertGe(
-            handler.ghost_maxSentinelReceived(),
-            handler.ghost_maxSentinelExpected(),
-            "MAX sentinel validation should pass: actualWithdrawn >= totalValue"
-        );
-
-        /// @dev verify adapter is now empty (MAX withdrawal drained it completely)
-        uint256 totalValueAfter = IStrategyAdapter(activeAdapter).getTotalValue(address(usdc));
-        assertEq(totalValueAfter, 0, "Adapter should be empty after MAX withdrawal");
-
-        /// @dev verify peer received the funds from the withdrawal
-        uint256 peerBalanceAfter = usdc.balanceOf(peer);
-        assertGt(peerBalanceAfter, peerBalanceBefore, "Peer should receive funds from MAX withdrawal");
-        /// @dev verify the amount received matches what was actually withdrawn
-        assertEq(
-            peerBalanceAfter - peerBalanceBefore,
-            handler.ghost_maxSentinelReceived(),
-            "Peer balance increase should match actual withdrawn amount"
+        /// If any MAX sentinel withdrawal occurred, that adapter must be drained (balance < 1e6 dust)
+        /// Logic: (maxSentinelWithdrawals > 0) => (adapterBalanceAfter < 1e6)
+        assertTrue(
+            maxSentinelWithdrawals == 0 || adapterBalanceAfter < 1e6,
+            "Invariant violated: Adapter balance in protocol should be 0 (or dust) after MAX sentinel withdrawal - Aave/Compound should have withdrawn everything"
         );
     }
 

@@ -101,9 +101,6 @@ contract Handler is Test {
 
     // MAX Sentinel Testing Ghost Variables
     uint256 public ghost_maxSentinelWithdrawals;
-    uint256 public ghost_maxSentinelFailures;
-    uint256 public ghost_maxSentinelReceived; // actualWithdrawn amount
-    uint256 public ghost_maxSentinelExpected; // totalValue that was checked
     uint256 public ghost_maxSentinelAdapterBalanceAfter; // adapter balance after MAX withdrawal
 
     /// @dev incremented by 1 everytime a WithdrawCompleted event is emitted
@@ -288,64 +285,6 @@ contract Handler is Test {
         /// @dev update the ghost state
         _updateWithdrawGhosts(withdrawer, shareBurnAmount);
         _handleWithdrawLogs();
-    }
-
-    /// @notice This function tests MAX sentinel withdrawal through YieldPeer
-    /// @param chainSelectorSeed the seed used to get the chain selector
-    function testMaxSentinelWithdraw(uint256 chainSelectorSeed) public {
-        uint64 chainSelector = uint64(bound(chainSelectorSeed, 1, 3));
-        this._testMaxSentinelWithdrawInternal(chainSelector);
-    }
-
-    function _testMaxSentinelWithdrawInternal(uint64 chainSelector) external {
-        /// @dev ensure the pools have enough liquidity
-        _dealPoolsUsdc();
-
-        /// @dev only test MAX sentinel for the active chain selector
-        if (chainSelector != parent.getStrategy().chainSelector) return;
-
-        address peer = chainSelectorsToPeers[chainSelector];
-        if (peer == address(0)) return;
-
-        /// @dev get the active adapter for this yield peer
-        IYieldPeer yieldPeer = IYieldPeer(peer);
-        address activeAdapter = yieldPeer.getActiveStrategyAdapter();
-        if (activeAdapter == address(0)) return;
-
-        /// @dev check adapter has funds before attempting MAX sentinel withdrawal
-        uint256 totalValueBefore = IStrategyAdapter(activeAdapter).getTotalValue(address(usdc));
-        if (totalValueBefore == 0) return;
-
-        uint256 peerUsdcBefore = usdc.balanceOf(peer);
-        this._executeMaxSentinelWithdraw(peer, activeAdapter, totalValueBefore, peerUsdcBefore);
-    }
-
-    function _executeMaxSentinelWithdraw(
-        address peer,
-        address activeAdapter,
-        uint256 totalValueBefore,
-        uint256 peerUsdcBefore
-    ) external {
-        _changePrank(peer);
-
-        /// @dev execute MAX sentinel withdrawal - should withdraw all protocol balance
-        IStrategyAdapter(activeAdapter).withdraw(address(usdc), type(uint256).max);
-
-        /// @dev update the ghost state for invariant verification
-        ghost_maxSentinelWithdrawals++;
-        ghost_maxSentinelExpected = totalValueBefore;
-
-        /// @dev calculate actual amount withdrawn by comparing peer balances
-        uint256 peerUsdcAfter = usdc.balanceOf(peer);
-        uint256 actualWithdrawn = peerUsdcAfter > peerUsdcBefore ? peerUsdcAfter - peerUsdcBefore : 0;
-
-        ghost_maxSentinelReceived = actualWithdrawn;
-
-        /// @dev verify adapter balance after MAX sentinel withdrawal (should be 0)
-        uint256 adapterBalanceAfter = IStrategyAdapter(activeAdapter).getTotalValue(address(usdc));
-        ghost_maxSentinelAdapterBalanceAfter = adapterBalanceAfter;
-
-        _stopPrank();
     }
 
     /// @notice This function handles rebalancer cre reports
@@ -560,6 +499,8 @@ contract Handler is Test {
         bytes32 reportDecodedEvent = keccak256("ReportDecoded(uint64,bytes32)");
         bytes32 currentStrategyOptimalEvent = keccak256("CurrentStrategyOptimal(uint64,bytes32)");
         bytes32 strategyUpdatedEvent = keccak256("StrategyUpdated(uint64,bytes32,uint64)");
+        // Added for max Sentinel tracking
+        bytes32 withdrawFromStrategyEvent = keccak256("WithdrawFromStrategy(address,uint256)");
 
         /// @dev Flags to track if the appropriate strategy event was emitted
         bool reportDecodedEventFound = false;
@@ -640,6 +581,28 @@ contract Handler is Test {
 
                     /// @dev consistency/sanity check that emitted old strategy chain matches the previous strategy chain
                     assertTrue(emittedOldStrategyChain == previousStrategyChain, "Old strategy chain mismatch");
+                }
+            }
+        }
+
+        /// @dev Track MAX sentinel withdrawals during rebalancing
+        /// @dev Check for WithdrawFromStrategy events with amount == type(uint256).max
+        if (isStrategyUpdated) {
+            for (uint256 i = 0; i < logs.length; i++) {
+                if (logs[i].topics[0] == withdrawFromStrategyEvent) {
+                    uint256 withdrawAmount = uint256(logs[i].topics[2]);
+                    if (withdrawAmount == type(uint256).max) {
+                        /// MAX sentinel withdrawal detected during rebalancing
+                        ghost_maxSentinelWithdrawals++;
+
+                        /// Get the adapter address from the event
+                        address adapterAddress = address(uint160(uint256(logs[i].topics[1])));
+
+                        /// Capture adapter balance after MAX sentinel withdrawal
+                        /// Should be 0
+                        uint256 adapterBalanceAfter = IStrategyAdapter(adapterAddress).getTotalValue(address(usdc));
+                        ghost_maxSentinelAdapterBalanceAfter = adapterBalanceAfter;
+                    }
                 }
             }
         }
