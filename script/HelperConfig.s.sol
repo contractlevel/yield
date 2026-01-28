@@ -16,6 +16,9 @@ import {ChildPeer} from "../src/peers/ChildPeer.sol";
 import {Rebalancer} from "../src/modules/Rebalancer.sol";
 import {SharePool} from "../src/token/SharePool.sol";
 import {Roles} from "../src/libraries/Roles.sol";
+import {ParentProxy} from "../src/proxies/ParentProxy.sol";
+import {ChildProxy} from "../src/proxies/ChildProxy.sol";
+import {RebalancerProxy} from "../src/proxies/RebalancerProxy.sol";
 
 contract HelperConfig is Script {
     /*//////////////////////////////////////////////////////////////
@@ -558,9 +561,24 @@ contract HelperConfig is Script {
         ccipLocalSimulator.supportNewTokenViaOwner(address(usdc));
         ccipLocalSimulator.supportNewTokenViaGetCCIPAdmin(address(share));
 
-        rebalancer = new Rebalancer();
-        parent = new ParentPeer(address(ccipRouter), address(link), 1, address(usdc), address(share));
-        child = new ChildPeer(address(ccipRouter), address(link), 2, address(usdc), address(share), 1);
+        // Deploy Rebalancer through proxy
+        Rebalancer rebalancerImpl = new Rebalancer();
+        bytes memory rebalancerInit = abi.encodeWithSelector(Rebalancer.initialize.selector);
+        RebalancerProxy rebalancerProxy = new RebalancerProxy(address(rebalancerImpl), rebalancerInit);
+        rebalancer = Rebalancer(address(rebalancerProxy)); /// @dev wrap proxy around rebalancer type
+
+        // Deploy Parent through proxy
+        ParentPeer parentImpl = new ParentPeer(address(ccipRouter), address(link), 1, address(usdc), address(share));
+        bytes memory parentInit = abi.encodeWithSelector(ParentPeer.initialize.selector);
+        ParentProxy parentProxy = new ParentProxy(address(parentImpl), parentInit);
+        parent = ParentPeer(address(parentProxy)); /// @dev wrap proxy around parent type
+
+        // Deploy Child through proxy
+        ChildPeer childImpl = new ChildPeer(address(ccipRouter), address(link), 2, address(usdc), address(share), 1);
+        bytes memory childInit = abi.encodeWithSelector(ChildPeer.initialize.selector);
+        ChildProxy childProxy = new ChildProxy(address(childImpl), childInit);
+        child = ChildPeer(address(childProxy)); /// @dev wrap proxy around child type
+
         /// @dev config admin role granted (then revoked) to deployer/'owner' to set rebalancer in parent
         parent.grantRole(Roles.CONFIG_ADMIN_ROLE, parent.owner());
         parent.setRebalancer(address(rebalancer));

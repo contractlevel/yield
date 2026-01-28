@@ -17,18 +17,6 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     //////////////////////////////////////////////////////////////*/
     using SafeERC20 for IERC20;
 
-    /*//////////////////////////////////////////////////////////////
-                                 ERRORS
-    //////////////////////////////////////////////////////////////*/
-    error ParentPeer__OnlyRebalancer();
-    error ParentPeer__InitialActiveStrategyAlreadySet();
-    /// @dev indicates activeStrategyAdapter not set when parent state shows s_strategy.chainSelector == thisChainSelector
-    /// activeStrategyAdapter is updated when rebalance TVL transit concludes
-    error ParentPeer__InactiveStrategyAdapter();
-
-    /*//////////////////////////////////////////////////////////////
-                           NAMESPACED STORAGE
-    //////////////////////////////////////////////////////////////*/
     /// @custom:storage-location erc7201:yieldcoin.storage.ParentPeer
     struct ParentPeerStorage {
         /// @dev total share tokens (YieldCoin) minted across all chains
@@ -47,25 +35,28 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
         Strategy s_strategy;
     }
 
+    /*//////////////////////////////////////////////////////////////
+                                 ERRORS
+    //////////////////////////////////////////////////////////////*/
+    error ParentPeer__OnlyRebalancer();
+    error ParentPeer__InitialActiveStrategyAlreadySet();
+    /// @dev indicates activeStrategyAdapter not set when parent state shows s_strategy.chainSelector == thisChainSelector
+    /// activeStrategyAdapter is updated when rebalance TVL transit concludes
+    error ParentPeer__InactiveStrategyAdapter();
+
+    /*//////////////////////////////////////////////////////////////
+                               VARIABLES
+    //////////////////////////////////////////////////////////////*/
     // keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.ParentPeer")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant ParentPeerStorageLocation =
+    bytes32 private constant PARENT_PEER_STORAGE_LOCATION =
         0x603686382b15940b5fa7ef449162bde228a5948ce3b6bdf08bd833ec6ae79500; // @review double check the hash
 
     // keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.StrategyStorage")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant StrategyStorageLocation =
+    bytes32 private constant STRATEGY_STORAGE_LOCATION =
         0x5202e425b34b6c95645915a460de54125f03aa25697774e32ad8f29e0d7eab00; // @review double check the hash
 
-    function _getParentPeerStorage() private pure returns (ParentPeerStorage storage $) {
-        assembly {
-            $.slot := ParentPeerStorageLocation
-        }
-    }
-
-    function _getStrategyStorage() private pure returns (StrategyStorage storage $) {
-        assembly {
-            $.slot := StrategyStorageLocation
-        }
-    }
+    /// @notice Version of the contract logic
+    string public constant VERSION = "1.0.0";
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -90,38 +81,25 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     event WithdrawPingPongToChild(uint256 indexed shareBurnAmount, uint64 indexed destChainSelector);
 
     /*//////////////////////////////////////////////////////////////
-                              CONSTRUCTOR
+                           CONSTRUCTOR / INIT
     //////////////////////////////////////////////////////////////*/
     /// @param ccipRouter The address of the CCIP router
     /// @param link The address of the LINK token
     /// @param thisChainSelector The selector of the chain this contract is deployed on
     /// @param usdc The address of the USDC token
     /// @param share The address of the share token native to this system that is minted in exchange for USDC deposits (YieldCoin)
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor(address ccipRouter, address link, uint64 thisChainSelector, address usdc, address share)
         YieldPeer(ccipRouter, link, thisChainSelector, usdc, share)
     {
         _disableInitializers();
     }
 
-    /*//////////////////////////////////////////////////////////////
-                              INITIALIZER
-    //////////////////////////////////////////////////////////////*/
     /// @notice Initializes the contract and its abstracts
-    /// @dev This replaces the logic that would normally be in a constructor for state variables
-    function initialize(address owner) external initializer {
-        // This sets up AccessControl, Pausable, and YieldFees
-        __YieldPeer_init(owner);
-        _grantRole(Roles.UPGRADER_ROLE, owner);
+    function initialize() external initializer {
+        __YieldPeer_init(msg.sender); // This sets up AccessControl, Pausable, and YieldFees
+        _grantRole(Roles.UPGRADER_ROLE, msg.sender);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                           UUPS AUTHORIZATION
-    //////////////////////////////////////////////////////////////*/
-    /// @notice Authorizes an upgrade to a new implementation
-    /// @param newImplementation The address of the new implementation
-    /// @dev Revert if msg.sender does not have UPGRADER_ROLE
-    /// @dev Required by UUPSUpgradeable
-    function _authorizeUpgrade(address newImplementation) internal override onlyRole(Roles.UPGRADER_ROLE) {}
 
     /*//////////////////////////////////////////////////////////////
                                 EXTERNAL
@@ -138,16 +116,18 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
         amountToDeposit = _initiateDeposit(amountToDeposit);
 
         /// @dev load StrategyStorage
-        StrategyStorage storage $ = _getStrategyStorage();
-        Strategy memory strategy = $.s_strategy;
+        StrategyStorage storage s$ = _getStrategyStorage();
+
+        Strategy memory strategy = s$.s_strategy;
 
         // 1. This Parent is the Strategy. Therefore the deposit is handled here and shares can be minted here.
         if (strategy.chainSelector == i_thisChainSelector) {
-            /// @dev load ParentPeerStorage
-            ParentPeerStorage storage p$ = _getParentPeerStorage(); // @review p$ because $ already declared earlier
-
             /// @dev cache active strategy adapter
             address activeStrategyAdapter = _getActiveStrategyAdapter();
+
+            /// @dev load ParentPeerStorage
+            ParentPeerStorage storage p$ = _getParentPeerStorage();
+
             /// @dev this is for the edgecase activeStrategyAdapter hasn't been updated yet, even though Parent state says it is strategy,
             /// TVL rebalance is still in transit
             if (activeStrategyAdapter == address(0)) revert ParentPeer__InactiveStrategyAdapter();
@@ -200,10 +180,10 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
 
         _revertIfZeroAmount(shareBurnAmount);
 
-        /// @dev load StrategyStorage
-        StrategyStorage storage $ = _getStrategyStorage();
         /// @dev load ParentPeerStorage
         ParentPeerStorage storage p$ = _getParentPeerStorage();
+        /// @dev load StrategyStorage
+        StrategyStorage storage s$ = _getStrategyStorage();
 
         /// @dev cache totalShares before updating
         uint256 totalShares = p$.s_totalShares;
@@ -214,7 +194,7 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
         emit WithdrawInitiated(withdrawer, shareBurnAmount, i_thisChainSelector);
         _burnShares(withdrawer, shareBurnAmount);
 
-        Strategy memory strategy = $.s_strategy;
+        Strategy memory strategy = s$.s_strategy;
 
         // 1. This Parent is the Strategy. Therefore the usdcWithdrawAmount is calculated and withdrawal is handled here.
         if (strategy.chainSelector == i_thisChainSelector) {
@@ -287,10 +267,10 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
         internal
     {
         /// @dev load StrategyStorage
-        StrategyStorage storage $ = _getStrategyStorage();
+        StrategyStorage storage s$ = _getStrategyStorage();
 
         DepositData memory depositData = abi.decode(encodedDepositData, (DepositData));
-        Strategy memory strategy = $.s_strategy;
+        Strategy memory strategy = s$.s_strategy;
 
         CCIPOperations._validateTokenAmounts(tokenAmounts, address(i_usdc), depositData.amount);
 
@@ -380,11 +360,10 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /// @param data The encoded WithdrawData
     /// @param sourceChainSelector The chain selector of the chain where the withdraw originated from and shares were burned
     function _handleCCIPWithdrawToParent(bytes memory data, uint64 sourceChainSelector) internal {
-        /// @dev load StrategyStorage
-        StrategyStorage storage $ = _getStrategyStorage();
-
         /// @dev load ParentPeerStorage
         ParentPeerStorage storage p$ = _getParentPeerStorage();
+        /// @dev load StrategyStorage
+        StrategyStorage storage s$ = _getStrategyStorage();
 
         WithdrawData memory withdrawData = _decodeWithdrawData(data);
         withdrawData.totalShares = p$.s_totalShares;
@@ -394,7 +373,7 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
             withdrawData.shareBurnAmount, sourceChainSelector, withdrawData.totalShares - withdrawData.shareBurnAmount
         );
 
-        _handleCCIPWithdraw($.s_strategy, withdrawData);
+        _handleCCIPWithdraw(s$.s_strategy, withdrawData);
     }
 
     /// @notice This function handles the withdraw flow logic that is used by both _handleCCIPWithdrawToParent and _handleCCIPWithdrawPingPong
@@ -439,9 +418,9 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /// @notice Forwards withdraw to active strategy without updating state (already updated in original flow)
     /// @notice This only happens when parent is NOT the strategy (if parent were strategy, withdraw would complete in _handleCCIPWithdrawToParent)
     function _handleCCIPWithdrawPingPong(bytes memory data) internal {
-        StrategyStorage storage $ = _getStrategyStorage();
+        StrategyStorage storage s$ = _getStrategyStorage(); /// @dev load StrategyStorage
         WithdrawData memory withdrawData = _decodeWithdrawData(data);
-        _handleCCIPWithdraw($.s_strategy, withdrawData);
+        _handleCCIPWithdraw(s$.s_strategy, withdrawData);
     }
 
     /// @notice This function sets the strategy on the parent and triggers appropriate strategy change
@@ -451,9 +430,9 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /// @param protocolId The protocol ID of the new strategy
     function _setAndHandleStrategyChange(uint64 chainSelector, bytes32 protocolId) internal {
         /// @dev load StrategyStorage
-        StrategyStorage storage $ = _getStrategyStorage();
+        StrategyStorage storage s$ = _getStrategyStorage();
 
-        Strategy memory oldStrategy = $.s_strategy;
+        Strategy memory oldStrategy = s$.s_strategy;
         Strategy memory newStrategy = Strategy({chainSelector: chainSelector, protocolId: protocolId});
 
         /// @dev Compare strategies and return early if optimal
@@ -464,7 +443,7 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
         }
 
         /// @dev Update Strategy state and emit StrategyUpdated event
-        $.s_strategy = newStrategy;
+        s$.s_strategy = newStrategy;
         emit StrategyUpdated(newStrategy.chainSelector, newStrategy.protocolId, oldStrategy.chainSelector);
 
         /// @dev Handle local strategy change on this parent chain
@@ -519,6 +498,12 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
         _ccipSend(oldChainSelector, CcipTxType.RebalanceOldStrategy, abi.encode(newStrategy), ZERO_BRIDGE_AMOUNT);
     }
 
+    /// @notice Authorizes an upgrade to a new implementation
+    /// @param newImplementation The address of the new implementation
+    /// @dev Revert if msg.sender does not have UPGRADER_ROLE
+    /// @dev Required override by UUPSUpgradeable
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(Roles.UPGRADER_ROLE) {}
+
     /*//////////////////////////////////////////////////////////////
                              INTERNAL VIEW
     //////////////////////////////////////////////////////////////*/
@@ -527,8 +512,7 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /// @return shareMintAmount The amount of shares/YieldCoin to mint
     /// @notice Returns amount * (SHARE_DECIMALS / USDC_DECIMALS) if there are no shares minted yet
     function _calculateMintAmount(uint256 totalValue, uint256 amount) internal view returns (uint256 shareMintAmount) {
-        /// @dev load ParentPeerStorage
-        ParentPeerStorage storage p$ = _getParentPeerStorage();
+        ParentPeerStorage storage p$ = _getParentPeerStorage(); /// @dev load ParentPeerStorage
         uint256 totalShares = p$.s_totalShares;
 
         if (totalShares != 0) {
@@ -538,6 +522,25 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
         }
 
         if (shareMintAmount == 0) shareMintAmount = 1;
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                         PRIVATE PURE / STORAGE
+    //////////////////////////////////////////////////////////////*/
+    /// @dev Return the ParentPeerStorage storage location
+    /// @return $ ParentPeerStorage storage location
+    function _getParentPeerStorage() private pure returns (ParentPeerStorage storage $) {
+        assembly {
+            $.slot := PARENT_PEER_STORAGE_LOCATION
+        }
+    }
+
+    /// @dev Return the StrategyStorage storage location
+    /// @return $ StrategyStorage storage location
+    function _getStrategyStorage() private pure returns (StrategyStorage storage $) {
+        assembly {
+            $.slot := STRATEGY_STORAGE_LOCATION
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -553,8 +556,7 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /// @param protocolId The protocol ID of the new strategy
     // @review Do we want to make this Pausable?
     function setStrategy(uint64 chainSelector, bytes32 protocolId) external {
-        /// @dev load ParentPeerStorage
-        ParentPeerStorage storage p$ = _getParentPeerStorage();
+        ParentPeerStorage storage p$ = _getParentPeerStorage(); /// @dev load ParentPeerStorage
         if (msg.sender != p$.s_rebalancer) revert ParentPeer__OnlyRebalancer();
         _setAndHandleStrategyChange(chainSelector, protocolId);
     }
@@ -567,14 +569,15 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /// @dev Called in deploy script, immediately after deploying initial strategy adapters, and setting them in YieldPeer::setStrategyAdapter
     /// @param protocolId The protocol ID of the initial active strategy
     function setInitialActiveStrategy(bytes32 protocolId) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        /// @dev load StrategyStorage
-        StrategyStorage storage $ = _getStrategyStorage();
         /// @dev load ParentPeerStorage
         ParentPeerStorage storage p$ = _getParentPeerStorage();
+        /// @dev load StrategyStorage
+        StrategyStorage storage s$ = _getStrategyStorage();
 
         if (p$.s_initialActiveStrategySet) revert ParentPeer__InitialActiveStrategyAlreadySet();
+
         p$.s_initialActiveStrategySet = true;
-        $.s_strategy = Strategy({chainSelector: i_thisChainSelector, protocolId: protocolId});
+        s$.s_strategy = Strategy({chainSelector: i_thisChainSelector, protocolId: protocolId});
         // @review unused-return, returns newActiveStrategyAdapter
         _updateActiveStrategyAdapter(i_thisChainSelector, protocolId);
     }
@@ -584,10 +587,7 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /// @param rebalancer The address of the rebalancer
     //slither-disable-next-line missing-zero-check
     function setRebalancer(address rebalancer) external onlyRole(Roles.CONFIG_ADMIN_ROLE) {
-        /// @dev load ParentPeerStorage
-        ParentPeerStorage storage p$ = _getParentPeerStorage();
-
-        p$.s_rebalancer = rebalancer;
+        _getParentPeerStorage().s_rebalancer = rebalancer;
         emit RebalancerSet(rebalancer);
     }
 
@@ -597,24 +597,24 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /// @notice Get the current strategy
     /// @return strategy The current strategy - chainSelector and protocol
     function getStrategy() external view returns (Strategy memory) {
-        /// @dev load StrategyStorage
-        StrategyStorage storage $ = _getStrategyStorage();
-        return $.s_strategy;
+        return _getStrategyStorage().s_strategy;
     }
 
     /// @notice Get the total shares minted across all chains
     /// @return totalShares The total shares minted across all chains
     function getTotalShares() external view returns (uint256) {
-        /// @dev load ParentPeerStorage
-        ParentPeerStorage storage p$ = _getParentPeerStorage();
-        return p$.s_totalShares;
+        return _getParentPeerStorage().s_totalShares;
     }
 
     /// @notice Get the current rebalancer
     /// @return rebalancer The current rebalancer
     function getRebalancer() external view returns (address) {
-        /// @dev load ParentPeerStorage
-        ParentPeerStorage storage p$ = _getParentPeerStorage();
-        return p$.s_rebalancer;
+        return _getParentPeerStorage().s_rebalancer;
+    }
+
+    /// @notice Get the contract version
+    /// @return version The contract version
+    function getVersion() external pure returns (string memory) {
+        return VERSION;
     }
 }

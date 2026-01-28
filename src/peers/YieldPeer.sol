@@ -35,6 +35,21 @@ abstract contract YieldPeer is
     using SafeERC20 for IERC20;
     using SafeERC20 for IShare;
 
+    /// @custom:storage-location erc7201:yieldcoin.storage.YieldPeer
+    struct YieldPeerStorage {
+        /// @dev Gas limit for CCIP
+        uint256 s_ccipGasLimit;
+        /// @dev Mapping of allowed chains
+        /// @dev This must include the Parent Chain on the ParentPeer!
+        mapping(uint64 chainSelector => bool isAllowed) s_allowedChains;
+        /// @dev Mapping of peers (ie other Yield contracts)
+        mapping(uint64 chainSelector => address peer) s_peers;
+        /// @dev The strategy registry
+        address s_strategyRegistry;
+        /// @dev The active strategy adapter
+        address s_activeStrategyAdapter;
+    }
+
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
@@ -56,6 +71,9 @@ abstract contract YieldPeer is
     uint256 internal constant SHARE_DECIMALS = 1e18;
     /// @dev Constant for the initial share precision used to calculate the mint amount for first deposit
     uint256 internal constant INITIAL_SHARE_PRECISION = SHARE_DECIMALS / USDC_DECIMALS;
+    // keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.YieldPeer")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant YIELD_PEER_STORAGE_LOCATION =
+        0x64ca1a4cbd2b05db1cf2adeaa253c530d3b0a11bd529ef6e3ea9005e6aabd600; // @review double check the hash
 
     /// @dev Chainlink token
     LinkTokenInterface internal immutable i_link;
@@ -65,34 +83,6 @@ abstract contract YieldPeer is
     IERC20 internal immutable i_usdc;
     /// @dev Share token minted in exchange for deposits
     IShare internal immutable i_share;
-
-    /*//////////////////////////////////////////////////////////////
-                           NAMESPACED STORAGE
-    //////////////////////////////////////////////////////////////*/
-    /// @custom:storage-location erc7201:yieldcoin.storage.YieldPeer
-    struct YieldPeerStorage {
-        /// @dev Gas limit for CCIP
-        uint256 s_ccipGasLimit;
-        /// @dev Mapping of allowed chains
-        /// @dev This must include the Parent Chain on the ParentPeer!
-        mapping(uint64 chainSelector => bool isAllowed) s_allowedChains;
-        /// @dev Mapping of peers (ie other Yield contracts)
-        mapping(uint64 chainSelector => address peer) s_peers;
-        /// @dev The strategy registry
-        address s_strategyRegistry;
-        /// @dev The active strategy adapter
-        address s_activeStrategyAdapter;
-    }
-
-    // keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.YieldPeer")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant YieldPeerStorageLocation =
-        0x64ca1a4cbd2b05db1cf2adeaa253c530d3b0a11bd529ef6e3ea9005e6aabd600; // @review double check the hash
-
-    function _getYieldPeerStorage() private pure returns (YieldPeerStorage storage $) {
-        assembly {
-            $.slot := YieldPeerStorageLocation
-        }
-    }
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -147,7 +137,7 @@ abstract contract YieldPeer is
     }
 
     /*//////////////////////////////////////////////////////////////
-                              CONSTRUCTOR
+                           CONSTRUCTOR / INIT
     //////////////////////////////////////////////////////////////*/
     /// @param ccipRouter The address of the CCIP router
     /// @param link The address of the Chainlink token
@@ -164,9 +154,7 @@ abstract contract YieldPeer is
         i_share = IShare(share);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                              INITIALIZER
-    //////////////////////////////////////////////////////////////*/
+    /// @dev Initialize the YieldPeer contract
     function __YieldPeer_init(address owner) internal onlyInitializing {
         __PausableWithAccessControl_init(owner); /// @dev Init the Access Control / Pausable module
         __YieldFees_init(); /// @dev Init the Fees module (Sets the initial 0.1% rate)
@@ -437,15 +425,14 @@ abstract contract YieldPeer is
     /// @param protocolId The protocol ID to get the strategy adapter from
     /// @return strategyAdapter The strategy adapter address
     function _getStrategyAdapterFromProtocol(bytes32 protocolId) internal view returns (address strategyAdapter) {
-        YieldPeerStorage storage $ = _getYieldPeerStorage(); // load YieldPeer storage
-        strategyAdapter = IStrategyRegistry($.s_strategyRegistry).getStrategyAdapter(protocolId);
+        address strategyRegistry = _getYieldPeerStorage().s_strategyRegistry;
+        strategyAdapter = IStrategyRegistry(strategyRegistry).getStrategyAdapter(protocolId);
     }
 
     /// @notice Helper function to get the active strategy adapter
     /// @return activeStrategyAdapter The active strategy adapter address
     function _getActiveStrategyAdapter() internal view returns (address activeStrategyAdapter) {
-        YieldPeerStorage storage $ = _getYieldPeerStorage(); // load YieldPeer storage
-        activeStrategyAdapter = $.s_activeStrategyAdapter;
+        activeStrategyAdapter = _getYieldPeerStorage().s_activeStrategyAdapter;
     }
 
     /// @notice Helper function to calculate the USDC withdraw amount
@@ -515,6 +502,17 @@ abstract contract YieldPeer is
     }
 
     /*//////////////////////////////////////////////////////////////
+                         PRIVATE PURE / STORAGE
+    //////////////////////////////////////////////////////////////*/
+    /// @notice Get the YieldPeerStorage storage
+    /// @return $ The YieldPeerStorage storage
+    function _getYieldPeerStorage() private pure returns (YieldPeerStorage storage $) {
+        assembly {
+            $.slot := YIELD_PEER_STORAGE_LOCATION
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
                                  SETTER
     //////////////////////////////////////////////////////////////*/
     /// @notice Set chains that are allowed to send CCIP messages to this peer
@@ -522,8 +520,7 @@ abstract contract YieldPeer is
     /// @param isAllowed Whether the chain is allowed to send CCIP messages to this peer
     /// @dev Access control: CROSS_CHAIN_ADMIN_ROLE
     function setAllowedChain(uint64 chainSelector, bool isAllowed) external onlyRole(Roles.CROSS_CHAIN_ADMIN_ROLE) {
-        YieldPeerStorage storage $ = _getYieldPeerStorage(); // load YieldPeer storage
-        $.s_allowedChains[chainSelector] = isAllowed;
+        _getYieldPeerStorage().s_allowedChains[chainSelector] = isAllowed;
         emit AllowedChainSet(chainSelector, isAllowed);
     }
 
@@ -533,6 +530,7 @@ abstract contract YieldPeer is
     /// @dev Access control: CROSS_CHAIN_ADMIN_ROLE
     function setAllowedPeer(uint64 chainSelector, address peer) external onlyRole(Roles.CROSS_CHAIN_ADMIN_ROLE) {
         YieldPeerStorage storage $ = _getYieldPeerStorage(); // load YieldPeer storage
+
         if (!$.s_allowedChains[chainSelector]) {
             revert YieldPeer__ChainNotAllowed(chainSelector);
         }
@@ -544,8 +542,7 @@ abstract contract YieldPeer is
     /// @param gasLimit The gas limit to set
     /// @dev Access control: CROSS_CHAIN_ADMIN_ROLE
     function setCCIPGasLimit(uint256 gasLimit) external onlyRole(Roles.CROSS_CHAIN_ADMIN_ROLE) {
-        YieldPeerStorage storage $ = _getYieldPeerStorage(); // load YieldPeer storage
-        $.s_ccipGasLimit = gasLimit;
+        _getYieldPeerStorage().s_ccipGasLimit = gasLimit;
         emit CCIPGasLimitSet(gasLimit);
     }
 
@@ -554,8 +551,7 @@ abstract contract YieldPeer is
     /// @dev Access control: CONFIG_ADMIN_ROLE
     //slither-disable-next-line missing-zero-check
     function setStrategyRegistry(address strategyRegistry) external onlyRole(Roles.CONFIG_ADMIN_ROLE) {
-        YieldPeerStorage storage $ = _getYieldPeerStorage(); // load YieldPeer storage
-        $.s_strategyRegistry = strategyRegistry;
+        _getYieldPeerStorage().s_strategyRegistry = strategyRegistry;
         emit StrategyRegistrySet(strategyRegistry);
     }
 
@@ -572,16 +568,14 @@ abstract contract YieldPeer is
     /// @param chainSelector The chain selector to check
     /// @return isAllowed Whether the chain is allowed to send CCIP messages to this peer
     function getAllowedChain(uint64 chainSelector) external view returns (bool) {
-        YieldPeerStorage storage $ = _getYieldPeerStorage(); // load YieldPeer storage
-        return $.s_allowedChains[chainSelector];
+        return _getYieldPeerStorage().s_allowedChains[chainSelector];
     }
 
     /// @notice Get the peer contract for an allowed chain selector
     /// @param chainSelector The chain selector to check
     /// @return peer The peer contract for the chain selector
     function getAllowedPeer(uint64 chainSelector) external view returns (address) {
-        YieldPeerStorage storage $ = _getYieldPeerStorage(); // load YieldPeer storage
-        return $.s_peers[chainSelector];
+        return _getYieldPeerStorage().s_peers[chainSelector];
     }
 
     /// @notice Get the Chainlink token address
@@ -605,15 +599,13 @@ abstract contract YieldPeer is
     /// @notice Get whether this chain is the strategy chain
     /// @return isStrategyChain Whether this chain is the strategy chain
     function getIsStrategyChain() external view returns (bool) {
-        YieldPeerStorage storage $ = _getYieldPeerStorage(); // load YieldPeer storage
-        return $.s_activeStrategyAdapter != address(0);
+        return _getYieldPeerStorage().s_activeStrategyAdapter != address(0);
     }
 
     /// @notice Get the CCIP gas limit
     /// @return ccipGasLimit The CCIP gas limit
     function getCCIPGasLimit() external view returns (uint256) {
-        YieldPeerStorage storage $ = _getYieldPeerStorage(); // load YieldPeer storage
-        return $.s_ccipGasLimit;
+        return _getYieldPeerStorage().s_ccipGasLimit;
     }
 
     /// @dev Reverts if this chain is not the strategy chain
@@ -638,8 +630,7 @@ abstract contract YieldPeer is
     /// @notice Get the strategy registry
     /// @return strategyRegistry The strategy registry address
     function getStrategyRegistry() external view returns (address strategyRegistry) {
-        YieldPeerStorage storage $ = _getYieldPeerStorage(); // load YieldPeer storage
-        strategyRegistry = $.s_strategyRegistry;
+        strategyRegistry = _getYieldPeerStorage().s_strategyRegistry;
     }
 
     /// @dev Used to override/resolve conflict of multiple contracts implementing this.

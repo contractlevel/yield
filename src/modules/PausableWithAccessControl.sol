@@ -1,16 +1,15 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {
     AccessControlDefaultAdminRulesUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
-
 import {IAccessControlEnumerable} from "@openzeppelin/contracts/access/extensions/IAccessControlEnumerable.sol";
 import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {IPausable} from "src/interfaces/IPausable.sol";
 import {Roles} from "src/libraries/Roles.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 /// @notice Abstract base contract that enables pausing and access control functionality.
 abstract contract PausableWithAccessControl is
@@ -25,39 +24,29 @@ abstract contract PausableWithAccessControl is
     //////////////////////////////////////////////////////////////*/
     using EnumerableSet for EnumerableSet.AddressSet;
 
+    /// @custom:storage-location erc7201:yieldcoin.storage.PausableWithAccessControl
+    struct PausableAccessControlStorage {
+        /// @notice The set of members in each role
+        mapping(bytes32 role => EnumerableSet.AddressSet) s_roleMembers;
+    }
+
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
     /// @notice The initial delay for transferring the admin role
     uint48 internal constant INITIAL_DEFAULT_ADMIN_ROLE_TRANSFER_DELAY = 259200 seconds; // 3 days // @review do we want another time delay later?
 
-    /*//////////////////////////////////////////////////////////////
-                           NAMESPACED STORAGE
-    //////////////////////////////////////////////////////////////*/
-    /// @custom:storage-location erc7201:yieldcoin.storage.PausableWithAccessControl
-    struct PausableWithAccessControlStorage {
-        /// @notice The set of members in each role
-        mapping(bytes32 role => EnumerableSet.AddressSet) s_roleMembers;
-    }
-
     // keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.PausableWithAccessControl")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant PausableWithAccessControlStorageLocation =
-        0xf31030139dc5ab9c02ef44394b5ae7391974390930648b2264297c3b013d0e00;
-
-    function _getPausableWithAccessControlStorage() private pure returns (PausableWithAccessControlStorage storage $) {
-        assembly {
-            $.slot := PausableWithAccessControlStorageLocation
-        }
-    }
+    bytes32 private constant PAUSABLE_ACCESS_CONTROL_STORAGE_LOCATION =
+        0xf31030139dc5ab9c02ef44394b5ae7391974390930648b2264297c3b013d0e00; // @review check hash
 
     /*//////////////////////////////////////////////////////////////
-                              INITIALIZER
+                                  INIT
     //////////////////////////////////////////////////////////////*/
-    // Replaces the constructor.
-    // Uses 'onlyInitializing' because this is an abstract parent contract.
+    /// @dev initialize pausable and access control modules
     function __PausableWithAccessControl_init(address owner) internal onlyInitializing {
         __Pausable_init();
-        __AccessControlDefaultAdminRules_init(INITIAL_DEFAULT_ADMIN_ROLE_TRANSFER_DELAY, owner);
+        __AccessControlDefaultAdminRules_init(INITIAL_DEFAULT_ADMIN_ROLE_TRANSFER_DELAY, owner); // @review maybe just msg.sender?
     }
 
     /*/////////////////////////////////////////////////////////////
@@ -85,7 +74,7 @@ abstract contract PausableWithAccessControl is
         granted = super._grantRole(role, account);
         if (granted) {
             // Access storage via the accessor function
-            PausableWithAccessControlStorage storage $ = _getPausableWithAccessControlStorage();
+            PausableAccessControlStorage storage $ = _getPausableAccessControlStorage();
             $.s_roleMembers[role].add(account);
         }
     }
@@ -94,28 +83,37 @@ abstract contract PausableWithAccessControl is
     function _revokeRole(bytes32 role, address account) internal virtual override returns (bool revoked) {
         revoked = super._revokeRole(role, account);
         if (revoked) {
-            PausableWithAccessControlStorage storage $ = _getPausableWithAccessControlStorage();
+            PausableAccessControlStorage storage $ = _getPausableAccessControlStorage();
             $.s_roleMembers[role].remove(account);
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                         PRIVATE PURE / STORAGE
+    //////////////////////////////////////////////////////////////*/
+    function _getPausableAccessControlStorage() private pure returns (PausableAccessControlStorage storage $) {
+        assembly {
+            $.slot := PAUSABLE_ACCESS_CONTROL_STORAGE_LOCATION
         }
     }
 
     /*//////////////////////////////////////////////////////////////
                                  GETTER
     //////////////////////////////////////////////////////////////*/
-    // @inheritdoc AccessControlDefaultAdminRulesUpgradeable
+    /// @inheritdoc AccessControlDefaultAdminRulesUpgradeable
     function supportsInterface(bytes4 interfaceId) public view virtual override returns (bool) {
         return interfaceId == type(IAccessControlEnumerable).interfaceId || super.supportsInterface(interfaceId);
     }
 
     /// @inheritdoc IAccessControlEnumerable
     function getRoleMember(bytes32 role, uint256 index) external view override returns (address roleMember) {
-        PausableWithAccessControlStorage storage $ = _getPausableWithAccessControlStorage();
+        PausableAccessControlStorage storage $ = _getPausableAccessControlStorage();
         roleMember = $.s_roleMembers[role].at(index);
     }
 
     /// @inheritdoc IAccessControlEnumerable
     function getRoleMemberCount(bytes32 role) external view override returns (uint256 roleMemberCount) {
-        PausableWithAccessControlStorage storage $ = _getPausableWithAccessControlStorage();
+        PausableAccessControlStorage storage $ = _getPausableAccessControlStorage();
         roleMemberCount = $.s_roleMembers[role].length();
     }
 
@@ -123,7 +121,7 @@ abstract contract PausableWithAccessControl is
     /// @param role The role to get the members of
     /// @return roleMembers members of the role
     function getRoleMembers(bytes32 role) public view virtual returns (address[] memory roleMembers) {
-        PausableWithAccessControlStorage storage $ = _getPausableWithAccessControlStorage();
+        PausableAccessControlStorage storage $ = _getPausableAccessControlStorage();
         roleMembers = $.s_roleMembers[role].values();
     }
 }

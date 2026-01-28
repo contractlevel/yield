@@ -17,6 +17,9 @@ contract ChildPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /// @dev The CCIP selector of the parent chain
     uint64 internal immutable i_parentChainSelector;
 
+    /// @notice Version of the contract logic
+    string public constant VERSION = "1.0.0";
+
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
@@ -26,7 +29,7 @@ contract ChildPeer is Initializable, UUPSUpgradeable, YieldPeer {
     event WithdrawPingPongToParent(uint256 indexed shareBurnAmount);
 
     /*//////////////////////////////////////////////////////////////
-                              CONSTRUCTOR
+                           CONSTRUCTOR / INIT
     //////////////////////////////////////////////////////////////*/
     /// @param ccipRouter The address of the CCIP router
     /// @param link The address of the LINK token
@@ -43,30 +46,15 @@ contract ChildPeer is Initializable, UUPSUpgradeable, YieldPeer {
     ) YieldPeer(ccipRouter, link, thisChainSelector, usdc, share) {
         i_parentChainSelector = parentChainSelector;
 
-        // 2. LOCK THE IMPLEMENTATION
-        // This prevents the implementation contract from being initialized directly.
         _disableInitializers();
     }
 
-    /*//////////////////////////////////////////////////////////////
-                              INITIALIZER
-    //////////////////////////////////////////////////////////////*/
     /// @notice Initializes the contract and its abstracts
     /// @dev This replaces the logic that would normally be in a constructor for state variables
-    function initialize(address owner) external initializer {
-        // This sets up AccessControl, Pausable, and YieldFees
-        __YieldPeer_init(owner);
-        _grantRole(Roles.UPGRADER_ROLE, owner);
+    function initialize() external initializer {
+        __YieldPeer_init(msg.sender); // Inits AccessControl, Pausable, and YieldFees
+        _grantRole(Roles.UPGRADER_ROLE, msg.sender);
     }
-
-    /*//////////////////////////////////////////////////////////////
-                           UUPS AUTHORIZATION
-    //////////////////////////////////////////////////////////////*/
-    /// @notice Authorizes an upgrade to a new implementation
-    /// @param newImplementation The address of the new implementation
-    /// @dev Revert if msg.sender does not have UPGRADER_ROLE
-    /// @dev Required by UUPSUpgradeable
-    function _authorizeUpgrade(address newImplementation) internal override onlyRole(Roles.UPGRADER_ROLE) {}
 
     /*//////////////////////////////////////////////////////////////
                                 EXTERNAL
@@ -256,11 +244,23 @@ contract ChildPeer is Initializable, UUPSUpgradeable, YieldPeer {
         }
     }
 
+    /// @notice Authorizes an upgrade to a new implementation
+    /// @param newImplementation The address of the new implementation
+    /// @dev Revert if msg.sender does not have UPGRADER_ROLE
+    /// @dev Required by UUPSUpgradeable
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(Roles.UPGRADER_ROLE) {}
+
     /*//////////////////////////////////////////////////////////////
                                  GETTER
     //////////////////////////////////////////////////////////////*/
     /// @return The parent chain selector
     function getParentChainSelector() external view returns (uint64) {
         return i_parentChainSelector;
+    }
+
+    /// @notice Get the contract version
+    /// @return version The contract version
+    function getVersion() external pure returns (string memory) {
+        return VERSION;
     }
 }

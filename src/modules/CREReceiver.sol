@@ -2,14 +2,35 @@
 pragma solidity 0.8.26;
 
 import {IReceiver, IERC165} from "@chainlink/contracts/src/v0.8/keystone/interfaces/IReceiver.sol";
-import {Ownable2Step, Ownable} from "@openzeppelin/contracts/access/Ownable2Step.sol";
+import {
+    Ownable2StepUpgradeable,
+    OwnableUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 /// @title CREReceiver
 /// @author George Gorzhiyev - Judge Finance
 /// @dev Modified 'IReceiverTemplate' with security checks made mandatory
 /// @dev From: https://docs.chain.link/cre/guides/workflow/using-evm-client/onchain-write/building-consumer-contracts#3-using-ireceivertemplate
 /// @notice Abstract contract to get/verify/consume CRE reports from a Chainlink Keystone Forwarder
-abstract contract CREReceiver is IReceiver, Ownable2Step {
+abstract contract CREReceiver is Initializable, IReceiver, Ownable2StepUpgradeable {
+    /*//////////////////////////////////////////////////////////////
+                           TYPE DECLARATIONS
+    //////////////////////////////////////////////////////////////*/
+    /// @dev Holds a workflow owner/name and mapped to a workflow id
+    struct Workflow {
+        address owner;
+        bytes10 name;
+    }
+
+    /// @custom:storage-location erc7201:yieldcoin.storage.CREReceiver
+    struct CREReceiverStorage {
+        /// @dev Mapping workflow ids to owner/name
+        mapping(bytes32 workflowId => Workflow) s_workflows;
+        /// @dev The Chainlink Keystone Forwarder contract address to receive CRE reports from
+        address s_keystoneForwarder;
+    }
+
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
@@ -26,16 +47,9 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
-    /// @dev Holds a workflow owner/name and mapped to a workflow id
-    struct Workflow {
-        address owner;
-        bytes10 name;
-    }
-
-    /// @dev Mapping workflow ids to owner/name
-    mapping(bytes32 workflowId => Workflow) internal s_workflows;
-    /// @dev The Chainlink Keystone Forwarder contract address to receive CRE reports from
-    address internal s_keystoneForwarder;
+    // keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.CREReceiver")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant CRE_RECEIVER_STORAGE_LOCATION =
+        0xf60800be5819a5efc7c1c9a92eb1fcc54ca0efa1fb3fa2b66ea649407eaffa00;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -52,10 +66,12 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
     event WorkflowRemoved(bytes32 indexed workflowId, address indexed workflowOwner, bytes10 indexed workflowName);
 
     /*//////////////////////////////////////////////////////////////
-                              CONSTRUCTOR
+                                  INIT
     //////////////////////////////////////////////////////////////*/
-    /// @notice Constructor sets msg.sender as the owner
-    constructor() Ownable(msg.sender) {}
+    /// @notice Initializes the contract
+    function __CREReceiver_init(address owner) internal onlyInitializing {
+        __Ownable_init(owner);
+    }
 
     /*//////////////////////////////////////////////////////////////
                                 EXTERNAL
@@ -66,8 +82,10 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
     /// @param metadata Metadata about the report
     /// @param report The CRE report
     function onReport(bytes calldata metadata, bytes calldata report) external {
+        CREReceiverStorage storage $ = _getCREReceiverStorage(); // load CREReceiver storage
+
         /// @dev  Security Check: Verify caller is the trusted Chainlink Keystone Forwarder
-        address keystoneForwarder = s_keystoneForwarder;
+        address keystoneForwarder = $.s_keystoneForwarder;
         if (msg.sender != keystoneForwarder) {
             revert CREReceiver__InvalidKeystoneForwarder(msg.sender, keystoneForwarder);
         }
@@ -81,8 +99,8 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
 
         /// @dev Security Checks: ID, owner and name
         /// @dev workflow id is checked by inference with owner/name existing for an id
-        address workflowOwner = s_workflows[decodedId].owner;
-        bytes10 workflowName = s_workflows[decodedId].name;
+        address workflowOwner = $.s_workflows[decodedId].owner;
+        bytes10 workflowName = $.s_workflows[decodedId].name;
 
         // Verify mapped workflow id exists
         if (workflowOwner == address(0) || workflowName == bytes10(0)) {
@@ -137,13 +155,24 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
     function _onReport(bytes calldata report) internal virtual;
 
     /*//////////////////////////////////////////////////////////////
+                         PRIVATE PURE / STORAGE
+    //////////////////////////////////////////////////////////////*/
+    /// @notice Get the CREReceiver storage
+    /// @return $ The CREReceiver storage
+    function _getCREReceiverStorage() private pure returns (CREReceiverStorage storage $) {
+        assembly {
+            $.slot := CRE_RECEIVER_STORAGE_LOCATION
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
                                  SETTER
     //////////////////////////////////////////////////////////////*/
     /// @notice Updates the Chainlink Keystone Forwarder address that is allowed to call onReport
     /// @param keystoneForwarder The new forwader address
     function setKeystoneForwarder(address keystoneForwarder) external onlyOwner {
         if (keystoneForwarder == address(0)) revert CREReceiver__ForwarderNotZero();
-        s_keystoneForwarder = keystoneForwarder;
+        _getCREReceiverStorage().s_keystoneForwarder = keystoneForwarder;
         emit KeystoneForwarderSet(keystoneForwarder);
     }
 
@@ -158,15 +187,17 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
         if (workflowOwner == address(0)) revert CREReceiver__OwnerNotZero();
         if (workflowName == bytes10(0)) revert CREReceiver__NameNotZero();
 
-        s_workflows[workflowId] = Workflow({owner: workflowOwner, name: workflowName});
+        _getCREReceiverStorage().s_workflows[workflowId] = Workflow({owner: workflowOwner, name: workflowName});
         emit WorkflowSet(workflowId, workflowOwner, workflowName);
     }
 
     /// @notice Removes a workflow from the allowed workflows mapping
     /// @param workflowId The id of the workflow to remove
     function removeWorkflow(bytes32 workflowId) external onlyOwner {
-        Workflow memory workflow = s_workflows[workflowId];
-        delete s_workflows[workflowId];
+        CREReceiverStorage storage $ = _getCREReceiverStorage(); // load CREReceiver storage
+
+        Workflow memory workflow = $.s_workflows[workflowId];
+        delete $.s_workflows[workflowId];
         emit WorkflowRemoved(workflowId, workflow.owner, workflow.name);
     }
 
@@ -175,12 +206,12 @@ abstract contract CREReceiver is IReceiver, Ownable2Step {
     //////////////////////////////////////////////////////////////*/
     /// @return keystoneForwarder The Chainlink Keystone Forwarder address
     function getKeystoneForwarder() external view returns (address keystoneForwarder) {
-        keystoneForwarder = s_keystoneForwarder;
+        keystoneForwarder = _getCREReceiverStorage().s_keystoneForwarder;
     }
 
     /// @param workflowId The workflow Id
     /// @return workflow The workflow - contains address owner and bytes10 name
     function getWorkflow(bytes32 workflowId) external view returns (Workflow memory workflow) {
-        workflow = s_workflows[workflowId];
+        workflow = _getCREReceiverStorage().s_workflows[workflowId];
     }
 }

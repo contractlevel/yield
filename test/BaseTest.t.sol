@@ -60,10 +60,13 @@ contract BaseTest is Test {
     uint256 internal constant OPTIMISM_MAINNET_BLOCK_NUMBER = 143640972;
     uint256 internal constant ETHEREUM_MAINNET_BLOCK_NUMBER = 23777365;
 
+    /// @dev base chain variables - parent
     Share internal baseShare;
     SharePool internal baseSharePool;
     ParentPeer internal baseParentPeer;
+    address internal baseParentPeerImpl;
     Rebalancer internal baseRebalancer;
+    address internal baseRebalancerImpl;
     HelperConfig internal baseConfig;
     HelperConfig.NetworkConfig internal baseNetworkConfig;
     uint64 internal baseChainSelector;
@@ -71,12 +74,15 @@ contract BaseTest is Test {
     USDCTokenPool internal baseUsdcTokenPool;
     IMessageTransmitter internal baseCCTPMessageTransmitter;
     StrategyRegistry internal baseStrategyRegistry;
+    address internal baseStrategyRegistryImpl;
     AaveV3Adapter internal baseAaveV3Adapter;
     CompoundV3Adapter internal baseCompoundV3Adapter;
 
+    /// @dev optimism chain variables - child 1
     Share internal optShare;
     SharePool internal optSharePool;
     ChildPeer internal optChildPeer;
+    address internal optChildPeerImpl;
     HelperConfig internal optConfig;
     HelperConfig.NetworkConfig internal optNetworkConfig;
     uint64 internal optChainSelector;
@@ -84,12 +90,15 @@ contract BaseTest is Test {
     USDCTokenPool internal optUsdcTokenPool;
     IMessageTransmitter internal optCCTPMessageTransmitter;
     StrategyRegistry internal optStrategyRegistry;
+    address internal optStrategyRegistryImpl;
     AaveV3Adapter internal optAaveV3Adapter;
     CompoundV3Adapter internal optCompoundV3Adapter;
 
+    /// @dev ethereum chain variables - child 2
     Share internal ethShare;
     SharePool internal ethSharePool;
     ChildPeer internal ethChildPeer;
+    address internal ethChildPeerImpl;
     HelperConfig internal ethConfig;
     HelperConfig.NetworkConfig internal ethNetworkConfig;
     uint64 internal ethChainSelector;
@@ -97,6 +106,7 @@ contract BaseTest is Test {
     USDCTokenPool internal ethUsdcTokenPool;
     IMessageTransmitter internal ethCCTPMessageTransmitter;
     StrategyRegistry internal ethStrategyRegistry;
+    address internal ethStrategyRegistryImpl;
     AaveV3Adapter internal ethAaveV3Adapter;
     CompoundV3Adapter internal ethCompoundV3Adapter;
 
@@ -127,7 +137,6 @@ contract BaseTest is Test {
     bool internal constant SET_CROSS_CHAIN = true;
     bool internal constant NO_CROSS_CHAIN = false;
 
-    // Add this constant at the top of BaseTest
     bytes32 internal constant IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
     /*//////////////////////////////////////////////////////////////
@@ -151,86 +160,128 @@ contract BaseTest is Test {
     }
 
     function _deployInfra() internal virtual {
-        // Deploy on Base
+        _deployBase();
+        _deployOpt();
+        _deployEth();
+
+        ccipLocalSimulatorFork = new CCIPLocalSimulatorFork();
+        vm.makePersistent(address(ccipLocalSimulatorFork));
+        _registerChains();
+    }
+
+    /// @dev _deployInfra: Helper to deploy Parent on Base
+    function _deployBase() private {
+        // --- Create Base fork --- //
         baseFork = vm.createSelectFork(vm.envString("BASE_MAINNET_RPC_URL"), BASE_MAINNET_BLOCK_NUMBER);
         assertEq(block.chainid, BASE_MAINNET_CHAIN_ID);
 
+        // --- Create & store Parent config --- //
         DeployParent baseDeployParent = new DeployParent();
         DeployParent.DeploymentConfig memory baseDeploy = baseDeployParent.run();
+
+        // --- Store deployed contracts from deployment config --- //
         baseShare = baseDeploy.share;
         baseSharePool = baseDeploy.sharePool;
         baseParentPeer = baseDeploy.parentPeer;
+        baseParentPeerImpl = baseDeploy.parentPeerImpl;
         baseRebalancer = baseDeploy.rebalancer;
+        baseRebalancerImpl = baseDeploy.rebalancerImpl;
         baseConfig = baseDeploy.config;
         baseStrategyRegistry = baseDeploy.strategyRegistry;
+        baseStrategyRegistryImpl = baseDeploy.strategyRegistryImpl;
         baseAaveV3Adapter = baseDeploy.aaveV3Adapter;
         baseCompoundV3Adapter = baseDeploy.compoundV3Adapter;
+
+        // --- Make persistent --- //
         vm.makePersistent(address(baseShare));
         vm.makePersistent(address(baseSharePool));
         vm.makePersistent(address(baseParentPeer));
         vm.makePersistent(address(baseRebalancer));
+        /// @dev impl's made persistent for proxy to call via delegatecall
+        vm.makePersistent(baseParentPeerImpl);
+        vm.makePersistent(baseRebalancerImpl);
+        vm.makePersistent(baseStrategyRegistryImpl);
 
-        // 2. NEW: Persist the hidden Implementation
-        address baseImpl = address(uint160(uint256(vm.load(address(baseDeploy.parentPeer), IMPLEMENTATION_SLOT))));
-        vm.makePersistent(baseImpl);
-
+        // --- Get and store network config values --- //
         baseNetworkConfig = baseConfig.getActiveNetworkConfig();
         baseChainSelector = baseNetworkConfig.ccip.thisChainSelector;
         baseUsdc = ERC20(baseNetworkConfig.tokens.usdc);
         baseUsdcTokenPool = USDCTokenPool(baseNetworkConfig.ccip.usdcTokenPool);
         baseCCTPMessageTransmitter = IMessageTransmitter(baseNetworkConfig.ccip.cctpMessageTransmitter);
+    }
 
-        // Deploy on Optimism
+    /// @dev _deployInfra: Helper to deploy Child on Optimism
+    function _deployOpt() private {
+        // --- Create Optimism fork --- //
         optFork = vm.createSelectFork(vm.envString("OPTIMISM_MAINNET_RPC_URL"), OPTIMISM_MAINNET_BLOCK_NUMBER);
         assertEq(block.chainid, OPTIMISM_MAINNET_CHAIN_ID);
 
+        // --- Create & store Child config --- //
         DeployChild optDeployChild = new DeployChild();
         DeployChild.ChildDeploymentConfig memory optDeploy = optDeployChild.run();
+
+        // --- Store deployed contracts from deployment config --- //
         optShare = optDeploy.share;
         optSharePool = optDeploy.sharePool;
         optChildPeer = optDeploy.childPeer;
+        optChildPeerImpl = optDeploy.childPeerImpl;
         optConfig = optDeploy.config;
         optStrategyRegistry = optDeploy.strategyRegistry;
+        optStrategyRegistryImpl = optDeploy.strategyRegistryImpl;
         optAaveV3Adapter = optDeploy.aaveV3Adapter;
         optCompoundV3Adapter = optDeploy.compoundV3Adapter;
+
+        // --- Make persistent --- //
         vm.makePersistent(address(optShare));
         vm.makePersistent(address(optSharePool));
         vm.makePersistent(address(optChildPeer));
-        vm.makePersistent(optDeploy.childPeerImpl);
+        /// @dev impl's made persistent for proxy to call via delegatecall
+        vm.makePersistent(optChildPeerImpl);
+        vm.makePersistent(optStrategyRegistryImpl);
 
+        // --- Get and store network config values --- //
         optNetworkConfig = optConfig.getActiveNetworkConfig();
         optChainSelector = optNetworkConfig.ccip.thisChainSelector;
         optUsdc = ERC20(optNetworkConfig.tokens.usdc);
         optUsdcTokenPool = USDCTokenPool(optNetworkConfig.ccip.usdcTokenPool);
         optCCTPMessageTransmitter = IMessageTransmitter(optNetworkConfig.ccip.cctpMessageTransmitter);
+    }
 
-        // Deploy on Ethereum
+    /// @dev _deployInfra: Helper to deploy Child on Ethereum
+    function _deployEth() private {
+        // --- Create Ethereum fork --- //
         ethFork = vm.createSelectFork(vm.envString("ETH_MAINNET_RPC_URL"), ETHEREUM_MAINNET_BLOCK_NUMBER);
         assertEq(block.chainid, ETHEREUM_MAINNET_CHAIN_ID);
 
+        // --- Create & store Child config --- //
         DeployChild ethDeployChild = new DeployChild();
         DeployChild.ChildDeploymentConfig memory ethDeploy = ethDeployChild.run();
+
+        // --- Store deployed contracts from deployment config --- //
         ethShare = ethDeploy.share;
         ethSharePool = ethDeploy.sharePool;
         ethChildPeer = ethDeploy.childPeer;
+        ethChildPeerImpl = ethDeploy.childPeerImpl;
         ethConfig = ethDeploy.config;
         ethStrategyRegistry = ethDeploy.strategyRegistry;
+        ethStrategyRegistryImpl = ethDeploy.strategyRegistryImpl;
         ethAaveV3Adapter = ethDeploy.aaveV3Adapter;
         ethCompoundV3Adapter = ethDeploy.compoundV3Adapter;
+
+        // --- Make persistent --- //
         vm.makePersistent(address(ethShare));
         vm.makePersistent(address(ethSharePool));
         vm.makePersistent(address(ethChildPeer));
-        vm.makePersistent(ethDeploy.childPeerImpl);
+        /// @dev impl's made persistent for proxy to call via delegatecall
+        vm.makePersistent(ethChildPeerImpl);
+        vm.makePersistent(ethStrategyRegistryImpl);
 
+        // --- Get and store network config values --- //
         ethNetworkConfig = ethConfig.getActiveNetworkConfig();
         ethChainSelector = ethNetworkConfig.ccip.thisChainSelector;
         ethUsdc = ERC20(ethNetworkConfig.tokens.usdc);
         ethUsdcTokenPool = USDCTokenPool(ethNetworkConfig.ccip.usdcTokenPool);
         ethCCTPMessageTransmitter = IMessageTransmitter(ethNetworkConfig.ccip.cctpMessageTransmitter);
-
-        ccipLocalSimulatorFork = new CCIPLocalSimulatorFork();
-        vm.makePersistent(address(ccipLocalSimulatorFork));
-        _registerChains();
     }
 
     function _grantRoles() internal virtual {

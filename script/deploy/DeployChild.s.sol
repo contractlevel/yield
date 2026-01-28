@@ -16,6 +16,7 @@ import {IYieldPeer} from "../../src/interfaces/IYieldPeer.sol";
 import {StrategyRegistry} from "../../src/modules/StrategyRegistry.sol";
 import {Roles} from "../../src/libraries/Roles.sol";
 import {ChildProxy} from "../../src/proxies/ChildProxy.sol";
+import {StrategyRegistryProxy} from "../../src/proxies/StrategyRegistryProxy.sol";
 
 contract DeployChild is Script {
     struct ChildDeploymentConfig {
@@ -25,6 +26,8 @@ contract DeployChild is Script {
         address childPeerImpl;
         HelperConfig config;
         StrategyRegistry strategyRegistry;
+        address strategyRegistryImpl;
+
         AaveV3Adapter aaveV3Adapter;
         CompoundV3Adapter compoundV3Adapter;
     }
@@ -33,22 +36,25 @@ contract DeployChild is Script {
                                   RUN
     //////////////////////////////////////////////////////////////*/
     function run() public returns (ChildDeploymentConfig memory deploy) {
+        // --- 1. Setup --- //
         deploy.config = new HelperConfig();
 
         vm.startBroadcast();
         HelperConfig.NetworkConfig memory networkConfig = deploy.config.getActiveNetworkConfig();
 
+        // --- 2. Deploy Share & Pool --- //
         deploy.share = new Share();
         deploy.sharePool =
             new SharePool(address(deploy.share), networkConfig.ccip.rmnProxy, networkConfig.ccip.ccipRouter);
 
+        // Configure Share & Pool with CCIP
         RegistryModuleOwnerCustom(networkConfig.ccip.registryModuleOwnerCustom)
             .registerAdminViaOwner(address(deploy.share));
         ITokenAdminRegistry(networkConfig.ccip.tokenAdminRegistry).acceptAdminRole(address(deploy.share));
         ITokenAdminRegistry(networkConfig.ccip.tokenAdminRegistry)
             .setPool(address(deploy.share), address(deploy.sharePool));
 
-        // 1 - deploy child impl
+        // --- 3. Deploy Child Impl & Proxy --- //
         ChildPeer childPeerImpl = new ChildPeer(
             networkConfig.ccip.ccipRouter,
             networkConfig.tokens.link,
@@ -57,30 +63,37 @@ contract DeployChild is Script {
             address(deploy.share),
             networkConfig.ccip.parentChainSelector
         );
-
-        // 2 - make init data
-        bytes memory childInitData = abi.encodeWithSelector(ChildPeer.initialize.selector, tx.origin);
-        /// @dev tx.origin is used to send the "deployer" into intialize and set owner
-
-        // 3 - deploy child proxy
+        bytes memory childInitData = abi.encodeWithSelector(ChildPeer.initialize.selector);
         ChildProxy childProxy = new ChildProxy(address(childPeerImpl), childInitData);
 
-        // 4 - set child peer interfaced through proxy
+        // Wrap ChildPeer proxy with ChildPeer type
         deploy.childPeer = ChildPeer(address(childProxy));
+        deploy.childPeerImpl = address(childPeerImpl); /// @dev store impl address for testing
 
-        deploy.childPeerImpl = address(childPeerImpl);
-
+        // Configure Share mint and burn roles to ChildPeer
         deploy.share.grantMintAndBurnRoles(address(deploy.sharePool));
         deploy.share.grantMintAndBurnRoles(address(deploy.childPeer));
 
-        deploy.strategyRegistry = new StrategyRegistry();
+        // --- 4. Deploy Strategy Registry Impl & Proxy --- //
+        StrategyRegistry strategyRegistryImpl = new StrategyRegistry();
+        bytes memory strategyRegistryInitData = abi.encodeWithSelector(StrategyRegistry.initialize.selector);
+        StrategyRegistryProxy strategyRegistryProxy =
+            new StrategyRegistryProxy(address(strategyRegistryImpl), strategyRegistryInitData);
+
+        // Wrap StrategyRegistry proxy with StrategyRegistry type
+        deploy.strategyRegistry = StrategyRegistry(address(strategyRegistryProxy));
+        deploy.strategyRegistryImpl = address(strategyRegistryImpl); /// @dev store impl address for testing
+
+        // --- 5. Configure Strategy Registry & Initial Strategies --- //
         deploy.aaveV3Adapter =
             new AaveV3Adapter(address(deploy.childPeer), networkConfig.protocols.aavePoolAddressesProvider);
         deploy.compoundV3Adapter = new CompoundV3Adapter(address(deploy.childPeer), networkConfig.protocols.comet);
+
         deploy.strategyRegistry
             .setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(deploy.aaveV3Adapter));
         deploy.strategyRegistry
             .setStrategyAdapter(keccak256(abi.encodePacked("compound-v3")), address(deploy.compoundV3Adapter));
+
         /// @dev config admin role granted (then revoked) to deployer/'owner' to set strategy registry
         deploy.childPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, deploy.childPeer.owner());
         deploy.childPeer.setStrategyRegistry(address(deploy.strategyRegistry));

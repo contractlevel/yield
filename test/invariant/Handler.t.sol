@@ -636,6 +636,7 @@ contract Handler is Test {
         parent.deposit(INITIAL_DEPOSIT_AMOUNT);
         _updateDepositGhosts(admin, INITIAL_DEPOSIT_AMOUNT);
         _handleDepositLogs();
+        _stopPrank();
     }
 
     /// @notice deal USDC to the pools to ensure they have enough liquidity and we dont get insufficient balance errors

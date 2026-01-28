@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 // import {FixedPointMathLib} from "solady/utils/FixedPointMathLib.sol";
 import {PausableWithAccessControl, Roles} from "./PausableWithAccessControl.sol";
 import {IYieldFees} from "../interfaces/IYieldFees.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 /// @title YieldFees
 /// @author @contractlevel
@@ -20,6 +20,12 @@ abstract contract YieldFees is Initializable, PausableWithAccessControl, IYieldF
                            TYPE DECLARATIONS
     //////////////////////////////////////////////////////////////*/
     using SafeERC20 for IERC20;
+
+    /// @custom:storage-location erc7201:yieldcoin.storage.YieldFees
+    struct YieldFeesStorage {
+        /// @dev The fee rate
+        uint256 s_feeRate;
+    }
 
     /*//////////////////////////////////////////////////////////////
                                  ERRORS
@@ -36,25 +42,9 @@ abstract contract YieldFees is Initializable, PausableWithAccessControl, IYieldF
     uint256 internal constant MAX_FEE_RATE = 10_000;
     /// @dev The initial fee rate
     uint256 internal constant INITIAL_FEE_RATE = 1_000; // 0.1%
-
-    /*//////////////////////////////////////////////////////////////
-                           NAMESPACED STORAGE
-    //////////////////////////////////////////////////////////////*/
-    /// @custom:storage-location erc7201:yieldcoin.storage.YieldFees
-    struct YieldFeesStorage {
-        /// @dev The fee rate
-        uint256 s_feeRate;
-    }
-
     // keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.YieldFees")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant YieldFeesStorageLocation =
+    bytes32 private constant YIELD_FEES_STORAGE_LOCATION =
         0x853571cb68111ee91d33df43d653890ed387a529557b80ade0723b14e4000b00; // @review double check the hash
-
-    function _getYieldFeesStorage() private pure returns (YieldFeesStorage storage $) {
-        assembly {
-            $.slot := YieldFeesStorageLocation
-        }
-    }
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -70,8 +60,7 @@ abstract contract YieldFees is Initializable, PausableWithAccessControl, IYieldF
                               INITIALIZER
     //////////////////////////////////////////////////////////////*/
     function __YieldFees_init() internal onlyInitializing {
-        YieldFeesStorage storage $ = _getYieldFeesStorage(); // load YieldFees storage
-        $.s_feeRate = INITIAL_FEE_RATE;
+        _getYieldFeesStorage().s_feeRate = INITIAL_FEE_RATE;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -99,12 +88,21 @@ abstract contract YieldFees is Initializable, PausableWithAccessControl, IYieldF
     /// @return fee The fee for the deposit
     /// @notice The fee is paid to the YieldCoin infrastructure to cover development and Chainlink costs
     function _calculateFee(uint256 stablecoinDepositAmount) internal view returns (uint256 fee) {
-        YieldFeesStorage storage $ = _getYieldFeesStorage(); // load YieldFees storage
-
-        fee = $.s_feeRate;
+        fee = _getYieldFeesStorage().s_feeRate;
         // @review:certora check if certora timeouts with solady
         if (fee != 0) fee = (stablecoinDepositAmount * fee) / FEE_RATE_DIVISOR;
         // if (fee != 0) fee = FixedPointMathLib.mulDivUp(stablecoinDepositAmount, fee, FEE_RATE_DIVISOR);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                         PRIVATE PURE / STORAGE
+    //////////////////////////////////////////////////////////////*/
+    /// @notice Get the YieldFees storage
+    /// @return $ The YieldFees storage
+    function _getYieldFeesStorage() private pure returns (YieldFeesStorage storage $) {
+        assembly {
+            $.slot := YIELD_FEES_STORAGE_LOCATION
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -115,12 +113,10 @@ abstract contract YieldFees is Initializable, PausableWithAccessControl, IYieldF
     /// @param newFeeRate The new fee rate
     /// @dev Revert if msg.sender does not have role of "FEE_RATE_SETTER_ROLE" in access control
     function setFeeRate(uint256 newFeeRate) external onlyRole(Roles.FEE_RATE_SETTER_ROLE) {
-        YieldFeesStorage storage $ = _getYieldFeesStorage(); // load YieldFees storage
-
         if (newFeeRate > MAX_FEE_RATE) {
             revert YieldFees__FeeRateTooHigh();
         }
-        $.s_feeRate = newFeeRate;
+        _getYieldFeesStorage().s_feeRate = newFeeRate;
         emit FeeRateSet(newFeeRate);
     }
 
@@ -130,8 +126,7 @@ abstract contract YieldFees is Initializable, PausableWithAccessControl, IYieldF
     /// @notice Get the current fee rate
     /// @return feeRate The current fee rate
     function getFeeRate() external view returns (uint256) {
-        YieldFeesStorage storage $ = _getYieldFeesStorage(); // load YieldFees storage
-        return $.s_feeRate;
+        return _getYieldFeesStorage().s_feeRate;
     }
 
     /// @notice Get the current fee rate divisor

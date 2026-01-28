@@ -24,6 +24,10 @@ import {AaveV3Adapter} from "../../src/adapters/AaveV3Adapter.sol";
 import {CompoundV3Adapter} from "../../src/adapters/CompoundV3Adapter.sol";
 import {StrategyRegistry} from "../../src/modules/StrategyRegistry.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ParentProxy} from "../../src/proxies/ParentProxy.sol";
+import {ChildProxy} from "../../src/proxies/ChildProxy.sol";
+import {RebalancerProxy} from "../../src/proxies/RebalancerProxy.sol";
+import {StrategyRegistryProxy} from "../../src/proxies/StrategyRegistryProxy.sol";
 
 /// @notice We are making the assumption that the gasLimit set for CCIP works correctly
 contract Invariant is StdInvariant, BaseTest {
@@ -58,24 +62,24 @@ contract Invariant is StdInvariant, BaseTest {
     address internal aavePool;
 
     /// @dev Strategy Registry contract for parent
-    StrategyRegistry internal strategyRegistryParent;
+    StrategyRegistry strategyRegistryParent;
     /// @dev Strategy Registry contract for child 1
-    StrategyRegistry internal strategyRegistryChild1;
+    StrategyRegistry strategyRegistryChild1;
     /// @dev Strategy Registry contract for child 2
-    StrategyRegistry internal strategyRegistryChild2;
+    StrategyRegistry strategyRegistryChild2;
 
     /// @dev Aave Adapter contract for parent
-    AaveV3Adapter internal aaveV3AdapterParent;
+    AaveV3Adapter aaveV3AdapterParent;
     /// @dev Compound Adapter contract for parent
-    CompoundV3Adapter internal compoundV3AdapterParent;
+    CompoundV3Adapter compoundV3AdapterParent;
     /// @dev Aave Adapter contract for child 1
-    AaveV3Adapter internal aaveV3AdapterChild1;
+    AaveV3Adapter aaveV3AdapterChild1;
     /// @dev Compound Adapter contract for child 1
-    CompoundV3Adapter internal compoundV3AdapterChild1;
+    CompoundV3Adapter compoundV3AdapterChild1;
     /// @dev Aave Adapter contract for child 2
-    AaveV3Adapter internal aaveV3AdapterChild2;
+    AaveV3Adapter aaveV3AdapterChild2;
     /// @dev Compound Adapter contract for child 2
-    CompoundV3Adapter internal compoundV3AdapterChild2;
+    CompoundV3Adapter compoundV3AdapterChild2;
 
     /*//////////////////////////////////////////////////////////////
                                  SETUP
@@ -114,50 +118,106 @@ contract Invariant is StdInvariant, BaseTest {
         targetContract(address(handler));
     }
 
-    /// @notice We are overriding the BaseTest _deployInfra because it forks live mainnets and we are going to be doing fuzz runs.
+    /// @notice Overrides BaseTest _deployInfra to deploy local UUPS proxies instead of forking mainnets.
+    /// @dev Peers interact via CCIPLocalSimulator.
+    /// @dev since we are not forking mainnets, we will deploy contracts locally
+    /// the deployed peers will interact via the ccip local simulator as if they were crosschain
+    /// this is a context we need to be aware of in this test suite
+    /// @dev All deployments follow the Implementation -> Proxy -> Interface pattern.
+    /// @dev Contracts are initialized with address(this) to allow the test contract to configure roles.
+    /// @dev Modularized into helper functions for readability and avoiding 'stack too deep'.
+    /// @notice Main deployment function orchestrating the setup for Invariant.
     function _deployInfra() internal override {
+        // 1. Setup Configuration & Mocks
+        _setupConfigAndMocks();
+
+        // 2. Prepare Strategy Registry Implementation (passed to deploy helpers)
+        StrategyRegistry registryImpl = new StrategyRegistry();
+        bytes memory registryInit = abi.encodeWithSelector(StrategyRegistry.initialize.selector);
+
+        // 3. Deploy Rebalancer, Parent & Children
+        _deployRebalancer();
+        _deployParent(address(registryImpl), registryInit);
+        _deployChild1(address(registryImpl), registryInit);
+        _deployChild2(address(registryImpl), registryInit);
+
+        // 4. Final Configuration - Roles & Liquidity
+        /// @dev Grant Share Roles to PROXIES (prank Share owner)
+        _changePrank(share.owner());
+        share.grantMintAndBurnRoles(address(parent));
+        share.grantMintAndBurnRoles(address(child1));
+        share.grantMintAndBurnRoles(address(child2));
+        _stopPrank();
+
+        /// @dev Seed liquidity for mocks
+        deal(networkConfig.tokens.usdc, aavePool, STRATEGY_POOL_USDC_STARTING_BALANCE);
+        deal(networkConfig.tokens.usdc, networkConfig.protocols.comet, STRATEGY_POOL_USDC_STARTING_BALANCE);
+    }
+
+    /// @dev _deployInfra: Helper to setup configuration and mocks
+    function _setupConfigAndMocks() private {
         helperConfig = new HelperConfig();
         networkConfig = helperConfig.getOrCreateAnvilEthConfig();
         usdc = IERC20(networkConfig.tokens.usdc);
         share = Share(networkConfig.tokens.share);
         aavePool = IPoolAddressesProvider(networkConfig.protocols.aavePoolAddressesProvider).getPool();
-        rebalancer = new Rebalancer();
+    }
 
-        /// @dev since we are not forking mainnets, we will deploy contracts locally
-        /// the deployed peers will interact via the ccip local simulator as if they were crosschain
-        /// this is a context we need to be aware of in this test suite
-        /// @dev deploy the parent contract
-        parent = new ParentPeer(
+    /// @dev _deployInfra: Helper to deploy Rebalancer
+    function _deployRebalancer() private {
+        Rebalancer rebalancerImpl = new Rebalancer();
+        bytes memory rebalancerInit = abi.encodeWithSelector(Rebalancer.initialize.selector);
+        RebalancerProxy rebalancerProxy = new RebalancerProxy(address(rebalancerImpl), rebalancerInit);
+        rebalancer = Rebalancer(address(rebalancerProxy)); /// @dev cast Proxy to Rebalancer type
+    }
+
+    /// @dev _deployInfra: Helper to deploy ParentPeer
+    /// @param registryImpl The strategy registry impl address
+    /// @param registryInit The strategy registry init data
+    function _deployParent(address registryImpl, bytes memory registryInit) private {
+        // Deploy Proxy
+        ParentPeer parentImpl = new ParentPeer(
             networkConfig.ccip.ccipRouter,
             networkConfig.tokens.link,
             PARENT_SELECTOR,
             networkConfig.tokens.usdc,
             networkConfig.tokens.share
         );
-        /// @dev temp config admin role granted to deployer/owner to set necessary configs
-        parent.grantRole(Roles.CONFIG_ADMIN_ROLE, parent.owner());
-        parent.setRebalancer(address(rebalancer));
-        _changePrank(rebalancer.owner());
-        rebalancer.setParentPeer(address(parent));
-        _stopPrank();
+        bytes memory parentInit = abi.encodeWithSelector(ParentPeer.initialize.selector);
+        ParentProxy parentProxy = new ParentProxy(address(parentImpl), parentInit);
+        parent = ParentPeer(address(parentProxy)); /// @dev cast Proxy to ParentPeer type
 
-        /// @dev deploy parent adapters
-        strategyRegistryParent = new StrategyRegistry();
+        // Connect Rebalancer & Parent
+        parent.grantRole(Roles.CONFIG_ADMIN_ROLE, address(this));
+        parent.setRebalancer(address(rebalancer));
+        rebalancer.setParentPeer(address(parent));
+
+        // Deploy Registry & Adapters
+        StrategyRegistryProxy strategyRegistryProxy = new StrategyRegistryProxy(registryImpl, registryInit);
+        strategyRegistryParent = StrategyRegistry(address(strategyRegistryProxy));
+
         aaveV3AdapterParent = new AaveV3Adapter(address(parent), networkConfig.protocols.aavePoolAddressesProvider);
         compoundV3AdapterParent = new CompoundV3Adapter(address(parent), networkConfig.protocols.comet);
+
+        // Configure Registry
         strategyRegistryParent.setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(aaveV3AdapterParent));
         strategyRegistryParent.setStrategyAdapter(
             keccak256(abi.encodePacked("compound-v3")), address(compoundV3AdapterParent)
         );
-        _changePrank(rebalancer.owner());
+
+        // Link Registry & set Initial Strategy
         rebalancer.setStrategyRegistry(address(strategyRegistryParent));
-        _stopPrank();
         parent.setStrategyRegistry(address(strategyRegistryParent));
         parent.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")));
-        parent.revokeRole(Roles.CONFIG_ADMIN_ROLE, parent.owner());
+        parent.revokeRole(Roles.CONFIG_ADMIN_ROLE, address(this));
+    }
 
-        /// @dev deploy at least 2 child peers to cover all CCIP tx types
-        child1 = new ChildPeer(
+    /// @dev _deployInfra: Helper to deploy ChildPeer 1
+    /// @param registryImpl The strategy registry impl address
+    /// @param registryInit The strategy registry init data
+    function _deployChild1(address registryImpl, bytes memory registryInit) private {
+        // Deploy Proxy
+        ChildPeer child1Impl = new ChildPeer(
             networkConfig.ccip.ccipRouter,
             networkConfig.tokens.link,
             CHILD1_SELECTOR,
@@ -165,20 +225,34 @@ contract Invariant is StdInvariant, BaseTest {
             networkConfig.tokens.share,
             PARENT_SELECTOR
         );
-        /// @dev child adapters
-        strategyRegistryChild1 = new StrategyRegistry();
+        bytes memory child1Init = abi.encodeWithSelector(ChildPeer.initialize.selector);
+        ChildProxy childProxy = new ChildProxy(address(child1Impl), child1Init);
+        child1 = ChildPeer(address(childProxy)); /// @dev cast Proxy to ChildPeer type
+
+        // Deploy Registry & Adapters
+        StrategyRegistryProxy strategyRegistryProxy = new StrategyRegistryProxy(registryImpl, registryInit);
+        strategyRegistryChild1 = StrategyRegistry(address(strategyRegistryProxy));
+
         aaveV3AdapterChild1 = new AaveV3Adapter(address(child1), networkConfig.protocols.aavePoolAddressesProvider);
         compoundV3AdapterChild1 = new CompoundV3Adapter(address(child1), networkConfig.protocols.comet);
-        /// @dev role granted to set registry
-        child1.grantRole(Roles.CONFIG_ADMIN_ROLE, child1.owner());
+
+        // Configure Child 1
+        child1.grantRole(Roles.CONFIG_ADMIN_ROLE, address(this));
         child1.setStrategyRegistry(address(strategyRegistryChild1));
-        child1.revokeRole(Roles.CONFIG_ADMIN_ROLE, child1.owner());
+        child1.revokeRole(Roles.CONFIG_ADMIN_ROLE, address(this));
+
         strategyRegistryChild1.setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(aaveV3AdapterChild1));
         strategyRegistryChild1.setStrategyAdapter(
             keccak256(abi.encodePacked("compound-v3")), address(compoundV3AdapterChild1)
         );
+    }
 
-        child2 = new ChildPeer(
+    /// @dev _deployInfra: Helper to deploy ChildPeer 2
+    /// @param registryImpl The strategy registry impl address
+    /// @param registryInit The strategy registry init data
+    function _deployChild2(address registryImpl, bytes memory registryInit) private {
+        // Deploy Proxy
+        ChildPeer child2Impl = new ChildPeer(
             networkConfig.ccip.ccipRouter,
             networkConfig.tokens.link,
             CHILD2_SELECTOR,
@@ -186,28 +260,26 @@ contract Invariant is StdInvariant, BaseTest {
             networkConfig.tokens.share,
             PARENT_SELECTOR
         );
-        strategyRegistryChild2 = new StrategyRegistry();
+        bytes memory child2Init = abi.encodeWithSelector(ChildPeer.initialize.selector);
+        ChildProxy childProxy = new ChildProxy(address(child2Impl), child2Init);
+        child2 = ChildPeer(address(childProxy)); /// @dev cast Proxy to ChildPeer type
+
+        // Deploy Registry & Adapters
+        StrategyRegistryProxy strategyRegistryProxy = new StrategyRegistryProxy(registryImpl, registryInit);
+        strategyRegistryChild2 = StrategyRegistry(address(strategyRegistryProxy));
+
         aaveV3AdapterChild2 = new AaveV3Adapter(address(child2), networkConfig.protocols.aavePoolAddressesProvider);
         compoundV3AdapterChild2 = new CompoundV3Adapter(address(child2), networkConfig.protocols.comet);
-        /// @dev role granted to set registry
-        child2.grantRole(Roles.CONFIG_ADMIN_ROLE, child2.owner());
+
+        // Configure Child 2
+        child2.grantRole(Roles.CONFIG_ADMIN_ROLE, address(this));
         child2.setStrategyRegistry(address(strategyRegistryChild2));
-        child2.revokeRole(Roles.CONFIG_ADMIN_ROLE, child2.owner());
+        child2.revokeRole(Roles.CONFIG_ADMIN_ROLE, address(this));
+
         strategyRegistryChild2.setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(aaveV3AdapterChild2));
         strategyRegistryChild2.setStrategyAdapter(
             keccak256(abi.encodePacked("compound-v3")), address(compoundV3AdapterChild2)
         );
-
-        /// @dev grant roles to the contracts
-        _changePrank(share.owner());
-        share.grantMintAndBurnRoles(address(parent));
-        share.grantMintAndBurnRoles(address(child1));
-        share.grantMintAndBurnRoles(address(child2));
-        _stopPrank();
-
-        /// @dev our mocks of aave and compound will need to be dealt usdc
-        deal(networkConfig.tokens.usdc, aavePool, STRATEGY_POOL_USDC_STARTING_BALANCE);
-        deal(networkConfig.tokens.usdc, networkConfig.protocols.comet, STRATEGY_POOL_USDC_STARTING_BALANCE);
     }
 
     function _grantRoles() internal override {
