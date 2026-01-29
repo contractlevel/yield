@@ -14,13 +14,15 @@ interface IYieldPeer is IYieldFees {
         DepositToStrategy, // 1 - deposit from parent to strategy (to deposit to strategy and get totalValue)
         DepositCallbackParent, // 2 - deposit callback from strategy to parent (to calculate shareMintAmount and update totalShares)
         DepositCallbackChild, // 3 - deposit callback from parent to child (to mint shares)
-        WithdrawToParent, // 4 - withdraw from child to parent (to get strategy chain and update totalShares)
+        WithdrawToParent, // 4 - withdraw from child to parent (to get strategy chain)
         WithdrawToStrategy, // 5 - withdraw from parent to strategy (to withdraw from strategy and get usdcWithdrawAmount)
-        WithdrawCallback, // 6 - withdraw callback from strategy to withdraw chain (to send USDC to withdrawer)
-        RebalanceOldStrategy, // 7 - message from parent to old strategy (to move funds to new strategy)
-        RebalanceNewStrategy, // 8 - reallocate funds from old strategy to new strategy
-        DepositPingPong, // 9 - pingpong deposit Tx from child to parent (to allow TVL to reach strategy chain)
-        WithdrawPingPong // 10 - pingpong withdraw Tx from parent to child (to allow TVL to reach strategy chain)
+        WithdrawCallbackChild, // 6 - withdraw callback from parent to withdraw-child (to burn shares and send USDC)
+        WithdrawCallbackParent, // 7 - withdraw callback from strategy to parent (to update s_totalShares and forward or transfer)
+        WithdrawFail, // 8 - withdraw failed on strategy; return shares to withdrawer (Phase 2)
+        RebalanceOldStrategy, // 9 - message from parent to old strategy (to move funds to new strategy)
+        RebalanceNewStrategy, // 10 - reallocate funds from old strategy to new strategy
+        DepositPingPong, // 11 - pingpong deposit Tx from child to parent (to allow TVL to reach strategy chain)
+        WithdrawPingPong // 12 - pingpong withdraw Tx from parent to child (to allow TVL to reach strategy chain)
     }
 
     struct DepositData {

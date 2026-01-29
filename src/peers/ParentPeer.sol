@@ -148,12 +148,6 @@ contract ParentPeer is YieldPeer {
 
         _revertIfZeroAmount(shareBurnAmount);
 
-        /// @dev cache totalShares before updating
-        uint256 totalShares = s_totalShares;
-
-        /// @dev update s_totalShares and burn shares from msg.sender
-        s_totalShares -= shareBurnAmount;
-        emit ShareBurnUpdate(shareBurnAmount, i_thisChainSelector, totalShares - shareBurnAmount);
         emit WithdrawInitiated(withdrawer, shareBurnAmount, i_thisChainSelector);
         _burnShares(withdrawer, shareBurnAmount);
 
@@ -161,6 +155,10 @@ contract ParentPeer is YieldPeer {
 
         // 1. This Parent is the Strategy. Therefore the usdcWithdrawAmount is calculated and withdrawal is handled here.
         if (strategy.chainSelector == i_thisChainSelector) {
+            /// @dev update s_totalShares when parent is strategy (optimistic but it's same chain tx)
+            uint256 totalShares = s_totalShares;
+            s_totalShares -= shareBurnAmount;
+            emit ShareBurnUpdate(shareBurnAmount, i_thisChainSelector, s_totalShares);
             address activeStrategyAdapter = _getActiveStrategyAdapter();
             /// @dev this is for the edgecase activeStrategyAdapter hasn't been updated yet, even though Parent state says it is strategy,
             /// TVL rebalance is still in transit
@@ -178,10 +176,10 @@ contract ParentPeer is YieldPeer {
             emit WithdrawCompleted(withdrawer, usdcWithdrawAmount);
             if (usdcWithdrawAmount != 0) _transferUsdcTo(withdrawer, usdcWithdrawAmount);
         }
-        // 2. This Parent is not the Strategy. Therefore the shareBurnAmount is sent to the strategy and the USDC tokens usdcWithdrawAmount is sent back.
+        // 2. This Parent is not the Strategy. Forward to strategy; s_totalShares is updated in _handleCCIPWithdrawCallbackParent.
         else {
             WithdrawData memory withdrawData = _buildWithdrawData(withdrawer, shareBurnAmount, i_thisChainSelector);
-            withdrawData.totalShares = totalShares;
+            withdrawData.totalShares = s_totalShares;
             _ccipSend(
                 strategy.chainSelector, CcipTxType.WithdrawToStrategy, abi.encode(withdrawData), ZERO_BRIDGE_AMOUNT
             );
@@ -213,7 +211,7 @@ contract ParentPeer is YieldPeer {
     /// - CcipTxType DepositToParent: A tx from child to parent to deposit USDC in strategy
     /// - CcipTxType DepositCallbackParent: A tx from the strategy to parent to calculate shareMintAmount and mint shares to the depositor on this chain or another child chain
     /// - CcipTxType WithdrawToParent: A tx from the withdraw chain to forward to the strategy chain
-    /// - CcipTxType WithdrawCallback: A tx from the strategy chain to send USDC to the withdrawer
+    /// - CcipTxType WithdrawCallbackParent: A tx from the strategy chain; parent updates s_totalShares and forwards WithdrawCallbackChild or transfers
     /// - CcipTxType RebalanceNewStrategy: A tx from the old strategy, sending rebalanced funds to the new strategy
     /// @param tokenAmounts The token amounts received in the CCIP message
     /// @param data The data received in the CCIP message
@@ -231,7 +229,7 @@ contract ParentPeer is YieldPeer {
         if (txType == CcipTxType.DepositCallbackParent) _handleCCIPDepositCallbackParent(data);
         if (txType == CcipTxType.WithdrawToParent) _handleCCIPWithdrawToParent(data, sourceChainSelector);
         if (txType == CcipTxType.WithdrawPingPong) _handleCCIPWithdrawPingPong(data);
-        if (txType == CcipTxType.WithdrawCallback) _handleCCIPWithdrawCallback(tokenAmounts, data);
+        if (txType == CcipTxType.WithdrawCallbackParent) _handleCCIPWithdrawCallbackParent(tokenAmounts, data);
         //slither-disable-next-line reentrancy-events
         if (txType == CcipTxType.RebalanceNewStrategy) _handleCCIPRebalanceNewStrategy(tokenAmounts, data);
     }
@@ -326,17 +324,26 @@ contract ParentPeer is YieldPeer {
     /// @notice This function handles a withdraw tx that initiated on another chain.
     /// If this Parent is the strategy, we withdraw and send the USDC back to the withdrawer
     /// If this Parent is not the strategy, we forward the withdrawData to the strategy
-    /// @dev Updates s_totalShares and emits ShareBurnUpdate
+    /// Forwards to strategy chain WITHOUT updating s_totalShares. Share burn and s_totalShares update
+    /// happen in _handleCCIPWithdrawCallbackParent (or in _handleCCIPWithdraw when strategy is on parent) after a successful strategy withdrawal.
     /// @param data The encoded WithdrawData
-    /// @param sourceChainSelector The chain selector of the chain where the withdraw originated from and shares were burned
-    function _handleCCIPWithdrawToParent(bytes memory data, uint64 sourceChainSelector) internal {
+    ///  sourceChainSelector The chain selector of the chain where the withdraw originated (unused; for future use)
+    function _handleCCIPWithdrawToParent(
+        bytes memory data,
+        uint64 /* sourceChainSelector */
+    )
+        internal
+    {
         WithdrawData memory withdrawData = _decodeWithdrawData(data);
-        withdrawData.totalShares = s_totalShares;
-        s_totalShares -= withdrawData.shareBurnAmount;
+        // @review reluctant to remove this right now
+        // could withdrawData.totalShares be stale at this point?
+        // could user interactions have changed totalShares prior to this point?
+        // is it better to be updating totalShares with s_totalShares everytime?
+        // -answer: probably, used as snapshot for cross chain
+        //
 
-        emit ShareBurnUpdate(
-            withdrawData.shareBurnAmount, sourceChainSelector, withdrawData.totalShares - withdrawData.shareBurnAmount
-        );
+        // could it be an issue/manipulated?
+        withdrawData.totalShares = s_totalShares;
 
         _handleCCIPWithdraw(s_strategy, withdrawData);
     }
@@ -347,20 +354,28 @@ contract ParentPeer is YieldPeer {
     /// @param withdrawData The withdraw data for the tx
     function _handleCCIPWithdraw(Strategy memory strategy, WithdrawData memory withdrawData) internal {
         // 1. If the parent is the strategy, we want to use the totalShares and shareBurnAmount to calculate the usdcWithdrawAmount then withdraw it and ccipSend it back to the withdrawer
+        // @review need to update share state here after withdrawing
+        // wait does that mean we were doing _withdrawFromStrategyAndGetUsdc with wrong share state?
+        // no because we were stashing s_totalShares inside the withdrawData.totalShares and using that for calculations
+        // basically doing accounting tracking but in memory
         if (strategy.chainSelector == i_thisChainSelector) {
             address activeStrategyAdapter = _getActiveStrategyAdapter();
             if (activeStrategyAdapter != address(0)) {
                 withdrawData.usdcWithdrawAmount =
                     _withdrawFromStrategyAndGetUsdcWithdrawAmount(activeStrategyAdapter, withdrawData);
 
+                s_totalShares -= withdrawData.shareBurnAmount;
+                emit ShareBurnUpdate(withdrawData.shareBurnAmount, withdrawData.chainSelector, s_totalShares);
+
                 _ccipSend(
                     withdrawData.chainSelector,
-                    CcipTxType.WithdrawCallback,
+                    CcipTxType.WithdrawCallbackChild,
                     abi.encode(withdrawData),
                     withdrawData.usdcWithdrawAmount
                 );
             } else {
                 emit WithdrawPingPongToChild(withdrawData.shareBurnAmount, withdrawData.chainSelector);
+                // @review need to think how this changes now that shares arent burnt in _handleCCIPWithdrawToParent
                 /// @dev Encode the updated withdrawData (with correct totalShares) instead of using stale encodedWithdrawData
                 _ccipSend(
                     withdrawData.chainSelector,
@@ -375,6 +390,35 @@ contract ParentPeer is YieldPeer {
             emit WithdrawForwardedToStrategy(withdrawData.shareBurnAmount, strategy.chainSelector);
             _ccipSend(
                 strategy.chainSelector, CcipTxType.WithdrawToStrategy, abi.encode(withdrawData), ZERO_BRIDGE_AMOUNT
+            );
+        }
+    }
+
+    /// @notice Handles callback from strategy chain after successful withdrawal. Updates s_totalShares, then
+    /// transfers USDC to withdrawer if parent is the withdraw chain, else forwards WithdrawCallbackChild to the child.
+    /// @param tokenAmounts The token amounts received (USDC). Validate only when length > 0.
+    /// @param data The encoded WithdrawData
+    function _handleCCIPWithdrawCallbackParent(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data)
+        internal
+    {
+        WithdrawData memory withdrawData = _decodeWithdrawData(data);
+        if (tokenAmounts.length != 0) {
+            CCIPOperations._validateTokenAmounts(tokenAmounts, address(i_usdc), withdrawData.usdcWithdrawAmount);
+        }
+
+        s_totalShares -= withdrawData.shareBurnAmount;
+        // @review ShareBurnUpdate is misleading, this is only accounting and burns occur on withdrawChain
+        emit ShareBurnUpdate(withdrawData.shareBurnAmount, withdrawData.chainSelector, s_totalShares);
+
+        if (withdrawData.chainSelector == i_thisChainSelector) {
+            _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
+            emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
+        } else {
+            _ccipSend(
+                withdrawData.chainSelector,
+                CcipTxType.WithdrawCallbackChild,
+                abi.encode(withdrawData),
+                withdrawData.usdcWithdrawAmount
             );
         }
     }
