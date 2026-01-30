@@ -7,7 +7,7 @@ import {ERC20, IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {MessageHashUtils} from "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
-
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {CCIPLocalSimulatorFork, Register} from "@chainlink-local/src/ccip/CCIPLocalSimulatorFork.sol";
 
 import {DeployParent, HelperConfig, ParentPeer, Rebalancer} from "../script/deploy/DeployParent.s.sol";
@@ -41,32 +41,35 @@ contract BaseTest is Test {
     uint256 internal constant INITIAL_SHARE_PRECISION = 1e18 / 1e6;
     uint256 internal constant BALANCE_TOLERANCE = 4; // Allow 4 wei difference
     uint256 internal constant INITIAL_FEE_RATE = 10_000; // 1%
-
-    CCIPLocalSimulatorFork internal ccipLocalSimulatorFork;
     uint256 internal constant LINK_AMOUNT = 1_000 * 1e18; // 1000 LINK
     uint256 internal constant INITIAL_CCIP_GAS_LIMIT = 500_000;
 
-    uint256 internal constant BASE_MAINNET_CHAIN_ID = 8453;
+    // EIP-1967 implementation slot for proxies
+    bytes32 internal constant IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+
+    // --- Fork IDs & Blocks ---
     uint256 internal baseFork;
-
-    uint256 internal constant OPTIMISM_MAINNET_CHAIN_ID = 10;
-    uint256 internal optFork;
-
-    uint256 internal constant ETHEREUM_MAINNET_CHAIN_ID = 1;
-    uint256 internal ethFork;
-
-    /// @dev update these with more recent block numbers
+    uint256 internal constant BASE_MAINNET_CHAIN_ID = 8453;
     uint256 internal constant BASE_MAINNET_BLOCK_NUMBER = 38045674;
+
+    uint256 internal optFork;
+    uint256 internal constant OPTIMISM_MAINNET_CHAIN_ID = 10;
     uint256 internal constant OPTIMISM_MAINNET_BLOCK_NUMBER = 143640972;
+
+    uint256 internal ethFork;
+    uint256 internal constant ETHEREUM_MAINNET_CHAIN_ID = 1;
     uint256 internal constant ETHEREUM_MAINNET_BLOCK_NUMBER = 23777365;
 
-    /// @dev base chain variables - parent
+    CCIPLocalSimulatorFork internal ccipLocalSimulatorFork;
+
+    // --- Base Chain (Parent) ---
     Share internal baseShare;
+    address internal baseShareImplAddr;
     SharePool internal baseSharePool;
     ParentPeer internal baseParentPeer;
-    address internal baseParentPeerImpl;
+    address internal baseParentPeerImplAddr;
     Rebalancer internal baseRebalancer;
-    address internal baseRebalancerImpl;
+    address internal baseRebalancerImplAddr;
     HelperConfig internal baseConfig;
     HelperConfig.NetworkConfig internal baseNetworkConfig;
     uint64 internal baseChainSelector;
@@ -74,15 +77,16 @@ contract BaseTest is Test {
     USDCTokenPool internal baseUsdcTokenPool;
     IMessageTransmitter internal baseCCTPMessageTransmitter;
     StrategyRegistry internal baseStrategyRegistry;
-    address internal baseStrategyRegistryImpl;
+    address internal baseStrategyRegistryImplAddr;
     AaveV3Adapter internal baseAaveV3Adapter;
     CompoundV3Adapter internal baseCompoundV3Adapter;
 
-    /// @dev optimism chain variables - child 1
+    // --- Optimism Chain (Child 1) ---
     Share internal optShare;
+    address internal optShareImplAddr;
     SharePool internal optSharePool;
     ChildPeer internal optChildPeer;
-    address internal optChildPeerImpl;
+    address internal optChildPeerImplAddr;
     HelperConfig internal optConfig;
     HelperConfig.NetworkConfig internal optNetworkConfig;
     uint64 internal optChainSelector;
@@ -90,15 +94,16 @@ contract BaseTest is Test {
     USDCTokenPool internal optUsdcTokenPool;
     IMessageTransmitter internal optCCTPMessageTransmitter;
     StrategyRegistry internal optStrategyRegistry;
-    address internal optStrategyRegistryImpl;
+    address internal optStrategyRegistryImplAddr;
     AaveV3Adapter internal optAaveV3Adapter;
     CompoundV3Adapter internal optCompoundV3Adapter;
 
-    /// @dev ethereum chain variables - child 2
+    // --- Ethereum Chain (Child 2) ---
     Share internal ethShare;
+    address internal ethShareImplAddr;
     SharePool internal ethSharePool;
     ChildPeer internal ethChildPeer;
-    address internal ethChildPeerImpl;
+    address internal ethChildPeerImplAddr;
     HelperConfig internal ethConfig;
     HelperConfig.NetworkConfig internal ethNetworkConfig;
     uint64 internal ethChainSelector;
@@ -106,19 +111,22 @@ contract BaseTest is Test {
     USDCTokenPool internal ethUsdcTokenPool;
     IMessageTransmitter internal ethCCTPMessageTransmitter;
     StrategyRegistry internal ethStrategyRegistry;
-    address internal ethStrategyRegistryImpl;
+    address internal ethStrategyRegistryImplAddr;
     AaveV3Adapter internal ethAaveV3Adapter;
     CompoundV3Adapter internal ethCompoundV3Adapter;
 
+    // --- Users & Roles ---
     address internal owner = makeAddr("owner");
     address internal depositor = makeAddr("depositor");
     address internal withdrawer = makeAddr("withdrawer");
     address internal holder = makeAddr("holder");
     address internal keystoneForwarder = makeAddr("keystoneForwarder");
+
+    // CCTP Actors
     address[] internal attesters = new address[](4);
     uint256[] internal attesterPks = new uint256[](4);
 
-    /// @dev addresses for custom roles
+    // Custom Role Addresses
     address internal configAdmin = makeAddr("configAdmin");
     address internal crossChainAdmin = makeAddr("crossChainAdmin");
     address internal emergencyPauser = makeAddr("emergencyPauser");
@@ -126,32 +134,35 @@ contract BaseTest is Test {
     address internal feeWithdrawer = makeAddr("feeWithdrawer");
     address internal feeRateSetter = makeAddr("feeRateSetter");
 
-    /// @dev workflow params and metadata setup
+    // --- Workflow Metadata ---
     address internal workflowOwner = makeAddr("workflowOwner");
     bytes32 internal workflowId = bytes32("rebalanceWorkflowId");
     string internal workflowNameRaw = "yieldcoin-rebalance-workflow";
     bytes10 internal workflowName = WorkflowHelpers.createWorkflowName(workflowNameRaw);
     bytes internal workflowMetadata = WorkflowHelpers.createWorkflowMetadata(workflowId, workflowName, workflowOwner);
 
-    /// @dev '_setStrategy' flag to control message routing
+    // --- Testing Flags ---
     bool internal constant SET_CROSS_CHAIN = true;
     bool internal constant NO_CROSS_CHAIN = false;
-
-    bytes32 internal constant IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
     /*//////////////////////////////////////////////////////////////
                                  SETUP
     //////////////////////////////////////////////////////////////*/
     function setUp() public virtual {
+        // 1. Deploy contracts on all 3 forks
         _deployInfra();
+
+        // 2. Setup Access Control
         _grantRoles();
+
+        // 3. CCIP & CCTP Setup
         _setPools();
         _setCrossChainPeers();
-        _dealLinkToPeers(false, address(0), address(0), address(0), address(0));
-
         _setCCTPAttesters();
         _setDomains();
 
+        // 4. Initial Funding & Config
+        _dealLinkToPeers(false, address(0), address(0), address(0), address(0));
         _setForwarderAndWorkflow();
 
         /// @dev sanity check that we're ending BaseTest.setUp() on the Parent chain
@@ -159,6 +170,8 @@ contract BaseTest is Test {
         _stopPrank();
     }
 
+    /// @dev Deploys ParentPeer on Base and ChildPeers on Optimism & Ethereum
+    /// @dev Sets up CCIP Local Simulator Fork
     function _deployInfra() internal virtual {
         _deployBase();
         _deployOpt();
@@ -169,40 +182,47 @@ contract BaseTest is Test {
         _registerChains();
     }
 
+    /*//////////////////////////////////////////////////////////////
+                          DEPLOYMENT HELPERS
+    //////////////////////////////////////////////////////////////*/
     /// @dev _deployInfra: Helper to deploy Parent on Base
     function _deployBase() private {
-        // --- Create Base fork --- //
+        // Create Base fork
         baseFork = vm.createSelectFork(vm.envString("BASE_MAINNET_RPC_URL"), BASE_MAINNET_BLOCK_NUMBER);
         assertEq(block.chainid, BASE_MAINNET_CHAIN_ID);
 
-        // --- Create & store Parent config --- //
+        // Create & store Parent deployment config
         DeployParent baseDeployParent = new DeployParent();
         DeployParent.DeploymentConfig memory baseDeploy = baseDeployParent.run();
 
-        // --- Store deployed contracts from deployment config --- //
+        // Store deployed contracts and impl addresses from deployment config
         baseShare = baseDeploy.share;
+        baseShareImplAddr = baseDeploy.shareImplAddr;
         baseSharePool = baseDeploy.sharePool;
         baseParentPeer = baseDeploy.parentPeer;
-        baseParentPeerImpl = baseDeploy.parentPeerImpl;
+        baseParentPeerImplAddr = baseDeploy.parentPeerImplAddr;
         baseRebalancer = baseDeploy.rebalancer;
-        baseRebalancerImpl = baseDeploy.rebalancerImpl;
+        baseRebalancerImplAddr = baseDeploy.rebalancerImplAddr;
         baseConfig = baseDeploy.config;
         baseStrategyRegistry = baseDeploy.strategyRegistry;
-        baseStrategyRegistryImpl = baseDeploy.strategyRegistryImpl;
+        baseStrategyRegistryImplAddr = baseDeploy.strategyRegistryImplAddr;
         baseAaveV3Adapter = baseDeploy.aaveV3Adapter;
         baseCompoundV3Adapter = baseDeploy.compoundV3Adapter;
 
-        // --- Make persistent --- //
+        // Persist
         vm.makePersistent(address(baseShare));
         vm.makePersistent(address(baseSharePool));
         vm.makePersistent(address(baseParentPeer));
         vm.makePersistent(address(baseRebalancer));
-        /// @dev impl's made persistent for proxy to call via delegatecall
-        vm.makePersistent(baseParentPeerImpl);
-        vm.makePersistent(baseRebalancerImpl);
-        vm.makePersistent(baseStrategyRegistryImpl);
+        vm.makePersistent(address(baseStrategyRegistry));
+        vm.makePersistent(address(baseAaveV3Adapter));
+        vm.makePersistent(address(baseCompoundV3Adapter));
+        vm.makePersistent(baseShareImplAddr);
+        vm.makePersistent(baseParentPeerImplAddr);
+        vm.makePersistent(baseRebalancerImplAddr);
+        vm.makePersistent(baseStrategyRegistryImplAddr);
 
-        // --- Get and store network config values --- //
+        // Network Config
         baseNetworkConfig = baseConfig.getActiveNetworkConfig();
         baseChainSelector = baseNetworkConfig.ccip.thisChainSelector;
         baseUsdc = ERC20(baseNetworkConfig.tokens.usdc);
@@ -212,34 +232,38 @@ contract BaseTest is Test {
 
     /// @dev _deployInfra: Helper to deploy Child on Optimism
     function _deployOpt() private {
-        // --- Create Optimism fork --- //
+        // Create Optimism fork
         optFork = vm.createSelectFork(vm.envString("OPTIMISM_MAINNET_RPC_URL"), OPTIMISM_MAINNET_BLOCK_NUMBER);
         assertEq(block.chainid, OPTIMISM_MAINNET_CHAIN_ID);
 
-        // --- Create & store Child config --- //
+        // Create & store Child deployment config
         DeployChild optDeployChild = new DeployChild();
         DeployChild.ChildDeploymentConfig memory optDeploy = optDeployChild.run();
 
-        // --- Store deployed contracts from deployment config --- //
+        // Store deployed contracts and impl addresses from deployment config
         optShare = optDeploy.share;
+        optShareImplAddr = optDeploy.shareImplAddr;
         optSharePool = optDeploy.sharePool;
         optChildPeer = optDeploy.childPeer;
-        optChildPeerImpl = optDeploy.childPeerImpl;
+        optChildPeerImplAddr = optDeploy.childPeerImplAddr;
         optConfig = optDeploy.config;
         optStrategyRegistry = optDeploy.strategyRegistry;
-        optStrategyRegistryImpl = optDeploy.strategyRegistryImpl;
+        optStrategyRegistryImplAddr = optDeploy.strategyRegistryImplAddr;
         optAaveV3Adapter = optDeploy.aaveV3Adapter;
         optCompoundV3Adapter = optDeploy.compoundV3Adapter;
 
-        // --- Make persistent --- //
+        // Persist
         vm.makePersistent(address(optShare));
         vm.makePersistent(address(optSharePool));
         vm.makePersistent(address(optChildPeer));
-        /// @dev impl's made persistent for proxy to call via delegatecall
-        vm.makePersistent(optChildPeerImpl);
-        vm.makePersistent(optStrategyRegistryImpl);
+        vm.makePersistent(address(optStrategyRegistry));
+        vm.makePersistent(address(optAaveV3Adapter));
+        vm.makePersistent(address(optCompoundV3Adapter));
+        vm.makePersistent(optShareImplAddr);
+        vm.makePersistent(optChildPeerImplAddr);
+        vm.makePersistent(optStrategyRegistryImplAddr);
 
-        // --- Get and store network config values --- //
+        // Network Config
         optNetworkConfig = optConfig.getActiveNetworkConfig();
         optChainSelector = optNetworkConfig.ccip.thisChainSelector;
         optUsdc = ERC20(optNetworkConfig.tokens.usdc);
@@ -249,34 +273,38 @@ contract BaseTest is Test {
 
     /// @dev _deployInfra: Helper to deploy Child on Ethereum
     function _deployEth() private {
-        // --- Create Ethereum fork --- //
+        // Create Ethereum fork
         ethFork = vm.createSelectFork(vm.envString("ETH_MAINNET_RPC_URL"), ETHEREUM_MAINNET_BLOCK_NUMBER);
         assertEq(block.chainid, ETHEREUM_MAINNET_CHAIN_ID);
 
-        // --- Create & store Child config --- //
+        // Create & store Child deployment config
         DeployChild ethDeployChild = new DeployChild();
         DeployChild.ChildDeploymentConfig memory ethDeploy = ethDeployChild.run();
 
-        // --- Store deployed contracts from deployment config --- //
+        // Store deployed contracts and impl addresses from deployment config
         ethShare = ethDeploy.share;
+        ethShareImplAddr = ethDeploy.shareImplAddr;
         ethSharePool = ethDeploy.sharePool;
         ethChildPeer = ethDeploy.childPeer;
-        ethChildPeerImpl = ethDeploy.childPeerImpl;
+        ethChildPeerImplAddr = ethDeploy.childPeerImplAddr;
         ethConfig = ethDeploy.config;
         ethStrategyRegistry = ethDeploy.strategyRegistry;
-        ethStrategyRegistryImpl = ethDeploy.strategyRegistryImpl;
+        ethStrategyRegistryImplAddr = ethDeploy.strategyRegistryImplAddr;
         ethAaveV3Adapter = ethDeploy.aaveV3Adapter;
         ethCompoundV3Adapter = ethDeploy.compoundV3Adapter;
 
-        // --- Make persistent --- //
+        // Persist
         vm.makePersistent(address(ethShare));
         vm.makePersistent(address(ethSharePool));
         vm.makePersistent(address(ethChildPeer));
-        /// @dev impl's made persistent for proxy to call via delegatecall
-        vm.makePersistent(ethChildPeerImpl);
-        vm.makePersistent(ethStrategyRegistryImpl);
+        vm.makePersistent(address(ethStrategyRegistry));
+        vm.makePersistent(address(ethAaveV3Adapter));
+        vm.makePersistent(address(ethCompoundV3Adapter));
+        vm.makePersistent(ethShareImplAddr);
+        vm.makePersistent(ethChildPeerImplAddr);
+        vm.makePersistent(ethStrategyRegistryImplAddr);
 
-        // --- Get and store network config values --- //
+        // Network Config
         ethNetworkConfig = ethConfig.getActiveNetworkConfig();
         ethChainSelector = ethNetworkConfig.ccip.thisChainSelector;
         ethUsdc = ERC20(ethNetworkConfig.tokens.usdc);
@@ -284,60 +312,71 @@ contract BaseTest is Test {
         ethCCTPMessageTransmitter = IMessageTransmitter(ethNetworkConfig.ccip.cctpMessageTransmitter);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                        CONFIGURATION HELPERS
+    //////////////////////////////////////////////////////////////*/
+    /// @dev _deployInfra: Helper to set up CCIP Local Simulator with all chains
+    /// @dev Registers all chains in CCIP Local Simulator
+    function _registerChains() internal {
+        _registerChainInSimulator(OPTIMISM_MAINNET_CHAIN_ID, optNetworkConfig);
+        _registerChainInSimulator(BASE_MAINNET_CHAIN_ID, baseNetworkConfig);
+        _registerChainInSimulator(ETHEREUM_MAINNET_CHAIN_ID, ethNetworkConfig);
+    }
+
+    /// @dev _registerChains: Helper to register a chain in the CCIP Local Simulator
+    /// @param chainId The chain ID to register
+    /// @param networkConfig The network config of the chain to register
+    function _registerChainInSimulator(uint256 chainId, HelperConfig.NetworkConfig memory networkConfig) private {
+        Register.NetworkDetails memory details = Register.NetworkDetails({
+            chainSelector: networkConfig.ccip.thisChainSelector,
+            routerAddress: networkConfig.ccip.ccipRouter,
+            linkAddress: networkConfig.tokens.link,
+            wrappedNativeAddress: address(0),
+            ccipBnMAddress: address(0),
+            ccipLnMAddress: address(0),
+            rmnProxyAddress: address(0),
+            registryModuleOwnerCustomAddress: address(0),
+            tokenAdminRegistryAddress: address(0)
+        });
+        ccipLocalSimulatorFork.setNetworkDetails(chainId, details);
+    }
+
+    /// @dev Grants custom roles on all chains to predefined addresses
     function _grantRoles() internal virtual {
-        // grant roles - parent
-        _selectFork(baseFork);
-        _changePrank(baseParentPeer.owner());
-        baseParentPeer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
-        baseParentPeer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
-        baseParentPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
-        baseParentPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin);
-        baseParentPeer.grantRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer);
-        baseParentPeer.grantRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter);
-
-        assertTrue(baseParentPeer.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
-        assertTrue(baseParentPeer.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
-        assertTrue(baseParentPeer.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
-        assertTrue(baseParentPeer.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin));
-        assertTrue(baseParentPeer.hasRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer));
-        assertTrue(baseParentPeer.hasRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter));
-
-        // grant roles - child 1
-        _selectFork(optFork);
-        _changePrank(optChildPeer.owner());
-        optChildPeer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
-        optChildPeer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
-        optChildPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
-        optChildPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin);
-        optChildPeer.grantRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer);
-        optChildPeer.grantRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter);
-
-        assertTrue(optChildPeer.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
-        assertTrue(optChildPeer.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
-        assertTrue(optChildPeer.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
-        assertTrue(optChildPeer.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin));
-        assertTrue(optChildPeer.hasRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer));
-        assertTrue(optChildPeer.hasRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter));
-
-        // grant roles - child 2
-        _selectFork(ethFork);
-        _changePrank(ethChildPeer.owner());
-        ethChildPeer.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
-        ethChildPeer.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
-        ethChildPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
-        ethChildPeer.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin);
-        ethChildPeer.grantRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer);
-        ethChildPeer.grantRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter);
-
-        assertTrue(ethChildPeer.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
-        assertTrue(ethChildPeer.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
-        assertTrue(ethChildPeer.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
-        assertTrue(ethChildPeer.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin));
-        assertTrue(ethChildPeer.hasRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer));
-        assertTrue(ethChildPeer.hasRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter));
+        _grantRolesForChain(baseFork, baseParentPeer, baseParentPeer.owner());
+        _grantRolesForChain(optFork, optChildPeer, optChildPeer.owner());
+        _grantRolesForChain(ethFork, ethChildPeer, ethChildPeer.owner());
         _stopPrank();
     }
 
+    /// @dev _grantRoles: Helper to grant custom roles on a specific chain
+    /// @param forkId The fork ID to grant roles for
+    /// @param peer The peer to grant roles for
+    /// @param peerOwner The owner of the peer to grant roles for
+    function _grantRolesForChain(uint256 forkId, IYieldPeer peer, address peerOwner) private {
+        _selectFork(forkId);
+        _changePrank(peerOwner);
+
+        // Cast IYieldPeer to IAccessControl to access role functions
+        IAccessControl accessControl = IAccessControl(address(peer));
+
+        accessControl.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
+        accessControl.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
+        accessControl.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
+        accessControl.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin);
+        accessControl.grantRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer);
+        accessControl.grantRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter);
+
+        // Assertions
+        assertTrue(accessControl.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
+        assertTrue(accessControl.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
+        assertTrue(accessControl.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
+        assertTrue(accessControl.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin));
+        assertTrue(accessControl.hasRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer));
+        assertTrue(accessControl.hasRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter));
+    }
+
+    /// @dev Sets up SharePools on all chains to know about each other
     function _setPools() internal {
         uint64[] memory remoteChains = new uint64[](3);
         address[] memory remotePools = new address[](3);
@@ -404,6 +443,7 @@ contract BaseTest is Test {
         assertEq(ethSharePool.getRemoteToken(ethChainSelector), abi.encode(address(ethShare)));
     }
 
+    /// @dev Sets cross chain configurations on Parent and Child Peers
     function _setCrossChainPeers() internal virtual {
         _selectFork(baseFork);
         /// @dev grant temp cross chain role to deployer to set cross chain configs
@@ -452,6 +492,12 @@ contract BaseTest is Test {
         assertEq(ethChildPeer.getAllowedPeer(optChainSelector), address(optChildPeer));
     }
 
+    /// _setCrossChainPeers: Helper to apply chain updates to SharePools
+    /// @dev Apply chain updates to SharePools
+    /// @param sharePool The SharePool to apply chain updates to
+    /// @param remoteChainSelectors The chain selectors to apply chain updates to
+    /// @param remotePoolAddresses The pool addresses to apply chain updates to
+    /// @param remoteTokenAddresses The token addresses to apply chain updates to
     function _applyChainUpdates(
         SharePool sharePool,
         uint64[] memory remoteChainSelectors,
@@ -480,6 +526,78 @@ contract BaseTest is Test {
         sharePool.applyChainUpdates(new uint64[](0), chainUpdates);
     }
 
+    /// @dev Sets CCTP attesters on all chains
+    function _setCCTPAttesters() internal {
+        for (uint256 i = 0; i < attesters.length; i++) {
+            (attesters[i], attesterPks[i]) = makeAddrAndKey(string.concat("attester", vm.toString(i)));
+        }
+        _enableAttestersForChain(baseFork, baseCCTPMessageTransmitter);
+        _enableAttestersForChain(optFork, optCCTPMessageTransmitter);
+        _enableAttestersForChain(ethFork, ethCCTPMessageTransmitter);
+        _stopPrank();
+    }
+
+    /// @dev _setCCTPAttesters: Helper to set CCTP attesters on a specific chain
+    function _enableAttestersForChain(uint256 forkId, IMessageTransmitter transmitter) private {
+        _selectFork(forkId);
+        _changePrank(transmitter.owner());
+        transmitter.updateAttesterManager(attesters[0]);
+        _changePrank(attesters[0]);
+        for (uint256 i = 0; i < attesters.length; i++) {
+            transmitter.enableAttester(attesters[i]);
+        }
+        transmitter.setSignatureThreshold(attesters.length);
+    }
+
+    /// @dev Sets domains on all USDC Token Pools
+    function _setDomains() internal {
+        // Domain Updates
+        USDCTokenPool.DomainUpdate[] memory domains = new USDCTokenPool.DomainUpdate[](3);
+
+        // Optimism Domain
+        domains[0] = USDCTokenPool.DomainUpdate({
+            allowedCaller: bytes32(uint256(uint160(address(optUsdcTokenPool)))),
+            domainIdentifier: 2,
+            destChainSelector: optChainSelector,
+            enabled: true
+        });
+        // Ethereum Domain
+        domains[1] = USDCTokenPool.DomainUpdate({
+            allowedCaller: bytes32(uint256(uint160(address(ethUsdcTokenPool)))),
+            domainIdentifier: 0,
+            destChainSelector: ethChainSelector,
+            enabled: true
+        });
+        // Base Domain
+        domains[2] = USDCTokenPool.DomainUpdate({
+            allowedCaller: bytes32(uint256(uint160(address(baseUsdcTokenPool)))),
+            domainIdentifier: 6,
+            destChainSelector: baseChainSelector,
+            enabled: true
+        });
+
+        // Apply
+        _selectFork(baseFork);
+        _changePrank(baseUsdcTokenPool.owner());
+        baseUsdcTokenPool.setDomains(domains);
+
+        _selectFork(optFork);
+        _changePrank(optUsdcTokenPool.owner());
+        optUsdcTokenPool.setDomains(domains);
+
+        _selectFork(ethFork);
+        _changePrank(ethUsdcTokenPool.owner());
+        ethUsdcTokenPool.setDomains(domains);
+
+        _stopPrank();
+    }
+
+    /// @dev Deals LINK to Parent and Child Peers
+    /// @param isLocal If true, deals LINK on the current fork. If false, deals LINK on each respective fork.
+    /// @param parent The Parent Peer address (used if isLocal is true)
+    /// @param child1 The Optimism Child Peer address (used if isLocal is true)
+    /// @param child2 The Ethereum Child Peer address (used if isLocal is true)
+    /// @param link The LINK token address (used if isLocal is true)
     function _dealLinkToPeers(bool isLocal, address parent, address child1, address child2, address link) internal {
         if (isLocal) {
             deal(link, parent, LINK_AMOUNT);
@@ -497,125 +615,7 @@ contract BaseTest is Test {
         }
     }
 
-    function _registerChains() internal {
-        // Set up Optimism network details using values from HelperConfig
-        Register.NetworkDetails memory optimismDetails = Register.NetworkDetails({
-            chainSelector: optChainSelector,
-            routerAddress: optNetworkConfig.ccip.ccipRouter,
-            linkAddress: optNetworkConfig.tokens.link,
-            wrappedNativeAddress: address(0),
-            ccipBnMAddress: address(0),
-            ccipLnMAddress: address(0),
-            rmnProxyAddress: address(0),
-            registryModuleOwnerCustomAddress: address(0),
-            tokenAdminRegistryAddress: address(0)
-        });
-
-        // Set the network details for Optimism
-        ccipLocalSimulatorFork.setNetworkDetails(OPTIMISM_MAINNET_CHAIN_ID, optimismDetails);
-
-        // Set up Base network details using values from HelperConfig
-        Register.NetworkDetails memory baseDetails = Register.NetworkDetails({
-            chainSelector: baseChainSelector,
-            routerAddress: baseNetworkConfig.ccip.ccipRouter,
-            linkAddress: baseNetworkConfig.tokens.link,
-            wrappedNativeAddress: address(0),
-            ccipBnMAddress: address(0),
-            ccipLnMAddress: address(0),
-            rmnProxyAddress: address(0),
-            registryModuleOwnerCustomAddress: address(0),
-            tokenAdminRegistryAddress: address(0)
-        });
-
-        // Set the network details for Base
-        ccipLocalSimulatorFork.setNetworkDetails(BASE_MAINNET_CHAIN_ID, baseDetails);
-
-        // Set up Ethereum network details using values from HelperConfig
-        Register.NetworkDetails memory ethereumDetails = Register.NetworkDetails({
-            chainSelector: ethChainSelector,
-            routerAddress: ethNetworkConfig.ccip.ccipRouter,
-            linkAddress: ethNetworkConfig.tokens.link,
-            wrappedNativeAddress: address(0),
-            ccipBnMAddress: address(0),
-            ccipLnMAddress: address(0),
-            rmnProxyAddress: address(0),
-            registryModuleOwnerCustomAddress: address(0),
-            tokenAdminRegistryAddress: address(0)
-        });
-
-        // Set the network details for Ethereum
-        ccipLocalSimulatorFork.setNetworkDetails(ETHEREUM_MAINNET_CHAIN_ID, ethereumDetails);
-    }
-
-    function _setCCTPAttesters() internal {
-        for (uint256 i = 0; i < attesters.length; i++) {
-            (attesters[i], attesterPks[i]) = makeAddrAndKey(string.concat("attester", vm.toString(i)));
-        }
-
-        _selectFork(baseFork);
-        _changePrank(baseCCTPMessageTransmitter.owner());
-        baseCCTPMessageTransmitter.updateAttesterManager(attesters[0]);
-        _changePrank(attesters[0]);
-        for (uint256 i = 0; i < attesters.length; i++) {
-            baseCCTPMessageTransmitter.enableAttester(attesters[i]);
-        }
-        baseCCTPMessageTransmitter.setSignatureThreshold(attesters.length);
-
-        _selectFork(optFork);
-        _changePrank(optCCTPMessageTransmitter.owner());
-        optCCTPMessageTransmitter.updateAttesterManager(attesters[0]);
-        _changePrank(attesters[0]);
-        for (uint256 i = 0; i < attesters.length; i++) {
-            optCCTPMessageTransmitter.enableAttester(attesters[i]);
-        }
-        optCCTPMessageTransmitter.setSignatureThreshold(attesters.length);
-
-        _selectFork(ethFork);
-        _changePrank(ethCCTPMessageTransmitter.owner());
-        ethCCTPMessageTransmitter.updateAttesterManager(attesters[0]);
-        _changePrank(attesters[0]);
-        for (uint256 i = 0; i < attesters.length; i++) {
-            ethCCTPMessageTransmitter.enableAttester(attesters[i]);
-        }
-        ethCCTPMessageTransmitter.setSignatureThreshold(attesters.length);
-
-        _stopPrank();
-    }
-
-    function _setDomains() internal {
-        // The allowedCaller must be the MessageTransmitterProxy address of the destination chain
-        USDCTokenPool.DomainUpdate[] memory domains = new USDCTokenPool.DomainUpdate[](3);
-        domains[0] = USDCTokenPool.DomainUpdate({
-            allowedCaller: bytes32(uint256(uint160(address(optUsdcTokenPool)))),
-            domainIdentifier: 2,
-            destChainSelector: optChainSelector,
-            enabled: true
-        });
-        domains[1] = USDCTokenPool.DomainUpdate({
-            allowedCaller: bytes32(uint256(uint160(address(ethUsdcTokenPool)))),
-            domainIdentifier: 0,
-            destChainSelector: ethChainSelector,
-            enabled: true
-        });
-        domains[2] = USDCTokenPool.DomainUpdate({
-            allowedCaller: bytes32(uint256(uint160(address(baseUsdcTokenPool)))),
-            domainIdentifier: 6,
-            destChainSelector: baseChainSelector,
-            enabled: true
-        });
-
-        _selectFork(baseFork);
-        _changePrank(baseUsdcTokenPool.owner());
-        baseUsdcTokenPool.setDomains(domains);
-        _selectFork(optFork);
-        _changePrank(optUsdcTokenPool.owner());
-        optUsdcTokenPool.setDomains(domains);
-        _selectFork(ethFork);
-        _changePrank(ethUsdcTokenPool.owner());
-        ethUsdcTokenPool.setDomains(domains);
-        _stopPrank();
-    }
-
+    /// @dev Sets the keystone forwarder and workflow on the Rebalancer
     function _setForwarderAndWorkflow() internal {
         _selectFork(baseFork);
         _changePrank(baseRebalancer.owner());

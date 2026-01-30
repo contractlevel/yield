@@ -12,6 +12,8 @@ contract ImplementationSlotTest is BaseTest {
         address storedImplementation = address(uint160(uint256(slotValue)));
 
         // Assert
-        assertEq(storedImplementation, optChildPeerImpl, "ChildPeer (Opt) proxy should point to ChildPeer Impl");
+        assertEq(
+            storedImplementation, optChildPeerImplAddr, "ChildPeer (Opt) proxy should point to ChildPeer Impl Addr"
+        );
     }
 }

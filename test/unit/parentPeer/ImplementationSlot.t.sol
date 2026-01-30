@@ -12,6 +12,6 @@ contract ImplementationSlotTest is BaseTest {
         address storedImplementation = address(uint160(uint256(slotValue)));
 
         // Assert
-        assertEq(storedImplementation, baseParentPeerImpl, "ParentPeer proxy should point to ParentPeer Impl");
+        assertEq(storedImplementation, baseParentPeerImplAddr, "ParentPeer proxy should point to ParentPeer Impl Addr");
     }
 }

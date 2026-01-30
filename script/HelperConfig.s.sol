@@ -16,6 +16,7 @@ import {ChildPeer} from "../src/peers/ChildPeer.sol";
 import {Rebalancer} from "../src/modules/Rebalancer.sol";
 import {SharePool} from "../src/token/SharePool.sol";
 import {Roles} from "../src/libraries/Roles.sol";
+import {ShareProxy} from "../src/proxies/ShareProxy.sol";
 import {ParentProxy} from "../src/proxies/ParentProxy.sol";
 import {ChildProxy} from "../src/proxies/ChildProxy.sol";
 import {RebalancerProxy} from "../src/proxies/RebalancerProxy.sol";
@@ -556,7 +557,12 @@ contract HelperConfig is Script {
         ccipLocalSimulator = new CCIPLocalSimulator();
         (, ccipRouter,,, link,,) = ccipLocalSimulator.configuration();
 
-        share = new Share();
+        // Deploy Share through Proxy
+        Share shareImpl = new Share();
+        bytes memory shareInit = abi.encodeWithSelector(Share.initialize.selector);
+        ShareProxy shareProxy = new ShareProxy(address(shareImpl), shareInit);
+        share = Share(address(shareProxy)); /// @dev wrap proxy around share type
+
         sharePool = new SharePool(address(share), address(1), address(ccipRouter));
         ccipLocalSimulator.supportNewTokenViaOwner(address(usdc));
         ccipLocalSimulator.supportNewTokenViaGetCCIPAdmin(address(share));

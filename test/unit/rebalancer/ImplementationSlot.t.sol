@@ -11,6 +11,6 @@ contract ImplementationSlotTest is BaseTest {
         address storedImplementation = address(uint160(uint256(slotValue)));
 
         // Assert
-        assertEq(storedImplementation, baseRebalancerImpl, "Rebalancer proxy should point to Rebalancer Impl");
+        assertEq(storedImplementation, baseRebalancerImplAddr, "Rebalancer proxy should point to Rebalancer Impl Addr");
     }
 }

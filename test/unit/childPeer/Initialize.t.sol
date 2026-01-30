@@ -20,7 +20,7 @@ contract InitializeTest is BaseTest {
     function test_yield_child_implementation_initialize_revertsWhen_calledDirectly() public {
         // Arrange
         _selectFork(optFork);
-        ChildPeer impl = ChildPeer(optChildPeerImpl); /// @dev direct impl address
+        ChildPeer impl = ChildPeer(optChildPeerImplAddr); /// @dev direct impl address
 
         // Act & Assert
         vm.expectRevert(abi.encodeWithSignature("InvalidInitialization()"));

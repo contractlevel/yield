@@ -13,8 +13,8 @@ contract ImplementationSlotTest is BaseTest {
         // Assert
         assertEq(
             storedImplementation,
-            baseStrategyRegistryImpl,
-            "StrategyRegistry (Base) proxy should point to StrategyRegistry Impl"
+            baseStrategyRegistryImplAddr,
+            "StrategyRegistry (Base) proxy should point to StrategyRegistry Impl Addr"
         );
     }
 }

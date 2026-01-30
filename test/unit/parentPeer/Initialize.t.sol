@@ -20,7 +20,7 @@ contract InitializationTest is BaseTest {
     function test_yield_parent_implementation_initialize_revertsWhen_calledDirectly() public {
         // Arrange
         _selectFork(baseFork);
-        ParentPeer impl = ParentPeer(baseParentPeerImpl);
+        ParentPeer impl = ParentPeer(baseParentPeerImplAddr);
 
         // Act & Assert
         vm.expectRevert(abi.encodeWithSignature("InvalidInitialization()"));

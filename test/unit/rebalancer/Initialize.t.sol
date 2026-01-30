@@ -20,7 +20,7 @@ contract InitializationTest is BaseTest {
     function test_yield_rebalancer_implementation_initialize_revertsWhen_calledDirectly() public {
         // Arrange
         _selectFork(baseFork);
-        Rebalancer impl = Rebalancer(baseRebalancerImpl);
+        Rebalancer impl = Rebalancer(baseRebalancerImplAddr);
 
         // Act & Assert
         vm.expectRevert(abi.encodeWithSignature("InvalidInitialization()"));

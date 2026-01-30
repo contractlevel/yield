@@ -24,6 +24,7 @@ import {AaveV3Adapter} from "../../src/adapters/AaveV3Adapter.sol";
 import {CompoundV3Adapter} from "../../src/adapters/CompoundV3Adapter.sol";
 import {StrategyRegistry} from "../../src/modules/StrategyRegistry.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {ShareProxy} from "../../src/proxies/ShareProxy.sol";
 import {ParentProxy} from "../../src/proxies/ParentProxy.sol";
 import {ChildProxy} from "../../src/proxies/ChildProxy.sol";
 import {RebalancerProxy} from "../../src/proxies/RebalancerProxy.sol";

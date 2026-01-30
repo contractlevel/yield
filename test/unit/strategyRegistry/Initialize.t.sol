@@ -20,7 +20,7 @@ contract InitializationTest is BaseTest {
     function test_yield_strategyRegistry_base_implementation_initialize_reverts() public {
         // Arrange
         _selectFork(baseFork);
-        StrategyRegistry impl = StrategyRegistry(baseStrategyRegistryImpl);
+        StrategyRegistry impl = StrategyRegistry(baseStrategyRegistryImplAddr);
 
         // Act & Assert
         vm.expectRevert(abi.encodeWithSignature("InvalidInitialization()"));
