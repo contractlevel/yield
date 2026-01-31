@@ -6,6 +6,7 @@ import {CCIPReceiver, IAny2EVMMessageReceiver} from "@chainlink/contracts/src/v0
 import {IRouterClient, Client} from "@chainlink/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
 import {IERC677Receiver} from "@chainlink/contracts/src/v0.8/shared/interfaces/IERC677Receiver.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {PausableWithAccessControl, Roles, IAccessControlEnumerable} from "../modules/PausableWithAccessControl.sol";
 import {IShare} from "../interfaces/IShare.sol";
@@ -14,7 +15,6 @@ import {DataStructures} from "../libraries/DataStructures.sol";
 import {CCIPOperations} from "../libraries/CCIPOperations.sol";
 import {IStrategyAdapter} from "../interfaces/IStrategyAdapter.sol";
 import {IStrategyRegistry} from "../interfaces/IStrategyRegistry.sol";
-import {IStablecoinRegistry} from "../interfaces/IStablecoinRegistry.sol";
 import {ISwapper} from "../interfaces/ISwapper.sol";
 import {YieldFees} from "../modules/YieldFees.sol";
 
@@ -44,19 +44,24 @@ abstract contract YieldPeer is
     error YieldPeer__NoZeroAmount();
     error YieldPeer__NotStrategyChain();
     error YieldPeer__InsufficientAmount();
+    error YieldPeer__StablecoinNotSupported(bytes32 stablecoinId);
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
     /// @dev Constant for the zero bridge amount - some CCIP messages don't need to send any USDC
     uint256 internal constant ZERO_BRIDGE_AMOUNT = 0;
+    /// @dev Constant for the USDC scaling factor
+    uint256 internal constant USDC_SCALING_FACTOR = 1e6;
+    /// @dev Constant for the Share scaling factor
+    uint256 internal constant SHARE_SCALING_FACTOR = 1e18;
     /// @dev Constant for the USDC decimals
-    uint256 internal constant USDC_DECIMALS = 1e6;
+    uint8 internal constant USDC_DECIMALS = 6;
     /// @dev Constant for the Share decimals
-    uint256 internal constant SHARE_DECIMALS = 1e18;
+    uint8 internal constant SHARE_DECIMALS = 18;
     /// @dev Constant for the initial share precision used to calculate the mint amount for first deposit
-    uint256 internal constant INITIAL_SHARE_PRECISION = SHARE_DECIMALS / USDC_DECIMALS;
-    /// @dev Constant for the USDC stablecoin ID - keccak256("USDC")
+    uint256 internal constant INITIAL_SHARE_PRECISION = SHARE_SCALING_FACTOR / USDC_SCALING_FACTOR;
+    /// @dev Constant for the USDC stablecoin ID - keccak256("usdc")
     bytes32 internal constant USDC_ID = 0xd6aca1be9729c13d677335161321649cccae6a591554772516700f986f942eaa;
     /// @dev Maximum slippage in basis points for stablecoin swaps (50 bps = 0.5%)
     uint256 internal constant MAX_SLIPPAGE_BPS = 50;
@@ -75,7 +80,7 @@ abstract contract YieldPeer is
     /// @dev Gas limit for CCIP
     uint256 internal s_ccipGasLimit;
     /// @dev Mapping of allowed chains
-    /// @dev This must include the Parent Chain on the ParentPeer!
+    /// @dev This must include the Parent Chain on the ParentPeer because it is checked when a rebalance occurs
     mapping(uint64 chainSelector => bool isAllowed) internal s_allowedChains;
     /// @dev Mapping of peers (ie other Yield contracts)
     mapping(uint64 chainSelector => address peer) internal s_peers;
@@ -84,12 +89,10 @@ abstract contract YieldPeer is
     address internal s_strategyRegistry;
     /// @dev The active strategy adapter
     address internal s_activeStrategyAdapter;
-    /// @dev The stablecoin registry
-    address internal s_stablecoinRegistry;
+    /// @dev The active stablecoin address for the current strategy (resolved from registry on update)
+    address internal s_activeStablecoin;
     /// @dev The swapper contract for stablecoin swaps
     address internal s_swapper;
-    /// @dev The active stablecoin ID for the current strategy (tracked for rebalancing)
-    bytes32 internal s_activeStablecoinId;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -100,22 +103,16 @@ abstract contract YieldPeer is
     event AllowedPeerSet(uint64 indexed chainSelector, address indexed peer);
     /// @notice Emitted when the CCIP gas limit is set
     event CCIPGasLimitSet(uint256 indexed gasLimit);
+
     /// @notice Emitted when the strategy registry is set
     event StrategyRegistrySet(address indexed strategyRegistry);
-    /// @notice Emitted when the stablecoin registry is set
-    event StablecoinRegistrySet(address indexed stablecoinRegistry);
     /// @notice Emitted when the swapper is set
     event SwapperSet(address indexed swapper);
     /// @notice Emitted when stablecoins are swapped
-    event StablecoinsSwapped(address indexed tokenIn, address indexed tokenOut, uint256 amountIn, uint256 amountOut);
+    event StablecoinsSwapped(address indexed tokenIn, address indexed tokenOut, uint256 indexed amountOut);
 
-    /// @notice Emitted when the strategy pool is updated
-    event ActiveStrategyAdapterUpdated(address indexed activeStrategyAdapter);
-
-    /// @notice Emitted when USDC is deposited to the strategy
-    event DepositToStrategy(address indexed strategyAdapter, uint256 indexed amount);
-    /// @notice Emitted when USDC is withdrawn from the strategy
-    event WithdrawFromStrategy(address indexed strategyAdapter, uint256 indexed amount);
+    /// @notice Emitted when the active strategy adapter and stablecoin are updated
+    event ActiveStrategyUpdated(address indexed newStrategyAdapter, address indexed newStablecoin);
 
     /// @notice Emitted when a user deposits USDC into the system
     event DepositInitiated(address indexed depositor, uint256 indexed amount, uint64 indexed thisChainSelector);
@@ -170,10 +167,9 @@ abstract contract YieldPeer is
     /*//////////////////////////////////////////////////////////////
                                 EXTERNAL
     //////////////////////////////////////////////////////////////*/
-    /// @notice Deposit any supported stablecoin into the system
-    /// @dev Depositors must approve address(this) for spending the stablecoin
+    /// @dev Depositors must approve address(this) for spending on the stablecoin contract
     /// @notice This function is overridden and implemented in the ChildPeer and ParentPeer contracts
-    /// @param stablecoinId The stablecoin ID (e.g., keccak256("USDC"))
+    /// @param stablecoinId The stablecoin ID (e.g., keccak256("USDC"), keccak256("USDT"))
     /// @param amount The amount of stablecoin to deposit
     function deposit(bytes32 stablecoinId, uint256 amount) external virtual;
 
@@ -183,6 +179,7 @@ abstract contract YieldPeer is
     /// @param withdrawer The address that sent the SHARE token to withdraw USDC
     /// @param shareBurnAmount The amount of SHARE token sent
     /// @notice This function is overridden and implemented in the ChildPeer and ParentPeer contracts
+    // @review currently only supporting withdrawing in USDC for the end user
     function onTokenTransfer(
         address withdrawer,
         uint256 shareBurnAmount,
@@ -257,90 +254,74 @@ abstract contract YieldPeer is
         emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
     }
 
-    /// @notice Handles the CCIP message for a rebalance new strategy
+    /// @notice Handles the CCIP message for a rebalance to a new strategy
     /// @notice The message this function handles is sent by the old strategy when the strategy is updated
     /// @dev Updates the strategy pool to the new strategy
     /// @dev Swaps USDC to target stablecoin if needed, then deposits into the new strategy
     /// @param tokenAmounts The token amounts received in the CCIP message (USDC from CCIP bridge)
     /// @param data The data to decode - decodes to Strategy (chainSelector, protocolId, stablecoinId)
-    function _handleCCIPRebalanceNewStrategy(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data) internal {
-        /// @dev update strategy pool to protocol on this chain
-        Strategy memory newStrategy = abi.decode(data, (Strategy));
-        address newActiveStrategyAdapter =
-            _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
-
-        /// @dev update active stablecoin ID
-        _updateActiveStablecoinId(newStrategy.chainSelector, newStrategy.stablecoinId);
-
-        /// @dev compare 0 amounts for the scenario a strategy rebalance occurs when there have been no deposits
-        if (tokenAmounts.length > 0 && tokenAmounts[0].amount > 0) {
-            uint256 amountToDeposit = tokenAmounts[0].amount;
-
-            /// @dev CCIP bridges USDC, so swap to target stablecoin if needed
-            if (newStrategy.stablecoinId != USDC_ID) {
-                address targetStablecoin = _getStablecoinAddress(newStrategy.stablecoinId);
-                amountToDeposit = _swapStablecoins(address(i_usdc), targetStablecoin, amountToDeposit);
-            }
-
-            /// @dev deposit to the new strategy
-            _depositToStrategy(newActiveStrategyAdapter, amountToDeposit);
-        }
-    }
-
-    /// @notice Internal helper to handle active strategy adapter updates
-    /// @param chainSelector The chain selector for the strategy
-    /// @param protocolId The protocol ID for the strategy
-    /// @return newActiveStrategyAdapter The new active strategy adapter address
-    function _updateActiveStrategyAdapter(uint64 chainSelector, bytes32 protocolId)
+    function _handleCCIPRebalanceToNewStrategy(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data)
         internal
-        returns (address newActiveStrategyAdapter)
     {
-        if (chainSelector == i_thisChainSelector) {
-            newActiveStrategyAdapter = _getStrategyAdapterFromProtocol(protocolId);
+        Strategy memory newStrategy = abi.decode(data, (Strategy));
+        /// @dev update active strategy and stablecoin
+        (address strategyAdapter, address stablecoin) = _updateActiveStrategy(newStrategy);
+
+        /// @dev this amount is in USDC decimals because USDC is the bridge currency // @review VERIFY THIS!
+        uint256 amountToDeposit = tokenAmounts[0].amount;
+        if (amountToDeposit > 0) {
+            if (stablecoin != address(i_usdc)) {
+                // @review does scaling happen in the _swapStablecoins function?
+                amountToDeposit = _swapStablecoins(address(i_usdc), stablecoin, amountToDeposit);
+            }
+            _depositToStrategy(strategyAdapter, stablecoin, amountToDeposit);
+        }
+    }
+
+    /// @notice Internal helper to update the active strategy and stablecoin
+    /// @param newStrategy The new strategy
+    /// @return newActiveStrategyAdapter The new active strategy adapter address
+    /// @return newActiveStablecoin The new active stablecoin address
+    function _updateActiveStrategy(Strategy memory newStrategy)
+        internal
+        returns (address newActiveStrategyAdapter, address newActiveStablecoin)
+    {
+        /// @dev update active strategy adapter and stablecoin if the new strategy is on this chain
+        if (newStrategy.chainSelector == i_thisChainSelector) {
+            newActiveStrategyAdapter = _getStrategyAdapterFromProtocol(newStrategy.protocolId);
+            newActiveStablecoin = _getStablecoinAddress(newStrategy.stablecoinId);
             s_activeStrategyAdapter = newActiveStrategyAdapter;
-        } else {
+            s_activeStablecoin = newActiveStablecoin;
+        }
+        /// @dev update active strategy adapter and stablecoin to address(0) if the new strategy is on a different chain
+        else {
             s_activeStrategyAdapter = address(0);
+            s_activeStablecoin = address(0);
         }
 
-        emit ActiveStrategyAdapterUpdated(newActiveStrategyAdapter);
-    }
-
-    /// @notice Internal helper to update the active stablecoin ID
-    /// @param chainSelector The chain selector for the strategy
-    /// @param stablecoinId The stablecoin ID for the strategy
-    function _updateActiveStablecoinId(uint64 chainSelector, bytes32 stablecoinId) internal {
-        if (chainSelector == i_thisChainSelector) {
-            s_activeStablecoinId = stablecoinId;
-        } else {
-            s_activeStablecoinId = bytes32(0);
-        }
-    }
-
-    /// @notice Get the active stablecoin ID
-    /// @return activeStablecoinId The active stablecoin ID
-    function _getActiveStablecoinId() internal view returns (bytes32 activeStablecoinId) {
-        activeStablecoinId = s_activeStablecoinId;
+        // @review certora verification
+        emit ActiveStrategyUpdated(newActiveStrategyAdapter, newActiveStablecoin);
     }
 
     /// @notice Internal helper to deposit to the strategy
-    /// @param strategyAdapter The strategy adapter to deposit to
-    /// @param amount The amount of USDC to deposit
-    /// @dev Emit DepositToStrategy event
-    // @review:stablecoins passing this an address asset param instead of address(i_usdc) - this will be part of the additional stablecoins task
-    function _depositToStrategy(address strategyAdapter, uint256 amount) internal {
-        emit DepositToStrategy(strategyAdapter, amount);
-        _transferUsdcTo(strategyAdapter, amount);
-        IStrategyAdapter(strategyAdapter).deposit(address(i_usdc), amount);
+    /// @param strategyAdapter The active strategy adapter to deposit to
+    /// @param stablecoin The stablecoin asset to deposit
+    /// @param amount The amount to deposit (in native decimals of the stablecoin)
+    function _depositToStrategy(address strategyAdapter, address stablecoin, uint256 amount) internal {
+        // @review event - where is it declared and check where it is verified in certora
+        emit DepositToStrategy(strategyAdapter, stablecoin, amount);
+        IERC20(stablecoin).safeTransfer(strategyAdapter, amount);
+        IStrategyAdapter(strategyAdapter).deposit(stablecoin, amount);
     }
 
     /// @notice Internal helper to withdraw from the strategy
-    /// @param strategyAdapter The strategy adapter to withdraw from
-    /// @param amount The amount of USDC to withdraw
-    /// @dev Emit WithdrawFromStrategy event
-    // @review:stablecoins passing this an address asset param instead of address(i_usdc) - additional/modular stablecoins task
-    function _withdrawFromStrategy(address strategyAdapter, uint256 amount) internal {
-        emit WithdrawFromStrategy(strategyAdapter, amount);
-        IStrategyAdapter(strategyAdapter).withdraw(address(i_usdc), amount);
+    /// @param strategyAdapter The active strategy adapter to withdraw from
+    /// @param stablecoin The stablecoin asset to withdraw
+    /// @param amount The amount to withdraw (in native decimals of the stablecoin)
+    function _withdrawFromStrategy(address strategyAdapter, address stablecoin, uint256 amount) internal {
+        // @review event - where is it declared and check where it is verified in certora
+        emit WithdrawFromStrategy(strategyAdapter, stablecoin, amount);
+        IStrategyAdapter(strategyAdapter).withdraw(stablecoin, amount);
     }
 
     /// @notice Internal helper to swap stablecoins using the configured swapper
@@ -355,70 +336,114 @@ abstract contract YieldPeer is
         if (tokenIn == tokenOut || amountIn == 0) return amountIn;
 
         address swapper = s_swapper;
-        if (swapper == address(0)) revert YieldPeer__NoZeroAmount(); // Using existing error for missing swapper
+        if (swapper == address(0)) revert YieldPeer__NoZeroAmount();
 
-        // Calculate minimum amount out with slippage protection
-        uint256 amountOutMin = (amountIn * (BPS_DENOMINATOR - MAX_SLIPPAGE_BPS)) / BPS_DENOMINATOR;
+        // Cross-decimal slippage: normalize to system (USDC) decimals, denormalize to output decimals, then apply BPS
+        uint8 tokenInDecimals = IERC20Metadata(tokenIn).decimals();
+        uint8 tokenOutDecimals = IERC20Metadata(tokenOut).decimals();
+        uint256 normalizedAmountIn = _scaleToUsdcDecimals(amountIn, tokenInDecimals);
+        uint256 expectedAmountOut = _scaleFromUsdcDecimals(normalizedAmountIn, tokenOutDecimals);
+        uint256 amountOutMin = (expectedAmountOut * (BPS_DENOMINATOR - MAX_SLIPPAGE_BPS)) / BPS_DENOMINATOR;
 
-        // Approve swapper to spend tokens
         IERC20(tokenIn).safeIncreaseAllowance(swapper, amountIn);
-
-        // Execute swap
         amountOut = ISwapper(swapper).swapAssets(tokenIn, tokenOut, amountIn, amountOutMin);
 
-        emit StablecoinsSwapped(tokenIn, tokenOut, amountIn, amountOut);
+        emit StablecoinsSwapped(tokenIn, tokenOut, amountOut);
     }
 
     /// @notice Internal helper to get a stablecoin address from its ID
-    /// @param stablecoinId The stablecoin ID (e.g., keccak256("usdc"))
+    /// @param stablecoinId The stablecoin ID (e.g., keccak256("USDC"))
     /// @return stablecoin The stablecoin address
     function _getStablecoinAddress(bytes32 stablecoinId) internal view returns (address stablecoin) {
-        // If it's USDC, return the immutable USDC address
-        if (stablecoinId == USDC_ID) {
-            return address(i_usdc);
-        }
-        // Otherwise, look it up in the stablecoin registry
-        address registry = s_stablecoinRegistry;
-        if (registry != address(0)) {
-            stablecoin = IStablecoinRegistry(registry).getStablecoin(stablecoinId);
-        }
+        /// @dev If it's USDC, return the immutable USDC address
+        if (stablecoinId == USDC_ID) stablecoin = address(i_usdc);
+        /// @dev Otherwise, look it up in the strategy registry
+        else stablecoin = IStrategyRegistry(s_strategyRegistry).getStablecoin(stablecoinId);
     }
 
-    /// @notice Deposits USDC to the strategy and returns the total value of the system
-    /// @param activeStrategyAdapter The active strategy adapter
-    /// @param amount The amount of USDC to deposit
-    /// @return totalValue The total value of the system // _getTotalValueAndDepositToStrategy
-    function _depositToStrategyAndGetTotalValue(address activeStrategyAdapter, uint256 amount)
+    /// @notice Deposits to the strategy and returns the total value scaled to USDC decimals
+    /// @param strategyAdapter The active strategy adapter
+    /// @param stablecoin The stablecoin asset to deposit
+    /// @param amount The amount to deposit (in native decimals of the stablecoin)
+    /// @return totalValueUsdcDecimals The total value in USDC decimals (6)
+    function _depositToStrategyAndGetTotalValue(address strategyAdapter, address stablecoin, uint256 amount)
         internal
-        returns (uint256 totalValue)
+        returns (uint256 totalValueUsdcDecimals)
     {
-        totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, address(i_usdc));
-        _depositToStrategy(activeStrategyAdapter, amount);
+        /// @dev if the stablecoin is USDC, the total value is already in USDC decimals
+        if (stablecoin == address(i_usdc)) {
+            totalValueUsdcDecimals = _getTotalValueFromStrategy(strategyAdapter, stablecoin);
+        }
+        /// @dev if the stablecoin is not USDC, we need to scale the total value to USDC decimals
+        else {
+            uint256 totalValueNativeDecimals = _getTotalValueFromStrategy(strategyAdapter, stablecoin);
+            totalValueUsdcDecimals =
+                _scaleToUsdcDecimals(totalValueNativeDecimals, IERC20Metadata(stablecoin).decimals());
+        }
+        /// @dev we do not need to scale the amount because it is already in the decimals native to the stablecoin
+        _depositToStrategy(strategyAdapter, stablecoin, amount);
     }
 
     /// @notice Withdraws from the strategy and returns the USDC withdraw amount
-    /// @param activeStrategyAdapter The active strategy adapter
+    /// @notice Handles normalization(scaling to USDC decimals) for share math and swaps to USDC if needed
+    /// @param strategyAdapter The active strategy adapter to withdraw from
+    /// @param stablecoin The active stablecoin to withdraw from the strategy
     /// @param withdrawData The withdraw data
-    /// @return usdcWithdrawAmount The USDC withdraw amount
+    /// @return usdcWithdrawAmount The USDC withdraw amount (in 6 dec)
     function _withdrawFromStrategyAndGetUsdcWithdrawAmount(
-        address activeStrategyAdapter,
+        address strategyAdapter,
+        address stablecoin,
         WithdrawData memory withdrawData
     ) internal returns (uint256 usdcWithdrawAmount) {
-        uint256 totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, address(i_usdc));
-        usdcWithdrawAmount =
-            _calculateWithdrawAmount(totalValue, withdrawData.totalShares, withdrawData.shareBurnAmount);
-        if (usdcWithdrawAmount != 0) _withdrawFromStrategy(activeStrategyAdapter, usdcWithdrawAmount);
+        uint256 totalValueUsdcDecimals;
+        uint8 decimals;
+        /// @dev if the stablecoin is USDC, the total value is already in USDC decimals
+        if (stablecoin == address(i_usdc)) {
+            totalValueUsdcDecimals = _getTotalValueFromStrategy(strategyAdapter, stablecoin);
+        }
+        /// @dev if the stablecoin is not USDC, we need to scale the total value to USDC decimals
+        else {
+            decimals = IERC20Metadata(stablecoin).decimals();
+            uint256 totalValueNativeDecimals = _getTotalValueFromStrategy(strategyAdapter, stablecoin);
+            totalValueUsdcDecimals = _scaleToUsdcDecimals(totalValueNativeDecimals, decimals);
+        }
+
+        uint256 withdrawAmountUsdcDecimals =
+            _calculateWithdrawAmount(totalValueUsdcDecimals, withdrawData.totalShares, withdrawData.shareBurnAmount);
+
+        /// @dev zero check for edgecase we have no value in the system
+        if (withdrawAmountUsdcDecimals != 0) {
+            /// @dev if the stablecoin is USDC, we can just withdraw the amount
+            if (stablecoin == address(i_usdc)) {
+                _withdrawFromStrategy(strategyAdapter, stablecoin, withdrawAmountUsdcDecimals);
+                usdcWithdrawAmount = withdrawAmountUsdcDecimals;
+            }
+            /// @dev if the stablecoin is not USDC, we need to scale the withdraw amount to that token's native decimals and then swap to USDC
+            else {
+                uint256 withdrawAmountNativeDecimals = _scaleFromUsdcDecimals(withdrawAmountUsdcDecimals, decimals);
+                _withdrawFromStrategy(strategyAdapter, stablecoin, withdrawAmountNativeDecimals);
+
+                usdcWithdrawAmount = _swapStablecoins(stablecoin, address(i_usdc), withdrawAmountNativeDecimals);
+            }
+        }
     }
 
-    /// @notice Initiates a deposit with any supported stablecoin
+    /// @notice Initiates a deposit of any supported stablecoin
     /// @param stablecoinId The stablecoin ID (e.g., keccak256("USDC"))
     /// @param amount The amount of stablecoin to deposit
-    /// @return amountMinusFee The amount to deposit after fee deduction
-    function _initiateDeposit(bytes32 stablecoinId, uint256 amount) internal returns (uint256 amountMinusFee) {
-        if (amount < USDC_DECIMALS) revert YieldPeer__InsufficientAmount();
-
-        address stablecoin = _getStablecoinAddress(stablecoinId);
-        if (stablecoin == address(0)) revert YieldPeer__ChainNotAllowed(0);
+    /// @dev Revert if stablecoin is not supported (address(0) in registry)
+    /// @dev Revert if amount is less than 1 unit of the stablecoin
+    /// @dev Transfer stablecoin from msg.sender to this contract
+    /// @dev Takes a fee and emits FeeTaken event (if fee rate is not 0)
+    /// @return amountMinusFee The amount deposited minus the fee
+    /// @return stablecoin The resolved stablecoin address
+    function _initiateDeposit(bytes32 stablecoinId, uint256 amount)
+        internal
+        returns (uint256 amountMinusFee, address stablecoin)
+    {
+        stablecoin = _getStablecoinAddress(stablecoinId);
+        if (stablecoin == address(0)) revert YieldPeer__StablecoinNotSupported(stablecoinId);
+        if (amount < 10 ** IERC20Metadata(stablecoin).decimals()) revert YieldPeer__InsufficientAmount();
 
         IERC20(stablecoin).safeTransferFrom(msg.sender, address(this), amount);
 
@@ -429,7 +454,6 @@ abstract contract YieldPeer is
         emit DepositInitiated(msg.sender, amountMinusFee, i_thisChainSelector);
     }
 
-    // @review:stablecoins we will update 2 helpers these in the additional/modular stablecoins task
     /// @notice Transfer USDC to an address
     /// @param to The address to transfer USDC to
     /// @param amount The amount of USDC to transfer
@@ -510,16 +534,16 @@ abstract contract YieldPeer is
     }
 
     /// @notice Helper function to calculate the USDC withdraw amount
-    /// @param totalValue The total value in the Contract Level Yield system
+    /// @param totalValueUsdcDecimals The total value in the Contract Level Yield system
     /// @param totalShares The total shares in the Contract Level Yield system
     /// @param shareBurnAmount The amount of shares the withdrawer burned
     /// @return usdcWithdrawAmount The USDC withdraw amount
-    function _calculateWithdrawAmount(uint256 totalValue, uint256 totalShares, uint256 shareBurnAmount)
+    function _calculateWithdrawAmount(uint256 totalValueUsdcDecimals, uint256 totalShares, uint256 shareBurnAmount)
         internal
         pure
         returns (uint256 usdcWithdrawAmount)
     {
-        uint256 shareWithdrawAmount = ((_convertUsdcToShare(totalValue) * shareBurnAmount) / totalShares);
+        uint256 shareWithdrawAmount = ((_convertUsdcToShare(totalValueUsdcDecimals) * shareBurnAmount) / totalShares);
         usdcWithdrawAmount = _convertShareToUsdc(shareWithdrawAmount);
     }
 
@@ -535,6 +559,28 @@ abstract contract YieldPeer is
     /// @return amountInUsdc The amount in USDC decimals
     function _convertShareToUsdc(uint256 amountInShare) internal pure returns (uint256 amountInUsdc) {
         amountInUsdc = amountInShare / INITIAL_SHARE_PRECISION;
+    }
+
+    /// @notice Normalize an amount from native decimals to system decimals (6 dec)
+    /// @param amount The amount in native decimals
+    /// @param fromDecimals The native decimal count
+    /// @return The amount in system decimals (6 dec)
+    // @review verify this never overflows
+    function _scaleToUsdcDecimals(uint256 amount, uint8 fromDecimals) internal pure returns (uint256 scaledAmount) {
+        if (fromDecimals == USDC_DECIMALS) scaledAmount = amount;
+        else if (fromDecimals > USDC_DECIMALS) scaledAmount = amount / (10 ** (fromDecimals - USDC_DECIMALS));
+        else scaledAmount = amount * (10 ** (USDC_DECIMALS - fromDecimals));
+    }
+
+    /// @notice Denormalize an amount from system decimals (6 dec) to native decimals
+    /// @param amount The amount in system decimals
+    /// @param toDecimals The target decimal count
+    /// @return The amount in native decimals
+    // @review verify this never overflows
+    function _scaleFromUsdcDecimals(uint256 amount, uint8 toDecimals) internal pure returns (uint256 scaledAmount) {
+        if (toDecimals == USDC_DECIMALS) scaledAmount = amount;
+        else if (toDecimals > USDC_DECIMALS) scaledAmount = amount * (10 ** (toDecimals - USDC_DECIMALS));
+        else scaledAmount = amount / (10 ** (USDC_DECIMALS - toDecimals));
     }
 
     /// @dev Revert if the amount is 0
@@ -563,13 +609,20 @@ abstract contract YieldPeer is
         withdrawData = abi.decode(data, (WithdrawData));
     }
 
-    /// @notice Get the total value of the Contract Level Yield system
-    /// @return totalValue The total value in the Contract Level Yield system
+    /// @notice Get the total value of the Contract Level Yield system in system decimals (6 dec)
+    /// @return totalValueUsdcDecimals The total value scaled to USDC decimals
     /// @dev Revert if this chain is not the strategy chain because the totalValue will be on another chain
-    function _getTotalValue() internal view returns (uint256 totalValue) {
-        address activeStrategyAdapter = _getActiveStrategyAdapter();
-        if (activeStrategyAdapter != address(0)) {
-            totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, address(i_usdc));
+    function _getTotalValue() internal view returns (uint256 totalValueUsdcDecimals) {
+        address strategyAdapter = _getActiveStrategyAdapter();
+        if (strategyAdapter != address(0)) {
+            address stablecoin = s_activeStablecoin;
+            if (stablecoin == address(i_usdc)) {
+                totalValueUsdcDecimals = _getTotalValueFromStrategy(strategyAdapter, stablecoin);
+            } else {
+                uint256 totalValueNativeDecimals = _getTotalValueFromStrategy(strategyAdapter, stablecoin);
+                totalValueUsdcDecimals =
+                    _scaleToUsdcDecimals(totalValueNativeDecimals, IERC20Metadata(stablecoin).decimals());
+            }
         } else {
             revert YieldPeer__NotStrategyChain();
         }
@@ -614,15 +667,6 @@ abstract contract YieldPeer is
     function setStrategyRegistry(address strategyRegistry) external onlyRole(Roles.CONFIG_ADMIN_ROLE) {
         s_strategyRegistry = strategyRegistry;
         emit StrategyRegistrySet(strategyRegistry);
-    }
-
-    /// @notice Set the stablecoin registry
-    /// @param stablecoinRegistry The stablecoin registry to set
-    /// @dev Access control: CONFIG_ADMIN_ROLE
-    //slither-disable-next-line missing-zero-check
-    function setStablecoinRegistry(address stablecoinRegistry) external onlyRole(Roles.CONFIG_ADMIN_ROLE) {
-        s_stablecoinRegistry = stablecoinRegistry;
-        emit StablecoinRegistrySet(stablecoinRegistry);
     }
 
     /// @notice Set the swapper contract
@@ -706,16 +750,16 @@ abstract contract YieldPeer is
         activeStrategyAdapter = _getActiveStrategyAdapter();
     }
 
+    /// @notice Get the active strategy stablecoin address
+    /// @return activeStablecoin The active stablecoin address
+    function getActiveStablecoin() external view returns (address activeStablecoin) {
+        activeStablecoin = s_activeStablecoin;
+    }
+
     /// @notice Get the strategy registry
     /// @return strategyRegistry The strategy registry address
     function getStrategyRegistry() external view returns (address strategyRegistry) {
         strategyRegistry = s_strategyRegistry;
-    }
-
-    /// @notice Get the stablecoin registry
-    /// @return stablecoinRegistry The stablecoin registry address
-    function getStablecoinRegistry() external view returns (address stablecoinRegistry) {
-        stablecoinRegistry = s_stablecoinRegistry;
     }
 
     /// @notice Get the swapper contract
