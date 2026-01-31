@@ -17,12 +17,12 @@ contract OnReportTest is BaseTest {
     bytes32 internal invalidProtocolIdEvent = keccak256("InvalidProtocolIdInReport(bytes32)");
     bytes32 internal reportDecodedEvent = keccak256("ReportDecoded(uint64,bytes32)");
     bytes32 internal strategyUpdatedEvent = keccak256("StrategyUpdated(uint64,bytes32,uint64)");
-    bytes32 internal depositToStrategyEvent = keccak256("DepositToStrategy(address,uint256)");
+    bytes32 internal depositToStrategyEvent = keccak256("DepositToStrategy(address,address,uint256)");
     bytes32 internal ccipMessageSentEvent = keccak256("CCIPMessageSent(bytes32,uint8,uint256)");
 
     // CCIP Tx Types
-    uint8 internal rebalanceNewStrategyTxType = uint8(IYieldPeer.CcipTxType.RebalanceNewStrategy);
-    uint8 internal rebalanceOldStrategyTxType = uint8(IYieldPeer.CcipTxType.RebalanceOldStrategy);
+    uint8 internal rebalanceNewStrategyTxType = uint8(IYieldPeer.CcipTxType.RebalanceToNewStrategy);
+    uint8 internal rebalanceOldStrategyTxType = uint8(IYieldPeer.CcipTxType.RebalanceFromOldStrategy);
 
     /*//////////////////////////////////////////////////////////////
                                  TESTS
@@ -170,7 +170,7 @@ contract OnReportTest is BaseTest {
             if (logs[i].topics[0] == depositToStrategyEvent) {
                 depositToStrategyEventFound = true;
                 emittedStrategyAdapter = address(uint160(uint256(logs[i].topics[1])));
-                emittedValue = uint256(logs[i].topics[2]);
+                emittedValue = uint256(logs[i].topics[3]);
             }
         }
 

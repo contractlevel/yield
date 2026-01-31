@@ -46,10 +46,11 @@ contract ParentWithdrawPingPongTest is BaseTest {
         /// @dev Route: BASE -> OPT (WithdrawPingPong emitted because adapter is 0)
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
-        /// @dev Now set adapter on BASE parent so the next attempt succeeds
+        /// @dev Now set adapter and stablecoin on BASE parent so the next attempt succeeds
         _selectFork(baseFork);
         stdstore.target(address(baseParentPeer)).sig("getActiveStrategyAdapter()")
             .checked_write(address(baseAaveV3Adapter));
+        stdstore.target(address(baseParentPeer)).sig("getActiveStablecoin()").checked_write(address(baseUsdc));
 
         /// @dev Route: OPT -> BASE (WithdrawPingPong retry, parent should complete withdraw)
         ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
@@ -106,10 +107,11 @@ contract ParentWithdrawPingPongTest is BaseTest {
         _selectFork(baseFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
 
-        /// @dev Now set adapter on parent
+        /// @dev Now set adapter and stablecoin on parent
         _selectFork(baseFork);
         stdstore.target(address(baseParentPeer)).sig("getActiveStrategyAdapter()")
             .checked_write(address(baseAaveV3Adapter));
+        stdstore.target(address(baseParentPeer)).sig("getActiveStablecoin()").checked_write(address(baseUsdc));
 
         /// @dev Route: OPT -> Parent (WithdrawPingPong again, now adapter is set)
         /// @dev This triggers _handleCCIPWithdrawPingPong -> _handleCCIPWithdraw

@@ -66,9 +66,10 @@ contract ChildWithdrawPingPongTest is BaseTest {
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
         /// child should pingpong back to parent since adapter is 0
         ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
-        /// then we set strategyAdapter on optChild to active
+        /// then we set strategyAdapter and stablecoin on optChild to active
         stdstore.target(address(optChildPeer)).sig("getActiveStrategyAdapter()")
             .checked_write(address(optAaveV3Adapter));
+        stdstore.target(address(optChildPeer)).sig("getActiveStablecoin()").checked_write(address(optUsdc));
 
         /// parent should forward to child again
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);

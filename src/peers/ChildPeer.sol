@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {YieldPeer, Client, IRouterClient, CCIPOperations} from "./YieldPeer.sol";
+import {YieldPeer, Client, IRouterClient, CCIPOperations, IERC20Metadata} from "./YieldPeer.sol";
 
 /// @title CLY ChildPeer
 /// @author @contractlevel
@@ -51,37 +51,61 @@ contract ChildPeer is YieldPeer {
     /// 2. This Child is not the Strategy
     /// @param stablecoinId The stablecoin ID (e.g., keccak256("USDC"), keccak256("USDT"))
     /// @param amount The amount of stablecoin to deposit
-    /// @dev Revert if amount is less than 1e6 (1 stablecoin unit)
+    /// @dev Revert if stablecoin is not supported
     /// @dev Revert if peer is paused
     function deposit(bytes32 stablecoinId, uint256 amount) external override whenNotPaused {
         /// @dev transfer stablecoin from user and take fee
-        amount = _initiateDeposit(stablecoinId, amount);
-
-        // @review - wtf?
-        /// @dev swap to USDC if needed (CCIP only bridges USDC)
-        if (stablecoinId != USDC_ID) {
-            address stablecoin = _getStablecoinAddress(stablecoinId);
-            amount = _swapStablecoins(stablecoin, address(i_usdc), amount);
-        }
+        address stablecoin;
+        (amount, stablecoin) = _initiateDeposit(stablecoinId, amount);
 
         address activeStrategyAdapter = _getActiveStrategyAdapter();
-        DepositData memory depositData = _buildDepositData(amount);
 
         // 1. This Child is the Strategy
         if (activeStrategyAdapter != address(0)) {
-            depositData.totalValue = _depositToStrategyAndGetTotalValue(activeStrategyAdapter, amount);
+            address activeStablecoin = s_activeStablecoin;
+
+            /// @dev swap deposited stablecoin to strategy stablecoin if different
+            uint256 depositAmountNativeDecimals = amount;
+            if (stablecoin != activeStablecoin) {
+                depositAmountNativeDecimals = _swapStablecoins(stablecoin, activeStablecoin, amount);
+            }
+
+            /// @dev scale depositAmount to USDC decimals (6 dec) for share math
+            uint256 depositAmountUsdcDecimals;
+            if (activeStablecoin == address(i_usdc)) {
+                /// @dev skip scaling if strategy uses USDC (already in system decimals)
+                depositAmountUsdcDecimals = depositAmountNativeDecimals;
+            } else {
+                depositAmountUsdcDecimals = _scaleToUsdcDecimals(
+                    depositAmountNativeDecimals, IERC20Metadata(activeStablecoin).decimals()
+                );
+            }
+
+            DepositData memory depositData = _buildDepositData(depositAmountUsdcDecimals);
+            /// @dev _depositToStrategyAndGetTotalValue returns totalValue in USDC decimals (has USDC optimization internally)
+            depositData.totalValue =
+                _depositToStrategyAndGetTotalValue(activeStrategyAdapter, activeStablecoin, depositAmountNativeDecimals);
+
             _ccipSend(
                 i_parentChainSelector, CcipTxType.DepositCallbackParent, abi.encode(depositData), ZERO_BRIDGE_AMOUNT
             );
         }
-        // 2. This Child is not the Strategy
+        // 2. This Child is not the Strategy — bridge USDC
         else {
-            _ccipSend(i_parentChainSelector, CcipTxType.DepositToParent, abi.encode(depositData), amount);
+            /// @dev swap to USDC if needed for CCIP bridging
+            uint256 bridgeAmount = amount;
+            if (stablecoin != address(i_usdc)) {
+                bridgeAmount = _swapStablecoins(stablecoin, address(i_usdc), amount);
+            }
+
+            DepositData memory depositData = _buildDepositData(bridgeAmount);
+            _ccipSend(i_parentChainSelector, CcipTxType.DepositToParent, abi.encode(depositData), bridgeAmount);
         }
     }
 
     /// @notice This function is to facilitate USDC withdrawals from the system
     /// @notice This function is called when a YieldCoin/share holder transferAndCall()s to this contract
+    // @review currently only supporting withdrawing in USDC
     /// @param withdrawer The address of the YieldCoin holder to send withdrawn USDC to
     /// @param shareBurnAmount The amount of YieldCoin/shares to burn
     /// @dev Revert if msg.sender is not the YieldCoin/share token
@@ -135,12 +159,12 @@ contract ChildPeer is YieldPeer {
         }
         if (txType == CcipTxType.WithdrawCallback) _handleCCIPWithdrawCallback(tokenAmounts, data);
         //slither-disable-next-line reentrancy-no-eth
-        if (txType == CcipTxType.RebalanceOldStrategy) _handleCCIPRebalanceOldStrategy(data, _getActiveStablecoinId());
-        if (txType == CcipTxType.RebalanceNewStrategy) _handleCCIPRebalanceNewStrategy(tokenAmounts, data);
+        if (txType == CcipTxType.RebalanceFromOldStrategy) _handleCCIPRebalanceOldStrategy(data, _getActiveStablecoin());
+        if (txType == CcipTxType.RebalanceToNewStrategy) _handleCCIPRebalanceToNewStrategy(tokenAmounts, data);
     }
 
     /// @notice This function handles a deposit sent from Parent to this Strategy-Child
-    /// @notice The purpose of this tx is to deposit USDC in the strategy and return the totalValue so that the parent can calculate the shareMintAmount.
+    /// @notice The purpose of this tx is to deposit in the strategy and return the totalValue so that the parent can calculate the shareMintAmount.
     /// deposit -> parent -> strategy (HERE) -> callback to parent -> possible callback to child
     /// @param tokenAmounts The token amounts received in the CCIP message
     /// @param data The encoded DepositData
@@ -149,14 +173,24 @@ contract ChildPeer is YieldPeer {
         CCIPOperations._validateTokenAmounts(tokenAmounts, address(i_usdc), depositData.amount);
         address activeStrategyAdapter = _getActiveStrategyAdapter();
         if (activeStrategyAdapter != address(0)) {
-            depositData.totalValue = _depositToStrategyAndGetTotalValue(activeStrategyAdapter, depositData.amount);
+            address activeStablecoin = s_activeStablecoin;
+            /// @dev depositData.amount is in USDC decimals (from CCIP bridge)
+            uint256 depositAmountNativeDecimals = depositData.amount;
 
-            /// @dev send a message to parent with totalValue to calculate shareMintAmount
+            /// @dev swap bridged USDC to strategy stablecoin if needed
+            if (activeStablecoin != address(i_usdc)) {
+                depositAmountNativeDecimals = _swapStablecoins(address(i_usdc), activeStablecoin, depositData.amount);
+            }
+
+            /// @dev _depositToStrategyAndGetTotalValue returns totalValue in USDC decimals (has USDC optimization internally)
+            depositData.totalValue =
+                _depositToStrategyAndGetTotalValue(activeStrategyAdapter, activeStablecoin, depositAmountNativeDecimals);
+            /// @dev depositData.amount stays in USDC decimals for share math
+
             _ccipSend(
                 i_parentChainSelector, CcipTxType.DepositCallbackParent, abi.encode(depositData), ZERO_BRIDGE_AMOUNT
             );
         } else {
-            // consider adding event for ping pong, pros/cons of emitting it here
             emit DepositPingPongToParent(depositData.amount);
             _ccipSend(i_parentChainSelector, CcipTxType.DepositPingPong, abi.encode(depositData), depositData.amount);
         }
@@ -173,17 +207,18 @@ contract ChildPeer is YieldPeer {
     }
 
     /// @notice This function handles a withdraw request from the parent chain to this Strategy-Child
-    /// @notice The purpose of this tx is to withdraw USDC from the strategy and then send it back to the withdraw chain
+    /// @notice The purpose of this tx is to withdraw from the strategy and then send USDC back to the withdraw chain
     /// withdraw -> parent -> strategy (HERE) -> callback to withdraw chain
     /// @notice If this strategy chain is the same as the withdraw chain, we transfer the USDC to the withdrawer, concluding the withdrawal process.
     /// @param data The encoded WithdrawData
+    // @review currently only supporting withdrawing in USDC
     function _handleCCIPWithdrawToStrategy(bytes memory data) internal {
         WithdrawData memory withdrawData = _decodeWithdrawData(data);
 
         address activeStrategyAdapter = _getActiveStrategyAdapter();
         if (activeStrategyAdapter != address(0)) {
             withdrawData.usdcWithdrawAmount =
-                _withdrawFromStrategyAndGetUsdcWithdrawAmount(activeStrategyAdapter, withdrawData);
+                _withdrawFromStrategyAndGetUsdcWithdrawAmount(activeStrategyAdapter, s_activeStablecoin, withdrawData);
 
             if (i_thisChainSelector == withdrawData.chainSelector) {
                 //slither-disable-next-line reentrancy-events
@@ -193,7 +228,7 @@ contract ChildPeer is YieldPeer {
                 _ccipSend(
                     withdrawData.chainSelector,
                     CcipTxType.WithdrawCallback,
-                    abi.encode(withdrawData), // @review solady calldata compression for all encoded crosschain data?
+                    abi.encode(withdrawData),
                     withdrawData.usdcWithdrawAmount
                 );
             }
@@ -207,45 +242,47 @@ contract ChildPeer is YieldPeer {
     /// @notice The message this function handles is sent by the Parent when the Strategy is updated
     /// @notice This function should only be executed when this chain is the (old) strategy
     /// @notice Handles stablecoin swaps when changing stablecoins
-    /// @dev Rebalances funds from the old strategy to the new strategy
+    /// @dev All amounts are in NATIVE DECIMALS until swapping to USDC for bridge
     /// @param data The data to decode - decodes to Strategy (chainSelector, protocolId, stablecoinId)
-    /// @param oldStablecoinId The stablecoin ID of the current (old) strategy
-    function _handleCCIPRebalanceOldStrategy(bytes memory data, bytes32 oldStablecoinId) internal {
-        /// @dev cache the old active strategy adapter
+    /// @param oldStablecoin The stablecoin address of the current (old) strategy
+    function _handleCCIPRebalanceOldStrategy(bytes memory data, address oldStablecoin) internal {
+        /// @dev cache the old active strategy adapter BEFORE updating
         address oldActiveStrategyAdapter = _getActiveStrategyAdapter();
-        address oldStablecoin = _getStablecoinAddress(oldStablecoinId);
 
-        /// @dev update strategy pool to either protocol on this chain or address(0) if on a different chain
+        /// @dev totalValueNativeDecimals in NATIVE DECIMALS of oldStablecoin
+        uint256 totalValueNativeDecimals = _getTotalValueFromStrategy(oldActiveStrategyAdapter, oldStablecoin);
+
+        /// @dev withdraw in NATIVE DECIMALS (must happen before _updateActiveStrategy overwrites adapter)
+        if (totalValueNativeDecimals != 0) _withdrawFromStrategy(oldActiveStrategyAdapter, oldStablecoin, totalValueNativeDecimals);
+
+        /// @dev update strategy - sets adapter + stablecoin, or both to address(0) if different chain
         Strategy memory newStrategy = abi.decode(data, (Strategy));
-        address newActiveStrategyAdapter =
-            _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
+        (address newActiveStrategyAdapter, address newStablecoin) = _updateActiveStrategy(newStrategy);
 
-        /// @dev withdraw from the old strategy
-        uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, oldStablecoin);
-        if (totalValue != 0) _withdrawFromStrategy(oldActiveStrategyAdapter, totalValue);
-
-        // if the new strategy is this chain, but different protocol or stablecoin
+        /// @dev if new strategy is on this chain, deposit locally (all in NATIVE DECIMALS)
         if (newStrategy.chainSelector == i_thisChainSelector) {
-            // Update active stablecoin ID
-            _updateActiveStablecoinId(newStrategy.chainSelector, newStrategy.stablecoinId);
+            uint256 depositAmountNativeDecimals = totalValueNativeDecimals;
 
-            // Swap stablecoins if needed
-            address newStablecoin = _getStablecoinAddress(newStrategy.stablecoinId);
-            uint256 amountToDeposit = totalValue;
-            if (oldStablecoin != newStablecoin && totalValue != 0) {
-                amountToDeposit = _swapStablecoins(oldStablecoin, newStablecoin, totalValue);
+            /// @dev swap if stablecoins differ: NATIVE(old) → NATIVE(new)
+            if (oldStablecoin != newStablecoin && totalValueNativeDecimals != 0) {
+                depositAmountNativeDecimals = _swapStablecoins(oldStablecoin, newStablecoin, totalValueNativeDecimals);
             }
+
             //slither-disable-next-line reentrancy-events
-            if (amountToDeposit != 0) _depositToStrategy(newActiveStrategyAdapter, amountToDeposit);
+            /// @dev deposit in NATIVE DECIMALS of newStablecoin
+            if (depositAmountNativeDecimals != 0) _depositToStrategy(newActiveStrategyAdapter, newStablecoin, depositAmountNativeDecimals);
         }
-        // if the new strategy is a different chain, swap to USDC for CCIP bridge and send
+        /// @dev if new strategy is on different chain, swap to USDC and bridge
         else {
-            uint256 bridgeAmount = totalValue;
-            // CCIP bridges USDC, so swap to USDC if the old stablecoin is different
-            if (oldStablecoinId != USDC_ID && totalValue != 0) {
-                bridgeAmount = _swapStablecoins(oldStablecoin, address(i_usdc), totalValue);
+            uint256 bridgeAmountUsdcDecimals = totalValueNativeDecimals;
+
+            /// @dev swap to USDC for CCIP: NATIVE(old) → 6 dec (USDC native = system decimals)
+            if (oldStablecoin != address(i_usdc) && totalValueNativeDecimals != 0) {
+                bridgeAmountUsdcDecimals = _swapStablecoins(oldStablecoin, address(i_usdc), totalValueNativeDecimals);
             }
-            _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, data, bridgeAmount);
+
+            /// @dev CCIP bridge amount in USDC decimals (6)
+            _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceToNewStrategy, data, bridgeAmountUsdcDecimals);
         }
     }
 

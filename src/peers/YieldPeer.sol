@@ -114,6 +114,11 @@ abstract contract YieldPeer is
     /// @notice Emitted when the active strategy adapter and stablecoin are updated
     event ActiveStrategyUpdated(address indexed newStrategyAdapter, address indexed newStablecoin);
 
+    /// @notice Emitted when funds are deposited into the strategy
+    event DepositToStrategy(address indexed strategyAdapter, address indexed stablecoin, uint256 indexed amount);
+    /// @notice Emitted when funds are withdrawn from the strategy
+    event WithdrawFromStrategy(address indexed strategyAdapter, address indexed stablecoin, uint256 indexed amount);
+
     /// @notice Emitted when a user deposits USDC into the system
     event DepositInitiated(address indexed depositor, uint256 indexed amount, uint64 indexed thisChainSelector);
     // @review DepositCompleted event?
@@ -267,11 +272,11 @@ abstract contract YieldPeer is
         /// @dev update active strategy and stablecoin
         (address strategyAdapter, address stablecoin) = _updateActiveStrategy(newStrategy);
 
-        /// @dev this amount is in USDC decimals because USDC is the bridge currency // @review VERIFY THIS!
-        uint256 amountToDeposit = tokenAmounts[0].amount;
-        if (amountToDeposit > 0) {
+        /// @dev check if there are bridged funds to deposit (array may be empty if totalValue was 0)
+        if (tokenAmounts.length > 0 && tokenAmounts[0].amount > 0) {
+            /// @dev amountToDeposit is in USDC decimals because USDC is the bridge currency
+            uint256 amountToDeposit = tokenAmounts[0].amount;
             if (stablecoin != address(i_usdc)) {
-                // @review does scaling happen in the _swapStablecoins function?
                 amountToDeposit = _swapStablecoins(address(i_usdc), stablecoin, amountToDeposit);
             }
             _depositToStrategy(strategyAdapter, stablecoin, amountToDeposit);
@@ -511,7 +516,7 @@ abstract contract YieldPeer is
     /// @notice Helper function to get the total value from the strategy
     /// @param strategyAdapter The strategy adapter to get the total value from
     /// @param asset The asset to get the total value from
-    /// @return totalValue The total value in the Contract Level Yield system
+    /// @return totalValue The total value in NATIVE DECIMALS of the stablecoin asset (not necessarily scaled to USDC decimals)
     function _getTotalValueFromStrategy(address strategyAdapter, address asset)
         internal
         view
@@ -531,6 +536,12 @@ abstract contract YieldPeer is
     /// @return activeStrategyAdapter The active strategy adapter address
     function _getActiveStrategyAdapter() internal view returns (address activeStrategyAdapter) {
         activeStrategyAdapter = s_activeStrategyAdapter;
+    }
+
+    /// @notice Helper function to get the active stablecoin
+    /// @return activeStablecoin The active stablecoin address
+    function _getActiveStablecoin() internal view returns (address activeStablecoin) {
+        activeStablecoin = s_activeStablecoin;
     }
 
     /// @notice Helper function to calculate the USDC withdraw amount
@@ -564,7 +575,7 @@ abstract contract YieldPeer is
     /// @notice Normalize an amount from native decimals to system decimals (6 dec)
     /// @param amount The amount in native decimals
     /// @param fromDecimals The native decimal count
-    /// @return The amount in system decimals (6 dec)
+    /// @return scaledAmount The amount in system decimals (6 dec)
     // @review verify this never overflows
     function _scaleToUsdcDecimals(uint256 amount, uint8 fromDecimals) internal pure returns (uint256 scaledAmount) {
         if (fromDecimals == USDC_DECIMALS) scaledAmount = amount;
@@ -575,7 +586,7 @@ abstract contract YieldPeer is
     /// @notice Denormalize an amount from system decimals (6 dec) to native decimals
     /// @param amount The amount in system decimals
     /// @param toDecimals The target decimal count
-    /// @return The amount in native decimals
+    /// @return scaledAmount The amount in native decimals
     // @review verify this never overflows
     function _scaleFromUsdcDecimals(uint256 amount, uint8 toDecimals) internal pure returns (uint256 scaledAmount) {
         if (toDecimals == USDC_DECIMALS) scaledAmount = amount;

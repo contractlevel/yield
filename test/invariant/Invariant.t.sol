@@ -139,6 +139,7 @@ contract Invariant is StdInvariant, BaseTest {
         parent.setRebalancer(address(rebalancer));
         parent.setSupportedProtocol(keccak256(abi.encodePacked("aave-v3")), true);
         parent.setSupportedProtocol(keccak256(abi.encodePacked("compound-v3")), true);
+        parent.setSupportedStablecoin(USDC_ID, true);
         _changePrank(rebalancer.owner());
         rebalancer.setParentPeer(address(parent));
         _stopPrank();

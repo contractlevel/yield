@@ -41,8 +41,6 @@ contract BaseTest is Test {
     uint256 internal constant INITIAL_SHARE_PRECISION = 1e18 / 1e6;
     uint256 internal constant BALANCE_TOLERANCE = 4; // Allow 4 wei difference
     uint256 internal constant INITIAL_FEE_RATE = 10_000; // 1%
-    /// @dev USDC stablecoin ID - keccak256("USDC")
-    bytes32 internal constant USDC_ID = 0xd6aca1be9729c13d677335161321649cccae6a591554772516700f986f942eaa;
 
     CCIPLocalSimulatorFork internal ccipLocalSimulatorFork;
     uint256 internal constant LINK_AMOUNT = 1_000 * 1e18; // 1000 LINK
@@ -129,6 +127,10 @@ contract BaseTest is Test {
     bool internal constant SET_CROSS_CHAIN = true;
     bool internal constant NO_CROSS_CHAIN = false;
 
+    bytes32 internal constant USDC_ID = keccak256("USDC");
+    bytes32 internal constant USDT_ID = keccak256("USDT");
+    bytes32 internal constant GHO_ID = keccak256("GHO");
+
     /*//////////////////////////////////////////////////////////////
                                  SETUP
     //////////////////////////////////////////////////////////////*/
@@ -143,6 +145,7 @@ contract BaseTest is Test {
         _setDomains();
 
         _setForwarderAndWorkflow();
+        _setSupportedStablecoins();
 
         /// @dev sanity check that we're ending BaseTest.setUp() on the Parent chain
         assertEq(block.chainid, BASE_MAINNET_CHAIN_ID);
@@ -553,6 +556,13 @@ contract BaseTest is Test {
         /// @dev set keystone forwarder
         baseRebalancer.setKeystoneForwarder(keystoneForwarder);
         baseRebalancer.setWorkflow(workflowId, workflowOwner, workflowName);
+    }
+
+    function _setSupportedStablecoins() internal {
+        _selectFork(baseFork);
+        _changePrank(configAdmin);
+        baseParentPeer.setSupportedStablecoin(USDC_ID, true);
+        _stopPrank();
     }
 
     /// @notice empty test to skip file in coverage

@@ -70,10 +70,12 @@ contract ChildDepositPingPongTest is BaseTest {
             "No deposit should occur before adapter is set"
         );
 
-        // Simulate adapter update on OPT using stdstore
+        // Simulate adapter and stablecoin update on OPT using stdstore
         stdstore.target(address(optChildPeer)).sig("getActiveStrategyAdapter()")
             .checked_write(address(optAaveV3Adapter));
+        stdstore.target(address(optChildPeer)).sig("getActiveStablecoin()").checked_write(address(optUsdc));
         assertEq(optChildPeer.getActiveStrategyAdapter(), address(optAaveV3Adapter));
+        assertEq(optChildPeer.getActiveStablecoin(), address(optUsdc));
 
         // Parent -> OPT (attempt 2): deposit should happen now
         // Now this should be a _handleCCIPDepositPingPong from parent, doing a ccipSend to the strategy

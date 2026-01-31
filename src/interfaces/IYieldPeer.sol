@@ -18,8 +18,8 @@ interface IYieldPeer is IYieldFees {
         WithdrawToParent, // 4 - withdraw from child to parent (to get strategy chain and update totalShares)
         WithdrawToStrategy, // 5 - withdraw from parent to strategy (to withdraw from strategy and get usdcWithdrawAmount)
         WithdrawCallback, // 6 - withdraw callback from strategy to withdraw chain (to send USDC to withdrawer)
-        RebalanceOldStrategy, // 7 - message from parent to old strategy (to move funds to new strategy)
-        RebalanceNewStrategy, // 8 - reallocate funds from old strategy to new strategy
+        RebalanceFromOldStrategy, // 7 - message from parent to old strategy (to move funds to new strategy)
+        RebalanceToNewStrategy, // 8 - reallocate funds from old strategy to new strategy
         DepositPingPong, // 9 - pingpong deposit Tx from child to parent (to allow TVL to reach strategy chain)
         WithdrawPingPong // 10 - pingpong withdraw Tx from parent to child (to allow TVL to reach strategy chain)
     }
@@ -49,7 +49,7 @@ interface IYieldPeer is IYieldFees {
     function getAllowedChain(uint64 chainSelector) external view returns (bool);
     function getAllowedPeer(uint64 chainSelector) external view returns (address);
     function getActiveStrategyAdapter() external view returns (address);
+    function getActiveStablecoin() external view returns (address);
     function getStrategyRegistry() external view returns (address);
-    function getStablecoinRegistry() external view returns (address);
     function getSwapper() external view returns (address);
 }

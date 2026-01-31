@@ -18,7 +18,7 @@ contract YieldHarness is YieldPeer, HelperHarness {
     /*//////////////////////////////////////////////////////////////
                                 OVERRIDE
     //////////////////////////////////////////////////////////////*/
-    function deposit(uint256 amountToDeposit) external override {}
+    function deposit(bytes32 stablecoinId, uint256 amount) external override {}
 
     function onTokenTransfer(address withdrawer, uint256 shareBurnAmount, bytes calldata /* data */ ) external override {}
 
@@ -40,12 +40,12 @@ contract YieldHarness is YieldPeer, HelperHarness {
         _handleCCIPRebalanceNewStrategy(tokenAmounts, data);
     }
 
-    function depositToStrategy(address strategyAdapter, uint256 amount) public {
-        _depositToStrategy(strategyAdapter, amount);
+    function depositToStrategy(address strategyAdapter, address asset, uint256 amount) public {
+        _depositToStrategy(strategyAdapter, asset, amount);
     }
 
-    function withdrawFromStrategy(address strategyAdapter, uint256 amount) public {
-        _withdrawFromStrategy(strategyAdapter, amount);
+    function withdrawFromStrategy(address strategyAdapter, address asset, uint256 amount) public {
+        _withdrawFromStrategy(strategyAdapter, asset, amount);
     }
 
     function calculateFee(uint256 stablecoinDepositAmount) public view returns (uint256) {

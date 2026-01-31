@@ -51,10 +51,11 @@ contract ParentDepositPingPongTest is BaseTest {
         /// @dev This should trigger the ping-pong branch in _handleCCIPDepositToParent (lines 294-295)
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
 
-        /// @dev Now set adapter and route again
+        /// @dev Now set adapter, stablecoin and route again
         _selectFork(baseFork);
         stdstore.target(address(baseParentPeer)).sig("getActiveStrategyAdapter()")
             .checked_write(address(baseAaveV3Adapter));
+        stdstore.target(address(baseParentPeer)).sig("getActiveStablecoin()").checked_write(address(baseUsdc));
 
         /// @dev Route: OPT -> Parent (DepositToParent again)
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
