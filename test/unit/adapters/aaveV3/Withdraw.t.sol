@@ -2,6 +2,7 @@
 pragma solidity 0.8.26;
 
 import {BaseTest} from "../../../BaseTest.t.sol";
+import {IPool} from "@aave/v3-origin/src/contracts/interfaces/IPool.sol";
 
 contract WithdrawTest is BaseTest {
     function test_yield_aaveV3Adapter_withdraw_revertsWhen_notYieldPeer() public {
@@ -85,6 +86,32 @@ contract WithdrawTest is BaseTest {
         _changePrank(address(baseParentPeer));
         vm.expectRevert(abi.encodeWithSignature("AaveV3Adapter__IncorrectWithdrawAmount()"));
         baseAaveV3Adapter.withdraw(address(baseUsdc), DEPOSIT_AMOUNT);
+    }
+
+    /// @dev Covers: if (withdrawnAmount < totalValue) revert AaveV3Adapter__IncorrectWithdrawAmount() (MAX sentinel path)
+    function test_yield_aaveV3Adapter_withdraw_maxSentinel_revertsWhen_withdrawnAmountLessThanTotalValue() public {
+        deal(address(baseUsdc), address(baseAaveV3Adapter), DEPOSIT_AMOUNT);
+
+        _changePrank(address(baseParentPeer));
+        baseAaveV3Adapter.deposit(address(baseUsdc), DEPOSIT_AMOUNT);
+
+        uint256 totalValue = baseAaveV3Adapter.getTotalValue(address(baseUsdc));
+        assertGt(totalValue, 0, "Adapter should have positive balance after deposit");
+
+        // Mock pool to return less than totalValue on withdraw(usdc, type(uint256).max, adapter)
+        // We use mockCall in this case, because AAVE uses advanced/complicated accounting involving AToken representation of user's supply capital
+        address aavePool = baseAaveV3Adapter.getStrategyPool();
+        vm.mockCall(
+            aavePool,
+            abi.encodeWithSelector(
+                IPool.withdraw.selector, address(baseUsdc), type(uint256).max, address(baseAaveV3Adapter)
+            ),
+            abi.encode(totalValue - 1)
+        );
+
+        _changePrank(address(baseParentPeer));
+        vm.expectRevert(abi.encodeWithSignature("AaveV3Adapter__IncorrectWithdrawAmount()"));
+        baseAaveV3Adapter.withdraw(address(baseUsdc), type(uint256).max);
     }
 }
 

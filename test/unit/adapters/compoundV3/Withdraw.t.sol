@@ -65,4 +65,50 @@ contract WithdrawTest is BaseTest {
         vm.expectRevert(abi.encodeWithSignature("CompoundV3Adapter__InsufficientSupply()"));
         baseCompoundV3Adapter.withdraw(address(baseUsdc), requestAmount);
     }
+
+    function test_yield_compoundV3Adapter_withdraw_revertsWhen_incorrectWithdrawAmount() public {
+        deal(address(baseUsdc), address(baseCompoundV3Adapter), DEPOSIT_AMOUNT);
+        _changePrank(address(baseParentPeer));
+        baseCompoundV3Adapter.deposit(address(baseUsdc), DEPOSIT_AMOUNT);
+
+        address comet = baseCompoundV3Adapter.getStrategyPool();
+        IncorrectWithdrawAmountPool incorrectPool = new IncorrectWithdrawAmountPool();
+        vm.etch(comet, address(incorrectPool).code);
+        // Mock balanceOf(adapter) so _getTotalValue() passes; adapter then calls withdraw which returns no USDC -> actualWithdrawn < amount
+        vm.store(comet, bytes32(0), bytes32(DEPOSIT_AMOUNT));
+
+        _changePrank(address(baseParentPeer));
+        vm.expectRevert(abi.encodeWithSignature("CompoundV3Adapter__InsufficientSupply()"));
+        baseCompoundV3Adapter.withdraw(address(baseUsdc), DEPOSIT_AMOUNT);
+    }
+
+    function test_yield_compoundV3Adapter_maxSentinelWithdraw_revertsWhen_incorrectWithdrawAmount() public {
+        deal(address(baseUsdc), address(baseCompoundV3Adapter), DEPOSIT_AMOUNT);
+        _changePrank(address(baseParentPeer));
+        baseCompoundV3Adapter.deposit(address(baseUsdc), DEPOSIT_AMOUNT);
+
+        address comet = baseCompoundV3Adapter.getStrategyPool();
+        IncorrectWithdrawAmountPool incorrectPool = new IncorrectWithdrawAmountPool();
+        vm.etch(comet, address(incorrectPool).code);
+        // Mock balanceOf(adapter) so _getTotalValue() passes; adapter then calls withdraw which returns no USDC -> actualWithdrawn < amount
+        vm.store(comet, bytes32(0), bytes32(DEPOSIT_AMOUNT));
+
+        _changePrank(address(baseParentPeer));
+        vm.expectRevert(abi.encodeWithSignature("CompoundV3Adapter__InsufficientSupply()"));
+        baseCompoundV3Adapter.withdraw(address(baseUsdc), type(uint256).max);
+    }
+}
+
+/// @notice Mock Comet that reports balance via balanceOf but does not transfer USDC on withdraw,
+///         so adapter sees actualWithdrawn < amount and reverts CompoundV3Adapter__InsufficientSupply().
+contract IncorrectWithdrawAmountPool {
+    uint256 internal balance; // slot 0: value returned by balanceOf
+
+    function balanceOf(address) external view returns (uint256) {
+        return balance;
+    }
+
+    function withdraw(address, uint256 amount) external {
+        // Intentionally do not transfer USDC to msg.sender; adapter's balanceAfter - balanceBefore = 0 < amount
+    }
 }
