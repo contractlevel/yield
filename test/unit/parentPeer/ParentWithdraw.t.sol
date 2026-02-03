@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {BaseTest, console2} from "../../BaseTest.t.sol";
+import {BaseTest, ParentPeer, console2} from "../../BaseTest.t.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IComet} from "../../../src/interfaces/IComet.sol";
 import {IYieldPeer} from "../../../src/interfaces/IYieldPeer.sol";
 import {Roles} from "../../../src/libraries/Roles.sol";
 import {stdStorage, StdStorage} from "forge-std/StdStorage.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 
 contract ParentWithdrawTest is BaseTest {
     using stdStorage for StdStorage;
@@ -22,6 +23,18 @@ contract ParentWithdrawTest is BaseTest {
         deal(address(baseUsdc), withdrawer, DEPOSIT_AMOUNT);
         _changePrank(withdrawer);
         baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
+    }
+
+    /// @dev Test that withdraw reverts when not called through proxy
+    /// @dev This sets up a direct withdraw call to the impl, which should revert
+    function test_yield_parent_onTokenTransfer_revertsWhen_notProxy() public {
+        // Arrange
+        /// @dev cast parent impl address to ParentPeer type
+        ParentPeer parentPeerImpl = ParentPeer(baseParentPeerImplAddr);
+
+        // Act & Assert
+        vm.expectRevert(UUPSUpgradeable.UUPSUnauthorizedCallContext.selector);
+        parentPeerImpl.onTokenTransfer(msg.sender, DEPOSIT_AMOUNT, "");
     }
 
     function test_yield_parent_onTokenTransfer_revertsWhen_notShare() public {

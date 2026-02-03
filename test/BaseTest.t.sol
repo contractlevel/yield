@@ -47,7 +47,7 @@ contract BaseTest is Test {
     // EIP-1967 implementation slot for proxies
     bytes32 internal constant IMPLEMENTATION_SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
-    // --- Fork IDs & Blocks ---
+    // --- Fork IDs & Blocks --- //
     uint256 internal baseFork;
     uint256 internal constant BASE_MAINNET_CHAIN_ID = 8453;
     uint256 internal constant BASE_MAINNET_BLOCK_NUMBER = 38045674;
@@ -62,7 +62,7 @@ contract BaseTest is Test {
 
     CCIPLocalSimulatorFork internal ccipLocalSimulatorFork;
 
-    // --- Base Chain (Parent) ---
+    // --- Base Chain (Parent) --- //
     Share internal baseShare;
     address internal baseShareImplAddr;
     SharePool internal baseSharePool;
@@ -81,7 +81,7 @@ contract BaseTest is Test {
     AaveV3Adapter internal baseAaveV3Adapter;
     CompoundV3Adapter internal baseCompoundV3Adapter;
 
-    // --- Optimism Chain (Child 1) ---
+    // --- Optimism Chain (Child 1) --- //
     Share internal optShare;
     address internal optShareImplAddr;
     SharePool internal optSharePool;
@@ -98,7 +98,7 @@ contract BaseTest is Test {
     AaveV3Adapter internal optAaveV3Adapter;
     CompoundV3Adapter internal optCompoundV3Adapter;
 
-    // --- Ethereum Chain (Child 2) ---
+    // --- Ethereum Chain (Child 2) --- //
     Share internal ethShare;
     address internal ethShareImplAddr;
     SharePool internal ethSharePool;
@@ -115,7 +115,7 @@ contract BaseTest is Test {
     AaveV3Adapter internal ethAaveV3Adapter;
     CompoundV3Adapter internal ethCompoundV3Adapter;
 
-    // --- Users & Roles ---
+    // --- Users & Roles --- //
     address internal owner = makeAddr("owner");
     address internal depositor = makeAddr("depositor");
     address internal withdrawer = makeAddr("withdrawer");
@@ -134,14 +134,15 @@ contract BaseTest is Test {
     address internal feeWithdrawer = makeAddr("feeWithdrawer");
     address internal feeRateSetter = makeAddr("feeRateSetter");
 
-    // --- Workflow Metadata ---
+    // --- Workflow Metadata --- //
     address internal workflowOwner = makeAddr("workflowOwner");
     bytes32 internal workflowId = bytes32("rebalanceWorkflowId");
     string internal workflowNameRaw = "yieldcoin-rebalance-workflow";
     bytes10 internal workflowName = WorkflowHelpers.createWorkflowName(workflowNameRaw);
     bytes internal workflowMetadata = WorkflowHelpers.createWorkflowMetadata(workflowId, workflowName, workflowOwner);
 
-    // --- Testing Flags ---
+    // --- Testing Flags --- //
+    /// @dev Flag to indicate whether to perform cross-chain tests
     bool internal constant SET_CROSS_CHAIN = true;
     bool internal constant NO_CROSS_CHAIN = false;
 
@@ -149,7 +150,7 @@ contract BaseTest is Test {
                                  SETUP
     //////////////////////////////////////////////////////////////*/
     function setUp() public virtual {
-        // 1. Deploy contracts on all 3 forks
+        // 1. Deploy contracts on all forks
         _deployInfra();
 
         // 2. Setup Access Control
@@ -161,7 +162,7 @@ contract BaseTest is Test {
         _setCCTPAttesters();
         _setDomains();
 
-        // 4. Initial Funding & Config
+        // 4. Initial Funding & Workflow Config
         _dealLinkToPeers(false, address(0), address(0), address(0), address(0));
         _setForwarderAndWorkflow();
 
@@ -170,7 +171,8 @@ contract BaseTest is Test {
         _stopPrank();
     }
 
-    /// @dev Deploys ParentPeer on Base and ChildPeers on Optimism & Ethereum
+    /// @dev Deploys Share/Pool, Rebalancer, ParentPeer, and StrategyRegistry on Base
+    /// @dev Deploys Share/Pool, ChildPeer and StrategyRegistry on Optimism & Ethereum
     /// @dev Sets up CCIP Local Simulator Fork
     function _deployInfra() internal virtual {
         _deployBase();
@@ -185,7 +187,7 @@ contract BaseTest is Test {
     /*//////////////////////////////////////////////////////////////
                           DEPLOYMENT HELPERS
     //////////////////////////////////////////////////////////////*/
-    /// @dev _deployInfra: Helper to deploy Parent on Base
+    /// @dev _deployInfra:: Helper to deploy Share/Pool, Parent, Rebalancer and StrategyRegistry on Base
     function _deployBase() private {
         // Create Base fork
         baseFork = vm.createSelectFork(vm.envString("BASE_MAINNET_RPC_URL"), BASE_MAINNET_BLOCK_NUMBER);
@@ -230,7 +232,7 @@ contract BaseTest is Test {
         baseCCTPMessageTransmitter = IMessageTransmitter(baseNetworkConfig.ccip.cctpMessageTransmitter);
     }
 
-    /// @dev _deployInfra: Helper to deploy Child on Optimism
+    /// @dev _deployInfra:: Helper to deploy Share/Pool, ChildPeer and StrategyRegistry on Optimism
     function _deployOpt() private {
         // Create Optimism fork
         optFork = vm.createSelectFork(vm.envString("OPTIMISM_MAINNET_RPC_URL"), OPTIMISM_MAINNET_BLOCK_NUMBER);
@@ -271,7 +273,7 @@ contract BaseTest is Test {
         optCCTPMessageTransmitter = IMessageTransmitter(optNetworkConfig.ccip.cctpMessageTransmitter);
     }
 
-    /// @dev _deployInfra: Helper to deploy Child on Ethereum
+    /// @dev _deployInfra:: Helper to deploy Share/Pool, ChildPeer and StrategyRegistry on Ethereum
     function _deployEth() private {
         // Create Ethereum fork
         ethFork = vm.createSelectFork(vm.envString("ETH_MAINNET_RPC_URL"), ETHEREUM_MAINNET_BLOCK_NUMBER);
@@ -315,7 +317,7 @@ contract BaseTest is Test {
     /*//////////////////////////////////////////////////////////////
                         CONFIGURATION HELPERS
     //////////////////////////////////////////////////////////////*/
-    /// @dev _deployInfra: Helper to set up CCIP Local Simulator with all chains
+    /// @dev _deployInfra:: Helper to set up CCIP Local Simulator with all chains
     /// @dev Registers all chains in CCIP Local Simulator
     function _registerChains() internal {
         _registerChainInSimulator(OPTIMISM_MAINNET_CHAIN_ID, optNetworkConfig);
@@ -323,7 +325,7 @@ contract BaseTest is Test {
         _registerChainInSimulator(ETHEREUM_MAINNET_CHAIN_ID, ethNetworkConfig);
     }
 
-    /// @dev _registerChains: Helper to register a chain in the CCIP Local Simulator
+    /// @dev _registerChains:: Helper to register a chain in the CCIP Local Simulator
     /// @param chainId The chain ID to register
     /// @param networkConfig The network config of the chain to register
     function _registerChainInSimulator(uint256 chainId, HelperConfig.NetworkConfig memory networkConfig) private {
@@ -343,37 +345,36 @@ contract BaseTest is Test {
 
     /// @dev Grants custom roles on all chains to predefined addresses
     function _grantRoles() internal virtual {
-        _grantRolesForChain(baseFork, baseParentPeer, baseParentPeer.owner());
-        _grantRolesForChain(optFork, optChildPeer, optChildPeer.owner());
-        _grantRolesForChain(ethFork, ethChildPeer, ethChildPeer.owner());
+        _grantRolesForPeer(baseFork, baseParentPeer, baseParentPeer.owner());
+        _grantRolesForPeer(optFork, optChildPeer, optChildPeer.owner());
+        _grantRolesForPeer(ethFork, ethChildPeer, ethChildPeer.owner());
         _stopPrank();
     }
 
-    /// @dev _grantRoles: Helper to grant custom roles on a specific chain
+    /// @dev _grantRoles:: Helper to grant custom roles on a specific chain
     /// @param forkId The fork ID to grant roles for
     /// @param peer The peer to grant roles for
     /// @param peerOwner The owner of the peer to grant roles for
-    function _grantRolesForChain(uint256 forkId, IYieldPeer peer, address peerOwner) private {
+    function _grantRolesForPeer(uint256 forkId, IYieldPeer peer, address peerOwner) private {
         _selectFork(forkId);
         _changePrank(peerOwner);
 
-        // Cast IYieldPeer to IAccessControl to access role functions
-        IAccessControl accessControl = IAccessControl(address(peer));
+        // Cast IYieldPeer to IAccessControl to access grant role functions
+        IAccessControl peerAccessControl = IAccessControl(address(peer));
 
-        accessControl.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
-        accessControl.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
-        accessControl.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
-        accessControl.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin);
-        accessControl.grantRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer);
-        accessControl.grantRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter);
-
+        peerAccessControl.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
+        peerAccessControl.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
+        peerAccessControl.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
+        peerAccessControl.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin);
+        peerAccessControl.grantRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer);
+        peerAccessControl.grantRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter);
         // Assertions
-        assertTrue(accessControl.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
-        assertTrue(accessControl.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
-        assertTrue(accessControl.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
-        assertTrue(accessControl.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin));
-        assertTrue(accessControl.hasRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer));
-        assertTrue(accessControl.hasRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter));
+        assertTrue(peerAccessControl.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
+        assertTrue(peerAccessControl.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
+        assertTrue(peerAccessControl.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
+        assertTrue(peerAccessControl.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin));
+        assertTrue(peerAccessControl.hasRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer));
+        assertTrue(peerAccessControl.hasRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter));
     }
 
     /// @dev Sets up SharePools on all chains to know about each other
@@ -492,7 +493,7 @@ contract BaseTest is Test {
         assertEq(ethChildPeer.getAllowedPeer(optChainSelector), address(optChildPeer));
     }
 
-    /// _setCrossChainPeers: Helper to apply chain updates to SharePools
+    /// _setCrossChainPeers:: Helper to apply chain updates to SharePools
     /// @dev Apply chain updates to SharePools
     /// @param sharePool The SharePool to apply chain updates to
     /// @param remoteChainSelectors The chain selectors to apply chain updates to
@@ -537,7 +538,7 @@ contract BaseTest is Test {
         _stopPrank();
     }
 
-    /// @dev _setCCTPAttesters: Helper to set CCTP attesters on a specific chain
+    /// @dev _setCCTPAttesters:: Helper to set CCTP attesters on a specific chain
     function _enableAttestersForChain(uint256 forkId, IMessageTransmitter transmitter) private {
         _selectFork(forkId);
         _changePrank(transmitter.owner());

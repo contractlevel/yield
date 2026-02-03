@@ -10,8 +10,10 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {IStrategyRegistry} from "../interfaces/IStrategyRegistry.sol";
 
 /// @title StrategyRegistry
-/// @author @contractlevel
+/// @author @contractlevel/George Gorzhiyev - Judge Finance
 /// @notice Registry for strategy adapters
+/// @dev This contract uses the UUPS upgrade pattern
+/// @dev Uses ERC7201 namespace storage location for upgradability safety
 contract StrategyRegistry is Initializable, UUPSUpgradeable, IStrategyRegistry, Ownable2StepUpgradeable {
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS
@@ -52,7 +54,8 @@ contract StrategyRegistry is Initializable, UUPSUpgradeable, IStrategyRegistry, 
     }
 
     function initialize() external initializer {
-        __Ownable_init(msg.sender);
+        __Ownable_init(msg.sender); // @review do we want to pass an owner here?
+        __Ownable2Step_init(); /// @dev empty init but OZ best practice pattern
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -67,7 +70,9 @@ contract StrategyRegistry is Initializable, UUPSUpgradeable, IStrategyRegistry, 
     /// @notice The string hashed for the protocol ID should match what is hashed in the Chainlink Functions source code - see functions/src.js
     /// @param strategyAdapter The strategy adapter address
     function setStrategyAdapter(bytes32 protocolId, address strategyAdapter) external onlyOwner {
-        StrategyRegistryStorage storage $ = _getStrategyRegistryStorage(); // load StrategyRegistry storage
+        /// @dev load StrategyRegistry storage
+        StrategyRegistryStorage storage $ = _getStrategyRegistryStorage();
+
         $.s_strategyAdapters[protocolId] = strategyAdapter;
         emit StrategyAdapterSet(protocolId, strategyAdapter);
     }
@@ -77,7 +82,7 @@ contract StrategyRegistry is Initializable, UUPSUpgradeable, IStrategyRegistry, 
     //////////////////////////////////////////////////////////////*/
     /// @notice Authorizes an upgrade to a new implementation
     /// @param newImplementation The address of the new implementation
-    /// @dev Revert if msg.sender does not have UPGRADER_ROLE
+    /// @dev Revert if msg.sender is not the owner
     /// @dev Required by UUPSUpgradeable
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 

@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {BaseTest} from "../../BaseTest.t.sol";
+import {BaseTest, ChildPeer} from "../../BaseTest.t.sol";
 import {IYieldPeer} from "../../../src/interfaces/IYieldPeer.sol";
 import {Roles} from "../../../src/libraries/Roles.sol";
 import {console2} from "forge-std/Test.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 
 contract ChildWithdrawTest is BaseTest {
     function setUp() public override {
@@ -18,6 +19,18 @@ contract ChildWithdrawTest is BaseTest {
         deal(address(optUsdc), withdrawer, DEPOSIT_AMOUNT);
         _changePrank(withdrawer);
         optUsdc.approve(address(optChildPeer), DEPOSIT_AMOUNT);
+    }
+
+    /// @dev Test that withdraw reverts when not called through proxy
+    /// @dev This sets up a direct withdraw call to the impl, which should revert
+    function test_yield_child_onTokenTransfer_revertsWhen_notProxy() public {
+        // Arrange
+        /// @dev cast child impl address to ChildPeer type
+        ChildPeer childPeerImpl = ChildPeer(optChildPeerImplAddr);
+
+        // Act & Assert
+        vm.expectRevert(UUPSUpgradeable.UUPSUnauthorizedCallContext.selector);
+        childPeerImpl.onTokenTransfer(msg.sender, DEPOSIT_AMOUNT, "");
     }
 
     function test_yield_child_onTokenTransfer_revertsWhen_notShare() public {

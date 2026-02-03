@@ -45,7 +45,8 @@ abstract contract PausableWithAccessControl is
     //////////////////////////////////////////////////////////////*/
     /// @dev initialize pausable and access control modules
     function __PausableWithAccessControl_init(address owner) internal onlyInitializing {
-        __Pausable_init();
+        __Pausable_init(); /// @dev empty init but OZ best practice pattern
+        __AccessControl_init();
         __AccessControlDefaultAdminRules_init(INITIAL_DEFAULT_ADMIN_ROLE_TRANSFER_DELAY, owner); // @review maybe just msg.sender?
     }
 

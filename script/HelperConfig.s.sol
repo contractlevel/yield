@@ -10,12 +10,12 @@ import {MockAToken} from "../test/mocks/MockAToken.sol";
 import {MockUsdc} from "../test/mocks/MockUsdc.sol";
 import {MockKeystoneForwarder} from "../test/mocks/MockKeystoneForwarder.sol";
 import {CCIPLocalSimulator, LinkToken, IRouterClient} from "@chainlink-local/src/ccip/CCIPLocalSimulator.sol";
+import {Roles} from "../src/libraries/Roles.sol";
 import {Share} from "../src/token/Share.sol";
+import {SharePool} from "../src/token/SharePool.sol";
 import {ParentPeer} from "../src/peers/ParentPeer.sol";
 import {ChildPeer} from "../src/peers/ChildPeer.sol";
 import {Rebalancer} from "../src/modules/Rebalancer.sol";
-import {SharePool} from "../src/token/SharePool.sol";
-import {Roles} from "../src/libraries/Roles.sol";
 import {ShareProxy} from "../src/proxies/ShareProxy.sol";
 import {ParentProxy} from "../src/proxies/ParentProxy.sol";
 import {ChildProxy} from "../src/proxies/ChildProxy.sol";
@@ -557,33 +557,45 @@ contract HelperConfig is Script {
         ccipLocalSimulator = new CCIPLocalSimulator();
         (, ccipRouter,,, link,,) = ccipLocalSimulator.configuration();
 
-        // Deploy Share through Proxy
+        // --- Share Proxy Deployment --- //
+        // Deploy Share implementation
         Share shareImpl = new Share();
+        // Create init data and deploy Share proxy
         bytes memory shareInit = abi.encodeWithSelector(Share.initialize.selector);
         ShareProxy shareProxy = new ShareProxy(address(shareImpl), shareInit);
-        share = Share(address(shareProxy)); /// @dev wrap proxy around share type
+        // Wrap proxy address around Share type
+        share = Share(address(shareProxy));
 
         sharePool = new SharePool(address(share), address(1), address(ccipRouter));
         ccipLocalSimulator.supportNewTokenViaOwner(address(usdc));
         ccipLocalSimulator.supportNewTokenViaGetCCIPAdmin(address(share));
 
-        // Deploy Rebalancer through proxy
+        // --- Rebalancer Proxy Deployment --- //
+        // Deploy Rebalancer implementation
         Rebalancer rebalancerImpl = new Rebalancer();
+        // Create init data and deploy Rebalancer proxy
         bytes memory rebalancerInit = abi.encodeWithSelector(Rebalancer.initialize.selector);
         RebalancerProxy rebalancerProxy = new RebalancerProxy(address(rebalancerImpl), rebalancerInit);
-        rebalancer = Rebalancer(address(rebalancerProxy)); /// @dev wrap proxy around rebalancer type
+        // Wrap proxy address around Rebalancer type
+        rebalancer = Rebalancer(address(rebalancerProxy));
 
-        // Deploy Parent through proxy
+        // --- Parent Proxy Deployment --- //
+        // Deploy Parent implementation
         ParentPeer parentImpl = new ParentPeer(address(ccipRouter), address(link), 1, address(usdc), address(share));
+        // Create init data and deploy Parent proxy
         bytes memory parentInit = abi.encodeWithSelector(ParentPeer.initialize.selector);
         ParentProxy parentProxy = new ParentProxy(address(parentImpl), parentInit);
-        parent = ParentPeer(address(parentProxy)); /// @dev wrap proxy around parent type
+        // Wrap proxy address around Parent type
+        parent = ParentPeer(address(parentProxy));
 
-        // Deploy Child through proxy
+        // --- Child Proxy Deployment --- //
+        // Deploy Child implementation
         ChildPeer childImpl = new ChildPeer(address(ccipRouter), address(link), 2, address(usdc), address(share), 1);
+        // Create init data and deploy Child proxy
         bytes memory childInit = abi.encodeWithSelector(ChildPeer.initialize.selector);
         ChildProxy childProxy = new ChildProxy(address(childImpl), childInit);
-        child = ChildPeer(address(childProxy)); /// @dev wrap proxy around child type
+        // Wrap proxy address around Child type
+        child = ChildPeer(address(childProxy));
 
         /// @dev config admin role granted (then revoked) to deployer/'owner' to set rebalancer in parent
         parent.grantRole(Roles.CONFIG_ADMIN_ROLE, parent.owner());

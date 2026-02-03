@@ -67,7 +67,7 @@ contract ChildPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /// @dev Revert if amountToDeposit is less than 1e6 (1 USDC)
     /// @dev Revert if peer is paused
     /// @notice User must approve this contract to spend their stablecoin
-    function deposit(uint256 amountToDeposit) external override whenNotPaused {
+    function deposit(uint256 amountToDeposit) external override onlyProxy whenNotPaused {
         /// @dev takes a fee
         /// same var name ==== confusing!
         amountToDeposit = _initiateDeposit(amountToDeposit);
@@ -107,6 +107,7 @@ contract ChildPeer is Initializable, UUPSUpgradeable, YieldPeer {
     )
         external
         override
+        onlyProxy
         whenNotPaused
     {
         _revertIfMsgSenderIsNotShare();

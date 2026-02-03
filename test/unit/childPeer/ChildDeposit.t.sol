@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.26;
 
-import {BaseTest, IERC20} from "../../BaseTest.t.sol";
+import {BaseTest, IERC20, ChildPeer} from "../../BaseTest.t.sol";
 import {IYieldPeer} from "../../../src/interfaces/IYieldPeer.sol";
 import {IComet} from "../../../src/interfaces/IComet.sol";
 import {Roles} from "../../../src/libraries/Roles.sol";
 import {console2} from "forge-std/console2.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 
 contract ChildDepositTest is BaseTest {
     function setUp() public override {
@@ -17,6 +18,18 @@ contract ChildDepositTest is BaseTest {
         deal(address(optUsdc), depositor, DEPOSIT_AMOUNT);
         _changePrank(depositor);
         optUsdc.approve(address(optChildPeer), DEPOSIT_AMOUNT);
+    }
+
+    /// @dev Test that deposit reverts when not called through proxy
+    /// @dev This sets up a direct deposit call to the impl, which should revert
+    function test_yield_child_deposit_revertsWhen_notProxy() public {
+        // Arrange
+        /// @dev cast child impl address to ChildPeer type
+        ChildPeer childPeerImpl = ChildPeer(optChildPeerImplAddr);
+
+        // Act & Assert
+        vm.expectRevert(UUPSUpgradeable.UUPSUnauthorizedCallContext.selector);
+        childPeerImpl.deposit(DEPOSIT_AMOUNT);
     }
 
     function test_yield_child_deposit_revertsWhen_insufficientAmount() public {

@@ -14,6 +14,7 @@ import {
 import {ParentPeer} from "../../../src/peers/ParentPeer.sol";
 import {Roles} from "../../../src/libraries/Roles.sol";
 import {stdStorage, StdStorage} from "forge-std/StdStorage.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 
 contract ParentDepositTest is BaseTest {
     using stdStorage for StdStorage;
@@ -29,6 +30,18 @@ contract ParentDepositTest is BaseTest {
 
         _changePrank(depositor);
         baseUsdc.approve(address(baseParentPeer), DEPOSIT_AMOUNT);
+    }
+
+    /// @dev Test that deposit reverts when not called through proxy
+    /// @dev This sets up a direct deposit call to the impl, which should revert
+    function test_yield_parent_deposit_revertsWhen_notProxy() public {
+        // Arrange
+        /// @dev cast parent impl address to ParentPeer type
+        ParentPeer parentPeerImpl = ParentPeer(baseParentPeerImplAddr);
+
+        // Act & Assert
+        vm.expectRevert(UUPSUpgradeable.UUPSUnauthorizedCallContext.selector);
+        parentPeerImpl.deposit(DEPOSIT_AMOUNT);
     }
 
     function test_yield_parent_deposit_revertsWhen_insufficientAmount() public {

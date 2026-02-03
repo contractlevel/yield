@@ -110,8 +110,9 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /// 2. This Parent is not the Strategy
     /// @param amountToDeposit The amount of USDC to deposit into the system
     /// @dev Revert if amountToDeposit is less than 1e6 (1 USDC)
+    /// @dev Revert if not called through a proxy
     /// @dev Revert if peer is paused
-    function deposit(uint256 amountToDeposit) external override whenNotPaused {
+    function deposit(uint256 amountToDeposit) external override onlyProxy whenNotPaused {
         /// @dev takes a fee
         amountToDeposit = _initiateDeposit(amountToDeposit);
 
@@ -174,6 +175,7 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     )
         external
         override
+        onlyProxy
         whenNotPaused
     {
         _revertIfMsgSenderIsNotShare();

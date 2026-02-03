@@ -12,7 +12,8 @@ import {
     IYieldPeer,
     Rebalancer,
     Roles,
-    IYieldPeer
+    IYieldPeer,
+    IAccessControl
 } from "../BaseTest.t.sol";
 import {Handler} from "./Handler.t.sol";
 import {HelperConfig} from "../../script/HelperConfig.s.sol";
@@ -143,7 +144,7 @@ contract Invariant is StdInvariant, BaseTest {
         _deployChild2(address(registryImpl), registryInit);
 
         // 4. Final Configuration - Roles & Liquidity
-        /// @dev Grant Share Roles to PROXIES (prank Share owner)
+        /// @dev Grant Share Roles to Proxies (prank Share owner)
         _changePrank(share.owner());
         share.grantMintAndBurnRoles(address(parent));
         share.grantMintAndBurnRoles(address(child1));
@@ -155,7 +156,7 @@ contract Invariant is StdInvariant, BaseTest {
         deal(networkConfig.tokens.usdc, networkConfig.protocols.comet, STRATEGY_POOL_USDC_STARTING_BALANCE);
     }
 
-    /// @dev _deployInfra: Helper to setup configuration and mocks
+    /// @dev _deployInfra:: Helper to setup configuration and mocks
     function _setupConfigAndMocks() private {
         helperConfig = new HelperConfig();
         networkConfig = helperConfig.getOrCreateAnvilEthConfig();
@@ -164,7 +165,7 @@ contract Invariant is StdInvariant, BaseTest {
         aavePool = IPoolAddressesProvider(networkConfig.protocols.aavePoolAddressesProvider).getPool();
     }
 
-    /// @dev _deployInfra: Helper to deploy Rebalancer
+    /// @dev _deployInfra:: Helper to deploy Rebalancer
     function _deployRebalancer() private {
         Rebalancer rebalancerImpl = new Rebalancer();
         bytes memory rebalancerInit = abi.encodeWithSelector(Rebalancer.initialize.selector);
@@ -172,7 +173,7 @@ contract Invariant is StdInvariant, BaseTest {
         rebalancer = Rebalancer(address(rebalancerProxy)); /// @dev cast Proxy to Rebalancer type
     }
 
-    /// @dev _deployInfra: Helper to deploy ParentPeer
+    /// @dev _deployInfra:: Helper to deploy ParentPeer
     /// @param registryImpl The strategy registry impl address
     /// @param registryInit The strategy registry init data
     function _deployParent(address registryImpl, bytes memory registryInit) private {
@@ -213,7 +214,7 @@ contract Invariant is StdInvariant, BaseTest {
         parent.revokeRole(Roles.CONFIG_ADMIN_ROLE, address(this));
     }
 
-    /// @dev _deployInfra: Helper to deploy ChildPeer 1
+    /// @dev _deployInfra:: Helper to deploy ChildPeer 1
     /// @param registryImpl The strategy registry impl address
     /// @param registryInit The strategy registry init data
     function _deployChild1(address registryImpl, bytes memory registryInit) private {
@@ -248,7 +249,7 @@ contract Invariant is StdInvariant, BaseTest {
         );
     }
 
-    /// @dev _deployInfra: Helper to deploy ChildPeer 2
+    /// @dev _deployInfra:: Helper to deploy ChildPeer 2
     /// @param registryImpl The strategy registry impl address
     /// @param registryInit The strategy registry init data
     function _deployChild2(address registryImpl, bytes memory registryInit) private {
@@ -283,53 +284,37 @@ contract Invariant is StdInvariant, BaseTest {
         );
     }
 
+    /// @dev Grants custom roles on all chains (simulated locally)
     function _grantRoles() internal override {
-        // grant roles - parent
-        _changePrank(parent.owner());
-        parent.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
-        parent.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
-        parent.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
-        parent.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin);
-        parent.grantRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer);
-        parent.grantRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter);
-        assertTrue(parent.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
-        assertTrue(parent.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
-        assertTrue(parent.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
-        assertTrue(parent.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin));
-        assertTrue(parent.hasRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer));
-        assertTrue(parent.hasRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter));
-
-        // grant roles - child 1
-        _changePrank(child1.owner());
-        child1.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
-        child1.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
-        child1.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
-        child1.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin);
-        child1.grantRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer);
-        child1.grantRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter);
-        assertTrue(child1.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
-        assertTrue(child1.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
-        assertTrue(child1.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
-        assertTrue(child1.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin));
-        assertTrue(child1.hasRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer));
-        assertTrue(child1.hasRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter));
-
-        // grant roles - child 2
-        _changePrank(child2.owner());
-        child2.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
-        child2.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
-        child2.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
-        child2.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin);
-        child2.grantRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer);
-        child2.grantRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter);
-        assertTrue(child2.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
-        assertTrue(child2.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
-        assertTrue(child2.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
-        assertTrue(child2.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin));
-        assertTrue(child2.hasRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer));
-        assertTrue(child2.hasRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter));
-
+        _grantRolesToPeer(parent, parent.owner());
+        _grantRolesToPeer(child1, child1.owner());
+        _grantRolesToPeer(child2, child2.owner());
         _stopPrank();
+    }
+
+    /// @dev _grantRoles:: Helper to grant roles to a specific peer
+    /// @param peer The peer to grant roles for
+    /// @param peerOwner The owner of the peer (passed explicitly as IYieldPeer might not expose owner())
+    function _grantRolesToPeer(IYieldPeer peer, address peerOwner) private {
+        _changePrank(peerOwner);
+
+        // Cast peer to IAccessControl to access role functions
+        IAccessControl peerAccessControl = IAccessControl(address(peer));
+
+        peerAccessControl.grantRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser);
+        peerAccessControl.grantRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser);
+        peerAccessControl.grantRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
+        peerAccessControl.grantRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin);
+        peerAccessControl.grantRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer);
+        peerAccessControl.grantRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter);
+
+        // Assertions
+        assertTrue(peerAccessControl.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser));
+        assertTrue(peerAccessControl.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser));
+        assertTrue(peerAccessControl.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin));
+        assertTrue(peerAccessControl.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin));
+        assertTrue(peerAccessControl.hasRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer));
+        assertTrue(peerAccessControl.hasRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter));
     }
 
     function _setCrossChainPeers() internal override {
