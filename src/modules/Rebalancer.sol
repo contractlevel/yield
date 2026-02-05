@@ -98,7 +98,7 @@ contract Rebalancer is Initializable, UUPSUpgradeable, CREReceiver {
 
     /// @notice Authorizes an upgrade to a new implementation
     /// @param newImplementation The address of the new implementation
-    /// @dev Revert if msg.sender does not have UPGRADER_ROLE
+    /// @dev Revert if msg.sender is not owner
     /// @dev Required by UUPSUpgradeable
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 

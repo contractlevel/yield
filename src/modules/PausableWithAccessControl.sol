@@ -34,7 +34,7 @@ abstract contract PausableWithAccessControl is
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
     /// @notice The initial delay for transferring the admin role
-    uint48 internal constant INITIAL_DEFAULT_ADMIN_ROLE_TRANSFER_DELAY = 259200 seconds; // 3 days // @review do we want another time delay later?
+    uint48 internal constant INITIAL_DEFAULT_ADMIN_ROLE_TRANSFER_DELAY = 259200 seconds; // 3 days
 
     // keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.PausableWithAccessControl")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant PAUSABLE_ACCESS_CONTROL_STORAGE_LOCATION =
@@ -47,7 +47,7 @@ abstract contract PausableWithAccessControl is
     function __PausableWithAccessControl_init(address owner) internal onlyInitializing {
         __Pausable_init(); /// @dev empty init but OZ best practice pattern
         __AccessControl_init();
-        __AccessControlDefaultAdminRules_init(INITIAL_DEFAULT_ADMIN_ROLE_TRANSFER_DELAY, owner); // @review maybe just msg.sender?
+        __AccessControlDefaultAdminRules_init(INITIAL_DEFAULT_ADMIN_ROLE_TRANSFER_DELAY, owner);
     }
 
     /*/////////////////////////////////////////////////////////////

@@ -3,6 +3,7 @@ pragma solidity 0.8.26;
 
 import {BaseTest, Rebalancer} from "../../BaseTest.t.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 contract AuthorizeUpgradeTest is BaseTest {
     RebalancerV2Mock newImplementation;
@@ -38,11 +39,16 @@ contract AuthorizeUpgradeTest is BaseTest {
     function test_yield_rebalancer_upgrade_revertsWhen_notOwner() public {
         // Arrange
         address proxy = address(baseRebalancer);
+        address unauthorizedUser = makeAddr("unauthorized");
 
         // Act & Assert
-        vm.prank(depositor); // Prank a non-owner address
-        vm.expectRevert(abi.encodeWithSignature("OwnableUnauthorizedAccount(address)", depositor));
+        vm.startPrank(unauthorizedUser);
+
+        // Expect OwnableUnauthorizedAccount(account)
+        vm.expectRevert(abi.encodeWithSelector(Ownable.OwnableUnauthorizedAccount.selector, unauthorizedUser));
+
         UUPSUpgradeable(proxy).upgradeToAndCall(address(newImplementation), "");
+        vm.stopPrank();
     }
 }
 

@@ -3,6 +3,7 @@ pragma solidity 0.8.26;
 
 import {BaseTest, ChildPeer} from "../../BaseTest.t.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {Roles} from "../../../src/libraries/Roles.sol";
 
 contract AuthorizeUpgradeTest is BaseTest {
@@ -52,18 +53,16 @@ contract AuthorizeUpgradeTest is BaseTest {
         address unauthorizedUser = makeAddr("unauthorized");
 
         // Act & Assert
-        vm.prank(unauthorizedUser);
+        vm.startPrank(unauthorizedUser);
 
-        // Expect AccessControlUnauthorizedAccount(account, role)
         vm.expectRevert(
             abi.encodeWithSelector(
-                bytes4(keccak256("AccessControlUnauthorizedAccount(address,bytes32)")),
-                unauthorizedUser,
-                Roles.UPGRADER_ROLE
+                IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorizedUser, Roles.UPGRADER_ROLE
             )
         );
 
         UUPSUpgradeable(proxy).upgradeToAndCall(address(newImplementation), "");
+        vm.stopPrank();
     }
 }
 
