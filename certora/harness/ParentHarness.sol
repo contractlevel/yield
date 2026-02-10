@@ -45,6 +45,15 @@ contract ParentHarness is ParentPeer, HelperHarness {
         _handleCCIPWithdraw(s_strategy, withdrawData);
     }
 
+    function handleCCIPWithdrawCallbackParent(
+        Client.EVMTokenAmount[] memory tokenAmounts,
+        bytes memory data
+    )
+        public
+    {
+        _handleCCIPWithdrawCallbackParent(tokenAmounts, data);
+    }
+
     // handlePinpong public
 
     function handleCCIPWithdrawPingPong(bytes memory data) public {

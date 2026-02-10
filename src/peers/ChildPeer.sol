@@ -185,6 +185,8 @@ contract ChildPeer is YieldPeer {
                 i_parentChainSelector,
                 CcipTxType.WithdrawCallbackParent,
                 abi.encode(withdrawData),
+                // @review sends usdc back and forth needlessly(?) if this is ultimately the withdrawChainSelector
+                // we can split the logic here and in ParentPeer::_handleCCIPWithdrawCallbackParent (Amounts.length == 0)
                 withdrawData.usdcWithdrawAmount
             );
         } else {
@@ -194,11 +196,9 @@ contract ChildPeer is YieldPeer {
     }
 
     /// @notice Handles callback from parent: burn shares (held since initiation) and transfer USDC to withdrawer.
-    /// @param tokenAmounts The token amounts received (USDC). 
+    /// @param tokenAmounts The token amounts received (USDC).
     /// @param data The encoded WithdrawData
-    function _handleCCIPWithdrawCallbackChild(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data)
-        internal
-    {
+    function _handleCCIPWithdrawCallbackChild(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data) internal {
         WithdrawData memory withdrawData = _decodeWithdrawData(data);
         if (tokenAmounts.length != 0) {
             CCIPOperations._validateTokenAmounts(tokenAmounts, address(i_usdc), withdrawData.usdcWithdrawAmount);

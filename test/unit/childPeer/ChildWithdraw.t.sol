@@ -56,6 +56,8 @@ contract ChildWithdrawTest is BaseTest {
         optShare.transferAndCall(address(optChildPeer), expectedShareBalance, "");
         ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
+        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
 
         /// @dev assert
         assertEq(optShare.balanceOf(withdrawer), 0);
@@ -85,6 +87,8 @@ contract ChildWithdrawTest is BaseTest {
         optShare.transferAndCall(address(optChildPeer), expectedShareBalance, "");
         ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
+        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
 
         /// @dev assert
         assertEq(optShare.balanceOf(withdrawer), 0);
@@ -173,6 +177,7 @@ contract ChildWithdrawTest is BaseTest {
         optShare.transferAndCall(address(optChildPeer), expectedShareBalance, "");
         ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(ethFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
 
         /// @dev assert
@@ -205,6 +210,7 @@ contract ChildWithdrawTest is BaseTest {
         optShare.transferAndCall(address(optChildPeer), expectedShareBalance, "");
         ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(ethFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
 
         /// @dev assert

@@ -436,15 +436,20 @@ rule onTokenTransfer_decreases_totalShares() {
 
     uint256 totalSharesBefore = getTotalShares();
 
+    // s_totalShares is only decreased in onTokenTransfer when parent is the strategy (same-chain withdraw path)
+    // Consider how to handle rules for WithdrawCallbackParent
+    require getStrategy().chainSelector == getThisChainSelector();
     onTokenTransfer(e, args);
 
     assert getTotalShares() < totalSharesBefore;
 }
 
+// For parentChain == strategyChain
 rule onTokenTransfer_emits_SharesBurned_and_ShareBurnUpdate_and_WithdrawInitiated() {
     env e;
     calldataarg args;
-
+    
+    require getStrategy().chainSelector == getThisChainSelector();
     require ghost_sharesBurned_eventCount == 0;
     require ghost_shareBurnUpdate_eventCount == 0;
     require ghost_withdrawInitiated_eventCount == 0;
@@ -592,7 +597,7 @@ rule handleCCIPDepositToParent_ping_pongs_to_child_when_activeStrategyAdapter_is
     handleCCIPDepositToParent(e, tokenAmounts, encodedDepositData);
     assert ghost_depositPingPongToChild_eventCount == 1;
     assert ghost_ccipMessageSent_eventCount == 1;
-    assert ghost_ccipMessageSent_txType_emitted == 9; // DepositPingPong
+    assert ghost_ccipMessageSent_txType_emitted == 11; // DepositPingPong
     assert ghost_ccipMessageSent_bridgeAmount_emitted == usdcDepositAmount;
 }
 
@@ -687,6 +692,10 @@ rule handleCCIPWithdrawToParent_updatesTotalShares_and_emits_ShareBurnUpdate() {
 
     uint256 totalSharesBefore = getTotalShares();
 
+    // ShareBurnUpdate is only emitted when parent is strategy and has an active adapter (_handleCCIPWithdraw first branch).
+    // When parent is not the strategy, totalShares/ShareBurnUpdate are updated in handleCCIPWithdrawCallbackParent (see that section).
+    require getStrategy().chainSelector == getThisChainSelector();
+    require getActiveStrategyAdapter() != 0;
     require ghost_shareBurnUpdate_eventCount == 0;
     handleCCIPWithdrawToParent(e, encodedWithdrawData, sourceChainSelector);
     assert ghost_shareBurnUpdate_eventCount == 1;
@@ -734,7 +743,7 @@ rule handleCCIPWithdrawToParent_sendsUsdc_to_withdrawChain_when_parent_is_strate
     require ghost_ccipMessageSent_eventCount == 0;
     handleCCIPWithdrawToParent(e, encodedWithdrawData, sourceChainSelector);
     assert ghost_ccipMessageSent_eventCount == 1;
-    assert ghost_ccipMessageSent_txType_emitted == 6; // WithdrawCallback
+    assert ghost_ccipMessageSent_txType_emitted == 6; // WithdrawCallbackChild
     assert ghost_ccipMessageSent_bridgeAmount_emitted == expectedWithdrawAmount;
 }
 
@@ -759,6 +768,71 @@ rule handleCCIPWithdrawToParent_forwardsToStrategy() {
     assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;
 }
 
+// --- handleCCIPWithdrawCallbackParent --- //
+// When parent is NOT the strategy: handleCCIPWithdrawToParent forwards WithdrawToStrategy; the strategy chain
+// later sends WithdrawCallbackParent to the parent. Here we verify the parent's handling of that callback:
+// always updates s_totalShares and emits ShareBurnUpdate; then either transfers USDC (withdraw chain = parent)
+// or forwards WithdrawCallbackChild (withdraw chain = child).
+rule handleCCIPWithdrawCallbackParent_updatesTotalShares_and_emits_ShareBurnUpdate() {
+    env e;
+    address withdrawer;
+    uint256 shareBurnAmount;
+    uint256 totalShares;
+    uint256 usdcWithdrawAmount;
+    uint64 withdrawChainSelector;
+    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, withdrawChainSelector);
+    Client.EVMTokenAmount[] tokenAmounts = prepareTokenAmounts(usdc, usdcWithdrawAmount);
+
+    uint256 totalSharesBefore = getTotalShares();
+
+    require ghost_shareBurnUpdate_eventCount == 0;
+    handleCCIPWithdrawCallbackParent(e, tokenAmounts, encodedWithdrawData);
+    assert ghost_shareBurnUpdate_eventCount == 1;
+    assert getTotalShares() == totalSharesBefore - shareBurnAmount;
+}
+
+// Current fail with balanceOf havocing 0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff9ef
+rule handleCCIPWithdrawCallbackParent_transfersUsdc_and_emits_WithdrawCompleted_when_withdrawChain_is_parent() {
+    env e;
+    address withdrawer;
+    uint256 shareBurnAmount;
+    uint256 totalShares;
+    uint256 usdcWithdrawAmount;
+    uint64 withdrawChainSelector;
+    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, withdrawChainSelector);
+    Client.EVMTokenAmount[] tokenAmounts = prepareTokenAmounts(usdc, usdcWithdrawAmount);
+
+    require withdrawChainSelector == getThisChainSelector();
+    uint256 usdcBalanceBefore = usdc.balanceOf(withdrawer);
+    require usdcBalanceBefore + usdcWithdrawAmount <= max_uint256;
+    // Simulate Parent holding USDC (as if CCIP had already delivered tokenAmounts to the parent)
+    require usdc.balanceOf(currentContract) >= usdcWithdrawAmount;
+
+    require ghost_withdrawCompleted_eventCount == 0;
+    handleCCIPWithdrawCallbackParent(e, tokenAmounts, encodedWithdrawData);
+    assert ghost_withdrawCompleted_eventCount == 1;
+    assert usdc.balanceOf(withdrawer) == usdcBalanceBefore + usdcWithdrawAmount;
+}
+
+rule handleCCIPWithdrawCallbackParent_forwardsWithdrawCallbackChild_when_withdrawChain_is_child() {
+    env e;
+    address withdrawer;
+    uint256 shareBurnAmount;
+    uint256 totalShares;
+    uint256 usdcWithdrawAmount;
+    uint64 withdrawChainSelector;
+    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, withdrawChainSelector);
+    Client.EVMTokenAmount[] tokenAmounts = prepareTokenAmounts(usdc, usdcWithdrawAmount);
+
+    require withdrawChainSelector != getThisChainSelector();
+
+    require ghost_ccipMessageSent_eventCount == 0;
+    handleCCIPWithdrawCallbackParent(e, tokenAmounts, encodedWithdrawData);
+    assert ghost_ccipMessageSent_eventCount == 1;
+    assert ghost_ccipMessageSent_txType_emitted == 6; // WithdrawCallbackChild
+    assert ghost_ccipMessageSent_bridgeAmount_emitted == usdcWithdrawAmount;
+}
+
 // --- handleCCIPWithdraw & handleCCIPWithdrawPingPong --- //
 rule handleCCIPWithdraw_forwardsToStrategy_and_emits_WithdrawPingPongToChild_when_Adapter_is_zero() {
     env e;
@@ -777,7 +851,7 @@ rule handleCCIPWithdraw_forwardsToStrategy_and_emits_WithdrawPingPongToChild_whe
     handleCCIPWithdraw(e, encodedWithdrawData);
     assert ghost_withdrawPingPongToChild_eventCount == 1;
     assert ghost_ccipMessageSent_eventCount == 1;
-    assert ghost_ccipMessageSent_txType_emitted == 10; // WithdrawPingPong
+    assert ghost_ccipMessageSent_txType_emitted == 12; // WithdrawPingPong
     assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;
 }
 
@@ -942,8 +1016,8 @@ rule rebalance_handles_rebalanceParentToChild() {
     require oldStrategy.chainSelector != chainSelector && oldStrategy.chainSelector == getThisChainSelector();
 
     uint256 totalValue = getTotalValue(e);
-    require totalValue > 0;
-
+    // totalvalue > 0;
+    // Allow totalValue >= 0 so rule is not vacuous when getTotalValue is summarized (e.g. returns 0)
     address strategyPool = getActiveStrategyAdapter().getStrategyPool(e);
     uint256 strategyPoolBalanceBefore = usdc.balanceOf(strategyPool);
     require strategyPoolBalanceBefore - totalValue >= 0;
@@ -952,7 +1026,7 @@ rule rebalance_handles_rebalanceParentToChild() {
     require ghost_ccipMessageSent_eventCount == 0;
     rebalance(e, newStrategy);
     assert ghost_ccipMessageSent_eventCount == 1;
-    assert ghost_ccipMessageSent_txType_emitted == 8; // RebalanceNewStrategy
+    assert ghost_ccipMessageSent_txType_emitted == 10; // RebalanceNewStrategy
     assert ghost_ccipMessageSent_bridgeAmount_emitted == totalValue;
 
     assert usdc.balanceOf(strategyPool) == strategyPoolBalanceBefore - totalValue;
@@ -972,7 +1046,7 @@ rule rebalance_handles_rebalanceChildToOther() {
     require ghost_ccipMessageSent_eventCount == 0;
     rebalance(e, newStrategy);
     assert ghost_ccipMessageSent_eventCount == 1;
-    assert ghost_ccipMessageSent_txType_emitted == 7; // RebalanceOldStrategy
+    assert ghost_ccipMessageSent_txType_emitted == 9; // RebalanceOldStrategy (7 is WithdrawCallbackParent)
     assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;
 }
 

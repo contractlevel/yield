@@ -398,6 +398,7 @@ contract ParentPeer is YieldPeer {
     /// transfers USDC to withdrawer if parent is the withdraw chain, else forwards WithdrawCallbackChild to the child.
     /// @param tokenAmounts The token amounts received (USDC). Validate only when length > 0.
     /// @param data The encoded WithdrawData
+    // @review uses tokenAmounts, not just data, because this is also called if withdrawChain != strategyChain
     function _handleCCIPWithdrawCallbackParent(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data)
         internal
     {

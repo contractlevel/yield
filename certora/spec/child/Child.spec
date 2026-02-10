@@ -255,7 +255,7 @@ rule handleCCIPDepositToStrategy_emits_CCIPMessageSent() {
         ghost_ccipMessageSent_txType_emitted == 2 && // CcipTxType.DepositCallbackParent
         ghost_ccipMessageSent_bridgeAmount_emitted == 0;
     assert getActiveStrategyAdapter() == 0 => 
-        ghost_ccipMessageSent_txType_emitted == 9 && // CcipTxType.DepositPingPong
+        ghost_ccipMessageSent_txType_emitted == 11 && // CcipTxType.DepositPingPong
         ghost_ccipMessageSent_bridgeAmount_emitted == tokenAmounts[0].amount;
 }
 
@@ -358,14 +358,14 @@ rule handleCCIPWithdrawToStrategy_completesWithdrawal_when_sameChain() {
     uint256 shareBurnAmount;
     uint256 totalShares;
     uint256 usdcWithdrawAmount; // this value is set during this function we are verifying
-    bytes encodedWithdrawData = 
+    bytes encodedWithdrawData =
         buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, getThisChainSelector());
     address aavePool = aaveV3Adapter.getStrategyPool(e);
     address compoundPool = compoundV3Adapter.getStrategyPool(e);
 
-    uint256 usdcBalanceBefore = usdc.balanceOf(withdrawer);
+    //uint256 usdcBalanceBefore = usdc.balanceOf(withdrawer);
     uint256 expectedWithdrawAmount = calculateWithdrawAmount(getTotalValue(e), totalShares, shareBurnAmount);
-    require usdcBalanceBefore + expectedWithdrawAmount <= max_uint256, "should not cause overflow";
+    //require usdcBalanceBefore + expectedWithdrawAmount <= max_uint256, "should not cause overflow";
 
     require getTotalValue(e) > 0, "total value should be greater than 0";
     require withdrawer != compoundPool && withdrawer != aavePool && withdrawer != currentContract,
@@ -373,14 +373,22 @@ rule handleCCIPWithdrawToStrategy_completesWithdrawal_when_sameChain() {
 
     require ghost_withdrawCompleted_eventCount == 0;
     require ghost_withdrawPingPong_eventCount == 0;
+    require ghost_ccipMessageSent_eventCount == 0;
+    require ghost_withdrawFromStrategy_eventCount == 0;
     handleCCIPWithdrawToStrategy(e, encodedWithdrawData);
-    
-    assert getActiveStrategyAdapter() == 0 =>
-        ghost_withdrawPingPong_eventCount == 1;
 
+    // When adapter == 0: Child ping-pongs to parent (emits WithdrawPingPongToParent, sends WithdrawPingPong)
+    assert getActiveStrategyAdapter() == 0 =>
+        ghost_withdrawPingPong_eventCount == 1 &&
+        ghost_ccipMessageSent_eventCount == 1 &&
+        ghost_ccipMessageSent_txType_emitted == 12; // WithdrawPingPong
+
+    // When adapter != 0: Child sends WithdrawCallbackParent. WithdrawFromStrategy is only emitted when
+    // usdcWithdrawAmount != 0 (see YieldPeer._withdrawFromStrategyAndGetUsdcWithdrawAmount).
     assert getActiveStrategyAdapter() != 0 =>
-        ghost_withdrawCompleted_eventCount == 1 &&
-        usdc.balanceOf(withdrawer) == usdcBalanceBefore + expectedWithdrawAmount; 
+        ghost_ccipMessageSent_eventCount == 1 &&
+        ghost_ccipMessageSent_txType_emitted == 7 && // WithdrawCallbackParent
+        (expectedWithdrawAmount > 0 => ghost_withdrawFromStrategy_eventCount == 1);
 }
 
 rule handleCCIPWithdrawToStrategy_emits_CCIPMessageSent_when_differentChain() {
@@ -400,7 +408,7 @@ rule handleCCIPWithdrawToStrategy_emits_CCIPMessageSent_when_differentChain() {
     require ghost_ccipMessageSent_eventCount == 0;
     handleCCIPWithdrawToStrategy(e, encodedWithdrawData);
     assert ghost_ccipMessageSent_eventCount == 1;
-    assert ghost_ccipMessageSent_txType_emitted == 6; // CcipTxType.WithdrawCallback
+    assert ghost_ccipMessageSent_txType_emitted == 7; // CcipTxType.WithdrawCallbackParent
     assert ghost_ccipMessageSent_bridgeAmount_emitted == expectedBridgeAmount;
 }
 
@@ -497,7 +505,7 @@ rule handleCCIPRebalanceOldStrategy_emits_CCIPMessageSent_when_differentChain() 
     require ghost_ccipMessageSent_eventCount == 0;
     handleCCIPRebalanceOldStrategy(e, newStrategy);
     assert ghost_ccipMessageSent_eventCount == 1;
-    assert ghost_ccipMessageSent_txType_emitted == 8; // CcipTxType.RebalanceNewStrategy
+    assert ghost_ccipMessageSent_txType_emitted == 10; // CcipTxType.RebalanceNewStrategy
     assert ghost_ccipMessageSent_bridgeAmount_emitted == totalValue;
 }
 
@@ -535,7 +543,7 @@ rule handleCCIPMessage_DepositToStrategyPingPongs() {
     handleCCIPMessage(e, txType, tokenAmounts, data, sourceChainSelector);
     assert 
         ghost_ccipMessageSent_eventCount == 1 &&
-        ghost_ccipMessageSent_txType_emitted == 9 && // CcipTxType.DepositPingPong
+        ghost_ccipMessageSent_txType_emitted == 11 && // CcipTxType.DepositPingPong
         ghost_ccipMessageSent_bridgeAmount_emitted == tokenAmounts[0].amount &&
         ghost_depositPingPong_eventCount == 1;
 }
@@ -571,24 +579,28 @@ rule handleCCIPMessage_WithdrawToStrategyPingPongs() {
     env e;
     IYieldPeer.CcipTxType txType = IYieldPeer.CcipTxType.WithdrawToStrategy;
     Client.EVMTokenAmount[] tokenAmounts;
-    bytes data;
+    address withdrawer;
+    uint256 shareBurnAmount;
+    uint256 totalShares;
+    uint256 usdcWithdrawAmount;
+    uint64 chainSelector;
+    bytes data = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
     uint64 sourceChainSelector;
 
+    require getActiveStrategyAdapter() == 0;
     require ghost_ccipMessageSent_eventCount == 0;
     require ghost_withdrawCompleted_eventCount == 0;
     require ghost_withdrawPingPong_eventCount == 0;
     handleCCIPMessage(e, txType, tokenAmounts, data, sourceChainSelector);
-    require getActiveStrategyAdapter() == 0;
-    assert getActiveStrategyAdapter() == 0 => 
-        ghost_withdrawPingPong_eventCount == 1 &&
-        ghost_ccipMessageSent_eventCount == 1 &&
-        ghost_withdrawCompleted_eventCount == 0 &&
-        ghost_ccipMessageSent_txType_emitted == 10;
+    assert ghost_withdrawPingPong_eventCount == 1;
+    assert ghost_ccipMessageSent_eventCount == 1;
+    assert ghost_withdrawCompleted_eventCount == 0;
+    assert ghost_ccipMessageSent_txType_emitted == 12; // WithdrawPingPong (10 is RebalanceNewStrategy)
 }
 
 rule handleCCIPMessage_WithdrawCallback() {
     env e;
-    IYieldPeer.CcipTxType txType = IYieldPeer.CcipTxType.WithdrawCallback;
+    IYieldPeer.CcipTxType txType = IYieldPeer.CcipTxType.WithdrawCallbackChild;
     Client.EVMTokenAmount[] tokenAmounts;
     bytes data;
     uint64 sourceChainSelector;
