@@ -385,6 +385,7 @@ rule handleCCIPWithdrawToStrategy_completesWithdrawal_when_sameChain() {
 
     // When adapter != 0: Child sends WithdrawCallbackParent. WithdrawFromStrategy is only emitted when
     // usdcWithdrawAmount != 0 (see YieldPeer._withdrawFromStrategyAndGetUsdcWithdrawAmount).
+    // no balance update to evaluate
     assert getActiveStrategyAdapter() != 0 =>
         ghost_ccipMessageSent_eventCount == 1 &&
         ghost_ccipMessageSent_txType_emitted == 7 && // WithdrawCallbackParent
