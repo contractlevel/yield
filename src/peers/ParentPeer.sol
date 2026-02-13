@@ -130,9 +130,8 @@ contract ParentPeer is YieldPeer {
                 depositAmountUsdcDecimals = depositAmountNativeDecimals;
             } else {
                 uint8 decimals = IERC20Metadata(activeStablecoin).decimals();
-                totalValueUsdcDecimals = _scaleToUsdcDecimals(
-                    _getTotalValueFromStrategy(activeStrategyAdapter, activeStablecoin), decimals
-                );
+                totalValueUsdcDecimals =
+                    _scaleToUsdcDecimals(_getTotalValueFromStrategy(activeStrategyAdapter, activeStablecoin), decimals);
                 depositAmountUsdcDecimals = _scaleToUsdcDecimals(depositAmountNativeDecimals, decimals);
             }
             uint256 shareMintAmount = _calculateMintAmount(totalValueUsdcDecimals, depositAmountUsdcDecimals);
@@ -206,9 +205,8 @@ contract ParentPeer is YieldPeer {
             withdrawData.shareBurnAmount = shareBurnAmount;
 
             /// @dev handles: get totalValue, scale, calculate, withdraw, swap to USDC (with USDC optimization)
-            uint256 usdcWithdrawAmount = _withdrawFromStrategyAndGetUsdcWithdrawAmount(
-                activeStrategyAdapter, s_activeStablecoin, withdrawData
-            );
+            uint256 usdcWithdrawAmount =
+                _withdrawFromStrategyAndGetUsdcWithdrawAmount(activeStrategyAdapter, s_activeStablecoin, withdrawData);
 
             //slither-disable-next-line reentrancy-events
             emit WithdrawCompleted(withdrawer, usdcWithdrawAmount);
@@ -301,7 +299,8 @@ contract ParentPeer is YieldPeer {
                     /// @dev skip scaling if strategy uses USDC (already in system decimals)
                     depositData.totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, activeStablecoin);
                 } else {
-                    depositAmountNativeDecimals = _swapStablecoins(address(i_usdc), activeStablecoin, depositData.amount);
+                    depositAmountNativeDecimals =
+                        _swapStablecoins(address(i_usdc), activeStablecoin, depositData.amount);
                     uint8 decimals = IERC20Metadata(activeStablecoin).decimals();
                     depositData.totalValue = _scaleToUsdcDecimals(
                         _getTotalValueFromStrategy(activeStrategyAdapter, activeStablecoin), decimals
@@ -534,7 +533,12 @@ contract ParentPeer is YieldPeer {
             }
 
             /// @dev CCIP bridge amount in USDC decimals (6)
-            _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceToNewStrategy, abi.encode(newStrategy), bridgeAmountUsdcDecimals);
+            _ccipSend(
+                newStrategy.chainSelector,
+                CcipTxType.RebalanceToNewStrategy,
+                abi.encode(newStrategy),
+                bridgeAmountUsdcDecimals
+            );
         } else {
             _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceToNewStrategy, abi.encode(newStrategy), 0);
         }

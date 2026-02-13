@@ -76,15 +76,17 @@ contract ChildPeer is YieldPeer {
                 /// @dev skip scaling if strategy uses USDC (already in system decimals)
                 depositAmountUsdcDecimals = depositAmountNativeDecimals;
             } else {
-                depositAmountUsdcDecimals = _scaleToUsdcDecimals(
-                    depositAmountNativeDecimals, IERC20Metadata(activeStablecoin).decimals()
-                );
+                depositAmountUsdcDecimals =
+                    _scaleToUsdcDecimals(depositAmountNativeDecimals, IERC20Metadata(activeStablecoin).decimals());
             }
 
+            // @review - clearly explain why we are using depositAmountUsdcDecimals here
             DepositData memory depositData = _buildDepositData(depositAmountUsdcDecimals);
             /// @dev _depositToStrategyAndGetTotalValue returns totalValue in USDC decimals (has USDC optimization internally)
-            depositData.totalValue =
-                _depositToStrategyAndGetTotalValue(activeStrategyAdapter, activeStablecoin, depositAmountNativeDecimals);
+            // @review - clearly explain why we are using depositAmountNativeDecimals here
+            depositData.totalValue = _depositToStrategyAndGetTotalValue(
+                activeStrategyAdapter, activeStablecoin, depositAmountNativeDecimals
+            );
 
             _ccipSend(
                 i_parentChainSelector, CcipTxType.DepositCallbackParent, abi.encode(depositData), ZERO_BRIDGE_AMOUNT
@@ -159,7 +161,9 @@ contract ChildPeer is YieldPeer {
         }
         if (txType == CcipTxType.WithdrawCallback) _handleCCIPWithdrawCallback(tokenAmounts, data);
         //slither-disable-next-line reentrancy-no-eth
-        if (txType == CcipTxType.RebalanceFromOldStrategy) _handleCCIPRebalanceOldStrategy(data, _getActiveStablecoin());
+        if (txType == CcipTxType.RebalanceFromOldStrategy) {
+            _handleCCIPRebalanceOldStrategy(data, _getActiveStablecoin());
+        }
         if (txType == CcipTxType.RebalanceToNewStrategy) _handleCCIPRebalanceToNewStrategy(tokenAmounts, data);
     }
 
@@ -183,8 +187,9 @@ contract ChildPeer is YieldPeer {
             }
 
             /// @dev _depositToStrategyAndGetTotalValue returns totalValue in USDC decimals (has USDC optimization internally)
-            depositData.totalValue =
-                _depositToStrategyAndGetTotalValue(activeStrategyAdapter, activeStablecoin, depositAmountNativeDecimals);
+            depositData.totalValue = _depositToStrategyAndGetTotalValue(
+                activeStrategyAdapter, activeStablecoin, depositAmountNativeDecimals
+            );
             /// @dev depositData.amount stays in USDC decimals for share math
 
             _ccipSend(
@@ -253,7 +258,9 @@ contract ChildPeer is YieldPeer {
         uint256 totalValueNativeDecimals = _getTotalValueFromStrategy(oldActiveStrategyAdapter, oldStablecoin);
 
         /// @dev withdraw in NATIVE DECIMALS (must happen before _updateActiveStrategy overwrites adapter)
-        if (totalValueNativeDecimals != 0) _withdrawFromStrategy(oldActiveStrategyAdapter, oldStablecoin, totalValueNativeDecimals);
+        if (totalValueNativeDecimals != 0) {
+            _withdrawFromStrategy(oldActiveStrategyAdapter, oldStablecoin, totalValueNativeDecimals);
+        }
 
         /// @dev update strategy - sets adapter + stablecoin, or both to address(0) if different chain
         Strategy memory newStrategy = abi.decode(data, (Strategy));
@@ -270,7 +277,9 @@ contract ChildPeer is YieldPeer {
 
             //slither-disable-next-line reentrancy-events
             /// @dev deposit in NATIVE DECIMALS of newStablecoin
-            if (depositAmountNativeDecimals != 0) _depositToStrategy(newActiveStrategyAdapter, newStablecoin, depositAmountNativeDecimals);
+            if (depositAmountNativeDecimals != 0) {
+                _depositToStrategy(newActiveStrategyAdapter, newStablecoin, depositAmountNativeDecimals);
+            }
         }
         /// @dev if new strategy is on different chain, swap to USDC and bridge
         else {
