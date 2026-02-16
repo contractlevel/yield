@@ -23,9 +23,9 @@ import {StrategyRegistryProxy} from "../../src/proxies/StrategyRegistryProxy.sol
 /// @notice Deployment script for the Child architecture
 /// @dev Deploys Share, Pool, ChildPeer, Registry, and Adapters, then configs them together.
 contract DeployChild is Script {
-    /// @dev Struct to hold deployed contracts and impl addresses for testing
+    /// @dev Struct to hold deployed contracts and Impl addresses for testing
     struct ChildDeploymentConfig {
-        // Contract Types that will be interfaced through their proxies
+        // Contract Types that are interfaced through their Proxies
         Share share;
         SharePool sharePool;
         ChildPeer childPeer;
@@ -45,20 +45,17 @@ contract DeployChild is Script {
                                   RUN
     //////////////////////////////////////////////////////////////*/
     function run() public returns (ChildDeploymentConfig memory deploy) {
-        // 1. Setup
+        // Setup - create HelperConfig and get network config
         deploy.config = new HelperConfig();
         HelperConfig.NetworkConfig memory networkConfig = deploy.config.getActiveNetworkConfig();
 
         vm.startBroadcast();
 
-        // 2. Deployment
-        _deployShareInfra(deploy, networkConfig);
-        _deployChildPeer(deploy, networkConfig);
-        _deployStrategyRegistry(deploy);
-        _deployAdapters(deploy, networkConfig);
-
-        // 3. Configuration
-        _setConfigs(deploy);
+        // Deployment & Configuration
+        _deployShareInfra(deploy, networkConfig); /// @dev BnM role granted to Pool
+        _deployChildPeer(deploy, networkConfig); /// @dev BnM role granted to ChildPeer
+        _deployStrategyRegistry(deploy); /// @dev Registry set on ChildPeer
+        _deployStrategyAdapters(deploy, networkConfig); /// @dev Adapters set in Registry
 
         vm.stopBroadcast();
     }
@@ -71,15 +68,15 @@ contract DeployChild is Script {
     function _deployShareInfra(ChildDeploymentConfig memory deploy, HelperConfig.NetworkConfig memory networkConfig)
         private
     {
-        // Deploy Share impl and store address for testing
+        // Deploy Share Impl and cache address for testing
         Share shareImpl = new Share();
         deploy.shareImplAddr = address(shareImpl);
 
-        // Create Share Proxy init data and deploy proxy
+        // Create Share Proxy init data and deploy Proxy
         bytes memory shareInitData = abi.encodeWithSelector(Share.initialize.selector);
         ShareProxy shareProxy = new ShareProxy(address(shareImpl), shareInitData);
 
-        // Cast proxy address to Share type
+        // Cast Proxy address to Share type
         deploy.share = Share(address(shareProxy));
 
         // Deploy CCIP Pool
@@ -94,13 +91,16 @@ contract DeployChild is Script {
 
         ITokenAdminRegistry(networkConfig.ccip.tokenAdminRegistry)
             .setPool(address(deploy.share), address(deploy.sharePool));
+
+        // Grant Share BnM role to Share Pool
+        deploy.share.grantMintAndBurnRoles(address(deploy.sharePool));
     }
 
     /// @dev Deploys the Child Peer contract Impl and Proxy
     function _deployChildPeer(ChildDeploymentConfig memory deploy, HelperConfig.NetworkConfig memory networkConfig)
         private
     {
-        // Deploy ChildPeer impl and store address for testing
+        // Deploy ChildPeer Impl and cache address for testing
         ChildPeer childPeerImpl = new ChildPeer(
             networkConfig.ccip.ccipRouter,
             networkConfig.tokens.link,
@@ -111,34 +111,44 @@ contract DeployChild is Script {
         );
         deploy.childPeerImplAddr = address(childPeerImpl);
 
-        // Create ChildPeer Proxy init data and deploy proxy
+        // Create ChildPeer Proxy init data and deploy Proxy
         bytes memory childInitData = abi.encodeWithSelector(ChildPeer.initialize.selector);
         ChildProxy childProxy = new ChildProxy(address(childPeerImpl), childInitData);
 
-        // Cast proxy address to ChildPeer type
+        // Cast Proxy address to ChildPeer type
         deploy.childPeer = ChildPeer(address(childProxy));
+
+        // Grant Share BnM role to Child Peer
+        deploy.share.grantMintAndBurnRoles(address(deploy.childPeer));
     }
 
-    /// @dev Deploys the Strategy Registry module Impl and Proxy
+    /// @dev Deploys the Strategy Registry Impl and Proxy
     function _deployStrategyRegistry(ChildDeploymentConfig memory deploy) private {
-        // Deploy Strategy Registry impl and store address for testing
+        // Deploy Strategy Registry Impl and cache address for testing
         StrategyRegistry strategyRegistryImpl = new StrategyRegistry();
         deploy.strategyRegistryImplAddr = address(strategyRegistryImpl);
 
-        // Create Strategy Registry Proxy init data and deploy proxy
+        // Create Strategy Registry Proxy init data and deploy Proxy
         bytes memory strategyRegistryInitData = abi.encodeWithSelector(StrategyRegistry.initialize.selector);
         StrategyRegistryProxy strategyRegistryProxy =
             new StrategyRegistryProxy(address(strategyRegistryImpl), strategyRegistryInitData);
 
-        // Cast proxy address to StrategyRegistry type
+        // Cast Proxy address to StrategyRegistry type
         deploy.strategyRegistry = StrategyRegistry(address(strategyRegistryProxy));
+
+        // Set deployed StrategyRegistry on ChildPeer
+        /// @dev Temp role granted/revoked after
+        deploy.childPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, deploy.childPeer.owner());
+        deploy.childPeer.setStrategyRegistry(address(deploy.strategyRegistry));
+        deploy.childPeer.revokeRole(Roles.CONFIG_ADMIN_ROLE, deploy.childPeer.owner());
     }
 
     /// @dev Deploys adapters and registers them (Child adapters point to ChildPeer)
-    function _deployAdapters(ChildDeploymentConfig memory deploy, HelperConfig.NetworkConfig memory networkConfig)
-        private
-    {
-        // Deploy Adapters
+    function _deployStrategyAdapters(
+        ChildDeploymentConfig memory deploy,
+        HelperConfig.NetworkConfig memory networkConfig
+    ) private {
+        // Deploy Strategy Adapters
         deploy.aaveV3Adapter =
             new AaveV3Adapter(address(deploy.childPeer), networkConfig.protocols.aavePoolAddressesProvider);
 
@@ -150,24 +160,5 @@ contract DeployChild is Script {
 
         deploy.strategyRegistry
             .setStrategyAdapter(keccak256(abi.encodePacked("compound-v3")), address(deploy.compoundV3Adapter));
-    }
-
-    /*//////////////////////////////////////////////////////////////
-                             CONFIGURATION
-    //////////////////////////////////////////////////////////////*/
-    /// @dev Configs system together (Roles, Links)
-    function _setConfigs(ChildDeploymentConfig memory deploy) private {
-        // Grant Share BnM Roles to Pool & Peer
-        deploy.share.grantMintAndBurnRoles(address(deploy.sharePool));
-        deploy.share.grantMintAndBurnRoles(address(deploy.childPeer));
-
-        // Grant Temp Config Admin Role to deployer/owner
-        deploy.childPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, deploy.childPeer.owner());
-
-        // Link Registry to ChildPeer
-        deploy.childPeer.setStrategyRegistry(address(deploy.strategyRegistry));
-
-        // Cleanup (Revoke Temp Config Admin role from deployer/owner)
-        deploy.childPeer.revokeRole(Roles.CONFIG_ADMIN_ROLE, deploy.childPeer.owner());
     }
 }

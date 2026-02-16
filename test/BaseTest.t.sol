@@ -150,19 +150,19 @@ contract BaseTest is Test {
                                  SETUP
     //////////////////////////////////////////////////////////////*/
     function setUp() public virtual {
-        // 1. Deploy contracts on all forks
+        // Deploy contracts on all forks
         _deployInfra();
 
-        // 2. Setup Access Control
+        // Set up Access Control
         _grantRoles();
 
-        // 3. CCIP & CCTP Setup
+        // CCIP & CCTP Setup
         _setPools();
         _setCrossChainPeers();
         _setCCTPAttesters();
         _setDomains();
 
-        // 4. Initial Funding & Workflow Config
+        // Initial Funding & Workflow Config
         _dealLinkToPeers(false, address(0), address(0), address(0), address(0));
         _setForwarderAndWorkflow();
 
@@ -171,6 +171,9 @@ contract BaseTest is Test {
         _stopPrank();
     }
 
+    /*//////////////////////////////////////////////////////////////
+                     DEPLOY INFRA & REGISTER CHAINS
+    //////////////////////////////////////////////////////////////*/
     /// @dev Deploys Share/Pool, Rebalancer, ParentPeer, and StrategyRegistry on Base
     /// @dev Deploys Share/Pool, ChildPeer and StrategyRegistry on Optimism & Ethereum
     /// @dev Sets up CCIP Local Simulator Fork
@@ -184,9 +187,6 @@ contract BaseTest is Test {
         _registerChains();
     }
 
-    /*//////////////////////////////////////////////////////////////
-                          DEPLOYMENT HELPERS
-    //////////////////////////////////////////////////////////////*/
     /// @dev _deployInfra:: Helper to deploy Share/Pool, Parent, Rebalancer and StrategyRegistry on Base
     function _deployBase() private {
         // Create Base fork
@@ -314,9 +314,6 @@ contract BaseTest is Test {
         ethCCTPMessageTransmitter = IMessageTransmitter(ethNetworkConfig.ccip.cctpMessageTransmitter);
     }
 
-    /*//////////////////////////////////////////////////////////////
-                        CONFIGURATION HELPERS
-    //////////////////////////////////////////////////////////////*/
     /// @dev _deployInfra:: Helper to set up CCIP Local Simulator with all chains
     /// @dev Registers all chains in CCIP Local Simulator
     function _registerChains() internal {
@@ -343,6 +340,9 @@ contract BaseTest is Test {
         ccipLocalSimulatorFork.setNetworkDetails(chainId, details);
     }
 
+    /*//////////////////////////////////////////////////////////////
+                              GRANT ROLES
+    //////////////////////////////////////////////////////////////*/
     /// @dev Grants custom roles on all chains to predefined addresses
     function _grantRoles() internal virtual {
         _grantRolesForPeer(baseFork, baseParentPeer, baseParentPeer.owner());
@@ -377,6 +377,9 @@ contract BaseTest is Test {
         assertTrue(peerAccessControl.hasRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter));
     }
 
+    /*//////////////////////////////////////////////////////////////
+                               SET POOLS
+    //////////////////////////////////////////////////////////////*/
     /// @dev Sets up SharePools on all chains to know about each other
     function _setPools() internal {
         uint64[] memory remoteChains = new uint64[](3);
@@ -444,6 +447,43 @@ contract BaseTest is Test {
         assertEq(ethSharePool.getRemoteToken(ethChainSelector), abi.encode(address(ethShare)));
     }
 
+    /// _setPools:: Helper to apply chain updates to SharePools
+    /// @dev Apply chain updates to SharePools
+    /// @param sharePool The SharePool to apply chain updates to
+    /// @param remoteChainSelectors The chain selectors to apply chain updates to
+    /// @param remotePoolAddresses The pool addresses to apply chain updates to
+    /// @param remoteTokenAddresses The token addresses to apply chain updates to
+    function _applyChainUpdates(
+        SharePool sharePool,
+        uint64[] memory remoteChainSelectors,
+        address[] memory remotePoolAddresses,
+        address[] memory remoteTokenAddresses
+    ) internal {
+        require(
+            remoteChainSelectors.length == remotePoolAddresses.length
+                && remotePoolAddresses.length == remoteTokenAddresses.length,
+            "Length mismatch"
+        );
+
+        TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](remoteChainSelectors.length);
+        for (uint256 i = 0; i < remoteChainSelectors.length; i++) {
+            chainUpdates[i] = TokenPool.ChainUpdate({
+                remoteChainSelector: remoteChainSelectors[i],
+                remotePoolAddresses: new bytes[](1),
+                remoteTokenAddress: abi.encode(remoteTokenAddresses[i]),
+                outboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0}),
+                inboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0})
+            });
+            chainUpdates[i].remotePoolAddresses[0] = abi.encode(remotePoolAddresses[i]);
+        }
+
+        _changePrank(sharePool.owner());
+        sharePool.applyChainUpdates(new uint64[](0), chainUpdates);
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                          SET CROSSCHAIN PEERS
+    //////////////////////////////////////////////////////////////*/
     /// @dev Sets cross chain configurations on Parent and Child Peers
     function _setCrossChainPeers() internal virtual {
         _selectFork(baseFork);
@@ -493,40 +533,9 @@ contract BaseTest is Test {
         assertEq(ethChildPeer.getAllowedPeer(optChainSelector), address(optChildPeer));
     }
 
-    /// _setCrossChainPeers:: Helper to apply chain updates to SharePools
-    /// @dev Apply chain updates to SharePools
-    /// @param sharePool The SharePool to apply chain updates to
-    /// @param remoteChainSelectors The chain selectors to apply chain updates to
-    /// @param remotePoolAddresses The pool addresses to apply chain updates to
-    /// @param remoteTokenAddresses The token addresses to apply chain updates to
-    function _applyChainUpdates(
-        SharePool sharePool,
-        uint64[] memory remoteChainSelectors,
-        address[] memory remotePoolAddresses,
-        address[] memory remoteTokenAddresses
-    ) internal {
-        require(
-            remoteChainSelectors.length == remotePoolAddresses.length
-                && remotePoolAddresses.length == remoteTokenAddresses.length,
-            "Length mismatch"
-        );
-
-        TokenPool.ChainUpdate[] memory chainUpdates = new TokenPool.ChainUpdate[](remoteChainSelectors.length);
-        for (uint256 i = 0; i < remoteChainSelectors.length; i++) {
-            chainUpdates[i] = TokenPool.ChainUpdate({
-                remoteChainSelector: remoteChainSelectors[i],
-                remotePoolAddresses: new bytes[](1),
-                remoteTokenAddress: abi.encode(remoteTokenAddresses[i]),
-                outboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0}),
-                inboundRateLimiterConfig: RateLimiter.Config({isEnabled: false, capacity: 0, rate: 0})
-            });
-            chainUpdates[i].remotePoolAddresses[0] = abi.encode(remotePoolAddresses[i]);
-        }
-
-        _changePrank(sharePool.owner());
-        sharePool.applyChainUpdates(new uint64[](0), chainUpdates);
-    }
-
+    /*//////////////////////////////////////////////////////////////
+                           SET CCTP & DOMAINS
+    //////////////////////////////////////////////////////////////*/
     /// @dev Sets CCTP attesters on all chains
     function _setCCTPAttesters() internal {
         for (uint256 i = 0; i < attesters.length; i++) {
@@ -593,6 +602,9 @@ contract BaseTest is Test {
         _stopPrank();
     }
 
+    /*//////////////////////////////////////////////////////////////
+                   DEAL LINK & SET FORWARDER/WORKFLOW
+    //////////////////////////////////////////////////////////////*/
     /// @dev Deals LINK to Parent and Child Peers
     /// @param isLocal If true, deals LINK on the current fork. If false, deals LINK on each respective fork.
     /// @param parent The Parent Peer address (used if isLocal is true)
