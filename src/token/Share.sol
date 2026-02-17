@@ -22,6 +22,7 @@ contract Share is BurnMintERC677, IGetCCIPAdmin {
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
+    // @review ccipAdmin should be passed or transferred in deploy script
     constructor() BurnMintERC677("YieldCoin", "YIELD", 18, 0) {
         s_ccipAdmin = msg.sender;
     }

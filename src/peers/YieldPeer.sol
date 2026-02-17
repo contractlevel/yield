@@ -284,11 +284,15 @@ abstract contract YieldPeer is
     /// @notice Internal helper to withdraw from the strategy
     /// @param strategyAdapter The strategy adapter to withdraw from
     /// @param amount The amount of USDC to withdraw
+    /// @return actualWithdrawnAmount The actual withdrawn amount
     /// @dev Emit WithdrawFromStrategy event
     // @review:stablecoins passing this an address asset param instead of address(i_usdc) - additional/modular stablecoins task
-    function _withdrawFromStrategy(address strategyAdapter, uint256 amount) internal {
+    function _withdrawFromStrategy(address strategyAdapter, uint256 amount)
+        internal
+        returns (uint256 actualWithdrawnAmount)
+    {
         emit WithdrawFromStrategy(strategyAdapter, amount);
-        IStrategyAdapter(strategyAdapter).withdraw(address(i_usdc), amount);
+        actualWithdrawnAmount = IStrategyAdapter(strategyAdapter).withdraw(address(i_usdc), amount);
     }
 
     /// @notice Deposits USDC to the strategy and returns the total value of the system

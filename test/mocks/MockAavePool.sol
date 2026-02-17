@@ -34,7 +34,6 @@ contract MockAavePool {
     }
 
     function withdraw(address asset, uint256 amount, address to) external returns (uint256) {
-    
         // Calculate interest accrued for the caller
         uint256 interestAccrued = _calculateInterest(msg.sender);
         s_balances[msg.sender] += interestAccrued;
@@ -60,7 +59,6 @@ contract MockAavePool {
         // Transfer asset to recipient (to)
         IERC20(asset).transfer(to, amountToWithdraw);
 
-        
         return amountToWithdraw;
     }
 

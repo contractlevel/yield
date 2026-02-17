@@ -433,10 +433,9 @@ contract ParentPeer is YieldPeer {
 
         uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, address(i_usdc));
         if (totalValue != 0) {
-            // @review consider returning actualWithdrawn to be used in deposit to newActiveStrategyAdapter
-            _withdrawFromStrategy(oldActiveStrategyAdapter, type(uint256).max);
+            uint256 totalValueWithdrawn = _withdrawFromStrategy(oldActiveStrategyAdapter, type(uint256).max);
             //slither-disable-next-line reentrancy-events
-            _depositToStrategy(newActiveStrategyAdapter, totalValue);
+            _depositToStrategy(newActiveStrategyAdapter, totalValueWithdrawn);
         }
     }
 
@@ -450,8 +449,7 @@ contract ParentPeer is YieldPeer {
         // @review unused-return, returns newActiveStrategyAdapter
         _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
 
-        // @review consider returning actualWithdrawn to be used as bridgeAmount in ccipSend
-        if (totalValue != 0) _withdrawFromStrategy(oldActiveStrategyAdapter, type(uint256).max);
+        if (totalValue != 0) totalValue = _withdrawFromStrategy(oldActiveStrategyAdapter, type(uint256).max);
 
         _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, abi.encode(newStrategy), totalValue);
     }

@@ -217,8 +217,7 @@ contract ChildPeer is YieldPeer {
 
         /// @dev withdraw from the old strategy
         uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, address(i_usdc));
-        // @review consider returning actualWithdrawn to be used in deposit to newActiveStrategyAdapter or ccipSend
-        if (totalValue != 0) _withdrawFromStrategy(oldActiveStrategyAdapter, type(uint256).max);
+        if (totalValue != 0) totalValue = _withdrawFromStrategy(oldActiveStrategyAdapter, type(uint256).max);
 
         // if the new strategy is this chain, but different protocol, then we need to deposit to the new strategy
         if (newStrategy.chainSelector == i_thisChainSelector) {

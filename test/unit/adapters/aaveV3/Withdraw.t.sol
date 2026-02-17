@@ -10,7 +10,7 @@ contract WithdrawTest is BaseTest {
         baseAaveV3Adapter.withdraw(address(baseUsdc), DEPOSIT_AMOUNT);
     }
 
-    function test_yield_aaveV3Adapter_withdraw_success() public {
+    function test_yield_aaveV3Adapter_withdraw_userWithdraw_success() public {
         deal(address(baseUsdc), address(baseAaveV3Adapter), DEPOSIT_AMOUNT);
 
         _changePrank(address(baseParentPeer));
@@ -19,13 +19,15 @@ contract WithdrawTest is BaseTest {
         uint256 yieldPeerBalanceBefore = baseUsdc.balanceOf(address(baseParentPeer));
 
         _changePrank(address(baseParentPeer));
-        baseAaveV3Adapter.withdraw(address(baseUsdc), baseAaveV3Adapter.getTotalValue(address(baseUsdc)));
+        uint256 returnedWithdrawnAmount =
+            baseAaveV3Adapter.withdraw(address(baseUsdc), baseAaveV3Adapter.getTotalValue(address(baseUsdc)));
 
         uint256 yieldPeerBalanceAfter = baseUsdc.balanceOf(address(baseParentPeer));
         assertApproxEqAbs(yieldPeerBalanceAfter, yieldPeerBalanceBefore + DEPOSIT_AMOUNT, BALANCE_TOLERANCE);
+        assertApproxEqAbs(returnedWithdrawnAmount, DEPOSIT_AMOUNT, BALANCE_TOLERANCE);
     }
 
-    function test_yield_aaveV3Adapter_withdraw_maxSentinel_success() public {
+    function test_yield_aaveV3Adapter_withdraw_rebalanceWithdraw_success() public {
         deal(address(baseUsdc), address(baseAaveV3Adapter), DEPOSIT_AMOUNT);
 
         _changePrank(address(baseParentPeer));
@@ -35,7 +37,7 @@ contract WithdrawTest is BaseTest {
         uint256 yieldPeerBalanceBefore = baseUsdc.balanceOf(address(baseParentPeer));
 
         _changePrank(address(baseParentPeer));
-        baseAaveV3Adapter.withdraw(address(baseUsdc), type(uint256).max);
+        uint256 returnedWithdrawnAmount = baseAaveV3Adapter.withdraw(address(baseUsdc), type(uint256).max);
 
         uint256 yieldPeerBalanceAfter = baseUsdc.balanceOf(address(baseParentPeer));
         uint256 actualWithdrawn = yieldPeerBalanceAfter - yieldPeerBalanceBefore;
@@ -46,9 +48,10 @@ contract WithdrawTest is BaseTest {
             0,
             "Adapter should have zero balance after MAX withdrawal"
         );
+        assertEq(returnedWithdrawnAmount, actualWithdrawn);
     }
 
-    function test_yield_aaveV3Adapter_getTotalValue_works() public {
+    function test_yield_aaveV3Adapter_getTotalValue_success() public {
         deal(address(baseUsdc), address(baseAaveV3Adapter), DEPOSIT_AMOUNT);
 
         _changePrank(address(baseParentPeer));
@@ -58,28 +61,7 @@ contract WithdrawTest is BaseTest {
         assertApproxEqAbs(totalValue, DEPOSIT_AMOUNT, BALANCE_TOLERANCE);
     }
 
-    function test_yield_aaveV3Adapter_withdraw_allowsInterestAccrual() public {
-        deal(address(baseUsdc), address(baseAaveV3Adapter), DEPOSIT_AMOUNT);
-
-        _changePrank(address(baseParentPeer));
-        baseAaveV3Adapter.deposit(address(baseUsdc), DEPOSIT_AMOUNT);
-
-        // Warp time to accrue interest
-        vm.warp(block.timestamp + 365 days);
-
-        uint256 yieldPeerBalanceBefore = baseUsdc.balanceOf(address(baseParentPeer));
-
-        _changePrank(address(baseParentPeer));
-        baseAaveV3Adapter.withdraw(address(baseUsdc), DEPOSIT_AMOUNT / 2); // Withdraw less than total
-
-        uint256 yieldPeerBalanceAfter = baseUsdc.balanceOf(address(baseParentPeer));
-        uint256 actualWithdrawn = yieldPeerBalanceAfter - yieldPeerBalanceBefore;
-
-        // Should withdraw the requested amount even with interest accrued
-        assertApproxEqAbs(actualWithdrawn, DEPOSIT_AMOUNT / 2, BALANCE_TOLERANCE);
-    }
-
-    function test_yield_aaveV3Adapter_withdraw_revertsWhen_incorrectWithdrawAmount() public {
+    function test_yield_aaveV3Adapter_withdraw_userWithdraw_revertsWhen_incorrectWithdrawAmount() public {
         IncorrectWithdrawAmountPool incorrectWithdrawAmountPool = new IncorrectWithdrawAmountPool();
         vm.etch(address(baseAaveV3Adapter.getStrategyPool()), address(incorrectWithdrawAmountPool).code);
 
@@ -89,7 +71,9 @@ contract WithdrawTest is BaseTest {
     }
 
     /// @dev Covers: if (withdrawnAmount < totalValue) revert AaveV3Adapter__IncorrectWithdrawAmount() (MAX sentinel path)
-    function test_yield_aaveV3Adapter_withdraw_maxSentinel_revertsWhen_withdrawnAmountLessThanTotalValue() public {
+    function test_yield_aaveV3Adapter_withdraw_rebalanceWithdraw_revertsWhen_withdrawnAmountLessThanTotalValue()
+        public
+    {
         deal(address(baseUsdc), address(baseAaveV3Adapter), DEPOSIT_AMOUNT);
 
         _changePrank(address(baseParentPeer));

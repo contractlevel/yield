@@ -24,7 +24,6 @@ import {AaveV3Adapter} from "../../src/adapters/AaveV3Adapter.sol";
 import {CompoundV3Adapter} from "../../src/adapters/CompoundV3Adapter.sol";
 import {StrategyRegistry} from "../../src/modules/StrategyRegistry.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {IStrategyAdapter} from "../../src/interfaces/IStrategyAdapter.sol";
 
 /// @notice We are making the assumption that the gasLimit set for CCIP works correctly
 contract Invariant is StdInvariant, BaseTest {
@@ -519,7 +518,7 @@ contract Invariant is StdInvariant, BaseTest {
         /// @dev only check if CRE report was decoded
         /// @dev to avoid false positive in run where no CRE report was decoded
         if (!handler.ghost_flag_creReport_decoded()) {
-            return;
+            return; // @review
         }
         IYieldPeer.Strategy memory strategy = parent.getStrategy();
         IYieldPeer.Strategy memory reportedStrategy = handler.getLastCREReceivedStrategy();
@@ -547,7 +546,7 @@ contract Invariant is StdInvariant, BaseTest {
     }
 
     /// @dev The adapter's balance in the protocol (via getTotalValue) must be 0 after MAX withdrawal
-    function invariant_strategyAdapter_maxSentinel_withdrawsAllProtocolBalance() public view {
+    function invariant_strategyAdapter_rebalance_withdrawsTotalValue() public view {
         /// check if any MAX sentinel withdrawals occurred during fuzzing (via rebalancing)
         uint256 maxSentinelWithdrawals = handler.ghost_maxSentinelWithdrawals();
 

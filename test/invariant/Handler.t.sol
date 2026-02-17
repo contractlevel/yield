@@ -99,10 +99,6 @@ contract Handler is Test {
     /// @dev incremented by 1 everytime a ShareMintUpdate event is emitted
     uint256 public ghost_event_shareMintUpdate_emissions;
 
-    // MAX Sentinel Testing Ghost Variables
-    uint256 public ghost_maxSentinelWithdrawals;
-    uint256 public ghost_maxSentinelAdapterBalanceAfter; // adapter balance after MAX withdrawal
-
     /// @dev incremented by 1 everytime a WithdrawCompleted event is emitted
     uint256 public ghost_event_withdrawCompleted_emissions;
     /// @dev incremented by 1 everytime a ShareBurnUpdate event is emitted
@@ -138,12 +134,21 @@ contract Handler is Test {
     /// @dev tracks previous strategy before onReport changes it
     IYieldPeer.Strategy public ghost_state_previousStrategy;
 
-    /// @dev ghost flag to track if the CRE report was decoded
-    bool public ghost_flag_creReport_decoded;
-
     /// @dev ghost flag to track if the decoded CRE report strategy
     /// @dev doesn't match the strategy emitted by Parent after 'onReport'
     bool public ghost_flag_decodedStrategy_mismatchWithEmittedStrategy;
+
+    uint256 public ghost_maxSentinelAdapterBalanceAfter; // adapter balance after MAX withdrawal // @review
+    /// @dev track the USDC/stablecoin balance of the strategy adapter after a withdraw
+    uint256 public ghost_state_strategyAdapter_balance_after_withdraw;
+
+    /// @dev incremented by 1 everytime a WithdrawFromStrategy event is emitted
+    uint256 internal ghost_event_yieldPeer_WithdrawFromStrategy_emissions;
+    /// @dev incremented by 1 everytime a WithdrawFromStrategy event is emitted for a rebalance (ie emitted amount == type(uint256).max)
+    uint256 internal ghost_event_yieldPeer_WithdrawFromStrategy_rebalance_emissions;
+
+    /// @dev incremented by 1 everytime a ReportDecoded event is emitted
+    uint256 public ghost_event_creReport_decoded;
 
     /*//////////////////////////////////////////////////////////////
                             DEPOSIT TRACKING
@@ -159,6 +164,64 @@ contract Handler is Test {
 
     /// @dev mapping from user to array of their deposits
     mapping(address => DepositRecord[]) public ghost_userDeposits;
+
+    /*//////////////////////////////////////////////////////////////
+                                 EVENTS
+    //////////////////////////////////////////////////////////////*/
+    // --- YieldPeer events --- //
+    bytes internal yieldPeer_AllowedChainSet_event = keccak256("AllowedChainSet(uint64,bool)");
+    bytes internal yieldPeer_AllowedPeerSet_event = keccak256("AllowedPeerSet(uint64,address)");
+    bytes internal yieldPeer_CCIPGasLimitSet_event = keccak256("CCIPGasLimitSet(uint256)");
+    bytes internal yieldPeer_StrategyRegistrySet_event = keccak256("StrategyRegistrySet(address)");
+    bytes internal yieldPeer_ActiveStrategyAdapterUpdated_event = keccak256("ActiveStrategyAdapterUpdated(address)");
+    bytes internal yieldPeer_DepositToStrategy_event = keccak256("DepositToStrategy(address,uint256)");
+    // WithdrawFromStrategy
+    bytes internal yieldPeer_WithdrawFromStrategy_event = keccak256("WithdrawFromStrategy(address,uint256)");
+
+    bytes internal yieldPeer_DepositInitiated_event = keccak256("DepositInitiated(address,uint256,uint64)");
+    bytes internal yieldPeer_WithdrawInitiated_event = keccak256("WithdrawInitiated(address,uint256,uint64)");
+    bytes internal yieldPeer_WithdrawCompleted_event = keccak256("WithdrawCompleted(address,uint256)");
+    bytes internal yieldPeer_CCIPMessageSent_event = keccak256("CCIPMessageSent(bytes32,uint8,uint256)");
+    bytes internal yieldPeer_CCIPMessageReceived_event = keccak256("CCIPMessageReceived(bytes32,uint8,uint64)");
+    bytes internal yieldPeer_SharesMinted_event = keccak256("SharesMinted(address,uint256)");
+    bytes internal yieldPeer_SharesBurned_event = keccak256("SharesBurned(address,uint256)");
+    // --- Parent events --- //
+    bytes internal parent_StrategyUpdated_event = keccak256("StrategyUpdated(uint64,bytes32,uint64)");
+    bytes internal parent_ShareMintUpdate_event = keccak256("ShareMintUpdate(uint256,uint64,uint256)");
+    bytes internal parent_ShareBurnUpdate_event = keccak256("ShareBurnUpdate(uint256,uint64,uint256)");
+    bytes internal parent_DepositForwardedToStrategy_event = keccak256("DepositForwardedToStrategy(uint256,uint64)");
+    bytes internal parent_WithdrawForwardedToStrategy_event = keccak256("WithdrawForwardedToStrategy(uint256,uint64)");
+    bytes internal parent_DepositPingPongToChild_event = keccak256("DepositPingPongToChild(uint256,uint64)");
+    bytes internal parent_WithdrawPingPongToChild_event = keccak256("WithdrawPingPongToChild(uint256,uint64)");
+    bytes internal parent_RebalancerSet_event = keccak256("RebalancerSet(address)");
+    bytes internal parent_SupportedProtocolSet_event = keccak256("SupportedProtocolSet(bytes32,bool)");
+    // --- Child events --- //
+    bytes internal child_DepositPingPongToParent_event = keccak256("DepositPingPongToParent(uint256)");
+    bytes internal child_WithdrawPingPongToParent_event = keccak256("WithdrawPingPongToParent(uint256)");
+    // --- Rebalancer events --- //
+    bytes internal rebalancer_ReportDecoded_event = keccak256("ReportDecoded(uint64,bytes32)");
+
+    bytes internal rebalancer_ParentPeerSet_event = keccak256("ParentPeerSet(address)");
+    bytes internal rebalancer_StrategyRegistrySet_event = keccak256("StrategyRegistrySet(address)");
+
+    // --- StrategyRegistry events --- //
+    bytes internal strategyRegistry_StrategyAdapterSet_event = keccak256("StrategyAdapterSet(bytes32,address)");
+
+    // --- StrategyAdapter events --- //
+    bytes internal strategyAdapter_Deposit_event = keccak256("Deposit(address,uint256)");
+    bytes internal strategyAdapter_Withdraw_event = keccak256("Withdraw(address,uint256)");
+
+    // --- YieldFees events --- //
+    bytes internal yieldFees_FeeRateSet_event = keccak256("FeeRateSet(uint256)");
+    bytes internal yieldFees_FeeTaken_event = keccak256("FeeTaken(uint256)");
+    bytes internal yieldFees_FeesWithdrawn_event = keccak256("FeesWithdrawn(uint256)");
+
+    // --- CREReceiver events --- //
+    bytes internal creReceiver_OnReportSecurityChecksPassed_event =
+        keccak256("OnReportSecurityChecksPassed(bytes32,address,bytes10)");
+    bytes internal creReceiver_KeystoneForwarderSet_event = keccak256("KeystoneForwarderSet(address)");
+    bytes internal creReceiver_WorkflowSet_event = keccak256("WorkflowSet(bytes32,address,bytes10)");
+    bytes internal creReceiver_WorkflowRemoved_event = keccak256("WorkflowRemoved(bytes32,address,bytes10)");
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -499,7 +562,6 @@ contract Handler is Test {
         bytes32 reportDecodedEvent = keccak256("ReportDecoded(uint64,bytes32)");
         bytes32 currentStrategyOptimalEvent = keccak256("CurrentStrategyOptimal(uint64,bytes32)");
         bytes32 strategyUpdatedEvent = keccak256("StrategyUpdated(uint64,bytes32,uint64)");
-        // Added for max Sentinel tracking
         bytes32 withdrawFromStrategyEvent = keccak256("WithdrawFromStrategy(address,uint256)");
 
         /// @dev Flags to track if the appropriate strategy event was emitted
@@ -509,7 +571,7 @@ contract Handler is Test {
 
         /// @dev Flag to track which strategy event to check
         bool isCurrentStrategyOptimal = false;
-        bool isStrategyUpdated = false;
+        bool isStrategyUpdated = false; // @review rename to rebalanceHappened
 
         /// @dev previous strategy before onReport changed it
         uint64 previousStrategyChain = ghost_state_previousStrategy.chainSelector;
@@ -523,8 +585,8 @@ contract Handler is Test {
         Vm.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i = 0; i < logs.length; i++) {
             if (logs[i].topics[0] == reportDecodedEvent) {
-                /// @dev set ghost flag indicating CRE report was decoded
-                ghost_flag_creReport_decoded = true;
+                /// @dev increment the ghost tracking number of CRE report decoded
+                ghost_event_creReport_decoded++;
                 /// @dev update event flag and decode strategy
                 reportDecodedEventFound = true;
                 decodedChainSelector = uint64(uint256(logs[i].topics[1]));
@@ -533,10 +595,6 @@ contract Handler is Test {
                 /// @dev store the decoded strategy in ghost state
                 ghost_event_lastCREReceivedStrategy =
                     IYieldPeer.Strategy({chainSelector: decodedChainSelector, protocolId: decodedProtocolId});
-                /// @dev log decoded strategy for debugging
-                console2.log("Decoded Report - chainSelector:", decodedChainSelector);
-                console2.log("Decoded Report - protocolId:");
-                console2.logBytes32(decodedProtocolId);
 
                 /// @dev set flag for appropriate emitted strategy event check
                 if (previousStrategyChain == decodedChainSelector && previousStrategyProtocol == decodedProtocolId) {
@@ -590,19 +648,22 @@ contract Handler is Test {
         if (isStrategyUpdated) {
             for (uint256 i = 0; i < logs.length; i++) {
                 if (logs[i].topics[0] == withdrawFromStrategyEvent) {
+                    /// @dev increment the ghost tracking number of withdraw from strategy events
+                    ghost_event_withdrawFromStrategy_emissions++;
+
+                    /// @dev get the amount withdrawn from the event params
                     uint256 withdrawAmount = uint256(logs[i].topics[2]);
                     if (withdrawAmount == type(uint256).max) {
-                        /// MAX sentinel withdrawal detected during rebalancing
-                        ghost_maxSentinelWithdrawals++;
-
-                        /// Get the adapter address from the event
-                        address adapterAddress = address(uint160(uint256(logs[i].topics[1])));
-
-                        /// Capture adapter balance after MAX sentinel withdrawal
-                        /// Should be 0
-                        uint256 adapterBalanceAfter = IStrategyAdapter(adapterAddress).getTotalValue(address(usdc));
-                        ghost_maxSentinelAdapterBalanceAfter = adapterBalanceAfter;
+                        /// @dev increment the ghost tracking number of rebalance withdraws from strategy events
+                        ghost_event_withdrawFromStrategy_rebalance_emissions++;
                     }
+
+                    /// @dev get the strategy adapter address from the event params
+                    address adapterAddress = address(uint160(uint256(logs[i].topics[1])));
+
+                    /// @dev track the USDC/stablecoin balance of the strategy adapter after a withdraw
+                    ghost_state_strategyAdapter_balance_after_withdraw =
+                        IStrategyAdapter(adapterAddress).getTotalValue(address(usdc));
                 }
             }
         }

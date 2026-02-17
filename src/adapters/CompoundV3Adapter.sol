@@ -4,15 +4,23 @@ pragma solidity 0.8.26;
 import {StrategyAdapter} from "../modules/StrategyAdapter.sol";
 import {IComet} from "../interfaces/IComet.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 /// @title CompoundV3Adapter
 /// @author @contractlevel
 /// @notice Adapter for Compound V3
 contract CompoundV3Adapter is StrategyAdapter {
     /*//////////////////////////////////////////////////////////////
+                           TYPE DECLARATIONS
+    //////////////////////////////////////////////////////////////*/
+    using SafeERC20 for IERC20;
+
+    /*//////////////////////////////////////////////////////////////
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
-    error CompoundV3Adapter__InsufficientSupply();
+    error CompoundV3Adapter__IncorrectWithdrawAmount();
+    error CompoundV3Adapter__WithdrawAmountExceedsTotalValue();
+
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
@@ -39,16 +47,17 @@ contract CompoundV3Adapter is StrategyAdapter {
     function deposit(address usdc, uint256 amount) external onlyYieldPeer {
         emit Deposit(usdc, amount);
 
-        _approveToken(usdc, i_comet, amount);
+        IERC20(usdc).safeIncreaseAllowance(i_comet, amount);
         IComet(i_comet).supply(usdc, amount);
     }
 
     /// @notice Withdraws USDC from the Compound V3 pool
     /// @param usdc The USDC token address
     /// @param amount The amount of USDC to withdraw (use type(uint256).max to withdraw all)
+    /// @return actualWithdrawnAmount The actual withdrawn amount
     /// @dev Transfers the actual withdrawn amount to the yield peer
     /// @dev Prevents borrowing by ensuring amount <= balance when not using MAX sentinel
-    function withdraw(address usdc, uint256 amount) external onlyYieldPeer {
+    function withdraw(address usdc, uint256 amount) external onlyYieldPeer returns (uint256 actualWithdrawnAmount) {
         // Get balance before withdraw to calculate actual withdrawn amount
         uint256 balanceBefore = IERC20(usdc).balanceOf(address(this));
 
@@ -61,32 +70,27 @@ contract CompoundV3Adapter is StrategyAdapter {
 
             // Get actual amount received (Comet transfers to adapter)
             uint256 balanceAfter = IERC20(usdc).balanceOf(address(this));
-            uint256 actualWithdrawn = balanceAfter - balanceBefore;
+            actualWithdrawnAmount = balanceAfter - balanceBefore;
 
             // Verify we got at least the expected total value
-            if (actualWithdrawn < totalValue) revert CompoundV3Adapter__InsufficientSupply();
-            emit Withdraw(usdc, actualWithdrawn);
-            _transferTokenTo(usdc, i_yieldPeer, actualWithdrawn);
+            if (actualWithdrawnAmount < totalValue) revert CompoundV3Adapter__IncorrectWithdrawAmount();
         }
         // Case 2: User Withdraw
         else {
             // Ensure we don't withdraw more than supply to prevent borrowing
             uint256 supplyBalance = _getTotalValue();
-            if (amount > supplyBalance) {
-                revert CompoundV3Adapter__InsufficientSupply();
-            }
+            if (amount > supplyBalance) revert CompoundV3Adapter__WithdrawAmountExceedsTotalValue();
 
             // Comet transfers directly to this adapter (msg.sender)
             IComet(i_comet).withdraw(usdc, amount);
 
             // Get actual amount received (Comet transfers to adapter)
             uint256 balanceAfter = IERC20(usdc).balanceOf(address(this));
-            uint256 actualWithdrawn = balanceAfter - balanceBefore;
-            if (actualWithdrawn < amount) revert CompoundV3Adapter__InsufficientSupply();
-            emit Withdraw(usdc, actualWithdrawn);
-            // Transfer actual withdrawn amount to yield peer
-            _transferTokenTo(usdc, i_yieldPeer, actualWithdrawn);
+            actualWithdrawnAmount = balanceAfter - balanceBefore;
+            if (actualWithdrawnAmount < amount) revert CompoundV3Adapter__IncorrectWithdrawAmount();
         }
+        emit Withdraw(usdc, actualWithdrawnAmount);
+        IERC20(usdc).safeTransfer(i_yieldPeer, actualWithdrawnAmount);
     }
 
     /*//////////////////////////////////////////////////////////////
