@@ -32,9 +32,9 @@ contract ParentWithdrawTest is BaseTest {
         baseParentPeer.onTokenTransfer(msg.sender, DEPOSIT_AMOUNT, "");
     }
 
-    function test_yield_parent_onTokenTransfer_revertsWhen_parentPaused() public {
+    function test_yield_parent_onTokenTransfer_revertsWhen_paused() public {
         _changePrank(emergencyPauser);
-        baseParentPeer.emergencyPause();
+        baseParentPeer.pause();
         _changePrank(depositor);
         vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
         baseParentPeer.onTokenTransfer(msg.sender, DEPOSIT_AMOUNT, "");
