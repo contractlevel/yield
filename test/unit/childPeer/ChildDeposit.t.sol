@@ -24,9 +24,9 @@ contract ChildDepositTest is BaseTest {
         optChildPeer.deposit(1e6 - 1);
     }
 
-    function test_yield_child_deposit_revertsWhen_ChildPaused() public {
+    function test_yield_child_deposit_revertsWhen_paused() public {
         _changePrank(emergencyPauser);
-        optChildPeer.emergencyPause();
+        optChildPeer.pause();
         _changePrank(depositor);
         vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
         optChildPeer.deposit(DEPOSIT_AMOUNT);

@@ -15,6 +15,11 @@ contract ConstructorTest is BaseTest {
         assertEq(baseParentPeer.getStrategy().chainSelector, baseNetworkConfig.ccip.thisChainSelector);
 
         assertEq(baseRebalancer.getKeystoneForwarder(), keystoneForwarder);
+
+        /// @dev deployed admin transfer delay value in constructor is correct
+        assertEq(baseParentPeer.defaultAdminDelay(), 3 days);
+        /// @dev deploying 'owner' should be 'default admin'
+        assertEq(baseParentPeer.owner(), baseParentPeer.defaultAdmin());
     }
 
     function test_yield_child_constructor() public view {
@@ -29,6 +34,15 @@ contract ConstructorTest is BaseTest {
         assertEq(ethChildPeer.getUsdc(), ethNetworkConfig.tokens.usdc);
         assertEq(ethChildPeer.getShare(), address(ethShare));
         assertEq(ethChildPeer.getParentChainSelector(), baseNetworkConfig.ccip.thisChainSelector);
+
+        /// @dev deployed admin transfer delay value in constructor is correct
+        assertEq(optChildPeer.defaultAdminDelay(), 3 days);
+        /// @dev deploying 'owner' should be 'default admin'
+        assertEq(optChildPeer.owner(), optChildPeer.defaultAdmin());
+        /// @dev deployed admin transfer delay value in constructor is correct
+        assertEq(ethChildPeer.defaultAdminDelay(), 3 days);
+        /// @dev deploying 'owner' should be 'default admin'
+        assertEq(ethChildPeer.owner(), ethChildPeer.defaultAdmin());
     }
 
     function test_yield_getIsStrategyChain() public view {

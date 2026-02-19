@@ -36,7 +36,7 @@ contract Invariant is StdInvariant, BaseTest {
     uint256 internal constant STRATEGY_POOL_USDC_STARTING_BALANCE = 1_000_000_000_000_000_000; // 1T USDC
     uint256 internal constant CCIP_GAS_LIMIT = 1_000_000;
 
-    /// @dev Handler contract we are running calls to the SBT through
+    /// @dev Handler contract we are running calls to the system through
     Handler internal handler;
     /// @dev provides addresses passed to the contracts based on where we are deploying (locally in this case)
     HelperConfig internal helperConfig;
@@ -88,6 +88,16 @@ contract Invariant is StdInvariant, BaseTest {
         _setCrossChainPeers();
         _setWorkflow();
 
+        /// @notice needed to avoid stack too deep errors
+        Handler.SystemRoles memory systemRoles = Handler.SystemRoles({
+            emergencyPauser: emergencyPauser,
+            emergencyUnpauser: emergencyUnpauser,
+            configAdmin: configAdmin,
+            crossChainAdmin: crossChainAdmin,
+            feeWithdrawer: feeWithdrawer,
+            feeRateSetter: feeRateSetter
+        });
+
         /// @dev deploy handler
         handler = new Handler(
             parent,
@@ -98,7 +108,8 @@ contract Invariant is StdInvariant, BaseTest {
             address(usdc),
             aavePool,
             networkConfig.protocols.comet,
-            rebalancer
+            rebalancer,
+            systemRoles
         );
 
         /// @dev define appropriate function selectors

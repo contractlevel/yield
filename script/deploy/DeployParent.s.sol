@@ -81,6 +81,8 @@ contract DeployParent is Script {
         /// @dev revoke config admin role from deployer after necessary configs set
         deploy.parentPeer.revokeRole(Roles.CONFIG_ADMIN_ROLE, deploy.parentPeer.owner());
 
+        // @review this will need to also begin transfer the default admin role to a multisig address
+
         vm.stopBroadcast();
     }
 }

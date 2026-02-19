@@ -4,8 +4,12 @@ pragma solidity 0.8.26;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 // import {FixedPointMathLib} from "solady/utils/FixedPointMathLib.sol";
-import {PausableWithAccessControl, Roles} from "./PausableWithAccessControl.sol";
+import {
+    AccessControlDefaultAdminRules
+} from "@openzeppelin/contracts/access/extensions/AccessControlDefaultAdminRules.sol";
+
 import {IYieldFees} from "../interfaces/IYieldFees.sol";
+import {Roles} from "../libraries/Roles.sol";
 
 /// @title YieldFees
 /// @author @contractlevel
@@ -14,7 +18,7 @@ import {IYieldFees} from "../interfaces/IYieldFees.sol";
 /// @notice Fees are collected on every chain during deposit if s_feeRate is not 0.
 /// @notice Fees are taken in YieldPeer::_initiateDeposit
 /// @notice FV for this contract is in certora/spec/yield/BasePeer.spec
-abstract contract YieldFees is PausableWithAccessControl, IYieldFees {
+abstract contract YieldFees is AccessControlDefaultAdminRules, IYieldFees {
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS
     //////////////////////////////////////////////////////////////*/
@@ -35,6 +39,8 @@ abstract contract YieldFees is PausableWithAccessControl, IYieldFees {
     uint256 internal constant MAX_FEE_RATE = 10_000;
     /// @dev The initial fee rate
     uint256 internal constant INITIAL_FEE_RATE = 1_000; // 0.1%
+    /// @dev Constant for the initial default admin role transfer delay
+    uint48 internal constant INITIAL_DEFAULT_ADMIN_ROLE_TRANSFER_DELAY = 259200 seconds; // 3 days
 
     /// @dev The fee rate
     uint256 internal s_feeRate;
@@ -52,7 +58,7 @@ abstract contract YieldFees is PausableWithAccessControl, IYieldFees {
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
-    constructor() {
+    constructor() AccessControlDefaultAdminRules(INITIAL_DEFAULT_ADMIN_ROLE_TRANSFER_DELAY, msg.sender) {
         s_feeRate = INITIAL_FEE_RATE;
     }
 

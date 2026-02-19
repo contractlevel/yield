@@ -5,9 +5,14 @@ import {LinkTokenInterface} from "@chainlink/contracts/src/v0.8/shared/interface
 import {CCIPReceiver, IAny2EVMMessageReceiver} from "@chainlink/contracts/src/v0.8/ccip/applications/CCIPReceiver.sol";
 import {IRouterClient, Client} from "@chainlink/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
 import {IERC677Receiver} from "@chainlink/contracts/src/v0.8/shared/interfaces/IERC677Receiver.sol";
+
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {PausableWithAccessControl, Roles, IAccessControlEnumerable} from "../modules/PausableWithAccessControl.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {
+    AccessControlDefaultAdminRules
+} from "@openzeppelin/contracts/access/extensions/AccessControlDefaultAdminRules.sol";
+
 import {IShare} from "../interfaces/IShare.sol";
 import {IYieldPeer} from "../interfaces/IYieldPeer.sol";
 import {DataStructures} from "../libraries/DataStructures.sol";
@@ -15,6 +20,7 @@ import {CCIPOperations} from "../libraries/CCIPOperations.sol";
 import {IStrategyAdapter} from "../interfaces/IStrategyAdapter.sol";
 import {IStrategyRegistry} from "../interfaces/IStrategyRegistry.sol";
 import {YieldFees} from "../modules/YieldFees.sol";
+import {Roles} from "../libraries/Roles.sol";
 
 /// @title YieldPeer
 /// @author @contractlevel
@@ -22,7 +28,8 @@ import {YieldFees} from "../modules/YieldFees.sol";
 abstract contract YieldPeer is
     IAny2EVMMessageReceiver,
     CCIPReceiver,
-    PausableWithAccessControl,
+    Pausable,
+    // AccessControlDefaultAdminRules,
     IERC677Receiver,
     IYieldPeer,
     YieldFees
@@ -54,6 +61,8 @@ abstract contract YieldPeer is
     uint256 internal constant SHARE_DECIMALS = 1e18;
     /// @dev Constant for the initial share precision used to calculate the mint amount for first deposit
     uint256 internal constant INITIAL_SHARE_PRECISION = SHARE_DECIMALS / USDC_DECIMALS;
+    // /// @dev Constant for the initial default admin role transfer delay
+    // uint48 internal constant INITIAL_DEFAULT_ADMIN_ROLE_TRANSFER_DELAY = 259200 seconds; // 3 days
 
     /// @dev Chainlink token
     LinkTokenInterface internal immutable i_link;
@@ -139,7 +148,6 @@ abstract contract YieldPeer is
     //slither-disable-next-line missing-zero-check
     constructor(address ccipRouter, address link, uint64 thisChainSelector, address usdc, address share)
         CCIPReceiver(ccipRouter)
-        PausableWithAccessControl(msg.sender)
     {
         i_link = LinkTokenInterface(link);
         i_thisChainSelector = thisChainSelector;
@@ -525,6 +533,21 @@ abstract contract YieldPeer is
     }
 
     /*//////////////////////////////////////////////////////////////
+                               EMERGENCY
+    //////////////////////////////////////////////////////////////*/
+    /// @notice Pause the contract
+    /// @dev Access control: EMERGENCY_PAUSER_ROLE
+    function pause() external onlyRole(Roles.EMERGENCY_PAUSER_ROLE) {
+        _pause();
+    }
+
+    /// @notice Unpause the contract
+    /// @dev Access control: EMERGENCY_UNPAUSER_ROLE
+    function unpause() external onlyRole(Roles.EMERGENCY_UNPAUSER_ROLE) {
+        _unpause();
+    }
+
+    /*//////////////////////////////////////////////////////////////
                                  GETTER
     //////////////////////////////////////////////////////////////*/
     /// @notice Get the chain selector for this chain
@@ -611,7 +634,7 @@ abstract contract YieldPeer is
         public
         view
         virtual
-        override(CCIPReceiver, PausableWithAccessControl)
+        override(CCIPReceiver, AccessControlDefaultAdminRules)
         returns (bool)
     {
         return interfaceId == type(IAny2EVMMessageReceiver).interfaceId || super.supportsInterface(interfaceId);

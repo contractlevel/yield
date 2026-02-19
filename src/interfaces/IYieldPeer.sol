@@ -49,4 +49,6 @@ interface IYieldPeer is IYieldFees {
     function getAllowedPeer(uint64 chainSelector) external view returns (address);
     function getActiveStrategyAdapter() external view returns (address);
     function getStrategyRegistry() external view returns (address);
+    function pause() external;
+    function unpause() external;
 }

@@ -59,6 +59,18 @@ contract Handler is Test {
     bytes10 internal workflowName = WorkflowHelpers.createWorkflowName(workflowNameRaw);
     bytes internal workflowMetadata = WorkflowHelpers.createWorkflowMetadata(workflowId, workflowName, workflowOwner);
 
+    /// @dev struct is used to track the actors with the system roles
+    /// @notice needed to avoid stack too deep errors
+    struct SystemRoles {
+        address emergencyPauser;
+        address emergencyUnpauser;
+        address configAdmin;
+        address crossChainAdmin;
+        address feeWithdrawer;
+        address feeRateSetter;
+    }
+    SystemRoles internal systemRoles;
+
     /*//////////////////////////////////////////////////////////////
                             ENUMERABLE SETS
     //////////////////////////////////////////////////////////////*/
@@ -167,7 +179,8 @@ contract Handler is Test {
         address _usdc,
         address _aavePool,
         address _compoundPool,
-        Rebalancer _rebalancer
+        Rebalancer _rebalancer,
+        Handler.SystemRoles memory _systemRoles
     ) {
         parent = _parent;
         child1 = _child1;
@@ -178,6 +191,8 @@ contract Handler is Test {
         aavePool = _aavePool;
         compoundPool = _compoundPool;
         rebalancer = _rebalancer;
+        systemRoles = _systemRoles;
+
         vm.prank(rebalancer.owner());
         rebalancer.setKeystoneForwarder(forwarder);
 
@@ -317,9 +332,6 @@ contract Handler is Test {
 
     /// @notice This function handles withdrawing fees
     function withdrawFees(address nonFeeWithdrawerAddr) public {
-        /// @dev get the (first/default) fee withdrawer address
-        address feeWithdrawer = parent.getRoleMember(Roles.FEE_WITHDRAWER_ROLE, 0);
-
         uint256 parentFees = usdc.balanceOf(address(parent));
         uint256 child1Fees = usdc.balanceOf(address(child1));
         uint256 child2Fees = usdc.balanceOf(address(child2));
@@ -330,7 +342,7 @@ contract Handler is Test {
         ghost_state_totalFeesWithdrawnInStablecoin += availableFees;
 
         /// @dev try call from non-fee withdrawer to assert it never succeeds
-        vm.assume(nonFeeWithdrawerAddr != feeWithdrawer);
+        vm.assume(nonFeeWithdrawerAddr != systemRoles.feeWithdrawer);
         _changePrank(nonFeeWithdrawerAddr);
         try parent.withdrawFees(address(usdc)) {
             ghost_nonFeeWithdrawer_withdrewFees = true;
@@ -339,7 +351,7 @@ contract Handler is Test {
         }
 
         /// @dev withdraw the fees
-        _changePrank(feeWithdrawer);
+        _changePrank(systemRoles.feeWithdrawer);
         if (parentFees > 0) parent.withdrawFees(address(usdc));
         if (child1Fees > 0) child1.withdrawFees(address(usdc));
         if (child2Fees > 0) child2.withdrawFees(address(usdc));
@@ -348,15 +360,12 @@ contract Handler is Test {
     /// @notice This function handles setting the fee rate
     /// @param feeRate the fee rate to set
     function setFeeRate(uint256 feeRate) public {
-        /// @dev get the (first/default) fee rate setter address
-        address feeRateSetter = parent.getRoleMember(Roles.FEE_RATE_SETTER_ROLE, 0);
-
         /// @dev bind the fee rate to the range of valid values
         feeRate = bound(feeRate, 0, parent.getMaxFeeRate());
         /// @dev update the ghost state
         ghost_state_feeRate = feeRate;
         /// @dev update the fee rate
-        _changePrank(feeRateSetter);
+        _changePrank(systemRoles.feeRateSetter);
         parent.setFeeRate(feeRate);
         child1.setFeeRate(feeRate);
         child2.setFeeRate(feeRate);

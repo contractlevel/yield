@@ -3,14 +3,14 @@ pragma solidity 0.8.26;
 
 import {BaseTest, Vm, Roles} from "../../BaseTest.t.sol";
 
-contract EmergencyUnpauseTest is BaseTest {
+contract UnpauseTest is BaseTest {
     /// @dev emergency unpausing correctly unpauses yield peer and emits unpaused log
-    function test_yield_pausableWithAccessControlYieldPeer_emergencyUnpause_success() public {
+    function test_yield_yieldPeer_unpause_success() public {
         vm.recordLogs();
         _changePrank(emergencyPauser);
-        baseParentPeer.emergencyPause();
+        baseParentPeer.pause();
         _changePrank(emergencyUnpauser);
-        baseParentPeer.emergencyUnpause();
+        baseParentPeer.unpause();
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
         bool unpausedLogFound;
@@ -30,22 +30,22 @@ contract EmergencyUnpauseTest is BaseTest {
     }
 
     /// @dev emergency unpausing reverts on yield peer if caller doesn't have correct unpauser role
-    function test_yield_pausableWithAccessControlYieldPeer_emergencyUnpause_revertsWhen_noUnpauserRole() public {
+    function test_yield_yieldPeer_unpause_revertsWhen_noUnpauserRole() public {
         _changePrank(emergencyPauser);
-        baseParentPeer.emergencyPause();
+        baseParentPeer.pause();
         _changePrank(holder);
         vm.expectRevert(
             abi.encodeWithSignature(
                 "AccessControlUnauthorizedAccount(address,bytes32)", holder, Roles.EMERGENCY_UNPAUSER_ROLE
             )
         );
-        baseParentPeer.emergencyUnpause();
+        baseParentPeer.unpause();
     }
 
     /// @dev emergency unpausing correctly reverts on yield peer if not paused
-    function test_yield_pausableWithAccessControlYieldPeer_emergencyUnpause_revertsWhen_notPaused() public {
+    function test_yield_yieldPeer_unpause_revertsWhen_notPaused() public {
         _changePrank(emergencyUnpauser);
         vm.expectRevert(abi.encode("ExpectedPause()"));
-        baseParentPeer.emergencyUnpause();
+        baseParentPeer.unpause();
     }
 }

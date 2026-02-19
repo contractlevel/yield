@@ -31,9 +31,9 @@ contract ChildWithdrawTest is BaseTest {
         optChildPeer.onTokenTransfer(msg.sender, DEPOSIT_AMOUNT, "");
     }
 
-    function test_yield_child_onTokenTransfer_revertsWhen_childPaused() public {
+    function test_yield_child_onTokenTransfer_revertsWhen_paused() public {
         _changePrank(emergencyPauser);
-        optChildPeer.emergencyPause();
+        optChildPeer.pause();
         _changePrank(depositor);
         vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
         optChildPeer.onTokenTransfer(msg.sender, DEPOSIT_AMOUNT, "");
