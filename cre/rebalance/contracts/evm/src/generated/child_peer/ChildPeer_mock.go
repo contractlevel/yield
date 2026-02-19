@@ -35,9 +35,6 @@ type ChildPeerMock struct {
 	GetLink                       func() (common.Address, error)
 	GetParentChainSelector        func() (uint64, error)
 	GetRoleAdmin                  func(GetRoleAdminInput) ([32]byte, error)
-	GetRoleMember                 func(GetRoleMemberInput) (common.Address, error)
-	GetRoleMemberCount            func(GetRoleMemberCountInput) (*big.Int, error)
-	GetRoleMembers                func(GetRoleMembersInput) ([]common.Address, error)
 	GetRouter                     func() (common.Address, error)
 	GetShare                      func() (common.Address, error)
 	GetStrategyAdapter            func(GetStrategyAdapterInput) (common.Address, error)
@@ -237,79 +234,6 @@ func NewChildPeerMock(address common.Address, clientMock *evmmock.ClientCapabili
 				return nil, err
 			}
 			return abi.Methods["getRoleAdmin"].Outputs.Pack(result)
-		},
-		string(abi.Methods["getRoleMember"].ID[:4]): func(payload []byte) ([]byte, error) {
-			if mock.GetRoleMember == nil {
-				return nil, errors.New("getRoleMember method not mocked")
-			}
-			inputs := abi.Methods["getRoleMember"].Inputs
-
-			values, err := inputs.Unpack(payload)
-			if err != nil {
-				return nil, errors.New("Failed to unpack payload")
-			}
-			if len(values) != 2 {
-				return nil, errors.New("expected 2 input values")
-			}
-
-			args := GetRoleMemberInput{
-				Role:  values[0].([32]byte),
-				Index: values[1].(*big.Int),
-			}
-
-			result, err := mock.GetRoleMember(args)
-			if err != nil {
-				return nil, err
-			}
-			return abi.Methods["getRoleMember"].Outputs.Pack(result)
-		},
-		string(abi.Methods["getRoleMemberCount"].ID[:4]): func(payload []byte) ([]byte, error) {
-			if mock.GetRoleMemberCount == nil {
-				return nil, errors.New("getRoleMemberCount method not mocked")
-			}
-			inputs := abi.Methods["getRoleMemberCount"].Inputs
-
-			values, err := inputs.Unpack(payload)
-			if err != nil {
-				return nil, errors.New("Failed to unpack payload")
-			}
-			if len(values) != 1 {
-				return nil, errors.New("expected 1 input value")
-			}
-
-			args := GetRoleMemberCountInput{
-				Role: values[0].([32]byte),
-			}
-
-			result, err := mock.GetRoleMemberCount(args)
-			if err != nil {
-				return nil, err
-			}
-			return abi.Methods["getRoleMemberCount"].Outputs.Pack(result)
-		},
-		string(abi.Methods["getRoleMembers"].ID[:4]): func(payload []byte) ([]byte, error) {
-			if mock.GetRoleMembers == nil {
-				return nil, errors.New("getRoleMembers method not mocked")
-			}
-			inputs := abi.Methods["getRoleMembers"].Inputs
-
-			values, err := inputs.Unpack(payload)
-			if err != nil {
-				return nil, errors.New("Failed to unpack payload")
-			}
-			if len(values) != 1 {
-				return nil, errors.New("expected 1 input value")
-			}
-
-			args := GetRoleMembersInput{
-				Role: values[0].([32]byte),
-			}
-
-			result, err := mock.GetRoleMembers(args)
-			if err != nil {
-				return nil, err
-			}
-			return abi.Methods["getRoleMembers"].Outputs.Pack(result)
 		},
 		string(abi.Methods["getRouter"].ID[:4]): func(payload []byte) ([]byte, error) {
 			if mock.GetRouter == nil {
