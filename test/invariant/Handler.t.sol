@@ -700,7 +700,7 @@ contract Handler is Test {
         users.add(seedAddress);
     }
 
-    /// @dev create a user address for calling and passing to requestKycStatus or onTokenTransfer
+    /// @dev create a user address
     function _createOrGetUser(uint256 addressSeed) internal returns (address user) {
         if (users.length() == 0) {
             user = _seedToAddress(addressSeed);

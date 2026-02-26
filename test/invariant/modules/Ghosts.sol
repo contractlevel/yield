@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.26;
 
 /// @notice Ghost variables for the Yieldcoin invariant handler
@@ -293,6 +293,6 @@ abstract contract Ghosts {
     /// @dev track the Share.balanceOf for a user
     mapping(address user => uint256 balance) public ghost_share_state_balanceOf_totalAcrossChains;
 
-    /// @
+    /// @dev
     uint256 public ghost_share_state_crosschain_totalSupply;
 }

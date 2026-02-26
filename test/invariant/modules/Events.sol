@@ -1,10 +1,10 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.26;
 
 import {Ghosts} from "./Ghosts.sol";
 
-/// @notice Signatures for all events in the Yieldcoin system, as well as internal functions to handle logs and update ghost state
-/// @dev These are used to track events in the system for invariant testing
+/// @notice Signatures for all events in the Yieldcoin system
+/// @notice And internal functions to handle logs and update ghost state
 /// @notice This should be updated when events in the system are updated
 /// @dev This contract inherits from the Ghosts contract to access ghost state and update it based on events
 contract Events is Ghosts {
