@@ -1,9 +1,72 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.26;
 
+import {IYieldPeer} from "../../../src/interfaces/IYieldPeer.sol";
+
 /// @notice Ghost variables for the Yieldcoin invariant handler
 /// @dev These are used to track state changes and event emissions in the system for invariant testing
 abstract contract Ghosts {
+    /*//////////////////////////////////////////////////////////////
+                           SYSTEM AGGREGATE
+    //////////////////////////////////////////////////////////////*/
+    // Deposits
+    /// @dev total USDC deposited across all peers (raw, including fees)
+    uint256 public ghost_totalUsdcDeposited;
+    /// @dev total USDC deposited across all peers minus fees (user principal)
+    uint256 public ghost_totalUsdcDeposited_userPrincipal;
+    /// @dev total USDC deposited per user minus fees (user principal)
+    mapping(address user => uint256 usdcAmount) public ghost_totalUsdcDepositedPerUser_userPrincipal;
+    /// @dev total fees taken in stablecoin per user — computed via _calculateFee at deposit time
+    mapping(address user => uint256 feeAmount) public ghost_totalFeesTakenInStablecoinPerUser;
+    /// @dev total shares minted per user — accumulated via SharesMinted event ghost during deposit
+    mapping(address user => uint256 shareAmount) public ghost_totalSharesMintedPerUser;
+
+    // @review
+    uint256 public ghost_totalSharesMinted;
+    uint256 public ghost_totalUsdcWithdrawn;
+
+    // Withdrawals
+    /// @notice ghost_totalUsdcWithdrawn is equivalent to ghost_yieldPeer_event_WithdrawCompleted_param_amount_totalSum
+    /// @dev total shares burned system-wide — from the shareBurnAmount passed to transferAndCall (not from events)
+    uint256 public ghost_totalSharesBurned;
+    /// @dev total shares burned per user — from transferAndCall
+    mapping(address user => uint256 shareAmount) public ghost_totalSharesBurnedPerUser;
+    /// @dev total USDC withdrawn per user — accumulated via WithdrawCompleted event ghost
+    mapping(address user => uint256 usdcAmount) public ghost_event_totalUsdcWithdrawnPerUser;
+
+    // Fees
+    /// @dev total fees withdrawn in stablecoin — accumulated during withdrawFees action
+    uint256 public ghost_totalFeesWithdrawnInStablecoin;
+    /// @dev current fee rate — mirrors fee rate set in setFeeRate action
+    uint256 public ghost_feeRate;
+
+    // Rebalance
+    /// @dev total number of rebalances
+    uint256 public ghost_rebalances;
+
+    // Strategy
+    /// @dev the strategy stored in parent before onReport changed it
+    IYieldPeer.Strategy public ghost_previousStrategy;
+
+    // Flags
+    /// @dev true if a non-FeeWithdrawer address ever successfully called withdrawFees
+    bool public ghost_flag_nonFeeWithdrawer_withdrewFees;
+
+    /*//////////////////////////////////////////////////////////////
+                            DEPOSIT TRACKING
+    //////////////////////////////////////////////////////////////*/
+    /// @dev struct to track individual deposits with their fee rates
+    struct DepositRecord {
+        address user;
+        uint256 amount; // total deposit amount including fee
+        uint256 feeRate;
+        uint256 timestamp;
+        uint256 fee;
+    }
+
+    /// @dev each user's full deposit history, used for fee cross-checking invariants
+    mapping(address user => DepositRecord[]) public ghost_userDeposits;
+
     /*//////////////////////////////////////////////////////////////
                             YIELDPEER STATE
     //////////////////////////////////////////////////////////////*/
@@ -74,6 +137,11 @@ abstract contract Ghosts {
     uint256 public ghost_yieldPeer_event_WithdrawFromStrategy_param_amount;
     /// @dev the total sum of all amounts emitted by WithdrawFromStrategy events
     uint256 public ghost_yieldPeer_event_WithdrawFromStrategy_param_amount_totalSum;
+    /// @dev emission count for MAX sentinel (rebalance) WithdrawFromStrategy events specifically
+    uint256 public ghost_yieldPeer_event_WithdrawFromStrategy_rebalance_emissions;
+    /// @dev address of the adapter from the most recent MAX sentinel (rebalance) withdrawal
+    // @review possibly redundant with ghost_yieldPeer_event_WithdrawFromStrategy_param_strategyAdapter
+    address public ghost_yieldPeer_event_WithdrawFromStrategy_rebalance_param_strategyAdapter;
 
     // --- DepositInitiated event --- //
     /// @dev incremented everytime a DepositInitiated event is emitted
@@ -115,7 +183,7 @@ abstract contract Ghosts {
     /// @dev the message id emitted by the CCIPMessageSent event
     bytes32 public ghost_yieldPeer_event_CCIPMessageSent_param_messageId;
     /// @dev the tx type emitted by the CCIPMessageSent event
-    CcipTxType public ghost_yieldPeer_event_CCIPMessageSent_param_txType;
+    IYieldPeer.CcipTxType public ghost_yieldPeer_event_CCIPMessageSent_param_txType;
     /// @dev the amount emitted by the CCIPMessageSent event
     uint256 public ghost_yieldPeer_event_CCIPMessageSent_param_amount;
     /// @dev the total sum of all amounts emitted by CCIPMessageSent events
@@ -127,7 +195,7 @@ abstract contract Ghosts {
     /// @dev the message id emitted by the CCIPMessageReceived event
     bytes32 public ghost_yieldPeer_event_CCIPMessageReceived_param_messageId;
     /// @dev the tx type emitted by the CCIPMessageReceived event
-    CcipTxType public ghost_yieldPeer_event_CCIPMessageReceived_param_txType;
+    IYieldPeer.CcipTxType public ghost_yieldPeer_event_CCIPMessageReceived_param_txType;
     /// @dev the source chain selector emitted by the CCIPMessageReceived event
     uint64 public ghost_yieldPeer_event_CCIPMessageReceived_param_sourceChainSelector;
     // @review CCIPMessageReceived event doesn't emit an amountReceived
@@ -158,7 +226,7 @@ abstract contract Ghosts {
     /// @dev ParentPeer::s_totalShares
     uint256 public ghost_parent_state_totalShares;
     /// @dev ParentPeer::s_strategy
-    Strategy public ghost_parent_state_strategy;
+    IYieldPeer.Strategy public ghost_parent_state_strategy;
     /// @dev ParentPeer::s_rebalancer
     address public ghost_parent_state_rebalancer;
     /// @dev ParentPeer::s_initialActiveStrategySet
@@ -284,6 +352,93 @@ abstract contract Ghosts {
     bytes32 public ghost_rebalancer_event_ReportDecoded_param_protocolId;
 
     /*//////////////////////////////////////////////////////////////
+                        STRATEGY ADAPTER EVENTS
+    //////////////////////////////////////////////////////////////*/
+    // --- Deposit event --- //
+    /// @dev incremented everytime a Deposit event is emitted by a StrategyAdapter
+    uint256 public ghost_strategyAdapter_event_Deposit_emissions;
+    /// @dev the usdc address emitted by the StrategyAdapter Deposit event
+    address public ghost_strategyAdapter_event_Deposit_param_usdc;
+    /// @dev the amount emitted by the StrategyAdapter Deposit event
+    uint256 public ghost_strategyAdapter_event_Deposit_param_amount;
+    /// @dev the total sum of all amounts emitted by StrategyAdapter Deposit events
+    uint256 public ghost_strategyAdapter_event_Deposit_param_amount_totalSum;
+
+    // --- Withdraw event --- //
+    /// @dev incremented everytime a Withdraw event is emitted by a StrategyAdapter
+    uint256 public ghost_strategyAdapter_event_Withdraw_emissions;
+    /// @dev the usdc address emitted by the StrategyAdapter Withdraw event
+    address public ghost_strategyAdapter_event_Withdraw_param_usdc;
+    /// @dev the amount emitted by the StrategyAdapter Withdraw event
+    uint256 public ghost_strategyAdapter_event_Withdraw_param_amount;
+    /// @dev the total sum of all amounts emitted by StrategyAdapter Withdraw events
+    uint256 public ghost_strategyAdapter_event_Withdraw_param_amount_totalSum;
+
+    /*//////////////////////////////////////////////////////////////
+                             YIELDFEES EVENTS
+    //////////////////////////////////////////////////////////////*/
+    // --- FeeRateSet event --- //
+    /// @dev incremented everytime a FeeRateSet event is emitted
+    uint256 public ghost_yieldFees_event_FeeRateSet_emissions;
+    /// @dev the fee rate emitted by the FeeRateSet event
+    uint256 public ghost_yieldFees_event_FeeRateSet_param_feeRate;
+
+    // --- FeeTaken event --- //
+    /// @dev incremented everytime a FeeTaken event is emitted
+    uint256 public ghost_yieldFees_event_FeeTaken_emissions;
+    /// @dev the fee amount emitted by the FeeTaken event
+    uint256 public ghost_yieldFees_event_FeeTaken_param_amount;
+    /// @dev the total sum of all fee amounts emitted by FeeTaken events
+    uint256 public ghost_yieldFees_event_FeeTaken_param_amount_totalSum;
+
+    // --- FeesWithdrawn event --- //
+    /// @dev incremented everytime a FeesWithdrawn event is emitted
+    uint256 public ghost_yieldFees_event_FeesWithdrawn_emissions;
+    /// @dev the amount emitted by the FeesWithdrawn event
+    uint256 public ghost_yieldFees_event_FeesWithdrawn_param_amount;
+    /// @dev the total sum of all amounts emitted by FeesWithdrawn events
+    uint256 public ghost_yieldFees_event_FeesWithdrawn_param_amount_totalSum;
+
+    /*//////////////////////////////////////////////////////////////
+                           CRE RECEIVER EVENTS
+    //////////////////////////////////////////////////////////////*/
+    // --- OnReportSecurityChecksPassed event --- //
+    /// @dev incremented everytime an OnReportSecurityChecksPassed event is emitted
+    uint256 public ghost_creReceiver_event_OnReportSecurityChecksPassed_emissions;
+    /// @dev the workflow id emitted by the OnReportSecurityChecksPassed event
+    bytes32 public ghost_creReceiver_event_OnReportSecurityChecksPassed_param_workflowId;
+    /// @dev the workflow owner emitted by the OnReportSecurityChecksPassed event
+    address public ghost_creReceiver_event_OnReportSecurityChecksPassed_param_workflowOwner;
+    /// @dev the workflow name emitted by the OnReportSecurityChecksPassed event
+    bytes10 public ghost_creReceiver_event_OnReportSecurityChecksPassed_param_workflowName;
+
+    // --- KeystoneForwarderSet event --- //
+    /// @dev incremented everytime a KeystoneForwarderSet event is emitted
+    uint256 public ghost_creReceiver_event_KeystoneForwarderSet_emissions;
+    /// @dev the forwarder emitted by the KeystoneForwarderSet event
+    address public ghost_creReceiver_event_KeystoneForwarderSet_param_forwarder;
+
+    // --- WorkflowSet event --- //
+    /// @dev incremented everytime a WorkflowSet event is emitted
+    uint256 public ghost_creReceiver_event_WorkflowSet_emissions;
+    /// @dev the workflow id emitted by the WorkflowSet event
+    bytes32 public ghost_creReceiver_event_WorkflowSet_param_workflowId;
+    /// @dev the workflow owner emitted by the WorkflowSet event
+    address public ghost_creReceiver_event_WorkflowSet_param_workflowOwner;
+    /// @dev the workflow name emitted by the WorkflowSet event
+    bytes10 public ghost_creReceiver_event_WorkflowSet_param_workflowName;
+
+    // --- WorkflowRemoved event --- //
+    /// @dev incremented everytime a WorkflowRemoved event is emitted
+    uint256 public ghost_creReceiver_event_WorkflowRemoved_emissions;
+    /// @dev the workflow id emitted by the WorkflowRemoved event
+    bytes32 public ghost_creReceiver_event_WorkflowRemoved_param_workflowId;
+    /// @dev the workflow owner emitted by the WorkflowRemoved event
+    address public ghost_creReceiver_event_WorkflowRemoved_param_workflowOwner;
+    /// @dev the workflow name emitted by the WorkflowRemoved event
+    bytes10 public ghost_creReceiver_event_WorkflowRemoved_param_workflowName;
+
+    /*//////////////////////////////////////////////////////////////
                                  SHARE
     //////////////////////////////////////////////////////////////*/
     // something here for the total balances of share token across chains
@@ -295,4 +450,5 @@ abstract contract Ghosts {
 
     /// @dev
     uint256 public ghost_share_state_crosschain_totalSupply;
+    // @review - CLAUDE did nothing to share ghosts. ??
 }

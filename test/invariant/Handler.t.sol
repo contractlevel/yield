@@ -16,10 +16,11 @@ import {
     WorkflowHelpers
 } from "../BaseTest.t.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {IStrategyAdapter} from "../../src/interfaces/IStrategyAdapter.sol";
+import {Events} from "./modules/Events.t.sol";
 
 /// @notice This contract is used to handle fuzzed interactions with the external functions of the system to test invariants.
-contract Handler is Test {
+/// @notice Events inherits Ghosts, and forge-std/Test.sol
+contract Handler is Events {
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS
     //////////////////////////////////////////////////////////////*/
@@ -79,161 +80,6 @@ contract Handler is Test {
     EnumerableSet.AddressSet internal users;
     /// @dev track the chain selectors in the system
     EnumerableSet.UintSet internal chainSelectors;
-
-    /*//////////////////////////////////////////////////////////////
-                                 GHOSTS
-    //////////////////////////////////////////////////////////////*/
-    /// @dev track the total shares burned by incrementing by shareBurnAmount everytime share.transferAndCall is used to withdraw USDC
-    uint256 public ghost_state_totalSharesBurned;
-
-    /// @dev track the total shares minted amount according to ShareMintUpdate events emitted by ParentPeet
-    uint256 public ghost_event_totalSharesMinted;
-    /// @dev track the total shares burned amount according to ShareBurnUpdate events emitted by ParentPeer
-    uint256 public ghost_event_totalSharesBurned;
-
-    /// @dev track total USDC deposited across the system
-    uint256 public ghost_state_totalUsdcDeposited;
-
-    /// @dev track the total USDC deposited as user principal (initial deposit amount minus fees)
-    uint256 public ghost_state_totalUsdcDeposited_userPrincipal;
-
-    /// @dev track the total USDC withdrawn amount according to WithdrawCompleted events emitted by Peers
-    uint256 public ghost_event_totalUsdcWithdrawn;
-
-    /// @dev track total USDC deposited per user in user principal (initial deposit amount minus fees)
-    mapping(address user => uint256 usdcDepositAmount) public ghost_state_totalUsdcDepositedPerUser_userPrincipal;
-
-    /// @dev tracks the total usdc withdrawn per user emitted by WithdrawCompleted events
-    mapping(address user => uint256 usdcWithdrawAmount) public ghost_event_totalUsdcWithdrawnPerUser;
-
-    /// @dev incremented by 1 everytime a DepositInitiated event is emitted
-    uint256 public ghost_event_depositInitiated_emissions;
-    /// @dev incremented by 1 everytime a ShareMintUpdate event is emitted
-    uint256 public ghost_event_shareMintUpdate_emissions;
-
-    /// @dev incremented by 1 everytime a WithdrawCompleted event is emitted
-    uint256 public ghost_event_withdrawCompleted_emissions;
-    /// @dev incremented by 1 everytime a ShareBurnUpdate event is emitted
-    uint256 public ghost_event_shareBurnUpdate_emissions;
-
-    /// @dev tracks the total shares minted per user - based on ShareMintUpdate events
-    mapping(address user => uint256 totalSharesMinted) public ghost_event_totalSharesMintedPerUser;
-    /// @dev track total shares burnt per user - based on value passed to share.transferAndCall
-    mapping(address user => uint256 shareBurnAmount) public ghost_state_totalSharesBurnedPerUser;
-
-    /// @dev tracks the total fees withdrawn, in stablecoin
-    uint256 public ghost_state_totalFeesWithdrawnInStablecoin;
-
-    /// @dev tracks the number of FeeTaken events
-    uint256 public ghost_event_feeTaken_emissions;
-    /// @dev tracks the number of FeeWithdrawn events
-    uint256 public ghost_event_feeWithdrawn_emissions; // unused
-
-    /// @dev tracks the total fees taken in stablecoins per user - based on FeeTaken events
-    mapping(address user => uint256 totalFeesTaken) public ghost_event_totalFeesTakenInStablecoinPerUser;
-    /// @dev tracks the total fees taken in stablecoins - based on FeeTaken events
-    uint256 public ghost_event_totalFeesTakenInStablecoin;
-
-    /// @dev tracks the current fee rate
-    uint256 public ghost_state_feeRate;
-
-    /// @dev tracks if a non-FeeWithdrawer withdrew fees
-    bool public ghost_nonFeeWithdrawer_withdrewFees;
-
-    /// @dev tracks decoded strategy in CRE report
-    IYieldPeer.Strategy public ghost_event_lastCREReceivedStrategy;
-
-    /// @dev tracks previous strategy before onReport changes it
-    IYieldPeer.Strategy public ghost_state_previousStrategy;
-
-    /// @dev ghost flag to track if the decoded CRE report strategy
-    /// @dev doesn't match the strategy emitted by Parent after 'onReport'
-    bool public ghost_flag_decodedStrategy_mismatchWithEmittedStrategy;
-
-    uint256 public ghost_maxSentinelAdapterBalanceAfter; // adapter balance after MAX withdrawal // @review
-    /// @dev track the USDC/stablecoin balance of the strategy adapter after a withdraw
-    uint256 public ghost_state_strategyAdapter_balance_after_withdraw;
-
-    /// @dev incremented by 1 everytime a WithdrawFromStrategy event is emitted
-    uint256 internal ghost_event_yieldPeer_WithdrawFromStrategy_emissions;
-    /// @dev incremented by 1 everytime a WithdrawFromStrategy event is emitted for a rebalance (ie emitted amount == type(uint256).max)
-    uint256 internal ghost_event_yieldPeer_WithdrawFromStrategy_rebalance_emissions;
-
-    /// @dev incremented by 1 everytime a ReportDecoded event is emitted
-    uint256 public ghost_event_creReport_decoded;
-
-    /*//////////////////////////////////////////////////////////////
-                            DEPOSIT TRACKING
-    //////////////////////////////////////////////////////////////*/
-    /// @dev struct to track individual deposits with their fee rates
-    struct DepositRecord {
-        address user;
-        uint256 amount;
-        uint256 feeRate;
-        uint256 timestamp;
-        uint256 fee;
-    }
-
-    /// @dev mapping from user to array of their deposits
-    mapping(address => DepositRecord[]) public ghost_userDeposits;
-
-    /*//////////////////////////////////////////////////////////////
-                                 EVENTS
-    //////////////////////////////////////////////////////////////*/
-    // --- YieldPeer events --- //
-    bytes internal yieldPeer_AllowedChainSet_event = keccak256("AllowedChainSet(uint64,bool)");
-    bytes internal yieldPeer_AllowedPeerSet_event = keccak256("AllowedPeerSet(uint64,address)");
-    bytes internal yieldPeer_CCIPGasLimitSet_event = keccak256("CCIPGasLimitSet(uint256)");
-    bytes internal yieldPeer_StrategyRegistrySet_event = keccak256("StrategyRegistrySet(address)");
-    bytes internal yieldPeer_ActiveStrategyAdapterUpdated_event = keccak256("ActiveStrategyAdapterUpdated(address)");
-    bytes internal yieldPeer_DepositToStrategy_event = keccak256("DepositToStrategy(address,uint256)");
-    // WithdrawFromStrategy
-    bytes internal yieldPeer_WithdrawFromStrategy_event = keccak256("WithdrawFromStrategy(address,uint256)");
-
-    bytes internal yieldPeer_DepositInitiated_event = keccak256("DepositInitiated(address,uint256,uint64)");
-    bytes internal yieldPeer_WithdrawInitiated_event = keccak256("WithdrawInitiated(address,uint256,uint64)");
-    bytes internal yieldPeer_WithdrawCompleted_event = keccak256("WithdrawCompleted(address,uint256)");
-    bytes internal yieldPeer_CCIPMessageSent_event = keccak256("CCIPMessageSent(bytes32,uint8,uint256)");
-    bytes internal yieldPeer_CCIPMessageReceived_event = keccak256("CCIPMessageReceived(bytes32,uint8,uint64)");
-    bytes internal yieldPeer_SharesMinted_event = keccak256("SharesMinted(address,uint256)");
-    bytes internal yieldPeer_SharesBurned_event = keccak256("SharesBurned(address,uint256)");
-    // --- Parent events --- //
-    bytes internal parent_StrategyUpdated_event = keccak256("StrategyUpdated(uint64,bytes32,uint64)");
-    bytes internal parent_ShareMintUpdate_event = keccak256("ShareMintUpdate(uint256,uint64,uint256)");
-    bytes internal parent_ShareBurnUpdate_event = keccak256("ShareBurnUpdate(uint256,uint64,uint256)");
-    bytes internal parent_DepositForwardedToStrategy_event = keccak256("DepositForwardedToStrategy(uint256,uint64)");
-    bytes internal parent_WithdrawForwardedToStrategy_event = keccak256("WithdrawForwardedToStrategy(uint256,uint64)");
-    bytes internal parent_DepositPingPongToChild_event = keccak256("DepositPingPongToChild(uint256,uint64)");
-    bytes internal parent_WithdrawPingPongToChild_event = keccak256("WithdrawPingPongToChild(uint256,uint64)");
-    bytes internal parent_RebalancerSet_event = keccak256("RebalancerSet(address)");
-    bytes internal parent_SupportedProtocolSet_event = keccak256("SupportedProtocolSet(bytes32,bool)");
-    // --- Child events --- //
-    bytes internal child_DepositPingPongToParent_event = keccak256("DepositPingPongToParent(uint256)");
-    bytes internal child_WithdrawPingPongToParent_event = keccak256("WithdrawPingPongToParent(uint256)");
-    // --- Rebalancer events --- //
-    bytes internal rebalancer_ReportDecoded_event = keccak256("ReportDecoded(uint64,bytes32)");
-
-    bytes internal rebalancer_ParentPeerSet_event = keccak256("ParentPeerSet(address)");
-    bytes internal rebalancer_StrategyRegistrySet_event = keccak256("StrategyRegistrySet(address)");
-
-    // --- StrategyRegistry events --- //
-    bytes internal strategyRegistry_StrategyAdapterSet_event = keccak256("StrategyAdapterSet(bytes32,address)");
-
-    // --- StrategyAdapter events --- //
-    bytes internal strategyAdapter_Deposit_event = keccak256("Deposit(address,uint256)");
-    bytes internal strategyAdapter_Withdraw_event = keccak256("Withdraw(address,uint256)");
-
-    // --- YieldFees events --- //
-    bytes internal yieldFees_FeeRateSet_event = keccak256("FeeRateSet(uint256)");
-    bytes internal yieldFees_FeeTaken_event = keccak256("FeeTaken(uint256)");
-    bytes internal yieldFees_FeesWithdrawn_event = keccak256("FeesWithdrawn(uint256)");
-
-    // --- CREReceiver events --- //
-    bytes internal creReceiver_OnReportSecurityChecksPassed_event =
-        keccak256("OnReportSecurityChecksPassed(bytes32,address,bytes10)");
-    bytes internal creReceiver_KeystoneForwarderSet_event = keccak256("KeystoneForwarderSet(address)");
-    bytes internal creReceiver_WorkflowSet_event = keccak256("WorkflowSet(bytes32,address,bytes10)");
-    bytes internal creReceiver_WorkflowRemoved_event = keccak256("WorkflowRemoved(bytes32,address,bytes10)");
 
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
@@ -316,9 +162,9 @@ contract Handler is Test {
         console2.log("depositor:", depositor);
         console2.log("depositAmount:", depositAmount);
 
-        /// @dev update the ghost state
-        _updateDepositGhosts(depositor, depositAmount);
-        _handleDepositLogs();
+        /// @dev update ghost state — event ghosts first, then state ghosts (state helpers read event ghosts)
+        _handleLogs();
+        _updateDepositStateGhosts(depositor, depositAmount);
     }
 
     /// @notice This function handles withdraws from the system
@@ -360,9 +206,9 @@ contract Handler is Test {
         console2.log("withdrawer:", withdrawer);
         console2.log("shareBurnAmount:", shareBurnAmount);
 
-        /// @dev update the ghost state
-        _updateWithdrawGhosts(withdrawer, shareBurnAmount);
-        _handleWithdrawLogs();
+        /// @dev update ghost state — event ghosts first, then state ghosts (state helpers read event ghosts)
+        _handleLogs();
+        _updateWithdrawStateGhosts(withdrawer, shareBurnAmount);
     }
 
     /// @notice This function handles rebalancer cre reports
@@ -389,13 +235,14 @@ contract Handler is Test {
         /// @notice we are simulating CRE workflow triggering once per day
         vm.warp(block.timestamp + 1 days);
 
-        /// @dev store previous(current) strategy before onReport changes it
-        ghost_state_previousStrategy = parent.getStrategy();
+        /// @dev capture previous strategy before onReport changes it
+        ghost_previousStrategy = parent.getStrategy();
 
         vm.recordLogs();
         _changePrank(forwarder);
         rebalancer.onReport(workflowMetadata, report);
-        _handleOnReportLogs();
+        _handleLogs();
+        _updateRebalanceStateGhosts();
     }
 
     /// @notice This function handles withdrawing fees
@@ -407,22 +254,26 @@ contract Handler is Test {
         if (availableFees == 0) return; // @review wasted run
 
         /// @dev update the ghost state
-        ghost_state_totalFeesWithdrawnInStablecoin += availableFees;
+        _updateFeesStateGhosts(availableFees);
 
         /// @dev try call from non-fee withdrawer to assert it never succeeds
         vm.assume(nonFeeWithdrawerAddr != systemRoles.feeWithdrawer);
         _changePrank(nonFeeWithdrawerAddr);
         try parent.withdrawFees(address(usdc)) {
-            ghost_nonFeeWithdrawer_withdrewFees = true;
+            ghost_flag_nonFeeWithdrawer_withdrewFees = true;
         } catch {
             console2.log("nonFeeWithdrawerRoleAddr withdrawFees failed");
         }
+
+        vm.recordLogs();
 
         /// @dev withdraw the fees
         _changePrank(systemRoles.feeWithdrawer);
         if (parentFees > 0) parent.withdrawFees(address(usdc));
         if (child1Fees > 0) child1.withdrawFees(address(usdc));
         if (child2Fees > 0) child2.withdrawFees(address(usdc));
+
+        _handleLogs();
     }
 
     /// @notice This function handles setting the fee rate
@@ -431,7 +282,7 @@ contract Handler is Test {
         /// @dev bind the fee rate to the range of valid values
         feeRate = bound(feeRate, 0, parent.getMaxFeeRate());
         /// @dev update the ghost state
-        ghost_state_feeRate = feeRate;
+        ghost_feeRate = feeRate;
         /// @dev update the fee rate
         _changePrank(systemRoles.feeRateSetter);
         parent.setFeeRate(feeRate);
@@ -471,217 +322,43 @@ contract Handler is Test {
     }
 
     /*//////////////////////////////////////////////////////////////
-                             UPDATE GHOSTS
+                         UPDATE STATE GHOSTS
     //////////////////////////////////////////////////////////////*/
-    function _updateDepositGhosts(address depositor, uint256 depositAmount) internal {
-        uint256 userPrincipal = depositAmount - _calculateFee(depositAmount);
-        ghost_state_totalUsdcDeposited_userPrincipal += userPrincipal;
-        ghost_state_totalUsdcDepositedPerUser_userPrincipal[depositor] += userPrincipal;
-        ghost_state_totalUsdcDeposited += depositAmount;
+    /// @dev updates system aggregate ghosts after a deposit
+    /// @dev must be called after _handleLogs() — reads ghost_yieldPeer_event_SharesMinted_param_amount
+    function _updateDepositStateGhosts(address depositor, uint256 depositAmount) internal {
+        uint256 fee = _calculateFee(depositAmount);
+        uint256 userPrincipal = depositAmount - fee;
 
-        /// @dev record the deposit with current fee rate
+        ghost_totalUsdcDeposited += depositAmount;
+        ghost_totalUsdcDeposited_userPrincipal += userPrincipal;
+        ghost_totalUsdcDepositedPerUser_userPrincipal[depositor] += userPrincipal;
+        ghost_totalFeesTakenInStablecoinPerUser[depositor] += fee;
+
+        // reads event ghost set during _handleLogs() — intentional documented dependency
+        ghost_totalSharesMintedPerUser[depositor] += ghost_yieldPeer_event_SharesMinted_param_amount;
+
         _recordDeposit(depositor, depositAmount);
     }
 
-    function _updateWithdrawGhosts(address withdrawer, uint256 shareBurnAmount) internal {
-        ghost_state_totalSharesBurned += shareBurnAmount;
-        ghost_state_totalSharesBurnedPerUser[withdrawer] += shareBurnAmount;
+    /// @dev updates system aggregate ghosts after a withdrawal
+    /// @dev must be called after _handleLogs() — reads ghost_yieldPeer_event_WithdrawCompleted_param_amount
+    function _updateWithdrawStateGhosts(address withdrawer, uint256 shareBurnAmount) internal {
+        ghost_totalSharesBurned += shareBurnAmount;
+        ghost_totalSharesBurnedPerUser[withdrawer] += shareBurnAmount;
+
+        // reads event ghost set during _handleLogs() — intentional documented dependency
+        ghost_event_totalUsdcWithdrawnPerUser[withdrawer] += ghost_yieldPeer_event_WithdrawCompleted_param_amount;
     }
 
-    /*//////////////////////////////////////////////////////////////
-                              HANDLE LOGS
-    //////////////////////////////////////////////////////////////*/
-    function _handleDepositLogs() internal {
-        bytes32 depositInitiatedEvent = keccak256("DepositInitiated(address,uint256,uint64)");
-        bytes32 shareMintUpdateEvent = keccak256("ShareMintUpdate(uint256,uint64,uint256)");
-        bytes32 feeTakenEvent = keccak256("FeeTaken(uint256)");
-        bool depositInitiatedEventFound = false;
-        bool shareMintUpdateEventFound = false;
-        bool feeTakenEventFound = false;
-        address depositor;
-
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-
-        // First pass: find the depositor from DepositInitiated event
-        for (uint256 i = 0; i < logs.length; i++) {
-            if (logs[i].topics[0] == depositInitiatedEvent) {
-                depositInitiatedEventFound = true;
-                ghost_event_depositInitiated_emissions++;
-                depositor = address(uint160(uint256(logs[i].topics[1])));
-                break; // Found the depositor, break out of loop
-            }
-        }
-
-        // Second pass: process all events with the correct depositor
-        for (uint256 i = 0; i < logs.length; i++) {
-            if (logs[i].topics[0] == shareMintUpdateEvent) {
-                shareMintUpdateEventFound = true;
-                ghost_event_shareMintUpdate_emissions++;
-                uint256 shareMintAmount = uint256(logs[i].topics[1]);
-                ghost_event_totalSharesMinted += shareMintAmount;
-                ghost_event_totalSharesMintedPerUser[depositor] += shareMintAmount;
-                console2.log("shareMintAmount:", shareMintAmount);
-            }
-            if (logs[i].topics[0] == feeTakenEvent) {
-                feeTakenEventFound = true;
-                ghost_event_feeTaken_emissions++;
-                uint256 feeInStablecoin = uint256(logs[i].topics[1]);
-                console2.log("FeeTaken event found for depositor:", depositor);
-                console2.log("Fee amount:", feeInStablecoin);
-                ghost_event_totalFeesTakenInStablecoinPerUser[depositor] += feeInStablecoin;
-                ghost_event_totalFeesTakenInStablecoin += feeInStablecoin;
-            }
-        }
-        assertTrue(depositInitiatedEventFound, "DepositInitiated log not found");
-        assertTrue(shareMintUpdateEventFound, "ShareMintUpdate log not found");
-        console2.log("ghost_state_feeRate:", ghost_state_feeRate);
-        if (ghost_state_feeRate > 0) assertTrue(feeTakenEventFound, "FeeTaken log not found");
+    /// @dev updates system aggregate ghosts after fees are withdrawn
+    function _updateFeesStateGhosts(uint256 withdrawnFees) internal {
+        ghost_totalFeesWithdrawnInStablecoin += withdrawnFees;
     }
 
-    function _handleWithdrawLogs() internal {
-        bytes32 withdrawCompletedEvent = keccak256("WithdrawCompleted(address,uint256)");
-        bytes32 shareBurnUpdateEvent = keccak256("ShareBurnUpdate(uint256,uint64,uint256)");
-        bool withdrawCompletedEventFound = false;
-        bool shareBurnUpdateEventFound = false;
-
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        for (uint256 i = 0; i < logs.length; i++) {
-            if (logs[i].topics[0] == withdrawCompletedEvent) {
-                withdrawCompletedEventFound = true;
-                ghost_event_withdrawCompleted_emissions++;
-                address user = address(uint160(uint256(logs[i].topics[1])));
-                uint256 amount = uint256(logs[i].topics[2]);
-                ghost_event_totalUsdcWithdrawn += amount;
-                ghost_event_totalUsdcWithdrawnPerUser[user] += amount;
-                console2.log("usdc withdraw amount:", amount);
-                console2.log("total withdrawn:", ghost_event_totalUsdcWithdrawn);
-            }
-            if (logs[i].topics[0] == shareBurnUpdateEvent) {
-                shareBurnUpdateEventFound = true;
-                uint256 shareBurnAmount = uint256(logs[i].topics[1]);
-                ghost_event_shareBurnUpdate_emissions++;
-                ghost_event_totalSharesBurned += shareBurnAmount;
-            }
-        }
-        assertTrue(withdrawCompletedEventFound, "WithdrawCompleted log not found");
-    }
-
-    function _handleOnReportLogs() internal {
-        /// @dev Events to look for
-        bytes32 reportDecodedEvent = keccak256("ReportDecoded(uint64,bytes32)");
-        bytes32 currentStrategyOptimalEvent = keccak256("CurrentStrategyOptimal(uint64,bytes32)");
-        bytes32 strategyUpdatedEvent = keccak256("StrategyUpdated(uint64,bytes32,uint64)");
-        bytes32 withdrawFromStrategyEvent = keccak256("WithdrawFromStrategy(address,uint256)");
-
-        /// @dev Flags to track if the appropriate strategy event was emitted
-        bool reportDecodedEventFound = false;
-        bool currentStrategyOptimalEventFound = false;
-        bool strategyUpdatedEventFound = false;
-
-        /// @dev Flag to track which strategy event to check
-        bool isCurrentStrategyOptimal = false;
-        bool isStrategyUpdated = false; // @review rename to rebalanceHappened
-
-        /// @dev previous strategy before onReport changed it
-        uint64 previousStrategyChain = ghost_state_previousStrategy.chainSelector;
-        bytes32 previousStrategyProtocol = ghost_state_previousStrategy.protocolId;
-
-        /// @dev decoded strategy from ReportDecoded event
-        uint64 decodedChainSelector;
-        bytes32 decodedProtocolId;
-
-        /// @dev Pass to find ReportDecoded event and extract strategy
-        Vm.Log[] memory logs = vm.getRecordedLogs();
-        for (uint256 i = 0; i < logs.length; i++) {
-            if (logs[i].topics[0] == reportDecodedEvent) {
-                /// @dev increment the ghost tracking number of CRE report decoded
-                ghost_event_creReport_decoded++;
-                /// @dev update event flag and decode strategy
-                reportDecodedEventFound = true;
-                decodedChainSelector = uint64(uint256(logs[i].topics[1]));
-                decodedProtocolId = logs[i].topics[2];
-
-                /// @dev store the decoded strategy in ghost state
-                ghost_event_lastCREReceivedStrategy =
-                    IYieldPeer.Strategy({chainSelector: decodedChainSelector, protocolId: decodedProtocolId});
-
-                /// @dev set flag for appropriate emitted strategy event check
-                if (previousStrategyChain == decodedChainSelector && previousStrategyProtocol == decodedProtocolId) {
-                    isCurrentStrategyOptimal = true;
-                } else {
-                    isStrategyUpdated = true;
-                }
-            }
-        }
-
-        /// @dev If the current strategy is optimal, ensure CurrentStrategyOptimal
-        /// @dev event matches decoded strategy
-        if (isCurrentStrategyOptimal) {
-            for (uint256 i = 0; i < logs.length; i++) {
-                if (logs[i].topics[0] == currentStrategyOptimalEvent) {
-                    currentStrategyOptimalEventFound = true;
-                    uint64 emittedChainSelector = uint64(uint256(logs[i].topics[1]));
-                    bytes32 emittedProtocolId = logs[i].topics[2];
-
-                    if (emittedChainSelector != decodedChainSelector || emittedProtocolId != decodedProtocolId) {
-                        ghost_flag_decodedStrategy_mismatchWithEmittedStrategy = true;
-                        console2.log("CRE report strategy mismatch with emitted strategy detected");
-                    }
-                }
-            }
-        }
-
-        /// @dev If the strategy was updated, ensure StrategyUpdated event
-        /// @dev matches decoded strategy
-        if (isStrategyUpdated) {
-            for (uint256 i = 0; i < logs.length; i++) {
-                if (logs[i].topics[0] == strategyUpdatedEvent) {
-                    strategyUpdatedEventFound = true;
-                    uint64 emittedChainSelector = uint64(uint256(logs[i].topics[1]));
-                    bytes32 emittedProtocolId = logs[i].topics[2];
-                    uint64 emittedOldStrategyChain = uint64(uint256(logs[i].topics[3]));
-
-                    if (emittedChainSelector != decodedChainSelector || emittedProtocolId != decodedProtocolId) {
-                        ghost_flag_decodedStrategy_mismatchWithEmittedStrategy = true;
-                        console2.log("CRE report strategy mismatch with emitted strategy detected");
-                    }
-
-                    /// @dev consistency/sanity check that emitted old strategy chain matches the previous strategy chain
-                    assertTrue(emittedOldStrategyChain == previousStrategyChain, "Old strategy chain mismatch");
-                }
-            }
-        }
-
-        /// @dev Track MAX sentinel withdrawals during rebalancing
-        /// @dev Check for WithdrawFromStrategy events with amount == type(uint256).max
-        if (isStrategyUpdated) {
-            for (uint256 i = 0; i < logs.length; i++) {
-                if (logs[i].topics[0] == withdrawFromStrategyEvent) {
-                    /// @dev increment the ghost tracking number of withdraw from strategy events
-                    ghost_event_withdrawFromStrategy_emissions++;
-
-                    /// @dev get the amount withdrawn from the event params
-                    uint256 withdrawAmount = uint256(logs[i].topics[2]);
-                    if (withdrawAmount == type(uint256).max) {
-                        /// @dev increment the ghost tracking number of rebalance withdraws from strategy events
-                        ghost_event_withdrawFromStrategy_rebalance_emissions++;
-                    }
-
-                    /// @dev get the strategy adapter address from the event params
-                    address adapterAddress = address(uint160(uint256(logs[i].topics[1])));
-
-                    /// @dev track the USDC/stablecoin balance of the strategy adapter after a withdraw
-                    ghost_state_strategyAdapter_balance_after_withdraw =
-                        IStrategyAdapter(adapterAddress).getTotalValue(address(usdc));
-                }
-            }
-        }
-
-        assertTrue(reportDecodedEventFound, "ReportDecoded log not found");
-        assertTrue(
-            currentStrategyOptimalEventFound || strategyUpdatedEventFound,
-            "No strategy event matching decoded strategy found"
-        );
+    /// @dev updates system aggregate ghosts after a rebalance
+    function _updateRebalanceStateGhosts() internal {
+        ghost_rebalances++;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -736,8 +413,8 @@ contract Handler is Test {
         deal(address(usdc), admin, INITIAL_DEPOSIT_AMOUNT);
         usdc.approve(address(parent), INITIAL_DEPOSIT_AMOUNT);
         parent.deposit(INITIAL_DEPOSIT_AMOUNT);
-        _updateDepositGhosts(admin, INITIAL_DEPOSIT_AMOUNT);
-        _handleDepositLogs();
+        _handleLogs();
+        _updateDepositStateGhosts(admin, INITIAL_DEPOSIT_AMOUNT);
     }
 
     /// @notice deal USDC to the pools to ensure they have enough liquidity and we dont get insufficient balance errors
@@ -809,16 +486,6 @@ contract Handler is Test {
         return ghost_userDeposits[user][index];
     }
 
-    /// @dev get the previous strategy before onReport changed it
-    function getPreviousStrategy() external view returns (IYieldPeer.Strategy memory) {
-        return ghost_state_previousStrategy;
-    }
-
-    /// @dev get the last decoded strategy from CRE report
-    function getLastCREReceivedStrategy() external view returns (IYieldPeer.Strategy memory) {
-        return ghost_event_lastCREReceivedStrategy;
-    }
-
     /// @dev empty test to ignore in coverage report
-    function test_emptyTest() public {}
+    function test_emptyTest() public override {}
 }

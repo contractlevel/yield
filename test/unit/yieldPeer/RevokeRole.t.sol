@@ -47,8 +47,6 @@ contract RevokeRoleTest is BaseTest {
         */
         /// @dev _roles mapping shows if address has role for access control
 
-        address[] memory emptyMembers = new address[](0); /// @dev empty array since we are revoking the only member
-
         _changePrank(baseParentPeer.owner());
         baseParentPeer.revokeRole(Roles.CONFIG_ADMIN_ROLE, configAdmin);
 
