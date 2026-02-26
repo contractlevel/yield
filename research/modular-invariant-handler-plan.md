@@ -99,9 +99,6 @@ ghost_feeRate
 /// @dev the strategy stored in parent before onReport changed it
 IYieldPeer.Strategy ghost_previousStrategy
 
-/// @dev the strategy adapter's stablecoin balance after a MAX sentinel withdrawal during rebalance
-ghost_strategyAdapter_balanceAfter_rebalanceWithdraw
-
 // Flags
 /// @dev true if a non-FeeWithdrawer address ever successfully called withdrawFees
 bool ghost_flag_nonFeeWithdrawer_withdrewFees
@@ -125,7 +122,15 @@ mapping(address user => DepositRecord[]) public ghost_userDeposits;
 
 **2. YIELDPEER STATE** — existing, keep as-is
 
-**3. YIELDPEER EVENTS** — existing, keep as-is
+**3. YIELDPEER EVENTS** — existing, keep as-is, plus add:
+
+```
+/// @dev address of the adapter from the most recent MAX sentinel (rebalance) withdrawal
+ghost_yieldPeer_event_WithdrawFromStrategy_rebalance_param_strategyAdapter
+
+/// @dev emission count for MAX sentinel (rebalance) WithdrawFromStrategy events specifically
+ghost_yieldPeer_event_WithdrawFromStrategy_rebalance_emissions
+```
 
 **4. PARENT STATE** — existing, keep as-is
 
@@ -137,20 +142,7 @@ mapping(address user => DepositRecord[]) public ghost_userDeposits;
 
 ---
 
-**8. STRATEGY ADAPTER STATE** ← new section
-
-```
-/// @dev balance of the strategy adapter in the underlying protocol after a MAX sentinel withdrawal
-/// @dev note: ghost_strategyAdapter_balanceAfter_rebalanceWithdraw in SYSTEM AGGREGATE tracks
-/// @dev the most recent rebalance withdrawal across all calls to onReport
-ghost_strategyAdapter_state_balanceAfter_lastWithdraw
-```
-
-Wait — this is a per-adapter, per-action value. The system aggregate ghost captures the most recent MAX withdrawal specifically (which is what the invariant needs). This section is still useful for tracking the last withdrawal regardless of whether it was a rebalance. Keep both.
-
----
-
-**9. STRATEGY ADAPTER EVENTS** ← new section
+**8. STRATEGY ADAPTER EVENTS** ← new section
 
 ```
 ghost_strategyAdapter_event_Deposit_emissions
@@ -166,7 +158,7 @@ ghost_strategyAdapter_event_Withdraw_param_amount_totalSum
 
 ---
 
-**10. YIELDFEES EVENTS** ← new section
+**9. YIELDFEES EVENTS** ← new section
 
 ```
 ghost_yieldFees_event_FeeRateSet_emissions
@@ -183,7 +175,7 @@ ghost_yieldFees_event_FeesWithdrawn_param_amount_totalSum
 
 ---
 
-**11. CRE RECEIVER EVENTS** ← new section
+**10. CRE RECEIVER EVENTS** ← new section
 
 ```
 ghost_creReceiver_event_OnReportSecurityChecksPassed_emissions
@@ -207,7 +199,7 @@ ghost_creReceiver_event_WorkflowRemoved_param_workflowName
 
 ---
 
-**12. SHARE** — existing, review for completeness
+**11. SHARE** — existing, review for completeness
 
 ---
 
@@ -240,8 +232,7 @@ Each sub-function receives the full `logs` array. `vm.getRecordedLogs()` is call
 `_handleRebalanceLogs` handles `WithdrawFromStrategy` and updates:
 - `ghost_yieldPeer_event_WithdrawFromStrategy_emissions`
 - `ghost_yieldPeer_event_WithdrawFromStrategy_rebalance_emissions` (when amount == `type(uint256).max`)
-
-Note: `ghost_strategyAdapter_balanceAfter_rebalanceWithdraw` is **NOT** updated here. It is updated in `_updateRebalanceStateGhosts` in Handler, which reads `ghost_yieldPeer_event_WithdrawFromStrategy_param_strategyAdapter` (set here) to know which adapter to query.
+- `ghost_yieldPeer_event_WithdrawFromStrategy_rebalance_param_strategyAdapter` (the adapter address from MAX sentinel withdrawals only)
 
 `_handleFeeAndAdminLogs` handles `FeeTaken`, `FeesWithdrawn`, `FeeRateSet`.
 
@@ -282,8 +273,7 @@ function onReport(...) public {
     ghost_previousStrategy = parent.getStrategy();       // captured BEFORE the call
     vm.recordLogs();
     rebalancer.onReport(workflowMetadata, report);
-    _handleLogs();
-    _updateRebalanceStateGhosts();
+    _handleLogs();                                       // event ghosts updated; no state helper needed
 }
 
 function withdrawFees(...) public {
@@ -330,16 +320,6 @@ function _updateWithdrawStateGhosts(address withdrawer, uint256 shareBurnAmount)
         ghost_yieldPeer_event_WithdrawCompleted_param_amount;
 }
 
-/// @dev updates system aggregate ghosts after a rebalance (onReport)
-/// @dev must be called after _handleLogs() — reads WithdrawFromStrategy event ghost
-function _updateRebalanceStateGhosts() internal {
-    if (ghost_yieldPeer_event_WithdrawFromStrategy_rebalance_emissions > 0) {
-        address adapter = ghost_yieldPeer_event_WithdrawFromStrategy_param_strategyAdapter;
-        ghost_strategyAdapter_balanceAfter_rebalanceWithdraw =
-            IStrategyAdapter(adapter).getTotalValue(address(usdc));
-    }
-}
-
 function _updateFeesStateGhosts(uint256 availableFees) internal {
     ghost_totalFeesWithdrawnInStablecoin += availableFees;
 }
@@ -351,7 +331,7 @@ function _updateFeesStateGhosts(uint256 availableFees) internal {
 - Constants, contract references, chain selector mappings, `SystemRoles`
 - Constructor + setup
 - Public fuzz action functions
-- `_updateDepositStateGhosts`, `_updateWithdrawStateGhosts`, `_updateRebalanceStateGhosts`, `_updateFeesStateGhosts`
+- `_updateDepositStateGhosts`, `_updateWithdrawStateGhosts`, `_updateFeesStateGhosts`
 - `_recordDeposit` and `calculateExpectedFees*` helpers
 - User/chain actor management (until Actors.sol)
 - Utility functions
@@ -382,7 +362,6 @@ Fully migrated to new ghost names. Assertions previously inside Handler log hand
 | `ghost_state_totalFeesWithdrawnInStablecoin` | `ghost_totalFeesWithdrawnInStablecoin` |
 | `ghost_nonFeeWithdrawer_withdrewFees` | `ghost_flag_nonFeeWithdrawer_withdrewFees` |
 | `ghost_event_totalUsdcWithdrawnPerUser` | `ghost_event_totalUsdcWithdrawnPerUser` (unchanged) |
-| `ghost_maxSentinelAdapterBalanceAfter` | `ghost_strategyAdapter_balanceAfter_rebalanceWithdraw` |
 
 **Broken references to fix:**
 
@@ -390,7 +369,7 @@ Fully migrated to new ghost names. Assertions previously inside Handler log hand
 |---|---|
 | `handler.ghost_flag_creReport_decoded()` | `handler.ghost_rebalancer_event_ReportDecoded_emissions() > 0` |
 | `handler.ghost_maxSentinelWithdrawals()` | `handler.ghost_yieldPeer_event_WithdrawFromStrategy_rebalance_emissions()` |
-| `handler.ghost_maxSentinelAdapterBalanceAfter()` | `handler.ghost_strategyAdapter_balanceAfter_rebalanceWithdraw()` |
+| `handler.ghost_maxSentinelAdapterBalanceAfter()` | call `IStrategyAdapter(handler.ghost_yieldPeer_event_WithdrawFromStrategy_rebalance_param_strategyAdapter()).getTotalValue(address(usdc))` directly in the invariant |
 
 **Dropping `ghost_flag_decodedStrategy_mismatchWithEmittedStrategy`:**
 
@@ -414,6 +393,22 @@ function invariant_decodedCREReportStrategy_matchesParentStrategy() public view 
 ```
 
 This is simpler, has no hidden log-handler flag logic, and since parent's state is updated atomically with `StrategyUpdated` in the same transaction, matching the last decoded report confirms event/state consistency. The flag is dropped entirely.
+
+**Updated rebalance adapter invariant** (replaces the broken `ghost_maxSentinelAdapterBalanceAfter` approach):
+
+```solidity
+/// @dev After a MAX sentinel rebalance withdrawal, the old adapter's protocol position must be fully drained
+function invariant_strategyAdapter_rebalance_withdrawsTotalValue() public view {
+    if (handler.ghost_yieldPeer_event_WithdrawFromStrategy_rebalance_emissions() == 0) return;
+    address drainedAdapter = handler.ghost_yieldPeer_event_WithdrawFromStrategy_rebalance_param_strategyAdapter();
+    assertTrue(
+        IStrategyAdapter(drainedAdapter).getTotalValue(address(usdc)) < 1e6,
+        "Invariant violated: Old strategy adapter should be fully drained after rebalance withdrawal"
+    );
+}
+```
+
+No balance ghost. `getTotalValue()` is called live at invariant check time on the address tracked by the event ghost.
 
 **New invariants** (promoting Handler assertions):
 
@@ -458,18 +453,3 @@ Each step should compile and all tests should pass before moving to the next.
 
 Internal user actor helpers (`_seedToAddress`, `_createOrGetUser`, `_indexToUser`) and the `users` EnumerableSet can migrate here. `forEachUser` and `forEachChainSelector` must remain on Handler as they are called externally by `Invariant.t.sol`.
 
----
-
-A few things worth flagging before you review it:
-                                                                                                                                      
-  1. One unresolved rough edge in the plan — the STRATEGY ADAPTER STATE section (section 8) got a bit muddled. I started writing
-  ghost_strategyAdapter_state_balanceAfter_lastWithdraw but then caught myself mid-thought. The                                       
-  ghost_strategyAdapter_balanceAfter_rebalanceWithdraw in the SYSTEM AGGREGATE section is what the invariant actually needs (the
-  balance after a MAX sentinel withdrawal during rebalancing). The per-contract adapter state section may end up with additional
-  ghosts as we flesh out the adapter invariants, but for now you might find section 8 slightly unclear — worth a read.
-  2. The documented dependency pattern — where state update helpers intentionally read event ghosts set by _handleLogs() — appears
-  three times (totalSharesMintedPerUser, totalUsdcWithdrawnPerUser, strategyAdapter_balanceAfter_rebalanceWithdraw). The comments make
-   the ordering contract explicit, but if you feel this coupling is too implicit, one alternative is to have the action functions
-  extract those values explicitly and pass them as parameters to the state helpers. Happy to discuss that if it bothers you.
-  3. The ghost_flag_decodedStrategy_mismatchWithEmittedStrategy drop — the reasoning is in the plan. Let me know if you want to keep
-  the flag after all.
