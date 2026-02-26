@@ -686,6 +686,19 @@ contract Invariant is StdInvariant, BaseTest {
         );
     }
 
+    /// @notice Share Balance: Share balance per user must equal total shares minted per user minus total shares burned per user
+    function invariant_shareBalance_perUser_integrity() public {
+        handler.forEachUser(this.checkShareBalanceIntegrityPerUser);
+    }
+
+    function checkShareBalanceIntegrityPerUser(address user) external view {
+        assertEq(
+            share.balanceOf(user),
+            handler.ghost_totalSharesMintedPerUser(user) - handler.ghost_totalSharesBurnedPerUser(user),
+            "Invariant violated: Share balance per user must equal total shares minted per user minus total shares burned per user"
+        );
+    }
+
     /*//////////////////////////////////////////////////////////////
                                 UTILITY
     //////////////////////////////////////////////////////////////*/
