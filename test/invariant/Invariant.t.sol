@@ -324,106 +324,15 @@ contract Invariant is StdInvariant, BaseTest {
     }
 
     /*//////////////////////////////////////////////////////////////
-                               INVARIANTS
+                                 SYSTEM
     //////////////////////////////////////////////////////////////*/
-    /// @notice Active Strategy Adapter Consistency: Active strategy adapter on active strategy chain should match the protocol stored in ParentPeer
-    function invariant_activeStrategyAdapter_consistency() public {
-        handler.forEachChainSelector(this.checkActiveStrategyAdapterPerChainSelector);
-    }
-
-    function checkActiveStrategyAdapterPerChainSelector(uint64 chainSelector) external view {
-        if (chainSelector == parent.getStrategy().chainSelector) {
-            assertEq(
-                IYieldPeer(handler.chainSelectorsToPeers(chainSelector))
-                    .getStrategyAdapter(parent.getStrategy().protocolId),
-                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter(),
-                "Invariant violated: Active strategy adapter on active strategy chain should match the protocol stored in ParentPeer"
-            );
-            assertTrue(
-                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter() != address(0),
-                "Invariant violated: Active strategy adapter should be non-zero on the strategy chain"
-            );
-        } else {
-            assertEq(
-                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter(),
-                address(0),
-                "Invariant violated: Active strategy adapter should be set to 0 on non-active strategy chains"
-            );
-        }
-    }
-
-    /// @notice Total Shares Accountancy: The total shares tracked by ParentPeer should be equal to total minted minus total burned system wide.
-    function invariant_totalShares_integrity() public view {
-        uint256 totalSharesMinted = handler.ghost_parent_event_ShareMintUpdate_param_amount_totalSum();
-        uint256 totalSharesBurned = handler.ghost_totalSharesBurned();
-        assertEq(
-            parent.getTotalShares(),
-            totalSharesMinted - totalSharesBurned,
-            "Invariant violated: Total shares tracked by ParentPeer should be equal to total minted minus total burned system wide."
-        );
-    }
-
-    /// @notice Total Value Accountancy: The total value in the system should be more than or equal to total USDC deposited minus total USDC withdrawn
-    function invariant_totalValue_integrity() public {
-        handler.forEachChainSelector(this.checkTotalDepositsAgainstTotalValuePerChainSelector);
-    }
-
-    function checkTotalDepositsAgainstTotalValuePerChainSelector(uint64 chainSelector) external view {
-        uint256 totalDeposited = handler.ghost_totalUsdcDeposited_userPrincipal();
-        uint256 totalWithdrawn = handler.ghost_yieldPeer_event_WithdrawCompleted_param_amount_totalSum();
-        uint256 netDeposits = totalDeposited > totalWithdrawn ? totalDeposited - totalWithdrawn : 0;
-        if (chainSelector == parent.getStrategy().chainSelector) {
-            assertTrue(
-                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getTotalValue() >= netDeposits,
-                "Invariant violated: Total value in the system should be more than or equal to total USDC deposited minus total USDC withdrawn"
-            );
-        }
-    }
-
-    /// @notice Total Share Balances: The total shares tracked by ParentPeer should be equal to the sum of all holder balances
-    function invariant_totalShareBalances_integrity() public view {
-        /// @dev we mint an initial amount of shares to the admin to mitigate share inflation attacks
-        uint256 sumOfBalances = handler.getAdminShareBalance();
-        /// @dev loop through all users in the system and add their share balances to the sum
-        for (uint256 i = 0; i < handler.getUsersLength(); i++) {
-            address user = handler.getUserAt(i);
-            sumOfBalances += share.balanceOf(user);
-        }
-        sumOfBalances += share.balanceOf(address(parent));
-        sumOfBalances += share.balanceOf(parent.owner());
-
-        assertEq(
-            parent.getTotalShares(),
-            sumOfBalances,
-            "Invariant violated: Total shares tracked by ParentPeer should be equal to the sum of all holder balances"
-        );
-    }
-
-    /// @notice Event Consistency: The number of WithdrawCompleted events should be equal to the number of ShareBurnUpdate events
-    function invariant_withdrawCompleted_shareBurnUpdate_consistency() public view {
-        assertEq(
-            handler.ghost_yieldPeer_event_WithdrawCompleted_emissions(),
-            handler.ghost_parent_event_ShareBurnUpdate_emissions(),
-            "Invariant violated: The number of WithdrawCompleted events should be equal to the number of ShareBurnUpdate events"
-        );
-    }
-
-    /// @notice Event Consistency: The number of DepositInitiated events should be equal to the number of ShareMintUpdate events
-    function invariant_depositInitiated_shareMintUpdate_consistency() public view {
-        assertEq(
-            handler.ghost_yieldPeer_event_DepositInitiated_emissions(),
-            handler.ghost_parent_event_ShareMintUpdate_emissions(),
-            "Invariant violated: The number of DepositInitiated events should be equal to the number of ShareMintUpdate events"
-        );
-    }
-
     /// @notice Users should always be able to withdraw what they deposited
     /// @dev this is a critical invariant that ensures the integrity of user deposit redemption
-    function invariant_stablecoinRedemptionIntegrity() public {
-        handler.forEachUser(this.checkRedemptionIntegrityPerUser);
+    function invariant_system_stablecoinRedemption_perUser_integrity() public {
+        handler.forEachUser(this.checkStablecoinRedemptionPerUser);
     }
 
-    function checkRedemptionIntegrityPerUser(address user) external view {
+    function checkStablecoinRedemptionPerUser(address user) external view {
         uint256 deposited = handler.ghost_totalUsdcDepositedPerUser_userPrincipal(user);
         uint256 withdrawn = handler.ghost_event_totalUsdcWithdrawnPerUser(user);
         uint256 netDeposits = deposited > withdrawn ? deposited - withdrawn : 0;
@@ -448,8 +357,246 @@ contract Invariant is StdInvariant, BaseTest {
         }
     }
 
+    /// @notice Total Value Accountancy: The total value in the system should be more than or equal to total USDC deposited minus total USDC withdrawn
+    function invariant_system_totalValue_exceedsNetDeposits() public {
+        handler.forEachChainSelector(this.checkTotalValueExceedsNetDepositsPerChainSelector);
+    }
+
+    function checkTotalValueExceedsNetDepositsPerChainSelector(uint64 chainSelector) external view {
+        uint256 totalDeposited = handler.ghost_totalUsdcDeposited_userPrincipal();
+        uint256 totalWithdrawn = handler.ghost_yieldPeer_event_WithdrawCompleted_param_amount_totalSum();
+        uint256 netDeposits = totalDeposited > totalWithdrawn ? totalDeposited - totalWithdrawn : 0;
+        if (chainSelector == parent.getStrategy().chainSelector) {
+            assertTrue(
+                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getTotalValue() >= netDeposits,
+                "Invariant violated: Total value in the system should be more than or equal to total USDC deposited minus total USDC withdrawn"
+            );
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                DEPOSIT
+    //////////////////////////////////////////////////////////////*/
+    /// @notice Emission Count: DepositInitiated, ShareMintUpdate, and SharesMinted must each be emitted exactly once per deposit
+    function invariant_deposit_DepositInitiated_ShareMintUpdate_SharesMinted_emissionConsistency() public view {
+        assertEq(
+            handler.ghost_yieldPeer_event_DepositInitiated_emissions(),
+            handler.ghost_parent_event_ShareMintUpdate_emissions(),
+            "Invariant violated: The number of DepositInitiated events should be equal to the number of ShareMintUpdate events"
+        );
+        assertEq(
+            handler.ghost_yieldPeer_event_SharesMinted_emissions(),
+            handler.ghost_yieldPeer_event_DepositInitiated_emissions(),
+            "Invariant violated: SharesMinted must be emitted exactly once per DepositInitiated"
+        );
+    }
+
+    /// @notice Emission Count: DepositToStrategy must be emitted exactly once per DepositInitiated plus rebalances
+    function invariant_deposit_DepositToStrategy_emissionConsistency() public view {
+        assertEq(
+            handler.ghost_yieldPeer_event_DepositToStrategy_emissions(),
+            handler.ghost_yieldPeer_event_DepositInitiated_emissions() + handler.ghost_rebalances(),
+            "Invariant violated: DepositToStrategy must be emitted exactly once per DepositInitiated plus rebalances"
+        );
+    }
+
+    /// @notice Amount Flow: Total DepositInitiated amounts must equal total user principal deposited
+    function invariant_deposit_DepositInitiated_amount_equalsUserPrincipal() public view {
+        assertEq(
+            handler.ghost_yieldPeer_event_DepositInitiated_param_amount_totalSum(),
+            handler.ghost_totalUsdcDeposited_userPrincipal(),
+            "Invariant violated: Total DepositInitiated amounts must equal total user principal deposited"
+        );
+    }
+
+    /// @notice Amount Flow: Total StrategyAdapter Deposit amounts must equal total DepositToStrategy amounts emitted by peers
+    function invariant_deposit_DepositToStrategy_amount_matchesStrategyAdapterDeposit() public view {
+        assertEq(
+            handler.ghost_strategyAdapter_event_Deposit_param_amount_totalSum(),
+            handler.ghost_yieldPeer_event_DepositToStrategy_param_amount_totalSum(),
+            "Invariant violated: Total StrategyAdapter Deposit amounts must equal total DepositToStrategy amounts emitted by peers"
+        );
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                WITHDRAW
+    //////////////////////////////////////////////////////////////*/
+    /// @notice Emission Count: WithdrawInitiated, SharesBurned, WithdrawCompleted, and ShareBurnUpdate must each be emitted exactly once per withdrawal
+    function invariant_withdraw_WithdrawInitiated_SharesBurned_WithdrawCompleted_ShareBurnUpdate_emissionConsistency()
+        public
+        view
+    {
+        assertEq(
+            handler.ghost_yieldPeer_event_SharesBurned_emissions(),
+            handler.ghost_yieldPeer_event_WithdrawInitiated_emissions(),
+            "Invariant violated: SharesBurned must be emitted exactly once per WithdrawInitiated"
+        );
+        assertEq(
+            handler.ghost_yieldPeer_event_WithdrawCompleted_emissions(),
+            handler.ghost_yieldPeer_event_SharesBurned_emissions(),
+            "Invariant violated: WithdrawCompleted must be emitted exactly once per SharesBurned"
+        );
+        assertEq(
+            handler.ghost_yieldPeer_event_WithdrawCompleted_emissions(),
+            handler.ghost_parent_event_ShareBurnUpdate_emissions(),
+            "Invariant violated: The number of WithdrawCompleted events should be equal to the number of ShareBurnUpdate events"
+        );
+    }
+
+    /// @notice Amount Flow: Total WithdrawInitiated and SharesBurned amounts must equal ghost total shares burned
+    function invariant_withdraw_WithdrawInitiated_SharesBurned_amount_equalsGhostSharesBurned() public view {
+        assertEq(
+            handler.ghost_yieldPeer_event_WithdrawInitiated_param_amount_totalSum(),
+            handler.ghost_totalSharesBurned(),
+            "Invariant violated: Total WithdrawInitiated amounts must equal total shares burned"
+        );
+        assertEq(
+            handler.ghost_yieldPeer_event_SharesBurned_param_amount_totalSum(),
+            handler.ghost_totalSharesBurned(),
+            "Invariant violated: Total SharesBurned event amounts must equal total shares burned tracked by handler"
+        );
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                 SHARES
+    //////////////////////////////////////////////////////////////*/
+    /// @notice Total Shares Accountancy: The total shares tracked by ParentPeer should be equal to total minted minus total burned system wide.
+    function invariant_shares_totalShares_equalsMintedMinusBurned() public view {
+        uint256 totalSharesMinted = handler.ghost_parent_event_ShareMintUpdate_param_amount_totalSum();
+        uint256 totalSharesBurned = handler.ghost_totalSharesBurned();
+        assertEq(
+            parent.getTotalShares(),
+            totalSharesMinted - totalSharesBurned,
+            "Invariant violated: Total shares tracked by ParentPeer should be equal to total minted minus total burned system wide."
+        );
+    }
+
+    /// @notice Total Share Balances: The total shares tracked by ParentPeer should be equal to the sum of all holder balances
+    function invariant_shares_totalShares_equalsSumOfHolderBalances() public view {
+        /// @dev we mint an initial amount of shares to the admin to mitigate share inflation attacks
+        uint256 sumOfBalances = handler.getAdminShareBalance();
+        /// @dev loop through all users in the system and add their share balances to the sum
+        for (uint256 i = 0; i < handler.getUsersLength(); i++) {
+            address user = handler.getUserAt(i);
+            sumOfBalances += share.balanceOf(user);
+        }
+        sumOfBalances += share.balanceOf(address(parent));
+        sumOfBalances += share.balanceOf(parent.owner());
+
+        assertEq(
+            parent.getTotalShares(),
+            sumOfBalances,
+            "Invariant violated: Total shares tracked by ParentPeer should be equal to the sum of all holder balances"
+        );
+    }
+
+    /// @notice Share Balance: Share balance per user must equal total shares minted per user minus total shares burned per user
+    function invariant_shares_ShareBalance_perUser_equalsMintedMinusBurned() public {
+        handler.forEachUser(this.checkShareBalanceIntegrityPerUser);
+    }
+
+    function checkShareBalanceIntegrityPerUser(address user) external view {
+        assertEq(
+            share.balanceOf(user),
+            handler.ghost_totalSharesMintedPerUser(user) - handler.ghost_totalSharesBurnedPerUser(user),
+            "Invariant violated: Share balance per user must equal total shares minted per user minus total shares burned per user"
+        );
+    }
+
+    /// @notice Amount Consistency: Total SharesMinted event amounts must equal total ShareMintUpdate event amounts
+    function invariant_shares_SharesMinted_ShareMintUpdate_amountConsistency() public view {
+        assertEq(
+            handler.ghost_yieldPeer_event_SharesMinted_param_amount_totalSum(),
+            handler.ghost_parent_event_ShareMintUpdate_param_amount_totalSum(),
+            "Invariant violated: Total SharesMinted amounts must equal total ShareMintUpdate amounts"
+        );
+    }
+
+    /// @notice Amount Consistency: Total SharesBurned event amounts must equal total ShareBurnUpdate event amounts
+    function invariant_shares_SharesBurned_ShareBurnUpdate_amountConsistency() public view {
+        assertEq(
+            handler.ghost_yieldPeer_event_SharesBurned_param_amount_totalSum(),
+            handler.ghost_parent_event_ShareBurnUpdate_param_amount_totalSum(),
+            "Invariant violated: Total SharesBurned amounts must equal total ShareBurnUpdate amounts"
+        );
+    }
+
+    /// @notice Share Token Supply: share.totalSupply() must equal parent.getTotalShares()
+    function invariant_shares_Share_totalSupply_equalsParentTotalShares() public view {
+        assertEq(
+            share.totalSupply(),
+            parent.getTotalShares(),
+            "Invariant violated: share.totalSupply() must equal parent.getTotalShares()"
+        );
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                                  FEES
+    //////////////////////////////////////////////////////////////*/
+    /// @notice Fee rate should always be within valid bounds
+    function invariant_fees_FeeRate_withinBounds() public {
+        handler.forEachChainSelector(this.checkFeeRateWithinBoundsPerChainSelector);
+    }
+
+    function checkFeeRateWithinBoundsPerChainSelector(uint64 chainSelector) external view {
+        IYieldPeer peer = IYieldPeer(handler.chainSelectorsToPeers(chainSelector));
+        assertTrue(
+            peer.getFeeRate() <= peer.getMaxFeeRate(),
+            "Invariant violated: Fee rate should not exceed maximum allowed fee rate"
+        );
+    }
+
+    /// @notice Fee Rate: Fee rate must be consistent across all chains
+    function invariant_fees_FeeRate_consistentAcrossChains() public {
+        handler.forEachChainSelector(this.checkFeeRateConsistencyPerChainSelector);
+    }
+
+    function checkFeeRateConsistencyPerChainSelector(uint64 chainSelector) external view {
+        assertEq(
+            IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getFeeRate(),
+            parent.getFeeRate(),
+            "Invariant violated: Fee rate must be consistent across all chains"
+        );
+    }
+
+    /// @notice Amount Flow: Total FeeTaken event amounts must equal total raw deposits minus total user principal
+    function invariant_fees_FeeTaken_amount_equalsTotalDepositMinusUserPrincipal() public view {
+        assertEq(
+            handler.ghost_yieldFees_event_FeeTaken_param_amount_totalSum(),
+            handler.ghost_totalUsdcDeposited() - handler.ghost_totalUsdcDeposited_userPrincipal(),
+            "Invariant violated: Total FeeTaken amounts must equal total raw deposits minus total user principal"
+        );
+    }
+
+    /// @notice Fee amount integrity: Total fees per user should equal sum of individual deposit fees
+    function invariant_fees_FeeTaken_amount_perUser_equalsSumOfDepositFees() public {
+        handler.forEachUser(this.checkFeeAmountIntegrityPerUser);
+    }
+
+    function checkFeeAmountIntegrityPerUser(address user) external view {
+        if (handler.ghost_totalUsdcDepositedPerUser_userPrincipal(user) > 0) {
+            assertTrue(
+                handler.ghost_totalFeesTakenInStablecoinPerUser(user)
+                    == handler.calculateExpectedFeesFromDepositRecords(user),
+                "Invariant violated: Total fees per user should equal sum of individual deposit fees"
+            );
+        }
+    }
+
+    /// @notice Total fees taken should equal sum of all individual deposit fees
+    function invariant_fees_FeeTaken_amount_equalsSumOfDepositFees() public view {
+        uint256 totalFeesFromEvents = handler.ghost_yieldFees_event_FeeTaken_param_amount_totalSum();
+        uint256 totalFeesFromDepositRecords = handler.calculateTotalExpectedFeesFromDepositRecords();
+
+        assertEq(
+            totalFeesFromEvents,
+            totalFeesFromDepositRecords,
+            "Invariant violated: Total fees taken should equal sum of all individual deposit fees"
+        );
+    }
+
     /// @notice Fees Consistency: The total withdrawable fees taken should be equal to the total fees taken minus total fees withdrawn
-    function invariant_fees_consistency() public view {
+    function invariant_fees_FeeTaken_FeesWithdrawn_balanceConsistency() public view {
         // @review instead of using .balanceOf, do we want to track fees in YieldFees::s_feesCollected[feeToken] mapping address => uint256?
         uint256 parentFees = usdc.balanceOf(address(parent));
         uint256 child1Fees = usdc.balanceOf(address(child1));
@@ -463,67 +610,46 @@ contract Invariant is StdInvariant, BaseTest {
         );
     }
 
-    /// @notice Fee rate should always be within valid bounds
-    function invariant_feeRate_bounds() public {
-        handler.forEachChainSelector(this.checkFeeRateBoundsPerChainSelector);
-    }
-
-    function checkFeeRateBoundsPerChainSelector(uint64 chainSelector) external view {
-        IYieldPeer peer = IYieldPeer(handler.chainSelectorsToPeers(chainSelector));
-        assertTrue(
-            peer.getFeeRate() <= peer.getMaxFeeRate(),
-            "Invariant violated: Fee rate should not exceed maximum allowed fee rate"
-        );
-    }
-
-    /// @notice Fee amount integrity: Total fees per user should equal sum of individual deposit fees
-    function invariant_fee_integrity_perUser() public {
-        handler.forEachUser(this.checkFeeIntegrityPerUser);
-    }
-
-    function checkFeeIntegrityPerUser(address user) external view {
-        if (handler.ghost_totalUsdcDepositedPerUser_userPrincipal(user) > 0) {
-            assertTrue(
-                handler.ghost_totalFeesTakenInStablecoinPerUser(user)
-                    == handler.calculateExpectedFeesFromDepositRecords(user),
-                "Invariant violated: Total fees per user should equal sum of individual deposit fees"
-            );
-        }
-    }
-
-    /// @notice Total fees taken should equal sum of all individual deposit fees
-    function invariant_totalFees_equals_sumOfDepositFees() public view {
-        uint256 totalFeesFromEvents = handler.ghost_yieldFees_event_FeeTaken_param_amount_totalSum();
-        // @review would it be cleaner to do these calculations in invariant or handler?
-        uint256 totalFeesFromDepositRecords = handler.calculateTotalExpectedFeesFromDepositRecords();
-
+    /// @notice Amount Flow: Total FeesWithdrawn event amounts must equal ghost total fees withdrawn
+    function invariant_fees_FeesWithdrawn_amount_matchesGhost() public view {
         assertEq(
-            totalFeesFromEvents,
-            totalFeesFromDepositRecords,
-            "Invariant violated: Total fees taken should equal sum of all individual deposit fees"
+            handler.ghost_yieldFees_event_FeesWithdrawn_param_amount_totalSum(),
+            handler.ghost_totalFeesWithdrawnInStablecoin(),
+            "Invariant violated: Total FeesWithdrawn event amounts must equal total fees withdrawn tracked by handler"
         );
     }
 
-    /// @notice Fee withdrawal integrity: Non-owner should not be able to withdraw fees
-    function invariant_feeWithdrawal_onlyOwner() public view {
+    /// @notice Fee withdrawal integrity: Non-fee-withdrawer should not be able to withdraw fees
+    function invariant_fees_FeesWithdrawn_onlyFeeWithdrawer() public view {
         assertFalse(
             handler.ghost_flag_nonFeeWithdrawer_withdrewFees(),
             "Invariant violated: Fees should only be withdrawable by fee withdrawer"
         );
     }
 
+    /*//////////////////////////////////////////////////////////////
+                               STRATEGY
+    //////////////////////////////////////////////////////////////*/
     /// @notice Strategy Registry: Active protocol must be registered in StrategyRegistry
     // @review:certora is this verified with certora?
     // where should it be verified? BasePeer.spec? Parent.spec because of getStrategy()?
-    function invariant_activeProtocol_registered() public view {
+    function invariant_strategy_activeProtocol_registeredInStrategyRegistry() public view {
         bytes32 protocolId = parent.getStrategy().protocolId;
         address adapter = strategyRegistryParent.getStrategyAdapter(protocolId);
         assertTrue(adapter != address(0), "Invariant violated: Active protocol must be registered in StrategyRegistry");
     }
 
-    /// @notice Strategy Registry: Active adapter must match registered adapter for strategyprotocolId stored in ParentPeer
+    /// @notice Strategy: Active strategy protocolId must be a supported protocol in ParentPeer
+    function invariant_strategy_activeProtocol_isSupportedInParent() public view {
+        assertTrue(
+            parent.getSupportedProtocol(parent.getStrategy().protocolId),
+            "Invariant violated: Active strategy protocolId must be a supported protocol in ParentPeer"
+        );
+    }
+
+    /// @notice Strategy Registry: Active adapter must match registered adapter for protocolId stored in ParentPeer
     // @review:certora is this verified with certora?
-    function invariant_adapterMatchesRegistryOnActiveChain() public view {
+    function invariant_strategy_activeAdapter_matchesStrategyRegistry() public view {
         bytes32 protocolId = parent.getStrategy().protocolId;
         address activePeer = handler.chainSelectorsToPeers(parent.getStrategy().chainSelector);
         assertEq(
@@ -533,9 +659,79 @@ contract Invariant is StdInvariant, BaseTest {
         );
     }
 
+    /// @notice Active Strategy Adapter Consistency: Active strategy adapter on active strategy chain should match the protocol stored in ParentPeer
+    function invariant_strategy_ActiveStrategyAdapterUpdated_consistencyPerChain() public {
+        handler.forEachChainSelector(this.checkActiveStrategyAdapterConsistencyPerChainSelector);
+    }
+
+    function checkActiveStrategyAdapterConsistencyPerChainSelector(uint64 chainSelector) external view {
+        if (chainSelector == parent.getStrategy().chainSelector) {
+            assertEq(
+                IYieldPeer(handler.chainSelectorsToPeers(chainSelector))
+                    .getStrategyAdapter(parent.getStrategy().protocolId),
+                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter(),
+                "Invariant violated: Active strategy adapter on active strategy chain should match the protocol stored in ParentPeer"
+            );
+            assertTrue(
+                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter() != address(0),
+                "Invariant violated: Active strategy adapter should be non-zero on the strategy chain"
+            );
+        } else {
+            assertEq(
+                IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getActiveStrategyAdapter(),
+                address(0),
+                "Invariant violated: Active strategy adapter should be set to 0 on non-active strategy chains"
+            );
+        }
+    }
+
+    /// @notice Strategy: Exactly one peer must be the strategy chain (have a non-zero active strategy adapter)
+    function invariant_strategy_exactlyOneStrategyChain() public view {
+        uint256 strategyChainCount = 0;
+        if (IYieldPeer(handler.chainSelectorsToPeers(PARENT_SELECTOR)).getActiveStrategyAdapter() != address(0)) {
+            strategyChainCount++;
+        }
+        if (IYieldPeer(handler.chainSelectorsToPeers(CHILD1_SELECTOR)).getActiveStrategyAdapter() != address(0)) {
+            strategyChainCount++;
+        }
+        if (IYieldPeer(handler.chainSelectorsToPeers(CHILD2_SELECTOR)).getActiveStrategyAdapter() != address(0)) {
+            strategyChainCount++;
+        }
+        assertEq(strategyChainCount, 1, "Invariant violated: Exactly one peer must be the strategy chain");
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                               REBALANCE
+    //////////////////////////////////////////////////////////////*/
+    /// @notice Rebalance Event Consistency: The number of rebalances should be equal to the number of:
+    /// - WithdrawFromStrategy events
+    /// - OnReportSecurityChecksPassed events
+    /// - StrategyUpdated events
+    function invariant_rebalance_WithdrawFromStrategy_OnReportSecurityChecksPassed_StrategyUpdated_emissionConsistency()
+        public
+        view
+    {
+        uint256 rebalances = handler.ghost_rebalances();
+        assertEq(
+            rebalances,
+            handler.ghost_yieldPeer_event_WithdrawFromStrategy_rebalance_emissions(),
+            "Invariant violated: The number of rebalance events should be equal to the number of WithdrawFromStrategy events"
+        );
+        assertEq(
+            rebalances,
+            handler.ghost_creReceiver_event_OnReportSecurityChecksPassed_emissions(),
+            "Invariant violated: The number of rebalance events should be equal to the number of OnReportSecurityChecksPassed events"
+        );
+        assertEq(
+            rebalances,
+            handler.ghost_parent_event_StrategyUpdated_emissions(),
+            "Invariant violated: The number of rebalance events should be equal to the number of StrategyUpdated events"
+        );
+    }
+
     /// @notice CRE Report Consistency: The strategy decoded from the last CRE report
     /// must always match the strategy state stored in ParentPeer
-    function invariant_decodedCREReportStrategy_matchesParentStrategy() public view {
+    function invariant_rebalance_ReportDecoded_matchesParentStrategy() public view {
         if (handler.ghost_rebalancer_event_ReportDecoded_emissions() == 0) return;
         assertEq(
             parent.getStrategy().chainSelector,
@@ -549,113 +745,8 @@ contract Invariant is StdInvariant, BaseTest {
         );
     }
 
-    /// @notice After a MAX sentinel rebalance withdrawal, the old adapter's protocol position (getTotalValue()) must be fully drained
-    function invariant_strategyAdapter_rebalance_withdrawsTotalValue() public view {
-        if (handler.ghost_rebalances() == 0) return;
-        address drainedAdapter = handler.ghost_yieldPeer_event_WithdrawFromStrategy_rebalance_param_strategyAdapter();
-        assertTrue(
-            IStrategyAdapter(drainedAdapter).getTotalValue(address(usdc)) < 1e6,
-            "Invariant violated: Old strategy adapter should be fully drained after rebalance withdrawal"
-        );
-    }
-
-    /// @notice Rebalance Event Consistency: The number of rebalances should be equal to the number of:
-    /// - WithdrawFromStrategy events
-    /// - OnReportSecurityChecksPassed events
-    /// - StrategyUpdated events
-    function invariant_rebalance_eventConsistency() public view {
-        uint256 rebalances = handler.ghost_rebalances();
-        assertEq(
-            rebalances,
-            handler.ghost_yieldPeer_event_WithdrawFromStrategy_rebalance_emissions(),
-            "Invariant violated: The number of rebalance events should be equal to the number of WithdrawFromStrategy events"
-        );
-        assertEq(
-            rebalances,
-            handler.ghost_creReceiver_event_OnReportSecurityChecksPassed_emissions(),
-            "Invariant violated: The number of rebalance events should be equal to the number of WithdrawFromStrategy events"
-        );
-        assertEq(
-            rebalances,
-            handler.ghost_parent_event_StrategyUpdated_emissions(),
-            "Invariant violated: The number of rebalance events should be equal to the number of StrategyUpdated events"
-        );
-    }
-
-    /// @notice Amount Flow: Total DepositInitiated amounts must equal total user principal deposited
-    function invariant_depositInitiated_amount_equals_userPrincipal() public view {
-        assertEq(
-            handler.ghost_yieldPeer_event_DepositInitiated_param_amount_totalSum(),
-            handler.ghost_totalUsdcDeposited_userPrincipal(),
-            "Invariant violated: Total DepositInitiated amounts must equal total user principal deposited"
-        );
-    }
-
-    /// @notice Amount Flow: Total StrategyAdapter Deposit amounts must equal total DepositToStrategy amounts emitted by peers
-    function invariant_strategyAdapter_deposit_matchesPeerEmission() public view {
-        assertEq(
-            handler.ghost_strategyAdapter_event_Deposit_param_amount_totalSum(),
-            handler.ghost_yieldPeer_event_DepositToStrategy_param_amount_totalSum(),
-            "Invariant violated: Total StrategyAdapter Deposit amounts must equal total DepositToStrategy amounts emitted by peers"
-        );
-    }
-
-    /// @notice Amount Flow: Total SharesBurned event amounts must equal ghost total shares burned
-    function invariant_sharesBurned_matchesGhost() public view {
-        assertEq(
-            handler.ghost_yieldPeer_event_SharesBurned_param_amount_totalSum(),
-            handler.ghost_totalSharesBurned(),
-            "Invariant violated: Total SharesBurned event amounts must equal total shares burned tracked by handler"
-        );
-    }
-
-    /// @notice Amount Flow: Total WithdrawInitiated amounts must equal total shares burned
-    function invariant_withdrawInitiated_matchesSharesBurned() public view {
-        assertEq(
-            handler.ghost_yieldPeer_event_WithdrawInitiated_param_amount_totalSum(),
-            handler.ghost_totalSharesBurned(),
-            "Invariant violated: Total WithdrawInitiated amounts must equal total shares burned"
-        );
-    }
-
-    /// @notice Amount Flow: Total FeesWithdrawn event amounts must equal ghost total fees withdrawn
-    function invariant_feesWithdrawn_matchesGhost() public view {
-        assertEq(
-            handler.ghost_yieldFees_event_FeesWithdrawn_param_amount_totalSum(),
-            handler.ghost_totalFeesWithdrawnInStablecoin(),
-            "Invariant violated: Total FeesWithdrawn event amounts must equal total fees withdrawn tracked by handler"
-        );
-    }
-
-    /// @notice Emission Count: SharesMinted must be emitted exactly once per DepositInitiated
-    function invariant_sharesMinted_emissions_matchDeposits() public view {
-        assertEq(
-            handler.ghost_yieldPeer_event_SharesMinted_emissions(),
-            handler.ghost_yieldPeer_event_DepositInitiated_emissions(),
-            "Invariant violated: SharesMinted must be emitted exactly once per DepositInitiated"
-        );
-    }
-
-    /// @notice Emission Count: SharesBurned must be emitted exactly once per WithdrawInitiated
-    function invariant_sharesBurned_emissions_matchWithdrawals() public view {
-        assertEq(
-            handler.ghost_yieldPeer_event_SharesBurned_emissions(),
-            handler.ghost_yieldPeer_event_WithdrawInitiated_emissions(),
-            "Invariant violated: SharesBurned must be emitted exactly once per WithdrawInitiated"
-        );
-    }
-
-    /// @notice CCIP: Every CCIPMessageSent must result in a CCIPMessageReceived in the synchronous mock
-    function invariant_ccip_sentEqualsReceived() public view {
-        assertEq(
-            handler.ghost_yieldPeer_event_CCIPMessageSent_emissions(),
-            handler.ghost_yieldPeer_event_CCIPMessageReceived_emissions(),
-            "Invariant violated: Every CCIPMessageSent must result in a CCIPMessageReceived"
-        );
-    }
-
     /// @notice Rebalance: StrategyUpdated event params must match decoded CRE report params
-    function invariant_strategyUpdated_matchesDecodedReport() public view {
+    function invariant_rebalance_StrategyUpdated_matchesReportDecoded() public view {
         if (handler.ghost_rebalances() == 0) return;
         assertEq(
             handler.ghost_parent_event_StrategyUpdated_param_chainSelector(),
@@ -669,44 +760,30 @@ contract Invariant is StdInvariant, BaseTest {
         );
     }
 
-    /// @notice Fee Rate: Fee rate must be consistent across all chains
-    function invariant_feeRate_consistentAcrossChains() public {
-        handler.forEachChainSelector(this.checkFeeRateConsistencyPerChainSelector);
-    }
-
-    function checkFeeRateConsistencyPerChainSelector(uint64 chainSelector) external view {
-        assertEq(
-            IYieldPeer(handler.chainSelectorsToPeers(chainSelector)).getFeeRate(),
-            parent.getFeeRate(),
-            "Invariant violated: Fee rate must be consistent across all chains"
+    /// @notice After a MAX sentinel rebalance withdrawal, the old adapter's protocol position (getTotalValue()) must be fully drained
+    function invariant_rebalance_WithdrawFromStrategy_drainsTotalValue() public view {
+        if (handler.ghost_rebalances() == 0) return;
+        address drainedAdapter = handler.ghost_yieldPeer_event_WithdrawFromStrategy_rebalance_param_strategyAdapter();
+        assertTrue(
+            IStrategyAdapter(drainedAdapter).getTotalValue(address(usdc)) < 1e6,
+            "Invariant violated: Old strategy adapter should be fully drained after rebalance withdrawal"
         );
     }
 
-    /// @notice Fee Rate: Ghost fee rate must match live parent fee rate
-    // @review probably superfluous
-    function invariant_feeRate_matchesGhost() public view {
+    /*//////////////////////////////////////////////////////////////
+                              CROSSCHAIN
+    //////////////////////////////////////////////////////////////*/
+    /// @notice CCIP: Every CCIPMessageSent must result in a CCIPMessageReceived in the synchronous mock
+    function invariant_crosschain_CCIPMessageSent_CCIPMessageReceived_emissionConsistency() public view {
         assertEq(
-            handler.ghost_feeRate(),
-            parent.getFeeRate(),
-            "Invariant violated: Ghost fee rate must match live parent fee rate"
-        );
-    }
-
-    /// @notice Share Balance: Share balance per user must equal total shares minted per user minus total shares burned per user
-    function invariant_shareBalance_perUser_integrity() public {
-        handler.forEachUser(this.checkShareBalanceIntegrityPerUser);
-    }
-
-    function checkShareBalanceIntegrityPerUser(address user) external view {
-        assertEq(
-            share.balanceOf(user),
-            handler.ghost_totalSharesMintedPerUser(user) - handler.ghost_totalSharesBurnedPerUser(user),
-            "Invariant violated: Share balance per user must equal total shares minted per user minus total shares burned per user"
+            handler.ghost_yieldPeer_event_CCIPMessageSent_emissions(),
+            handler.ghost_yieldPeer_event_CCIPMessageReceived_emissions(),
+            "Invariant violated: Every CCIPMessageSent must result in a CCIPMessageReceived"
         );
     }
 
     /// @notice PingPong Completion: Every fuzzed depositPingPong must result in SharesMinted
-    function invariant_depositPingPong_alwaysCompletes() public view {
+    function invariant_crosschain_depositPingPong_alwaysCompletes() public view {
         assertEq(
             handler.ghost_depositPingPong_calls(),
             handler.ghost_depositPingPong_completions(),
@@ -715,7 +792,7 @@ contract Invariant is StdInvariant, BaseTest {
     }
 
     /// @notice PingPong Completion: Every fuzzed withdrawPingPong must result in WithdrawCompleted
-    function invariant_withdrawPingPong_alwaysCompletes() public view {
+    function invariant_crosschain_withdrawPingPong_alwaysCompletes() public view {
         assertEq(
             handler.ghost_withdrawPingPong_calls(),
             handler.ghost_withdrawPingPong_completions(),
