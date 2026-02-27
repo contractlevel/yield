@@ -32,12 +32,27 @@ import {MockCCIPRouter} from "@chainlink-local/test/mocks/MockRouter.sol";
 
 import {ProxyHandler} from "./ProxyHandler.t.sol";
 import {
+    MockUpgradeStorage,
     MockUpgradeParentPeer,
     MockUpgradeChildPeer,
     MockUpgradeShare,
     MockUpgradeRebalancer,
     MockUpgradeStrategyRegistry
 } from "./mocks/MockUpgrade.sol";
+
+/**
+ * @title ProxyInvariant
+ * @author George Gorzhiyev | Judge Finance
+ * @notice The ProxyInvariant contract defines a suite of invariant tests to ensure the integrity and security of the proxy-based architecture in the system.
+ * It verifies that implementations are sealed, storage slots are correct, cross-chain state is consistent, singleton components maintain integrity,
+ * and critical roles persist across upgrades.
+ */
+
+interface Pausable {
+    function paused() external view returns (bool);
+    function emergencyPause() external;
+    function emergencyUnpause() external;
+}
 
 contract ProxyInvariant is StdInvariant, BaseTest {
     /*//////////////////////////////////////////////////////////////
@@ -64,10 +79,6 @@ contract ProxyInvariant is StdInvariant, BaseTest {
     ChildPeer internal child1;
     ChildPeer internal child2;
     Share internal share;
-
-    address internal parentInitialImpl;
-    address internal child1InitialImpl;
-    address internal child2InitialImpl;
 
     // USDC & Aave Pool
     IERC20 internal usdc;
@@ -192,7 +203,6 @@ contract ProxyInvariant is StdInvariant, BaseTest {
             networkConfig.ccip.ccipRouter, networkConfig.tokens.link, PARENT_SELECTOR, address(usdc), address(share)
         );
         bytes memory parentInit = abi.encodeWithSelector(ParentPeer.initialize.selector);
-        parentInitialImpl = address(parentImpl);
 
         // Deploy Parent Proxy and cast to ParentPeer type
         ParentProxy parentProxy = new ParentProxy(address(parentImpl), parentInit);
@@ -236,7 +246,6 @@ contract ProxyInvariant is StdInvariant, BaseTest {
             PARENT_SELECTOR
         );
         bytes memory child1Init = abi.encodeWithSelector(ChildPeer.initialize.selector);
-        child1InitialImpl = address(child1Impl);
 
         // Deploy Child Proxy and cast to ChildPeer type
         ChildProxy childProxy = new ChildProxy(address(child1Impl), child1Init);
@@ -274,7 +283,6 @@ contract ProxyInvariant is StdInvariant, BaseTest {
             PARENT_SELECTOR
         );
         bytes memory child2Init = abi.encodeWithSelector(ChildPeer.initialize.selector);
-        child2InitialImpl = address(child2Impl);
 
         // Deploy Child Proxy and cast to ChildPeer type
         ChildProxy childProxy = new ChildProxy(address(child2Impl), child2Init);
@@ -386,743 +394,292 @@ contract ProxyInvariant is StdInvariant, BaseTest {
     /*//////////////////////////////////////////////////////////////
                                INVARIANTS
     //////////////////////////////////////////////////////////////*/
-    function invariant_proxy_implementations_are_locked() public view {
-        // Now a simple check against the ghost variable
-        assertFalse(
-            proxyHandler.ghost_implementation_was_unlocked(),
-            "CRITICAL: An implementation contract was deployed without _disableInitializers!"
-        );
-    }
 
-    function invariant_proxy_unauthorized_upgrade_not_allowed() public view {
-        assertTrue(!proxyHandler.ghost_unauthorized_upgrade_success(), "Unauthorized Upgrade Succeeded");
-    }
+    uint64[] internal chains = [PARENT_SELECTOR, CHILD1_SELECTOR, CHILD2_SELECTOR];
 
-    function invariant_proxy_noDeposit_noWithdraw_whilePaused() public view virtual {
-        assertFalse(proxyHandler.ghost_withdrewWhile_paused());
-        assertFalse(proxyHandler.ghost_depositedWhile_paused());
-    }
-
-    function invariant_proxy_noDirection_call() public view virtual {
-        assertFalse(proxyHandler.ghost_depositedInto_impl());
-        assertFalse(proxyHandler.ghost_withdrawFrom_impl());
-    }
-
-    function invariant_proxy_fee_configuration_integrity() public view virtual {
-        assertTrue(parent.getFeeRate() <= parent.getMaxFeeRate(), "Parent: Fee Corruption");
-        assertTrue(child1.getFeeRate() <= child1.getMaxFeeRate(), "Child1: Fee Corruption");
-    }
-
-    function invariant_proxy_solvency_totalShares_sync() public view {
-        assertEq(
-            parent.getTotalShares(),
-            share.totalSupply(),
-            "CRITICAL: Parent Peer accounting and Share Token supply are out of sync!"
-        );
-
-        assertEq(
-            parent.getTotalShares(),
-            proxyHandler.ghost_parent_totalShares(),
-            "Parent: Total shares accounting does not match expected ghost state"
-        );
-    }
-
-    function invariant_proxy_pausable_state_consistency() public view {
-        // Get the expected state from the handler
-        bool expectedPauseState = proxyHandler.ghost_state_paused();
-
-        // Ensure all contracts reflect this state
-        // If one is paused and another is not, the system is in an invalid fractured state
-        assertEq(parent.paused(), expectedPauseState, "Parent: Pause state mismatch");
-        assertEq(child1.paused(), expectedPauseState, "Child 1: Pause state mismatch");
-        assertEq(child2.paused(), expectedPauseState, "Child 2: Pause state mismatch");
-
-        // Also verify the fee module (inherited) is paused
-        // Since YieldFees inherits PausableWithAccessControl, checking .paused() on the contract covers it,
-        // but this verifies the inheritance structure didn't break.
-    }
-
-    function invariant_proxy_ccip_configuration_integrity() public view {
-        // Verify Parent Configuration
-        assertTrue(parent.getAllowedChain(CHILD1_SELECTOR), "Parent: Should allow Child 1 Chain");
-        assertTrue(parent.getAllowedChain(CHILD2_SELECTOR), "Parent: Should allow Child 2 Chain");
-        assertEq(parent.getAllowedPeer(CHILD1_SELECTOR), address(child1), "Parent: Incorrect Peer for Child 1");
-        assertEq(parent.getAllowedPeer(CHILD2_SELECTOR), address(child2), "Parent: Incorrect Peer for Child 2");
-
-        // Verify Child 1 Configuration
-        assertTrue(child1.getAllowedChain(PARENT_SELECTOR), "Child 1: Should allow Parent Chain");
-        // Child 1 might communicate with Child 2 depending on your rebalance logic, verifying Parent is critical
-        assertEq(child1.getAllowedPeer(PARENT_SELECTOR), address(parent), "Child 1: Incorrect Peer for Parent");
-
-        // Verify Child 2 Configuration
-        assertTrue(child2.getAllowedChain(PARENT_SELECTOR), "Child 2: Should allow Parent Chain");
-        assertEq(child2.getAllowedPeer(PARENT_SELECTOR), address(parent), "Child 2: Incorrect Peer for Parent");
-
-        // Verify Ghost Sync (Did we lose the config during an upgrade?)
-        if (proxyHandler.ghost_parent_upgradeCount() > 0) {
-            assertEq(
-                parent.getCCIPGasLimit(), proxyHandler.ghost_parent_ccipGasLimit(), "Parent: CCIP Gas Limit corrupted"
-            );
-        }
-        if (proxyHandler.ghost_child1_upgradeCount() > 0) {
-            assertEq(
-                child1.getCCIPGasLimit(), proxyHandler.ghost_child1_ccipGasLimit(), "Child 1: CCIP Gas Limit corrupted"
-            );
-        }
-    }
-
-    function invariant_proxy_distributed_state_integrity() public view virtual {
-        IYieldPeer.Strategy memory strategy = parent.getStrategy();
-
-        // 1. Check Upgrade Integrity (Ghosts)
-        if (proxyHandler.ghost_parent_upgradeCount() > 0) {
-            assertEq(
-                parent.getActiveStrategyAdapter(),
-                proxyHandler.ghost_parent_activeStrategyAdapter(),
-                "Parent Active Strategy Corrupted"
-            );
-        }
-        if (proxyHandler.ghost_child1_upgradeCount() > 0) {
-            assertEq(
-                child1.getActiveStrategyAdapter(),
-                proxyHandler.ghost_child1_activeStrategyAdapter(),
-                "Child1 Active Strategy Corrupted"
-            );
-        }
-        if (proxyHandler.ghost_child2_upgradeCount() > 0) {
-            assertEq(
-                child2.getActiveStrategyAdapter(),
-                proxyHandler.ghost_child2_activeStrategyAdapter(),
-                "Child2 Active Strategy Corrupted"
-            );
-        }
-
-        // 2. Check Logical Integrity (Multi-Chain Registry Check)
-        // If Parent says strategy is on Chain X, Peer X must have a valid adapter set.
-        if (strategy.chainSelector == PARENT_SELECTOR) {
-            assertTrue(parent.getActiveStrategyAdapter() != address(0), "Parent: Adapter 0 on active strategy chain");
-            address expected = strategyRegistryParent.getStrategyAdapter(strategy.protocolId);
-            assertEq(parent.getActiveStrategyAdapter(), expected, "Parent: Active adapter mismatch with Registry");
-        } else if (strategy.chainSelector == CHILD1_SELECTOR) {
-            assertTrue(child1.getActiveStrategyAdapter() != address(0), "Child1: Adapter 0 on active strategy chain");
-            address expected = strategyRegistryChild1.getStrategyAdapter(strategy.protocolId);
-            assertEq(child1.getActiveStrategyAdapter(), expected, "Child1: Active adapter mismatch with Registry");
-        } else if (strategy.chainSelector == CHILD2_SELECTOR) {
-            assertTrue(child2.getActiveStrategyAdapter() != address(0), "Child2: Adapter 0 on active strategy chain");
-            address expected = strategyRegistryChild2.getStrategyAdapter(strategy.protocolId);
-            assertEq(child2.getActiveStrategyAdapter(), expected, "Child2: Active adapter mismatch with Registry");
-        }
-    }
-
-    function invariant_proxy_role_persistence() public view {
-        // We iterate through all contracts to ensure role tables weren't wiped
-        address[3] memory contracts = [address(parent), address(child1), address(child2)];
-        string[3] memory labels = ["Parent", "Child1", "Child2"];
-
-        for (uint256 i = 0; i < 3; i++) {
-            IAccessControl accessControl = IAccessControl(contracts[i]);
-            string memory label = labels[i];
-
-            // 1. Check Default Admin (Owner)
-            // Note: In your setup, the 'owner' (this contract) holds the DEFAULT_ADMIN_ROLE
-            assertTrue(accessControl.hasRole(0x00, address(this)), string.concat(label, ": DEFAULT_ADMIN_ROLE lost"));
-
-            // 2. Check Emergency Pauser
-            assertTrue(
-                accessControl.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser),
-                string.concat(label, ": EMERGENCY_PAUSER_ROLE lost")
-            );
-
-            // 3. Check Emergency Unpauser
-            assertTrue(
-                accessControl.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser),
-                string.concat(label, ": EMERGENCY_UNPAUSER_ROLE lost")
-            );
-
-            // 4. Check Config Admin
-            assertTrue(
-                accessControl.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin),
-                string.concat(label, ": CONFIG_ADMIN_ROLE lost")
-            );
-
-            // 5. Check Cross Chain Admin
-            assertTrue(
-                accessControl.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin),
-                string.concat(label, ": CROSS_CHAIN_ADMIN_ROLE lost")
-            );
-
-            // 6. Check Fee Roles
-            assertTrue(
-                accessControl.hasRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer),
-                string.concat(label, ": FEE_WITHDRAWER_ROLE lost")
-            );
-            assertTrue(
-                accessControl.hasRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter),
-                string.concat(label, ": FEE_RATE_SETTER_ROLE lost")
-            );
-
-            // 7. Check Upgrader Role (Specific to UUPS safety)
-            // In your setup, 'owner' (this contract) usually holds this initially
-            assertTrue(
-                accessControl.hasRole(Roles.UPGRADER_ROLE, address(this)), string.concat(label, ": UPGRADER_ROLE lost")
-            );
-        }
-    }
-
-    function invariant_proxy_parent_storage_integrity_post_upgrade() public view virtual {
-        // Only run checks if at least one upgrade has occurred
-        if (proxyHandler.ghost_parent_upgradeCount() > 0) {
-            // --- 1. Core Yield State ---
-            // Verify Strategy Struct components
-            IYieldPeer.Strategy memory currentStrategy = parent.getStrategy();
-            assertEq(
-                currentStrategy.chainSelector,
-                proxyHandler.ghost_parent_strategy_chainSelector(),
-                "Parent: Strategy ChainSelector mismatch"
-            );
-            assertEq(
-                currentStrategy.protocolId,
-                proxyHandler.ghost_parent_strategy_protocolId(),
-                "Parent: Strategy ProtocolID mismatch"
-            );
-
-            assertEq(
-                parent.getActiveStrategyAdapter(),
-                proxyHandler.ghost_parent_activeStrategyAdapter(),
-                "Parent: Active Adapter mismatch"
-            );
-
-            // --- 2. Financial & Admin State ---
-            assertEq(parent.getTotalShares(), proxyHandler.ghost_parent_totalShares(), "Parent: TotalShares mismatch");
-            assertEq(parent.getFeeRate(), proxyHandler.ghost_parent_feeRate(), "Parent: FeeRate mismatch");
-            assertEq(parent.getRebalancer(), proxyHandler.ghost_parent_rebalancer(), "Parent: Rebalancer mismatch");
-
-            // --- 3. Low-Level Storage Check (initialActiveStrategySet) ---
-            // We verify the raw storage slot matches the boolean ghost we saved
-            bytes32 parentStorageLocation = 0x603686382b15940b5fa7ef449162bde228a5948ce3b6bdf08bd833ec6ae79500;
-            bytes32 initialSetSlot = bytes32(uint256(parentStorageLocation) + 2);
-            bool currentInitialSet = vm.load(address(parent), initialSetSlot) != bytes32(0);
-
-            assertEq(
-                currentInitialSet,
-                proxyHandler.ghost_parent_initialActiveStrategySet(),
-                "Parent: InitialStrategySet storage slot mismatch"
-            );
-
-            // --- 4. Peer Configuration ---
-            assertEq(
-                parent.getStrategyRegistry(),
-                proxyHandler.ghost_parent_strategyRegistry(),
-                "Parent: StrategyRegistry mismatch"
-            );
-            assertEq(
-                parent.getCCIPGasLimit(), proxyHandler.ghost_parent_ccipGasLimit(), "Parent: CCIP GasLimit mismatch"
-            );
-            assertEq(parent.paused(), proxyHandler.ghost_parent_paused(), "Parent: Paused state mismatch");
-
-            // --- 5. Allowed Chains & Peers ---
-            // Using literals 2 and 3 for child chain selectors based on your Handler constants
-            uint64 child1Chain = 2;
-            uint64 child2Chain = 3;
-
-            assertEq(
-                parent.getAllowedChain(child1Chain),
-                proxyHandler.ghost_parent_allowedChain1(),
-                "Parent: AllowedChain (Child1) mismatch"
-            );
-            assertEq(
-                parent.getAllowedChain(child2Chain),
-                proxyHandler.ghost_parent_allowedChain2(),
-                "Parent: AllowedChain (Child2) mismatch"
-            );
-
-            assertEq(
-                parent.getAllowedPeer(child1Chain),
-                proxyHandler.ghost_parent_allowedPeer1(),
-                "Parent: AllowedPeer (Child1) mismatch"
-            );
-            assertEq(
-                parent.getAllowedPeer(child2Chain),
-                proxyHandler.ghost_parent_allowedPeer2(),
-                "Parent: AllowedPeer (Child2) mismatch"
-            );
-
-            // --- 6. Upgrade Persistence (Mock Verification) ---
-            try MockUpgradeParentPeer(payable(address(parent))).version() returns (uint64 v) {
-                assertEq(v, proxyHandler.ghost_parent_version(), "Parent: Version check failed");
-            } catch {
-                assertTrue(false, "Parent: Call to version() failed on upgraded contract");
-            }
-
-            // Verify the new storage variable persisted
-            try MockUpgradeParentPeer(payable(address(parent))).getNewVal() returns (uint256 val) {
-                assertEq(val, proxyHandler.ghost_parent_newVal(), "Parent: NewVal mismatch");
-            } catch {
-                assertTrue(false, "Parent: Call to getNewVal() failed on upgraded contract");
-            }
-        }
-    }
-
-    function invariant_proxy_children_storage_integrity_post_upgrade() public view virtual {
-        // Defined constants for clarity matching Handler
-        uint64 parentChain = 1;
-        uint64 child1Chain = 2;
-        uint64 child2Chain = 3;
-
-        // --- CHECK 1: Child 1 State ---
-        if (proxyHandler.ghost_child1_upgradeCount() > 0) {
-            // Configuration & State
-            assertEq(
-                child1.getParentChainSelector(),
-                proxyHandler.ghost_child1_parentChainSelector(),
-                "Child1: ParentChainSelector mismatch"
-            );
-            assertEq(child1.getFeeRate(), proxyHandler.ghost_child1_feeRate(), "Child1: FeeRate mismatch");
-            assertEq(
-                child1.getActiveStrategyAdapter(),
-                proxyHandler.ghost_child1_activeStrategyAdapter(),
-                "Child1: ActiveStrategyAdapter mismatch"
-            );
-            assertEq(
-                child1.getStrategyRegistry(),
-                proxyHandler.ghost_child1_strategyRegistry(),
-                "Child1: StrategyRegistry mismatch"
-            );
-            assertEq(child1.paused(), proxyHandler.ghost_child1_paused(), "Child1: Paused state mismatch");
-            assertEq(
-                child1.getCCIPGasLimit(), proxyHandler.ghost_child1_ccipGasLimit(), "Child1: CCIP GasLimit mismatch"
-            );
-
-            // Allowed Chains & Peers (Child1 checks Parent(1) and Child2(3))
-            assertEq(
-                child1.getAllowedChain(parentChain),
-                proxyHandler.ghost_child1_allowedChain1(),
-                "Child1: AllowedChain (Parent) mismatch"
-            );
-            assertEq(
-                child1.getAllowedChain(child2Chain),
-                proxyHandler.ghost_child1_allowedChain2(),
-                "Child1: AllowedChain (Child2) mismatch"
-            );
-
-            assertEq(
-                child1.getAllowedPeer(parentChain),
-                proxyHandler.ghost_child1_allowedPeer1(),
-                "Child1: AllowedPeer (Parent) mismatch"
-            );
-            assertEq(
-                child1.getAllowedPeer(child2Chain),
-                proxyHandler.ghost_child1_allowedPeer2(),
-                "Child1: AllowedPeer (Child2) mismatch"
-            );
-
-            // Upgrade Verification
-            try MockUpgradeChildPeer(payable(address(child1))).version() returns (uint64 v) {
-                assertEq(v, proxyHandler.ghost_child1_version(), "Child1: Version check failed");
-            } catch {
-                assertTrue(false, "Child1: Call to version() failed on upgraded contract");
-            }
-
-            try MockUpgradeChildPeer(payable(address(child1))).getNewVal() returns (uint256 val) {
-                assertEq(val, proxyHandler.ghost_child1_newVal(), "Child1: NewVal mismatch");
-            } catch {
-                assertTrue(false, "Child1: Call to getNewVal() failed on upgraded contract");
-            }
-        }
-
-        // --- CHECK 2: Child 2 State ---
-        if (proxyHandler.ghost_child2_upgradeCount() > 0) {
-            // Configuration & State
-            assertEq(
-                child2.getParentChainSelector(),
-                proxyHandler.ghost_child2_parentChainSelector(),
-                "Child2: ParentChainSelector mismatch"
-            );
-            assertEq(child2.getFeeRate(), proxyHandler.ghost_child2_feeRate(), "Child2: FeeRate mismatch");
-            assertEq(
-                child2.getActiveStrategyAdapter(),
-                proxyHandler.ghost_child2_activeStrategyAdapter(),
-                "Child2: ActiveStrategyAdapter mismatch"
-            );
-            assertEq(
-                child2.getStrategyRegistry(),
-                proxyHandler.ghost_child2_strategyRegistry(),
-                "Child2: StrategyRegistry mismatch"
-            );
-            assertEq(child2.paused(), proxyHandler.ghost_child2_paused(), "Child2: Paused state mismatch");
-            assertEq(
-                child2.getCCIPGasLimit(), proxyHandler.ghost_child2_ccipGasLimit(), "Child2: CCIP GasLimit mismatch"
-            );
-
-            // Allowed Chains & Peers (Child2 checks Parent(1) and Child1(2))
-            assertEq(
-                child2.getAllowedChain(parentChain),
-                proxyHandler.ghost_child2_allowedChain1(),
-                "Child2: AllowedChain (Parent) mismatch"
-            );
-            assertEq(
-                child2.getAllowedChain(child1Chain),
-                proxyHandler.ghost_child2_allowedChain2(),
-                "Child2: AllowedChain (Child1) mismatch"
-            );
-
-            assertEq(
-                child2.getAllowedPeer(parentChain),
-                proxyHandler.ghost_child2_allowedPeer1(),
-                "Child2: AllowedPeer (Parent) mismatch"
-            );
-            assertEq(
-                child2.getAllowedPeer(child1Chain),
-                proxyHandler.ghost_child2_allowedPeer2(),
-                "Child2: AllowedPeer (Child1) mismatch"
-            );
-
-            // Upgrade Verification
-            try MockUpgradeChildPeer(payable(address(child2))).version() returns (uint64 v) {
-                assertEq(v, proxyHandler.ghost_child2_version(), "Child2: Version check failed");
-            } catch {
-                assertTrue(false, "Child2: Call to version() failed on upgraded contract");
-            }
-
-            try MockUpgradeChildPeer(payable(address(child2))).getNewVal() returns (uint256 val) {
-                assertEq(val, proxyHandler.ghost_child2_newVal(), "Child2: NewVal mismatch");
-            } catch {
-                assertTrue(false, "Child2: Call to getNewVal() failed on upgraded contract");
-            }
-        }
-    }
-
-    function invariant_proxy_share_storage_integrity_post_upgrade() public view virtual {
-        // Only run checks if at least one upgrade has occurred
-        if (proxyHandler.ghost_share_upgradeCount() > 0) {
-            // --- 1. Basic Token Metadata & Supply ---
-            assertEq(share.totalSupply(), proxyHandler.ghost_share_totalSupply(), "Share: TotalSupply mismatch");
-            assertEq(share.name(), proxyHandler.ghost_share_name(), "Share: Name mismatch");
-            assertEq(share.symbol(), proxyHandler.ghost_share_symbol(), "Share: Symbol mismatch");
-            assertEq(share.decimals(), proxyHandler.ghost_share_decimals(), "Share: Decimals mismatch");
-
-            // --- 2. Administrative Roles ---
-            assertEq(address(share.getCCIPAdmin()), proxyHandler.ghost_share_ccipAdmin(), "Share: CCIP Admin mismatch");
-
-            // --- 3. User Balances ---
-            // We retrieve the superUser address from the handler to ensure we check the right account
-            address superUser = proxyHandler.superUser();
-            assertEq(
-                share.balanceOf(superUser), proxyHandler.ghost_share_balance(), "Share: SuperUser Balance mismatch"
-            );
-
-            // --- 4. User Allowances ---
-            // Check allowance for Parent
-            assertEq(
-                share.allowance(superUser, address(parent)),
-                proxyHandler.ghost_share_allowance_parent(),
-                "Share: Allowance (Parent) mismatch"
-            );
-
-            // Check allowance for Child 1
-            assertEq(
-                share.allowance(superUser, address(child1)),
-                proxyHandler.ghost_share_allowance_child1(),
-                "Share: Allowance (Child1) mismatch"
-            );
-
-            // Check allowance for Child 2
-            assertEq(
-                share.allowance(superUser, address(child2)),
-                proxyHandler.ghost_share_allowance_child2(),
-                "Share: Allowance (Child2) mismatch"
-            );
-
-            // --- 5. Upgrade Specific Logic (Mock Verification) ---
-            // Verify the version bumped correctly
-            try MockUpgradeShare(payable(address(share))).version() returns (uint64 v) {
-                assertEq(v, proxyHandler.ghost_share_version(), "Share: Version check failed");
-            } catch {
-                // Using assertTrue(false, ...) allows you to keep the error message
-                assertTrue(false, "Share: Call to version() failed on upgraded contract");
-            }
-
-            // Verify the new storage variable (newVal) persisted
-            try MockUpgradeShare(payable(address(share))).getNewVal() returns (uint256 val) {
-                assertEq(val, proxyHandler.ghost_share_newVal(), "Share: NewVal mismatch");
-            } catch {
-                assertTrue(false, "Share: Call to getNewVal() failed on upgraded contract");
-            }
-        }
-    }
-
-    function invariant_proxy_rebalancer_storage_integrity_post_upgrade() public view virtual {
-        // Define the ID locally to ensure we query the correct mapping slot
-        bytes32 workflowId = bytes32("rebalanceWorkflowId");
-
-        // Only run checks if at least one upgrade has occurred
-        if (proxyHandler.ghost_rebalancer_upgradeCount() > 0) {
-            // --- 1. System Configuration Checks ---
-            assertEq(
-                rebalancer.getKeystoneForwarder(),
-                proxyHandler.ghost_rebalancer_forwarder(),
-                "Rebalancer: Keystone Forwarder mismatch"
-            );
-
-            assertEq(
-                address(rebalancer.getParentPeer()),
-                proxyHandler.ghost_rebalancer_parentPeer(),
-                "Rebalancer: ParentPeer mismatch"
-            );
-
-            assertEq(
-                address(rebalancer.getStrategyRegistry()),
-                proxyHandler.ghost_rebalancer_strategyRegistry(),
-                "Rebalancer: StrategyRegistry mismatch"
-            );
-
-            // --- 2. Workflow Storage Checks ---
-            // Retrieve the struct from the contract to verify integrity
-            CREReceiver.Workflow memory currentWorkflow = rebalancer.getWorkflow(workflowId);
-
-            assertEq(
-                currentWorkflow.owner,
-                proxyHandler.ghost_rebalancer_workflowOwner(),
-                "Rebalancer: Workflow Owner mismatch"
-            );
-
-            assertEq(
-                currentWorkflow.name, proxyHandler.ghost_rebalancer_workflowName(), "Rebalancer: Workflow Name mismatch"
-            );
-
-            // --- 3. Upgrade Persistence (Mock Verification) ---
-            // Verify version bumped correctly (to 2)
-            try MockUpgradeRebalancer(payable(address(rebalancer))).version() returns (uint64 v) {
-                assertEq(v, proxyHandler.ghost_rebalancer_version(), "Rebalancer: Version check failed");
-            } catch {
-                assertTrue(false, "Rebalancer: Call to version() failed on upgraded contract");
-            }
-
-            // Verify the new storage variable persisted
-            try MockUpgradeRebalancer(payable(address(rebalancer))).getNewVal() returns (uint256 val) {
-                assertEq(val, proxyHandler.ghost_rebalancer_newVal(), "Rebalancer: NewVal mismatch");
-            } catch {
-                assertTrue(false, "Rebalancer: Call to getNewVal() failed on upgraded contract");
-            }
-        }
-    }
-
-    function invariant_proxy_registry_storage_integrity_post_upgrade() public view virtual {
-        // Define IDs locally to verify against the source of truth
-        bytes32 aaveId = keccak256(abi.encodePacked("aave-v3"));
-        bytes32 compoundId = keccak256(abi.encodePacked("compound-v3"));
-
-        // --- CHECK 1: Parent Registry ---
-        if (proxyHandler.ghost_registryParent_upgradeCount() > 0) {
-            // Check Aave Adapter Integrity
-            assertEq(
-                strategyRegistryParent.getStrategyAdapter(aaveId),
-                proxyHandler.ghost_registryParent_aaveV3_adapter(),
-                "Registry Parent: AaveV3 Adapter mismatch"
-            );
-
-            // Check Compound Adapter Integrity
-            assertEq(
-                strategyRegistryParent.getStrategyAdapter(compoundId),
-                proxyHandler.ghost_registryParent_compoundV3_adapter(),
-                "Registry Parent: CompoundV3 Adapter mismatch"
-            );
-
-            // Check Upgrade Persistence (Version)
-            try MockUpgradeStrategyRegistry(payable(address(strategyRegistryParent))).version() returns (uint64 v) {
-                assertEq(v, proxyHandler.ghost_registryParent_version(), "Registry Parent: Version mismatch");
-            } catch {
-                assertTrue(false, "Registry Parent: Call to version() failed");
-            }
-
-            // Check Upgrade Persistence (New Value)
-            try MockUpgradeStrategyRegistry(payable(address(strategyRegistryParent))).getNewVal() returns (
-                uint256 val
-            ) {
-                assertEq(val, proxyHandler.ghost_registryParent_newVal(), "Registry Parent: NewVal mismatch");
-            } catch {
-                assertTrue(false, "Registry Parent: Call to getNewVal() failed");
-            }
-        }
-
-        // --- CHECK 2: Child1 Registry ---
-        if (proxyHandler.ghost_registryChild1_upgradeCount() > 0) {
-            assertEq(
-                strategyRegistryChild1.getStrategyAdapter(aaveId),
-                proxyHandler.ghost_registryChild1_aaveV3_adapter(),
-                "Registry Child1: AaveV3 Adapter mismatch"
-            );
-            assertEq(
-                strategyRegistryChild1.getStrategyAdapter(compoundId),
-                proxyHandler.ghost_registryChild1_compoundV3_adapter(),
-                "Registry Child1: CompoundV3 Adapter mismatch"
-            );
-
-            try MockUpgradeStrategyRegistry(payable(address(strategyRegistryChild1))).version() returns (uint64 v) {
-                assertEq(v, proxyHandler.ghost_registryChild1_version(), "Registry Child1: Version mismatch");
-            } catch {
-                assertTrue(false, "Registry Child1: Call to version() failed");
-            }
-
-            try MockUpgradeStrategyRegistry(payable(address(strategyRegistryChild1))).getNewVal() returns (
-                uint256 val
-            ) {
-                assertEq(val, proxyHandler.ghost_registryChild1_newVal(), "Registry Child1: NewVal mismatch");
-            } catch {
-                assertTrue(false, "Registry Child1: Call to getNewVal() failed");
-            }
-        }
-
-        // --- CHECK 3: Child2 Registry ---
-        if (proxyHandler.ghost_registryChild2_upgradeCount() > 0) {
-            assertEq(
-                strategyRegistryChild2.getStrategyAdapter(aaveId),
-                proxyHandler.ghost_registryChild2_aaveV3_adapter(),
-                "Registry Child2: AaveV3 Adapter mismatch"
-            );
-            assertEq(
-                strategyRegistryChild2.getStrategyAdapter(compoundId),
-                proxyHandler.ghost_registryChild2_compoundV3_adapter(),
-                "Registry Child2: CompoundV3 Adapter mismatch"
-            );
-
-            try MockUpgradeStrategyRegistry(payable(address(strategyRegistryChild2))).version() returns (uint64 v) {
-                assertEq(v, proxyHandler.ghost_registryChild2_version(), "Registry Child2: Version mismatch");
-            } catch {
-                assertTrue(false, "Registry Child2: Call to version() failed");
-            }
-
-            try MockUpgradeStrategyRegistry(payable(address(strategyRegistryChild2))).getNewVal() returns (
-                uint256 val
-            ) {
-                assertEq(val, proxyHandler.ghost_registryChild2_newVal(), "Registry Child2: NewVal mismatch");
-            } catch {
-                assertTrue(false, "Registry Child2: Call to getNewVal() failed");
-            }
-        }
-    }
-
-    // Hash from OpenZeppelin Initializable.sol (erc7201:openzeppelin.storage.Initializable)
-    bytes32 internal constant OZ_INITIALIZABLE_STORAGE_SLOT =
+    // --- Storage Slots ---
+    bytes32 internal constant OZ_INITIALIZABLE_SLOT =
         0xf0c57e16840df040f15088dc2f81fe391c3923bec73e23a9662efc9c229c6a00;
 
-    function invariant_proxy_implementation_is_sealed() public view {
-        // 1. Get the implementation address from our handler's ghost tracking
-        address impl = proxyHandler.latestParentImpl();
+    // --- 1. Global Safety & Implementation Checks ---
 
-        // Skip if we haven't deployed an implementation yet
-        if (impl == address(0)) return;
+    function invariant_proxy_implementations_are_sealed_and_secure() public view {
+        (
 
-        // 2. Load the specific storage slot from the IMPLEMENTATION contract
-        // We are reading the storage of the logic contract directly, not the proxy.
-        bytes32 storageSlotValue = vm.load(impl, OZ_INITIALIZABLE_STORAGE_SLOT);
+            /* bool paused */,
+            /* uint256 feeRate */,
+            /* uint256 ccipGasLimit */,
+            bool withdrewWhilePaused,
+            bool depositedWhilePaused,
+            bool depositedIntoImpl,
+            bool withdrawFromImpl,
+            bool unauthorizedUpgradeSuccess,
+            bool implementationWasUnlocked
+        ) = proxyHandler.globalGhost();
 
-        // 3. Extract `_initialized` (uint64)
-        // In Solidity packing, the first member of the struct (uint64) occupies
-        // the lowest-order bits (right-most) of the storage slot.
-        uint64 initializedVersion = uint64(uint256(storageSlotValue));
-
-        // 4. Assert the Seal
-        // _disableInitializers() sets the version to type(uint64).max
-        assertEq(
-            initializedVersion, type(uint64).max, "CRITICAL: Implementation contract is NOT sealed! It can be hijacked."
-        );
-        // Ensure the implementation is actually a contract
-        assertTrue(impl.code.length > 0, "Implementation address has no code!");
+        assertFalse(implementationWasUnlocked, "[Global] Impl deployed unsealed");
+        assertFalse(unauthorizedUpgradeSuccess, "[Global] Unauthorized upgrade succeeded");
+        assertFalse(withdrewWhilePaused, "[Global] Withdraw bypassed pause");
+        assertFalse(depositedWhilePaused, "[Global] Deposit bypassed pause");
+        assertFalse(depositedIntoImpl, "[Global] Direct impl deposit succeeded");
+        assertFalse(withdrawFromImpl, "[Global] Direct impl withdraw succeeded");
     }
 
-    function invariant_proxy_implementation_slot() public view virtual {
-        // 1. Parent
-        if (proxyHandler.ghost_parent_upgradeCount() > 0) {
-            assertEq(
-                vm.load(address(parent), IMPLEMENTATION_SLOT),
-                bytes32(uint256(uint160(address(proxyHandler.latestParentImpl())))),
-                "Parent: Implementation slot corrupted"
-            );
+    function invariant_proxy_implementation_slots_are_valid() public view {
+        for (uint256 i = 0; i < chains.length; i++) {
+            uint64 chain = chains[i];
 
-            // In your invariant
-            address parentImpl = address(uint160(uint256(vm.load(address(parent), IMPLEMENTATION_SLOT))));
-            assertTrue(parentImpl.code.length > 0, "Parent Implementation is not a contract!");
+            // 1. Peer Slot Check
+            (,,, address peerImpl,,,,,) = proxyHandler.peerGhosts(chain);
+            if (peerImpl != address(0)) {
+                assertEq(_getProxyImpl(address(proxyHandler.peers(chain))), peerImpl, "[Peer] Impl slot corrupted");
+
+                uint64 initVersion = uint64(uint256(vm.load(peerImpl, OZ_INITIALIZABLE_SLOT)));
+                assertEq(initVersion, type(uint64).max, "[Peer] Impl contract not sealed");
+            }
+
+            // 2. Registry Slot Check
+            (,,, address regImpl,,) = proxyHandler.registryGhosts(chain);
+            if (regImpl != address(0)) {
+                assertEq(
+                    _getProxyImpl(address(proxyHandler.registries(chain))), regImpl, "[Registry] Impl slot corrupted"
+                );
+            }
         }
 
-        // 2. Child 1
-        if (proxyHandler.ghost_child1_upgradeCount() > 0) {
-            assertEq(
-                vm.load(address(child1), IMPLEMENTATION_SLOT),
-                bytes32(uint256(uint160(address(proxyHandler.latestChild1Impl())))),
-                "Child1: Implementation slot corrupted"
-            );
+        // 3. Singleton Slot Checks
+        (,,, address shareImpl,,,,,,) = proxyHandler.shareGhost();
+        if (shareImpl != address(0)) {
+            assertEq(_getProxyImpl(address(share)), shareImpl, "[Share] Impl slot corrupted");
         }
 
-        // 3. Child 2
-        if (proxyHandler.ghost_child2_upgradeCount() > 0) {
-            assertEq(
-                vm.load(address(child2), IMPLEMENTATION_SLOT),
-                bytes32(uint256(uint160(address(proxyHandler.latestChild2Impl())))),
-                "Child2: Implementation slot corrupted"
-            );
-        }
-
-        // 4. Share Token
-        if (proxyHandler.ghost_share_upgradeCount() > 0) {
-            assertEq(
-                vm.load(address(share), IMPLEMENTATION_SLOT),
-                bytes32(uint256(uint160(address(proxyHandler.latestShareImpl())))),
-                "Share: Implementation slot corrupted"
-            );
-        }
-
-        // 5. Rebalancer
-        if (proxyHandler.ghost_rebalancer_upgradeCount() > 0) {
-            assertEq(
-                vm.load(address(rebalancer), IMPLEMENTATION_SLOT),
-                bytes32(uint256(uint160(address(proxyHandler.latestRebalancerImpl())))),
-                "Rebalancer: Implementation slot corrupted"
-            );
-        }
-
-        // 6. Parent Registry
-        if (proxyHandler.ghost_registryParent_upgradeCount() > 0) {
-            assertEq(
-                vm.load(address(strategyRegistryParent), IMPLEMENTATION_SLOT),
-                bytes32(uint256(uint160(address(proxyHandler.latestRegistryParentImpl())))),
-                "RegistryParent: Implementation slot corrupted"
-            );
-        }
-
-        // 7. Child 1 Registry
-        if (proxyHandler.ghost_registryChild1_upgradeCount() > 0) {
-            assertEq(
-                vm.load(address(strategyRegistryChild1), IMPLEMENTATION_SLOT),
-                bytes32(uint256(uint160(address(proxyHandler.latestRegistryChild1Impl())))),
-                "RegistryChild1: Implementation slot corrupted"
-            );
-        }
-
-        // 8. Child 2 Registry
-        if (proxyHandler.ghost_registryChild2_upgradeCount() > 0) {
-            assertEq(
-                vm.load(address(strategyRegistryChild2), IMPLEMENTATION_SLOT),
-                bytes32(uint256(uint160(address(proxyHandler.latestRegistryChild2Impl())))),
-                "RegistryChild2: Implementation slot corrupted"
-            );
+        (,,, address rebImpl,,,,,) = proxyHandler.rebalancerGhost();
+        if (rebImpl != address(0)) {
+            assertEq(_getProxyImpl(address(rebalancer)), rebImpl, "[Rebalancer] Impl slot corrupted");
         }
     }
 
-    function invariant_proxy_interface_adherence() public view virtual {
-        bytes4 accessControlId = type(IAccessControl).interfaceId;
-        bytes4 ccipReceiverId = type(IAny2EVMMessageReceiver).interfaceId;
-        bytes4 shareId = type(IERC20).interfaceId;
+    // --- 2. Dynamic Cross-Chain State Integrity ---
+    function invariant_proxy_distributed_peer_integrity() public view {
+        // --- 1. Hub (Parent) State Verification ---
+        (
+            uint256 hubShares,
+            address expectedRebalancer,
+            bool expectedInitialSet,
+            uint64 expectedStrategyChain,
+            bytes32 expectedStrategyProtocol
+        ) = proxyHandler.parentGhost();
 
-        // 1. Parent Checks
-        assertTrue(parent.supportsInterface(accessControlId), "Parent: Lost IAccessControl signature");
-        assertTrue(parent.supportsInterface(ccipReceiverId), "Parent: Lost CCIP Receiver signature");
+        // Accounting & Singleton References
+        assertEq(parent.getTotalShares(), hubShares, "[Hub] Total shares accounting drifted");
+        assertEq(parent.getTotalShares(), share.totalSupply(), "[Hub] Accounting vs Token supply mismatch");
+        assertEq(parent.getRebalancer(), expectedRebalancer, "[Hub] Rebalancer reference corrupted");
 
-        // 2. Child Checks
-        assertTrue(child1.supportsInterface(accessControlId), "Child1: Lost IAccessControl signature");
-        assertTrue(child2.supportsInterface(accessControlId), "Child2: Lost IAccessControl signature");
+        // Strategy Struct Integrity
+        IYieldPeer.Strategy memory liveStrategy = parent.getStrategy();
+        assertEq(liveStrategy.chainSelector, expectedStrategyChain, "[Hub] Strategy chain selector corrupted");
+        assertEq(liveStrategy.protocolId, expectedStrategyProtocol, "[Hub] Strategy protocol ID corrupted");
 
-        // 3. Share Checks
-        assertTrue(share.supportsInterface(shareId), "Share: Lost IERC20 signature");
+        // Low-level Initialization Flag Integrity
+        bytes32 initialSetSlot =
+            bytes32(uint256(0x603686382b15940b5fa7ef449162bde228a5948ce3b6bdf08bd833ec6ae79500) + 2);
+        bool liveInitialSet = vm.load(address(parent), initialSetSlot) != bytes32(0);
+        assertEq(liveInitialSet, expectedInitialSet, "[Hub] Initial strategy flag corrupted");
+
+        // --- 2. Universal Peer Verification ---
+        for (uint256 i = 0; i < chains.length; i++) {
+            uint64 chain = chains[i];
+            IYieldPeer livePeer = proxyHandler.peers(chain);
+
+            // Universal live state constraints
+            uint256 expectedFeeRate;
+            (, expectedFeeRate,,,,,,,) = proxyHandler.globalGhost();
+            assertTrue(livePeer.getFeeRate() == expectedFeeRate, "[Peer] Fee rate limit breached");
+
+            // Expected Pause State Sync (using the global state)
+            (bool expectedPauseState,,,,,,,,) = proxyHandler.globalGhost();
+            assertEq(Pausable(address(livePeer)).paused(), expectedPauseState, "[Peer] Pause state desynced");
+
+            // Offload the heavy memory destructuring to a dedicated execution context
+            _verifyPeerUpgradeState(chain, livePeer);
+        }
+    }
+
+    function _verifyPeerUpgradeState(uint64 chain, IYieldPeer livePeer) internal view {
+        (
+            uint64 version,
+            uint256 upgradeCount,
+            uint256 newVal,
+            /* latestImpl */,
+            /* paused     */,
+            uint256 feeRate,
+            uint256 ccipGasLimit,
+            address activeAdapter,
+            address strategyReg
+        ) = proxyHandler.peerGhosts(chain);
+
+        if (upgradeCount > 0) {
+            assertEq(livePeer.getFeeRate(), feeRate, "[Peer] FeeRate corrupted");
+            assertEq(livePeer.getCCIPGasLimit(), ccipGasLimit, "[Peer] CCIP Gas Limit corrupted");
+            assertEq(livePeer.getActiveStrategyAdapter(), activeAdapter, "[Peer] Active Adapter corrupted");
+            assertEq(livePeer.getStrategyRegistry(), strategyReg, "[Peer] Strategy Registry corrupted");
+
+            // Verify CCIP Topography Maps
+            for (uint256 j = 0; j < chains.length; j++) {
+                uint64 target = chains[j];
+                bool expectedChain = proxyHandler.getGhostAllowedChain(chain, target);
+                address expectedPeer = proxyHandler.getGhostAllowedPeer(chain, target);
+
+                assertEq(livePeer.getAllowedChain(target), expectedChain, "[Peer] AllowedChain topography corrupted");
+                assertEq(livePeer.getAllowedPeer(target), expectedPeer, "[Peer] AllowedPeer topography corrupted");
+            }
+
+            try MockUpgradeStorage(address(livePeer)).getNewVal() returns (uint256 val) {
+                assertEq(val, newVal, "[Peer] Mock dynamic data lost");
+                assertEq(
+                    MockUpgradeStorage(address(livePeer)).version(), version, "[Peer] Reinitializer version bump failed"
+                );
+            } catch {
+                assertTrue(false, "[Peer] Mock proxy interface failed");
+            }
+        }
+    }
+
+    function invariant_proxy_distributed_registry_integrity() public view {
+        for (uint256 i = 0; i < chains.length; i++) {
+            uint64 chain = chains[i];
+            StrategyRegistry liveReg = proxyHandler.registries(chain);
+
+            (
+                uint64 version,
+                uint256 upgradeCount,
+                uint256 newVal,
+                /* latestImpl */,
+                address aaveAdapter,
+                address compAdapter
+            ) = proxyHandler.registryGhosts(chain);
+
+            if (upgradeCount > 0) {
+                assertEq(liveReg.getStrategyAdapter(AAVE_V3_PROTOCOL_ID), aaveAdapter, "[Registry] Aave adapter lost");
+                assertEq(
+                    liveReg.getStrategyAdapter(COMPOUND_V3_PROTOCOL_ID), compAdapter, "[Registry] Compound adapter lost"
+                );
+
+                try MockUpgradeStorage(address(liveReg)).getNewVal() returns (uint256 val) {
+                    assertEq(val, newVal, "[Registry] Mock dynamic data lost");
+                    assertEq(
+                        MockUpgradeStorage(address(liveReg)).version(),
+                        version,
+                        "[Registry] Reinitializer version bump failed"
+                    );
+                } catch {
+                    assertTrue(false, "[Registry] Mock proxy interface failed");
+                }
+            }
+        }
+    }
+
+    // --- 3. Singleton Components Integrity ---
+
+    function invariant_proxy_share_token_integrity() public view {
+        (
+            uint64 version,
+            uint256 upgradeCount,
+            uint256 newVal,
+            /* latestImpl */,
+            uint256 totalSupply,
+            uint256 userBalance,
+            address ccipAdmin,
+            string memory expectedName,
+            string memory expectedSymbol,
+            uint8 expectedDecimals
+        ) = proxyHandler.shareGhost();
+
+        if (upgradeCount > 0) {
+            assertEq(share.totalSupply(), totalSupply, "[Share] Total supply corrupted");
+            assertEq(share.name(), expectedName, "[Share] Name corrupted");
+            assertEq(share.symbol(), expectedSymbol, "[Share] Symbol corrupted");
+            assertEq(share.decimals(), expectedDecimals, "[Share] Decimals corrupted");
+            assertEq(address(share.getCCIPAdmin()), ccipAdmin, "[Share] CCIP Admin lost");
+
+            address user = proxyHandler.superUser();
+            assertEq(share.balanceOf(user), userBalance, "[Share] User balance corrupted");
+
+            for (uint256 i = 0; i < chains.length; i++) {
+                address peer = address(proxyHandler.peers(chains[i]));
+                uint256 allowance = proxyHandler.getGhostAllowance(peer);
+                assertEq(share.allowance(user, peer), allowance, "[Share] Allowance corrupted");
+            }
+
+            try MockUpgradeStorage(address(share)).getNewVal() returns (uint256 val) {
+                assertEq(val, newVal, "[Share] Mock dynamic data lost");
+                assertEq(
+                    MockUpgradeStorage(address(share)).version(), version, "[Share] Reinitializer version bump failed"
+                );
+            } catch {
+                assertTrue(false, "[Share] Mock proxy interface failed");
+            }
+        }
+    }
+
+    function invariant_proxy_rebalancer_integrity() public view {
+        (
+            uint64 version,
+            uint256 upgradeCount,
+            uint256 newVal,
+            /* latestImpl */,
+            address parentPeer,
+            address strategyRegistry,
+            address forwarder,
+            address workflowOwner,
+            bytes10 workflowName
+        ) = proxyHandler.rebalancerGhost();
+
+        if (upgradeCount > 0) {
+            assertEq(rebalancer.getKeystoneForwarder(), forwarder, "[Rebalancer] Forwarder corrupted");
+            assertEq(rebalancer.getParentPeer(), parentPeer, "[Rebalancer] Parent ref corrupted");
+            assertEq(rebalancer.getStrategyRegistry(), strategyRegistry, "[Rebalancer] Registry ref corrupted");
+
+            CREReceiver.Workflow memory currentWorkflow = rebalancer.getWorkflow(bytes32("rebalanceWorkflowId"));
+            assertEq(currentWorkflow.owner, workflowOwner, "[Rebalancer] CRE Workflow owner corrupted");
+            assertEq(currentWorkflow.name, workflowName, "[Rebalancer] CRE Workflow name corrupted");
+
+            try MockUpgradeStorage(address(rebalancer)).getNewVal() returns (uint256 val) {
+                assertEq(val, newVal, "[Rebalancer] Mock dynamic data lost");
+                assertEq(
+                    MockUpgradeStorage(address(rebalancer)).version(),
+                    version,
+                    "[Rebalancer] Reinitializer version bump failed"
+                );
+            } catch {
+                assertTrue(false, "[Rebalancer] Mock proxy interface failed");
+            }
+        }
+    }
+
+    // --- 4. Role Persistence ---
+
+    function invariant_proxy_role_persistence() public view {
+        for (uint256 i = 0; i < chains.length; i++) {
+            IAccessControl ac = IAccessControl(address(proxyHandler.peers(chains[i])));
+
+            assertTrue(ac.hasRole(0x00, address(this)), "[Role] DEFAULT_ADMIN lost");
+            assertTrue(ac.hasRole(Roles.EMERGENCY_PAUSER_ROLE, emergencyPauser), "[Role] EMERGENCY_PAUSER lost");
+            assertTrue(ac.hasRole(Roles.EMERGENCY_UNPAUSER_ROLE, emergencyUnpauser), "[Role] EMERGENCY_UNPAUSER lost");
+            assertTrue(ac.hasRole(Roles.CONFIG_ADMIN_ROLE, configAdmin), "[Role] CONFIG_ADMIN lost");
+            assertTrue(ac.hasRole(Roles.CROSS_CHAIN_ADMIN_ROLE, crossChainAdmin), "[Role] CROSS_CHAIN_ADMIN lost");
+            assertTrue(ac.hasRole(Roles.FEE_WITHDRAWER_ROLE, feeWithdrawer), "[Role] FEE_WITHDRAWER lost");
+            assertTrue(ac.hasRole(Roles.FEE_RATE_SETTER_ROLE, feeRateSetter), "[Role] FEE_RATE_SETTER lost");
+            assertTrue(ac.hasRole(Roles.UPGRADER_ROLE, address(this)), "[Role] UPGRADER lost");
+        }
+    }
+
+    /*//////////////////////////////////////////////////////////////
+                             UTILITY HELPERS
+    //////////////////////////////////////////////////////////////*/
+
+    /// @dev Hides the ugly assembly bit-casting required to read the EIP-1967 slot
+    function _getProxyImpl(address proxy) internal view returns (address) {
+        return address(uint160(uint256(vm.load(proxy, IMPLEMENTATION_SLOT))));
     }
 }

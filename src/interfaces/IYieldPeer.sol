@@ -45,6 +45,7 @@ interface IYieldPeer is IYieldFees {
     function setCCIPGasLimit(uint256 gasLimit) external;
     function setAllowedChain(uint64 chainSelector, bool allowed) external;
     function setAllowedPeer(uint64 chainSelector, address peer) external;
+    function getCCIPGasLimit() external view returns (uint256);
     function getAllowedChain(uint64 chainSelector) external view returns (bool);
     function getAllowedPeer(uint64 chainSelector) external view returns (address);
     function getActiveStrategyAdapter() external view returns (address);
