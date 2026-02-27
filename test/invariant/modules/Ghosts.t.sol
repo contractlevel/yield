@@ -68,6 +68,18 @@ abstract contract Ghosts {
     mapping(address user => DepositRecord[]) public ghost_userDeposits;
 
     /*//////////////////////////////////////////////////////////////
+                        PINGPONG COMPLETION
+    //////////////////////////////////////////////////////////////*/
+    /// @dev number of fuzzed depositPingPong handler calls that completed without reverting
+    uint256 public ghost_depositPingPong_calls;
+    /// @dev number of fuzzed depositPingPong handler calls that resulted in a SharesMinted emission
+    uint256 public ghost_depositPingPong_completions;
+    /// @dev number of fuzzed withdrawPingPong handler calls that completed without reverting
+    uint256 public ghost_withdrawPingPong_calls;
+    /// @dev number of fuzzed withdrawPingPong handler calls that resulted in a WithdrawCompleted emission
+    uint256 public ghost_withdrawPingPong_completions;
+
+    /*//////////////////////////////////////////////////////////////
                             YIELDPEER STATE
     //////////////////////////////////////////////////////////////*/
     /// @dev YieldPeer::s_ccipGasLimit

@@ -19,7 +19,7 @@ import {HelperConfig} from "../../script/HelperConfig.s.sol";
 import {IRouterClient} from "@chainlink/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
 import {IPoolAddressesProvider} from "@aave/v3-origin/src/contracts/interfaces/IPoolAddressesProvider.sol";
 import {IComet} from "../../src/interfaces/IComet.sol";
-import {MockCCIPRouter} from "@chainlink-local/test/mocks/MockRouter.sol";
+import {ManualMockRouter} from "../mocks/ManualMockRouter.sol";
 import {AaveV3Adapter} from "../../src/adapters/AaveV3Adapter.sol";
 import {CompoundV3Adapter} from "../../src/adapters/CompoundV3Adapter.sol";
 import {StrategyRegistry} from "../../src/modules/StrategyRegistry.sol";
@@ -39,6 +39,8 @@ contract Invariant is StdInvariant, BaseTest {
 
     /// @dev Handler contract we are running calls to the system through
     Handler internal handler;
+    /// @dev Manual mock CCIP router used for all peers (replaces MockCCIPRouter)
+    ManualMockRouter internal ccipRouter;
     /// @dev provides addresses passed to the contracts based on where we are deploying (locally in this case)
     HelperConfig internal helperConfig;
     /// @dev provides address passed to contracts
@@ -105,7 +107,7 @@ contract Invariant is StdInvariant, BaseTest {
             child1,
             child2,
             share,
-            networkConfig.ccip.ccipRouter,
+            address(ccipRouter),
             address(usdc),
             aavePool,
             networkConfig.protocols.comet,
@@ -114,12 +116,14 @@ contract Invariant is StdInvariant, BaseTest {
         );
 
         /// @dev define appropriate function selectors
-        bytes4[] memory selectors = new bytes4[](5);
+        bytes4[] memory selectors = new bytes4[](7);
         selectors[0] = Handler.deposit.selector;
         selectors[1] = Handler.withdraw.selector;
         selectors[2] = Handler.onReport.selector;
         selectors[3] = Handler.withdrawFees.selector;
         selectors[4] = Handler.setFeeRate.selector;
+        selectors[5] = Handler.depositPingPong.selector;
+        selectors[6] = Handler.withdrawPingPong.selector;
 
         /// @dev target handler and appropriate function selectors
         targetSelector(FuzzSelector({addr: address(handler), selectors: selectors}));
@@ -135,12 +139,14 @@ contract Invariant is StdInvariant, BaseTest {
         aavePool = IPoolAddressesProvider(networkConfig.protocols.aavePoolAddressesProvider).getPool();
         rebalancer = new Rebalancer();
 
+        ccipRouter = new ManualMockRouter();
+
         /// @dev since we are not forking mainnets, we will deploy contracts locally
         /// the deployed peers will interact via the ccip local simulator as if they were crosschain
         /// this is a context we need to be aware of in this test suite
         /// @dev deploy the parent contract
         parent = new ParentPeer(
-            networkConfig.ccip.ccipRouter,
+            address(ccipRouter),
             networkConfig.tokens.link,
             PARENT_SELECTOR,
             networkConfig.tokens.usdc,
@@ -170,7 +176,7 @@ contract Invariant is StdInvariant, BaseTest {
 
         /// @dev deploy at least 2 child peers to cover all CCIP tx types
         child1 = new ChildPeer(
-            networkConfig.ccip.ccipRouter,
+            address(ccipRouter),
             networkConfig.tokens.link,
             CHILD1_SELECTOR,
             networkConfig.tokens.usdc,
@@ -191,7 +197,7 @@ contract Invariant is StdInvariant, BaseTest {
         );
 
         child2 = new ChildPeer(
-            networkConfig.ccip.ccipRouter,
+            address(ccipRouter),
             networkConfig.tokens.link,
             CHILD2_SELECTOR,
             networkConfig.tokens.usdc,
@@ -306,9 +312,9 @@ contract Invariant is StdInvariant, BaseTest {
         child1.revokeRole(Roles.CROSS_CHAIN_ADMIN_ROLE, child1.owner());
         child2.revokeRole(Roles.CROSS_CHAIN_ADMIN_ROLE, child2.owner());
 
-        MockCCIPRouter(networkConfig.ccip.ccipRouter).setPeerToChainSelector(address(parent), PARENT_SELECTOR);
-        MockCCIPRouter(networkConfig.ccip.ccipRouter).setPeerToChainSelector(address(child1), CHILD1_SELECTOR);
-        MockCCIPRouter(networkConfig.ccip.ccipRouter).setPeerToChainSelector(address(child2), CHILD2_SELECTOR);
+        ccipRouter.setPeerToChainSelector(address(parent), PARENT_SELECTOR);
+        ccipRouter.setPeerToChainSelector(address(child1), CHILD1_SELECTOR);
+        ccipRouter.setPeerToChainSelector(address(child2), CHILD2_SELECTOR);
     }
 
     function _setWorkflow() internal {
@@ -696,6 +702,24 @@ contract Invariant is StdInvariant, BaseTest {
             share.balanceOf(user),
             handler.ghost_totalSharesMintedPerUser(user) - handler.ghost_totalSharesBurnedPerUser(user),
             "Invariant violated: Share balance per user must equal total shares minted per user minus total shares burned per user"
+        );
+    }
+
+    /// @notice PingPong Completion: Every fuzzed depositPingPong must result in SharesMinted
+    function invariant_depositPingPong_alwaysCompletes() public view {
+        assertEq(
+            handler.ghost_depositPingPong_calls(),
+            handler.ghost_depositPingPong_completions(),
+            "Invariant violated: Every fuzzed depositPingPong must result in SharesMinted"
+        );
+    }
+
+    /// @notice PingPong Completion: Every fuzzed withdrawPingPong must result in WithdrawCompleted
+    function invariant_withdrawPingPong_alwaysCompletes() public view {
+        assertEq(
+            handler.ghost_withdrawPingPong_calls(),
+            handler.ghost_withdrawPingPong_completions(),
+            "Invariant violated: Every fuzzed withdrawPingPong must result in WithdrawCompleted"
         );
     }
 

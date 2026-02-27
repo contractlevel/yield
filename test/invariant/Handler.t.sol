@@ -16,7 +16,9 @@ import {
     WorkflowHelpers
 } from "../BaseTest.t.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {stdStorage, StdStorage} from "forge-std/StdStorage.sol";
 import {Events} from "./modules/Events.t.sol";
+import {ManualMockRouter} from "../mocks/ManualMockRouter.sol";
 
 /// @notice This contract is used to handle fuzzed interactions with the external functions of the system to test invariants.
 /// @notice Events inherits Ghosts, and forge-std/Test.sol
@@ -26,6 +28,7 @@ contract Handler is Events {
     //////////////////////////////////////////////////////////////*/
     using EnumerableSet for EnumerableSet.AddressSet;
     using EnumerableSet for EnumerableSet.UintSet;
+    using stdStorage for StdStorage;
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
@@ -40,7 +43,7 @@ contract Handler is Events {
     ChildPeer internal child1;
     ChildPeer internal child2;
     Share internal share;
-    address internal ccipRouter;
+    ManualMockRouter internal ccipRouter;
     IERC20 internal usdc;
     address internal forwarder = makeAddr("forwarder");
     address internal admin = makeAddr("admin");
@@ -100,7 +103,7 @@ contract Handler is Events {
         child1 = _child1;
         child2 = _child2;
         share = _share;
-        ccipRouter = _ccipRouter;
+        ccipRouter = ManualMockRouter(_ccipRouter);
         usdc = IERC20(_usdc);
         aavePool = _aavePool;
         compoundPool = _compoundPool;
@@ -288,6 +291,98 @@ contract Handler is Events {
         parent.setFeeRate(feeRate);
         child1.setFeeRate(feeRate);
         child2.setFeeRate(feeRate);
+    }
+
+    /// @notice This function handles deposit ping-pong scenarios
+    /// @notice Zeroes the strategy adapter, initiates a deposit from a child, manually steps
+    ///         through the first two CCIP hops, restores the adapter, then drains the queue.
+    /// @param addressSeed the seed used to create the depositor
+    /// @param depositAmount the amount of USDC to deposit
+    /// @param childSeed the seed used to select which child to deposit from
+    function depositPingPong(uint256 addressSeed, uint256 depositAmount, uint256 childSeed) public {
+        address depositor = _seedToAddress(addressSeed);
+        depositAmount = bound(depositAmount, MIN_DEPOSIT_AMOUNT, MAX_DEPOSIT_AMOUNT);
+        deal(address(usdc), depositor, depositAmount);
+
+        address depositingPeer = childSeed % 2 == 0 ? address(child1) : address(child2);
+
+        IYieldPeer.Strategy memory strategy = parent.getStrategy();
+        address strategyPeer = chainSelectorsToPeers[strategy.chainSelector];
+        address oldAdapter = IYieldPeer(strategyPeer).getActiveStrategyAdapter();
+        if (oldAdapter == address(0)) return; // @review wasted run
+
+        stdstore.target(strategyPeer).sig("getActiveStrategyAdapter()").checked_write(address(0));
+
+        ccipRouter.setManualMode(true);
+        vm.recordLogs();
+        _deposit(depositor, depositAmount, depositingPeer);
+
+        ccipRouter.routeNext();
+        ccipRouter.routeNext();
+        stdstore.target(strategyPeer).sig("getActiveStrategyAdapter()").checked_write(oldAdapter);
+        while (ccipRouter.queueLength() > 0) ccipRouter.routeNext();
+
+        ccipRouter.setManualMode(false);
+
+        uint256 prevMinted = ghost_yieldPeer_event_SharesMinted_emissions;
+        _handleLogs();
+        _updateDepositStateGhosts(depositor, depositAmount);
+        ghost_depositPingPong_calls++;
+        if (ghost_yieldPeer_event_SharesMinted_emissions > prevMinted) ghost_depositPingPong_completions++;
+    }
+
+    /// @notice This function handles withdraw ping-pong scenarios
+    /// @notice If the withdrawer has no shares, deposits first as a sub-action.
+    /// @notice Zeroes the strategy adapter, initiates a withdraw from a child, manually steps
+    ///         through the first two CCIP hops, restores the adapter, then drains the queue.
+    /// @param addressSeed the seed used to create or get the withdrawer
+    /// @param shareBurnAmount the amount of shares to burn
+    /// @param childSeed the seed used to select which child to withdraw from
+    /// @param usdcDepositAmount the amount of USDC to deposit if the withdrawer has no shares
+    function withdrawPingPong(
+        uint256 addressSeed,
+        uint256 shareBurnAmount,
+        uint256 childSeed,
+        uint256 usdcDepositAmount
+    ) public {
+        _dealPoolsUsdc();
+
+        address withdrawer = _createOrGetUser(addressSeed);
+        if (share.balanceOf(withdrawer) == 0) {
+            withdrawer = deposit(true, addressSeed, usdcDepositAmount, childSeed);
+        }
+        uint256 withdrawerShareBalance = share.balanceOf(withdrawer);
+        shareBurnAmount = bound(shareBurnAmount, 1, withdrawerShareBalance);
+
+        address withdrawingPeer = childSeed % 2 == 0 ? address(child1) : address(child2);
+
+        IYieldPeer.Strategy memory strategy = parent.getStrategy();
+        address strategyPeer = chainSelectorsToPeers[strategy.chainSelector];
+        address oldAdapter = IYieldPeer(strategyPeer).getActiveStrategyAdapter();
+        if (oldAdapter == address(0)) return; // @review wasted run
+
+        stdstore.target(strategyPeer).sig("getActiveStrategyAdapter()").checked_write(address(0));
+
+        ccipRouter.setManualMode(true);
+        vm.recordLogs();
+        _changePrank(withdrawer);
+        share.transferAndCall(withdrawingPeer, shareBurnAmount, "");
+        _stopPrank();
+
+        ccipRouter.routeNext();
+        ccipRouter.routeNext();
+        stdstore.target(strategyPeer).sig("getActiveStrategyAdapter()").checked_write(oldAdapter);
+        while (ccipRouter.queueLength() > 0) ccipRouter.routeNext();
+
+        ccipRouter.setManualMode(false);
+
+        uint256 prevWithdrawCompleted = ghost_yieldPeer_event_WithdrawCompleted_emissions;
+        _handleLogs();
+        _updateWithdrawStateGhosts(withdrawer, shareBurnAmount);
+        ghost_withdrawPingPong_calls++;
+        if (ghost_yieldPeer_event_WithdrawCompleted_emissions > prevWithdrawCompleted) {
+            ghost_withdrawPingPong_completions++;
+        }
     }
 
     /*//////////////////////////////////////////////////////////////
