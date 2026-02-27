@@ -89,6 +89,44 @@ aderyn .
 forge test --mt invariant
 ```
 
+### Formatting
+
+Invariants in `Invariant.t.sol` are organised into eight logical sections, each with its own banner header:
+
+```
+SYSTEM       — top-level protocol solvency properties
+DEPOSIT      — deposit lifecycle event and amount invariants
+WITHDRAW     — withdrawal lifecycle event and amount invariants
+SHARES       — share token supply and per-user balance integrity
+FEES         — fee rate bounds, amount integrity, and access control
+STRATEGY     — strategy registry and adapter consistency
+REBALANCE    — CRE report, strategy update, and drain-on-rebalance invariants
+CROSSCHAIN   — CCIP message parity and ping-pong completion
+```
+
+**Naming convention:**
+
+```
+invariant_{group}_{EventA/Subject}_{property/relationship}
+```
+
+- `{group}` matches one of the eight section names above (lowercase)
+- `{EventA/Subject}` is the event name(s) or state concept being asserted (camelCase, matching the actual Solidity event name); for emission-consistency invariants all relevant event names are included
+- `{property/relationship}` describes the assertion (e.g. `emissionConsistency`, `equalsUserPrincipal`, `withinBounds`)
+
+Example: `invariant_deposit_DepositInitiated_ShareMintUpdate_SharesMinted_emissionConsistency`
+
+**Ordering within sections:**
+
+Within each section invariants are ordered by:
+1. Emission count checks (simplest — event-level counts)
+2. Amount flow / param checks (cross-event amounts)
+3. State integrity checks (most complex — often `forEachUser` or `forEachChainSelector`)
+
+**Check helpers:**
+
+Each `check*` helper function is placed immediately after its corresponding `invariant_*` function, not in a separate section. Names follow `check{Description}Per{Entity}` where entity is `User` or `ChainSelector`.
+
 ## Certora formal verification
 
 These don't have to all be run at the same time, but should all be run at least once _and passing_ at the end of each task.
