@@ -20,7 +20,6 @@ methods {
     function _.approve(address, uint256) external => DISPATCHER(true);
     function _.transfer(address, uint256) external => DISPATCHER(true);
     function _.transferFrom(address, address, uint256) external => DISPATCHER(true);
-
     function _.balanceOf(address) external => DISPATCHER(true);
 
     // Harness helper methods
@@ -32,15 +31,17 @@ methods {
                           DEFINITIONS
 //////////////////////////////////////////////////////////////*/
 /// @notice functions that can only be called by the YieldPeer
-definition onlyYieldPeer(method f) returns bool = f.selector == sig:deposit(address, uint256).selector || f.selector == sig:withdraw(address, uint256).selector;
+definition onlyYieldPeer(method f) returns bool = 
+    f.selector == sig:deposit(address, uint256).selector || 
+    f.selector == sig:withdraw(address, uint256).selector;
 
 definition DepositEvent() returns bytes32 =
-// keccak256(abi.encodePacked("Deposit(address,uint256)"))
-to_bytes32(0xe1fffcc4923d04b559f4d29a8bfc6cda04eb5b0d3c460751c2402c5c5cc9109c);
+    // keccak256(abi.encodePacked("Deposit(address,uint256)"))
+    to_bytes32(0xe1fffcc4923d04b559f4d29a8bfc6cda04eb5b0d3c460751c2402c5c5cc9109c);
 
 definition WithdrawEvent() returns bytes32 =
-// keccak256(abi.encodePacked("Withdraw(address,uint256)"))
-to_bytes32(0x884edad9ce6fa2440d8a54cc123490eb96d2768479d49ff9c7366125a9424364);
+    // keccak256(abi.encodePacked("Withdraw(address,uint256)"))
+    to_bytes32(0x884edad9ce6fa2440d8a54cc123490eb96d2768479d49ff9c7366125a9424364);
 
 /*//////////////////////////////////////////////////////////////
                              GHOSTS
@@ -72,11 +73,13 @@ ghost mapping(address => mathint) ghost_withdraw_totalAmount_emitted {
 hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
     if (t0 == DepositEvent()) {
         ghost_deposit_eventCount = ghost_deposit_eventCount + 1;
-        ghost_deposit_totalAmount_emitted[bytes32ToAddress(t1)] = ghost_deposit_totalAmount_emitted[bytes32ToAddress(t1)] + bytes32ToUint256(t2);
+        ghost_deposit_totalAmount_emitted[bytes32ToAddress(t1)] = 
+        ghost_deposit_totalAmount_emitted[bytes32ToAddress(t1)] + bytes32ToUint256(t2);
     }
     if (t0 == WithdrawEvent()) {
         ghost_withdraw_eventCount = ghost_withdraw_eventCount + 1;
-        ghost_withdraw_totalAmount_emitted[bytes32ToAddress(t1)] = ghost_withdraw_totalAmount_emitted[bytes32ToAddress(t1)] + bytes32ToUint256(t2);
+        ghost_withdraw_totalAmount_emitted[bytes32ToAddress(t1)] = 
+        ghost_withdraw_totalAmount_emitted[bytes32ToAddress(t1)] + bytes32ToUint256(t2);
     }
 }
 
@@ -152,155 +155,116 @@ rule deposit_emits_event() {
 rule withdraw_decreases_strategy_balance() {
     env e;
     uint256 amount;
-    require amount > 0, "We are assuming there won't be withdrawals of 0. (There wont)";
+    address strategyPool = getStrategyPool();
 
-    // We ensure max sentinel is not hit, since we are using 'amount' for asserts
-    require amount < max_uint256;
+    uint256 beforeBalance = usdc.balanceOf(strategyPool);
 
-    uint256 beforeBalance = usdc.balanceOf(getStrategyPool());
-    require beforeBalance >= amount, "should not cause underflow";
+    require e.msg.sender != strategyPool, "StrategyPool will not be the YieldPeer/msg.sender";
 
-    require e.msg.sender != getStrategyPool(), "StrategyPool will not be the YieldPeer/msg.sender";
+    uint256 actualWithdrawn = withdraw(e, usdc, amount);
+    require beforeBalance - actualWithdrawn >= 0, "should not cause underflow";
 
-    withdraw(e, usdc, amount);
-
-    uint256 afterBalance = usdc.balanceOf(getStrategyPool());
-
-    // Actual withdrawn should be >= requested amount (allows for interest accrual of dust and rounding, mirrors adapter functionality)
-    assert afterBalance >= beforeBalance - amount;
+    uint256 afterBalance = usdc.balanceOf(strategyPool);
+    assert afterBalance == beforeBalance - actualWithdrawn;
 }
 
 rule withdraw_decreases_tvl() {
     env e;
     uint256 amount;
-    require amount > 0, "We are assuming there won't be withdrawals of 0. (There wont)";
-    require amount < max_uint256;
 
     uint256 beforeTvl = getTotalValue(e, usdc);
-    require beforeTvl > 0, "Ensure we test with non-zero TVL for meaningful withdrawal scenarios";
-    require beforeTvl >= amount, "should not cause underflow";
 
-    withdraw(e, usdc, amount);
+    uint256 actualWithdrawn = withdraw(e, usdc, amount);
 
     uint256 afterTvl = getTotalValue(e, usdc);
-    assert afterTvl == beforeTvl - amount;
+
+    assert afterTvl == beforeTvl - actualWithdrawn;
 }
 
 rule withdraw_increases_yieldPeer_balance() {
     env e;
     uint256 amount;
-    require amount > 0, "We are assuming there won't be withdrawals of 0. (There wont)";
-    require amount < max_uint256;
-
-    uint256 beforeBalance = usdc.balanceOf(currentContract.i_yieldPeer);
-    require beforeBalance + amount <= max_uint256, "should not cause overflow";
 
     require e.msg.sender != getStrategyPool(), "StrategyPool will not be the YieldPeer/msg.sender";
 
-    // Get totalValue before withdrawal to know what's actually available
-    uint256 totalValueBefore = getTotalValue(e, usdc);
-    require totalValueBefore > 0, "Ensure we test with non-zero TVL for meaningful withdrawal scenarios";
+    uint256 beforeBalance = usdc.balanceOf(currentContract.i_yieldPeer);
 
-    // For regular withdrawals, adapter enforces amount <= totalValueBefore
-    require amount <= totalValueBefore, "Adapter should revert if amount > totalValueBefore";
-
-    withdraw(e, usdc, amount);
+    uint256 actualWithdrawn = withdraw(e, usdc, amount);
+    require beforeBalance + actualWithdrawn <= max_uint256;
 
     uint256 afterBalance = usdc.balanceOf(currentContract.i_yieldPeer);
-    mathint actualReceived = afterBalance - beforeBalance;
 
-    // Yield peer should receive actualWithdrawn, which is >= requested amount (adapter validates this)
-    assert actualReceived >= amount, "yield peer should receive >= amount (adapter validates actualWithdrawn >= amount)";
+    assert afterBalance == beforeBalance + actualWithdrawn;
 }
 
-rule withdraw_maxSentinel_empties_tvl() {
+rule withdraw_rebalanceWithdraw_zeroes_getTotalValue() {
     env e;
+    withdraw(e, usdc, max_uint256);
+    assert getTotalValue(e, usdc) == 0;
+}
 
-    // Pass Max Sentinel withdraw
+rule withdraw_emits_event() {
+    env e;
+    uint256 amount;
+
+    require ghost_withdraw_eventCount == 0, "Starting at 0 emitted events";
+    require ghost_withdraw_totalAmount_emitted[usdc] == 0, "0 emitted events, so 0 emitted amount";
+
+    uint256 actualWithdrawn = withdraw(e, usdc, amount);
+
+    assert ghost_withdraw_eventCount == 1;
+    assert ghost_withdraw_totalAmount_emitted[usdc] == actualWithdrawn;
+}
+
+/// @notice a rebalance withdraw is when the amount passed is max_uint256
+// @review
+rule withdraw_rebalanceWithdraw_revertsWhen_actualWithdrawnIsLessThanTotalValue() {
+    env e;
     uint256 amount = max_uint256;
 
     uint256 beforeTvl = getTotalValue(e, usdc);
     require beforeTvl > 0, "Ensure we test with non-zero TVL for meaningful withdrawal scenarios";
 
-    withdraw(e, usdc, amount);
+    // require compound
 
-    // Ensure TVL has been drained from the protocol
-    uint256 afterTvl = getTotalValue(e, usdc);
-    assert afterTvl == 0;
+    /// @dev revert conditions not being verified
+    require e.msg.sender == currentContract.i_yieldPeer;
+    require e.msg.value == 0;
+
+    withdraw@withrevert(e, usdc, amount);
+    assert lastReverted;
 }
 
-rule withdraw_increases_yieldPeer_balance_maxSentinel() {
+/// @notice a user withdraw is when the amount passed is not max_uint256
+rule withdraw_userWithdraw_revertsWhen_withdrawAmountExceedsTotalValue() {
     env e;
-
-    // Testing rebalancing flow where withdraw is happening with type(uint256).max
-    uint256 amount = max_uint256;
-
-    uint256 beforeBalance = usdc.balanceOf(currentContract.i_yieldPeer);
-    require e.msg.sender != getStrategyPool(), "StrategyPool will not be the YieldPeer/msg.sender";
-
-    // Get totalValue before withdrawal to know what's actually available
-    uint256 totalValueBefore = getTotalValue(e, usdc);
-    require beforeBalance + totalValueBefore <= max_uint256, "should not cause overflow";
-
-    withdraw(e, usdc, amount);
-
-    // Checking what was actually withdrawn
-    uint256 afterBalance = usdc.balanceOf(currentContract.i_yieldPeer);
-    mathint actualReceived = afterBalance - beforeBalance;
-
-    // For MAX sentinel, yield peer should receive >= totalValueBefore (accounts for dust accrual inside protocol)
-    assert actualReceived >= totalValueBefore, "MAX sentinel: yield peer should receive >= totalValueBefore";
-}
-
-
-
-rule withdraw_emits_event() {
-    env e;
-
-    // Testing with Regular and Rebalancing Withdrawals
     uint256 amount;
     require amount > 0;
+    require amount < max_uint256;
 
-    require ghost_withdraw_eventCount == 0, "Starting at 0 emitted events";
-    require ghost_withdraw_totalAmount_emitted[usdc] == 0, "0 emitted events, so 0 emitted amount";
+    uint256 beforeTvl = getTotalValue(e, usdc);
+    require beforeTvl > 0, "Ensure we test with non-zero TVL for meaningful withdrawal scenarios";
 
-    require e.msg.sender != getStrategyPool(), "StrategyPool will not be the YieldPeer/msg.sender";
+    /// @dev revert condition being verified
+    require amount > beforeTvl;
 
-    // Track yield peer's balance before withdrawal to calculate actual received amount
-    uint256 beforeBalance = usdc.balanceOf(currentContract.i_yieldPeer);
+    /// @dev revert conditions not being verified
+    require e.msg.sender == currentContract.i_yieldPeer;
+    require e.msg.value == 0;
 
-    // Get totalValue before withdrawal to validate behavior
-    uint256 totalValueBefore = getTotalValue(e, usdc);
+    withdraw@withrevert(e, usdc, amount);
+    assert lastReverted;
+}
 
-    // For regular withdrawals (non-MAX), ensure we test with non-zero TVL
-    if (amount != max_uint256) {
-        require totalValueBefore > 0, "Ensure we test with non-zero TVL for meaningful withdrawal scenarios";
-    }
+// @review
+// rule withdraw_userWithdraw_revertsWhen_incorrectWithdrawAmount() {}
 
-    // For regular withdrawals, adapter enforces amount <= totalValueBefore
-    // If this doesn't hold, adapter should revert (so this rule wouldn't apply)
-    require (amount == max_uint256) || (amount <= totalValueBefore), "Adapter should revert if amount > totalValueBefore (for non-MAX)";
+rule withdraw_amountIntegrity() {
+    env e;
+    uint256 amount;
+    uint256 totalValue = getTotalValue(e, usdc);
+    uint256 actualWithdrawn = withdraw(e, usdc, amount);
 
-    // Ensure no overflow when calculating actualReceived
-    if (amount == max_uint256) {
-        require beforeBalance + totalValueBefore <= max_uint256, "should not cause overflow";
-    } else {
-        require beforeBalance + amount <= max_uint256, "should not cause overflow";
-    }
-
-    withdraw(e, usdc, amount);
-
-    // Track yield peer's balance after withdrawal to calculate actual received amount
-    uint256 afterBalance = usdc.balanceOf(currentContract.i_yieldPeer);
-    mathint actualReceived = afterBalance - beforeBalance;
-
-    assert ghost_withdraw_eventCount == 1;
-
-    // For MAX sentinel: actualWithdrawn should be >= totalValueBefore (adapter enforces this)
-    // For regular withdrawals: actualWithdrawn should be >= amount (adapter validates this)
-    assert (amount == max_uint256) => (ghost_withdraw_totalAmount_emitted[usdc] >= totalValueBefore), "MAX sentinel: emitted should be >= totalValueBefore";
-    assert (amount != max_uint256) => (ghost_withdraw_totalAmount_emitted[usdc] >= amount), "Regular withdrawal: emitted should be >= amount (adapter validates actualWithdrawn >= amount)";
-
-    // The emitted amount should equal what the yield peer actually received
-    assert ghost_withdraw_totalAmount_emitted[usdc] == actualReceived, "Event should emit actualWithdrawn (what yield peer actually received), not the requested amount";
+    assert amount == max_uint256 => actualWithdrawn >= totalValue;
+    assert amount != max_uint256 => actualWithdrawn >= amount;
 }

@@ -61,10 +61,10 @@ contract CompoundV3Adapter is StrategyAdapter {
         // Get balance before withdraw to calculate actual withdrawn amount
         uint256 balanceBefore = IERC20(usdc).balanceOf(address(this));
 
+        uint256 totalValue = _getTotalValue();
+
         // Case 1: Rebalance Withdraw (MAX sentinel)
         if (amount == type(uint256).max) {
-            uint256 totalValue = _getTotalValue();
-
             // Comet will set amount to balanceOf(address(this)) internally
             IComet(i_comet).withdraw(usdc, amount);
 
@@ -77,9 +77,8 @@ contract CompoundV3Adapter is StrategyAdapter {
         }
         // Case 2: User Withdraw
         else {
-            // Ensure we don't withdraw more than supply to prevent borrowing
-            uint256 supplyBalance = _getTotalValue();
-            if (amount > supplyBalance) revert CompoundV3Adapter__WithdrawAmountExceedsTotalValue();
+            // Ensure we don't withdraw more than the totalValue we have supplied to prevent borrowing
+            if (amount > totalValue) revert CompoundV3Adapter__WithdrawAmountExceedsTotalValue();
 
             // Comet transfers directly to this adapter (msg.sender)
             IComet(i_comet).withdraw(usdc, amount);
