@@ -217,21 +217,18 @@ rule withdraw_emits_event() {
 }
 
 /// @notice a rebalance withdraw is when the amount passed is max_uint256
-// @review
 rule withdraw_rebalanceWithdraw_revertsWhen_actualWithdrawnIsLessThanTotalValue() {
     env e;
     uint256 amount = max_uint256;
-
-    uint256 beforeTvl = getTotalValue(e, usdc);
-    require beforeTvl > 0, "Ensure we test with non-zero TVL for meaningful withdrawal scenarios";
-
-    // require compound
+    uint256 totalValue = getTotalValue(e, usdc);
 
     /// @dev revert conditions not being verified
     require e.msg.sender == currentContract.i_yieldPeer;
     require e.msg.value == 0;
 
-    withdraw@withrevert(e, usdc, amount);
+    uint256 actualWithdrawn = withdraw@withrevert(e, usdc, amount);
+    /// @dev revert condition being verified
+    require actualWithdrawn < totalValue, "actualWithdrawn should be less than totalValue";
     assert lastReverted;
 }
 
@@ -239,25 +236,36 @@ rule withdraw_rebalanceWithdraw_revertsWhen_actualWithdrawnIsLessThanTotalValue(
 rule withdraw_userWithdraw_revertsWhen_withdrawAmountExceedsTotalValue() {
     env e;
     uint256 amount;
-    require amount > 0;
     require amount < max_uint256;
 
-    uint256 beforeTvl = getTotalValue(e, usdc);
-    require beforeTvl > 0, "Ensure we test with non-zero TVL for meaningful withdrawal scenarios";
+    uint256 totalValue = getTotalValue(e, usdc);
 
     /// @dev revert condition being verified
-    require amount > beforeTvl;
+    require amount > totalValue;
 
     /// @dev revert conditions not being verified
     require e.msg.sender == currentContract.i_yieldPeer;
     require e.msg.value == 0;
 
-    withdraw@withrevert(e, usdc, amount);
+    uint256 actualWithdrawn = withdraw@withrevert(e, usdc, amount);
     assert lastReverted;
 }
 
-// @review
-// rule withdraw_userWithdraw_revertsWhen_incorrectWithdrawAmount() {}
+rule withdraw_userWithdraw_revertsWhen_actualWithdrawnIsLessThanAmount() {
+    env e;
+    uint256 amount;
+    require amount > 0;
+    require amount < max_uint256;
+
+    /// @dev revert conditions not being verified
+    require e.msg.sender == currentContract.i_yieldPeer;
+    require e.msg.value == 0;
+
+    uint256 actualWithdrawn = withdraw@withrevert(e, usdc, amount);
+    /// @dev revert condition being verified
+    require actualWithdrawn < amount, "actualWithdrawn should be less than amount";
+    assert lastReverted;
+}
 
 rule withdraw_amountIntegrity() {
     env e;
