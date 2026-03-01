@@ -296,7 +296,7 @@ contract ManualMockRouterTest is Test {
     /*//////////////////////////////////////////////////////////////
                              HELPERS
     //////////////////////////////////////////////////////////////*/
-    function _buildMessage(address _receiver, bytes memory data) internal view returns (Client.EVM2AnyMessage memory) {
+    function _buildMessage(address _receiver, bytes memory data) internal pure returns (Client.EVM2AnyMessage memory) {
         return Client.EVM2AnyMessage({
             receiver: abi.encode(_receiver),
             data: data,
