@@ -32,3 +32,5 @@ test/PoC.t.sol
 collect.json
 anvil.log
 script/bash/logs/*
+
+CLAUDE.md

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.26;
 
 import {BaseTest, Vm, WorkflowHelpers} from "../../BaseTest.t.sol";
@@ -13,7 +13,7 @@ contract OnReportTest is BaseTest {
     function test_yield_creReceiver_onReport_success_emitsSecurityChecksPassed() public {
         // Arrange
         bytes memory report =
-            WorkflowHelpers.createWorkflowReport(baseChainSelector, keccak256(abi.encodePacked("aave-v3")));
+            WorkflowHelpers.createWorkflowReport(baseChainSelector, keccak256(abi.encodePacked("compound-v3")));
         vm.recordLogs();
 
         // Act

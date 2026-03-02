@@ -51,7 +51,7 @@ var (
 )
 
 var ParentPeerMetaData = &bind.MetaData{
-	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"ccipRouter\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"link\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"thisChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"usdc\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"share\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"DEFAULT_ADMIN_ROLE\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"acceptDefaultAdminTransfer\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"beginDefaultAdminTransfer\",\"inputs\":[{\"name\":\"newAdmin\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"cancelDefaultAdminTransfer\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"ccipReceive\",\"inputs\":[{\"name\":\"message\",\"type\":\"tuple\",\"internalType\":\"structClient.Any2EVMMessage\",\"components\":[{\"name\":\"messageId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"sourceChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"sender\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"data\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"destTokenAmounts\",\"type\":\"tuple[]\",\"internalType\":\"structClient.EVMTokenAmount[]\",\"components\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"changeDefaultAdminDelay\",\"inputs\":[{\"name\":\"newDelay\",\"type\":\"uint48\",\"internalType\":\"uint48\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"defaultAdmin\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"defaultAdminDelay\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint48\",\"internalType\":\"uint48\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"defaultAdminDelayIncreaseWait\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint48\",\"internalType\":\"uint48\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"deposit\",\"inputs\":[{\"name\":\"amountToDeposit\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"emergencyPause\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"emergencyUnpause\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getActiveStrategyAdapter\",\"inputs\":[],\"outputs\":[{\"name\":\"activeStrategyAdapter\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAllowedChain\",\"inputs\":[{\"name\":\"chainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAllowedPeer\",\"inputs\":[{\"name\":\"chainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getCCIPGasLimit\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getFeeRate\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getFeeRateDivisor\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"getIsStrategyChain\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getLink\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getMaxFeeRate\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"getRebalancer\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRoleAdmin\",\"inputs\":[{\"name\":\"role\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRoleMember\",\"inputs\":[{\"name\":\"role\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"index\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[{\"name\":\"roleMember\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRoleMemberCount\",\"inputs\":[{\"name\":\"role\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"roleMemberCount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRoleMembers\",\"inputs\":[{\"name\":\"role\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"roleMembers\",\"type\":\"address[]\",\"internalType\":\"address[]\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRouter\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getShare\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getStrategy\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structIYieldPeer.Strategy\",\"components\":[{\"name\":\"protocolId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"chainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getStrategyAdapter\",\"inputs\":[{\"name\":\"protocolId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"strategyAdapter\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getStrategyRegistry\",\"inputs\":[],\"outputs\":[{\"name\":\"strategyRegistry\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getThisChainSelector\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getTotalShares\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getTotalValue\",\"inputs\":[],\"outputs\":[{\"name\":\"totalValue\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getUsdc\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"grantRole\",\"inputs\":[{\"name\":\"role\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"hasRole\",\"inputs\":[{\"name\":\"role\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"onTokenTransfer\",\"inputs\":[{\"name\":\"withdrawer\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"shareBurnAmount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"encodedWithdrawChainSelector\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"paused\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"pendingDefaultAdmin\",\"inputs\":[],\"outputs\":[{\"name\":\"newAdmin\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"schedule\",\"type\":\"uint48\",\"internalType\":\"uint48\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"pendingDefaultAdminDelay\",\"inputs\":[],\"outputs\":[{\"name\":\"newDelay\",\"type\":\"uint48\",\"internalType\":\"uint48\"},{\"name\":\"schedule\",\"type\":\"uint48\",\"internalType\":\"uint48\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"renounceRole\",\"inputs\":[{\"name\":\"role\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"revokeRole\",\"inputs\":[{\"name\":\"role\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"rollbackDefaultAdminDelay\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setAllowedChain\",\"inputs\":[{\"name\":\"chainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"isAllowed\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setAllowedPeer\",\"inputs\":[{\"name\":\"chainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"peer\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setCCIPGasLimit\",\"inputs\":[{\"name\":\"gasLimit\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setFeeRate\",\"inputs\":[{\"name\":\"newFeeRate\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setInitialActiveStrategy\",\"inputs\":[{\"name\":\"protocolId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setRebalancer\",\"inputs\":[{\"name\":\"rebalancer\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setStrategy\",\"inputs\":[{\"name\":\"chainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"protocolId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setStrategyRegistry\",\"inputs\":[{\"name\":\"strategyRegistry\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"supportsInterface\",\"inputs\":[{\"name\":\"interfaceId\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"withdrawFees\",\"inputs\":[{\"name\":\"feeToken\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"ActiveStrategyAdapterUpdated\",\"inputs\":[{\"name\":\"activeStrategyAdapter\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AllowedChainSet\",\"inputs\":[{\"name\":\"chainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"isAllowed\",\"type\":\"bool\",\"indexed\":true,\"internalType\":\"bool\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AllowedPeerSet\",\"inputs\":[{\"name\":\"chainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"peer\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"CCIPGasLimitSet\",\"inputs\":[{\"name\":\"gasLimit\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"CCIPMessageReceived\",\"inputs\":[{\"name\":\"messageId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"txType\",\"type\":\"uint8\",\"indexed\":true,\"internalType\":\"enumIYieldPeer.CcipTxType\"},{\"name\":\"sourceChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"CCIPMessageSent\",\"inputs\":[{\"name\":\"messageId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"txType\",\"type\":\"uint8\",\"indexed\":true,\"internalType\":\"enumIYieldPeer.CcipTxType\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"CurrentStrategyOptimal\",\"inputs\":[{\"name\":\"chainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"protocolId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DefaultAdminDelayChangeCanceled\",\"inputs\":[],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DefaultAdminDelayChangeScheduled\",\"inputs\":[{\"name\":\"newDelay\",\"type\":\"uint48\",\"indexed\":false,\"internalType\":\"uint48\"},{\"name\":\"effectSchedule\",\"type\":\"uint48\",\"indexed\":false,\"internalType\":\"uint48\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DefaultAdminTransferCanceled\",\"inputs\":[],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DefaultAdminTransferScheduled\",\"inputs\":[{\"name\":\"newAdmin\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"acceptSchedule\",\"type\":\"uint48\",\"indexed\":false,\"internalType\":\"uint48\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DepositForwardedToStrategy\",\"inputs\":[{\"name\":\"depositAmount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"},{\"name\":\"strategyChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DepositInitiated\",\"inputs\":[{\"name\":\"depositor\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"},{\"name\":\"thisChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DepositPingPongToChild\",\"inputs\":[{\"name\":\"depositAmount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"},{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DepositToStrategy\",\"inputs\":[{\"name\":\"strategyAdapter\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"FeeRateSet\",\"inputs\":[{\"name\":\"feeRate\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"FeeTaken\",\"inputs\":[{\"name\":\"feeAmountInStablecoin\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"FeesWithdrawn\",\"inputs\":[{\"name\":\"feesWithdrawn\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Paused\",\"inputs\":[{\"name\":\"account\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RebalancerSet\",\"inputs\":[{\"name\":\"rebalancer\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RoleAdminChanged\",\"inputs\":[{\"name\":\"role\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"previousAdminRole\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"newAdminRole\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RoleGranted\",\"inputs\":[{\"name\":\"role\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"account\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"sender\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RoleRevoked\",\"inputs\":[{\"name\":\"role\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"account\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"sender\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ShareBurnUpdate\",\"inputs\":[{\"name\":\"shareBurnAmount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"},{\"name\":\"chainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"totalShares\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ShareMintUpdate\",\"inputs\":[{\"name\":\"shareMintAmount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"},{\"name\":\"chainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"totalShares\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"SharesBurned\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"SharesMinted\",\"inputs\":[{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"StrategyRegistrySet\",\"inputs\":[{\"name\":\"strategyRegistry\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"StrategyUpdated\",\"inputs\":[{\"name\":\"chainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"protocolId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"oldChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Unpaused\",\"inputs\":[{\"name\":\"account\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"WithdrawCompleted\",\"inputs\":[{\"name\":\"withdrawer\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"WithdrawForwardedToStrategy\",\"inputs\":[{\"name\":\"shareBurnAmount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"},{\"name\":\"strategyChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"WithdrawFromStrategy\",\"inputs\":[{\"name\":\"strategyAdapter\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"WithdrawInitiated\",\"inputs\":[{\"name\":\"withdrawer\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"},{\"name\":\"thisChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"WithdrawPingPongToChild\",\"inputs\":[{\"name\":\"shareBurnAmount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"},{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"AccessControlBadConfirmation\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"AccessControlEnforcedDefaultAdminDelay\",\"inputs\":[{\"name\":\"schedule\",\"type\":\"uint48\",\"internalType\":\"uint48\"}]},{\"type\":\"error\",\"name\":\"AccessControlEnforcedDefaultAdminRules\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"AccessControlInvalidDefaultAdmin\",\"inputs\":[{\"name\":\"defaultAdmin\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"AccessControlUnauthorizedAccount\",\"inputs\":[{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"neededRole\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]},{\"type\":\"error\",\"name\":\"CCIPOperations__InvalidToken\",\"inputs\":[{\"name\":\"invalidToken\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"CCIPOperations__InvalidTokenAmount\",\"inputs\":[{\"name\":\"invalidAmount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"CCIPOperations__NotEnoughLink\",\"inputs\":[{\"name\":\"linkBalance\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"fees\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"EnforcedPause\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ExpectedPause\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidRouter\",\"inputs\":[{\"name\":\"router\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"ParentPeer__InactiveStrategyAdapter\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ParentPeer__InitialActiveStrategyAlreadySet\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ParentPeer__NoStrategyChangeFound\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ParentPeer__OnlyRebalancer\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"SafeCastOverflowedUintDowncast\",\"inputs\":[{\"name\":\"bits\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"value\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"SafeERC20FailedOperation\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"YieldFees__FeeRateTooHigh\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"YieldFees__NoFeesToWithdraw\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"YieldPeer__ChainNotAllowed\",\"inputs\":[{\"name\":\"chainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"YieldPeer__InsufficientAmount\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"YieldPeer__NoZeroAmount\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"YieldPeer__NotStrategyChain\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"YieldPeer__OnlyShare\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"YieldPeer__PeerNotAllowed\",\"inputs\":[{\"name\":\"peer\",\"type\":\"address\",\"internalType\":\"address\"}]}]",
+	ABI: "[{\"type\":\"constructor\",\"inputs\":[{\"name\":\"ccipRouter\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"link\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"thisChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"usdc\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"share\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"DEFAULT_ADMIN_ROLE\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"acceptDefaultAdminTransfer\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"beginDefaultAdminTransfer\",\"inputs\":[{\"name\":\"newAdmin\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"cancelDefaultAdminTransfer\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"ccipReceive\",\"inputs\":[{\"name\":\"message\",\"type\":\"tuple\",\"internalType\":\"structClient.Any2EVMMessage\",\"components\":[{\"name\":\"messageId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"sourceChainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"sender\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"data\",\"type\":\"bytes\",\"internalType\":\"bytes\"},{\"name\":\"destTokenAmounts\",\"type\":\"tuple[]\",\"internalType\":\"structClient.EVMTokenAmount[]\",\"components\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"changeDefaultAdminDelay\",\"inputs\":[{\"name\":\"newDelay\",\"type\":\"uint48\",\"internalType\":\"uint48\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"defaultAdmin\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"defaultAdminDelay\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint48\",\"internalType\":\"uint48\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"defaultAdminDelayIncreaseWait\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint48\",\"internalType\":\"uint48\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"deposit\",\"inputs\":[{\"name\":\"amountToDeposit\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"getActiveStrategyAdapter\",\"inputs\":[],\"outputs\":[{\"name\":\"activeStrategyAdapter\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAllowedChain\",\"inputs\":[{\"name\":\"chainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getAllowedPeer\",\"inputs\":[{\"name\":\"chainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getCCIPGasLimit\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getFeeRate\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getFeeRateDivisor\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"getIsStrategyChain\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getLink\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getMaxFeeRate\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"pure\"},{\"type\":\"function\",\"name\":\"getRebalancer\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRoleAdmin\",\"inputs\":[{\"name\":\"role\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getRouter\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getShare\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getStrategy\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"tuple\",\"internalType\":\"structIYieldPeer.Strategy\",\"components\":[{\"name\":\"protocolId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"chainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getStrategyAdapter\",\"inputs\":[{\"name\":\"protocolId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"strategyAdapter\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getStrategyRegistry\",\"inputs\":[],\"outputs\":[{\"name\":\"strategyRegistry\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getSupportedProtocol\",\"inputs\":[{\"name\":\"protocolId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[{\"name\":\"isSupported\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getThisChainSelector\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint64\",\"internalType\":\"uint64\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getTotalShares\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getTotalValue\",\"inputs\":[],\"outputs\":[{\"name\":\"totalValue\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"getUsdc\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"grantRole\",\"inputs\":[{\"name\":\"role\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"hasRole\",\"inputs\":[{\"name\":\"role\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"onTokenTransfer\",\"inputs\":[{\"name\":\"withdrawer\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"shareBurnAmount\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"\",\"type\":\"bytes\",\"internalType\":\"bytes\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"owner\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"address\",\"internalType\":\"address\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"pause\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"paused\",\"inputs\":[],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"pendingDefaultAdmin\",\"inputs\":[],\"outputs\":[{\"name\":\"newAdmin\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"schedule\",\"type\":\"uint48\",\"internalType\":\"uint48\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"pendingDefaultAdminDelay\",\"inputs\":[],\"outputs\":[{\"name\":\"newDelay\",\"type\":\"uint48\",\"internalType\":\"uint48\"},{\"name\":\"schedule\",\"type\":\"uint48\",\"internalType\":\"uint48\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"rebalance\",\"inputs\":[{\"name\":\"newStrategy\",\"type\":\"tuple\",\"internalType\":\"structIYieldPeer.Strategy\",\"components\":[{\"name\":\"protocolId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"chainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"renounceRole\",\"inputs\":[{\"name\":\"role\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"revokeRole\",\"inputs\":[{\"name\":\"role\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"rollbackDefaultAdminDelay\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setAllowedChain\",\"inputs\":[{\"name\":\"chainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"isAllowed\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setAllowedPeer\",\"inputs\":[{\"name\":\"chainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"},{\"name\":\"peer\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setCCIPGasLimit\",\"inputs\":[{\"name\":\"gasLimit\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setFeeRate\",\"inputs\":[{\"name\":\"newFeeRate\",\"type\":\"uint256\",\"internalType\":\"uint256\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setInitialActiveStrategy\",\"inputs\":[{\"name\":\"protocolId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setRebalancer\",\"inputs\":[{\"name\":\"rebalancer\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setStrategyRegistry\",\"inputs\":[{\"name\":\"strategyRegistry\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"setSupportedProtocol\",\"inputs\":[{\"name\":\"protocolId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"},{\"name\":\"isSupported\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"supportsInterface\",\"inputs\":[{\"name\":\"interfaceId\",\"type\":\"bytes4\",\"internalType\":\"bytes4\"}],\"outputs\":[{\"name\":\"\",\"type\":\"bool\",\"internalType\":\"bool\"}],\"stateMutability\":\"view\"},{\"type\":\"function\",\"name\":\"unpause\",\"inputs\":[],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"function\",\"name\":\"withdrawFees\",\"inputs\":[{\"name\":\"feeToken\",\"type\":\"address\",\"internalType\":\"address\"}],\"outputs\":[],\"stateMutability\":\"nonpayable\"},{\"type\":\"event\",\"name\":\"ActiveStrategyAdapterUpdated\",\"inputs\":[{\"name\":\"activeStrategyAdapter\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AllowedChainSet\",\"inputs\":[{\"name\":\"chainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"isAllowed\",\"type\":\"bool\",\"indexed\":true,\"internalType\":\"bool\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"AllowedPeerSet\",\"inputs\":[{\"name\":\"chainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"peer\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"CCIPGasLimitSet\",\"inputs\":[{\"name\":\"gasLimit\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"CCIPMessageReceived\",\"inputs\":[{\"name\":\"messageId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"txType\",\"type\":\"uint8\",\"indexed\":true,\"internalType\":\"enumIYieldPeer.CcipTxType\"},{\"name\":\"sourceChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"CCIPMessageSent\",\"inputs\":[{\"name\":\"messageId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"txType\",\"type\":\"uint8\",\"indexed\":true,\"internalType\":\"enumIYieldPeer.CcipTxType\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DefaultAdminDelayChangeCanceled\",\"inputs\":[],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DefaultAdminDelayChangeScheduled\",\"inputs\":[{\"name\":\"newDelay\",\"type\":\"uint48\",\"indexed\":false,\"internalType\":\"uint48\"},{\"name\":\"effectSchedule\",\"type\":\"uint48\",\"indexed\":false,\"internalType\":\"uint48\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DefaultAdminTransferCanceled\",\"inputs\":[],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DefaultAdminTransferScheduled\",\"inputs\":[{\"name\":\"newAdmin\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"acceptSchedule\",\"type\":\"uint48\",\"indexed\":false,\"internalType\":\"uint48\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DepositForwardedToStrategy\",\"inputs\":[{\"name\":\"depositAmount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"},{\"name\":\"strategyChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DepositInitiated\",\"inputs\":[{\"name\":\"depositor\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"},{\"name\":\"thisChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DepositPingPongToChild\",\"inputs\":[{\"name\":\"depositAmount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"},{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"DepositToStrategy\",\"inputs\":[{\"name\":\"strategyAdapter\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"FeeRateSet\",\"inputs\":[{\"name\":\"feeRate\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"FeeTaken\",\"inputs\":[{\"name\":\"feeAmountInStablecoin\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"FeesWithdrawn\",\"inputs\":[{\"name\":\"feesWithdrawn\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Paused\",\"inputs\":[{\"name\":\"account\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RebalancerSet\",\"inputs\":[{\"name\":\"rebalancer\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RoleAdminChanged\",\"inputs\":[{\"name\":\"role\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"previousAdminRole\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"newAdminRole\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RoleGranted\",\"inputs\":[{\"name\":\"role\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"account\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"sender\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"RoleRevoked\",\"inputs\":[{\"name\":\"role\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"account\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"sender\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ShareBurnUpdate\",\"inputs\":[{\"name\":\"shareBurnAmount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"},{\"name\":\"chainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"totalShares\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"ShareMintUpdate\",\"inputs\":[{\"name\":\"shareMintAmount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"},{\"name\":\"chainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"totalShares\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"SharesBurned\",\"inputs\":[{\"name\":\"from\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"SharesMinted\",\"inputs\":[{\"name\":\"to\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"StrategyRegistrySet\",\"inputs\":[{\"name\":\"strategyRegistry\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"StrategyUpdated\",\"inputs\":[{\"name\":\"chainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"},{\"name\":\"protocolId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"oldChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"SupportedProtocolSet\",\"inputs\":[{\"name\":\"protocolId\",\"type\":\"bytes32\",\"indexed\":true,\"internalType\":\"bytes32\"},{\"name\":\"isSupported\",\"type\":\"bool\",\"indexed\":true,\"internalType\":\"bool\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"Unpaused\",\"inputs\":[{\"name\":\"account\",\"type\":\"address\",\"indexed\":false,\"internalType\":\"address\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"WithdrawCompleted\",\"inputs\":[{\"name\":\"withdrawer\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"WithdrawForwardedToStrategy\",\"inputs\":[{\"name\":\"shareBurnAmount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"},{\"name\":\"strategyChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"WithdrawFromStrategy\",\"inputs\":[{\"name\":\"strategyAdapter\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"WithdrawInitiated\",\"inputs\":[{\"name\":\"withdrawer\",\"type\":\"address\",\"indexed\":true,\"internalType\":\"address\"},{\"name\":\"amount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"},{\"name\":\"thisChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"event\",\"name\":\"WithdrawPingPongToChild\",\"inputs\":[{\"name\":\"shareBurnAmount\",\"type\":\"uint256\",\"indexed\":true,\"internalType\":\"uint256\"},{\"name\":\"destChainSelector\",\"type\":\"uint64\",\"indexed\":true,\"internalType\":\"uint64\"}],\"anonymous\":false},{\"type\":\"error\",\"name\":\"AccessControlBadConfirmation\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"AccessControlEnforcedDefaultAdminDelay\",\"inputs\":[{\"name\":\"schedule\",\"type\":\"uint48\",\"internalType\":\"uint48\"}]},{\"type\":\"error\",\"name\":\"AccessControlEnforcedDefaultAdminRules\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"AccessControlInvalidDefaultAdmin\",\"inputs\":[{\"name\":\"defaultAdmin\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"AccessControlUnauthorizedAccount\",\"inputs\":[{\"name\":\"account\",\"type\":\"address\",\"internalType\":\"address\"},{\"name\":\"neededRole\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]},{\"type\":\"error\",\"name\":\"CCIPOperations__InvalidToken\",\"inputs\":[{\"name\":\"invalidToken\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"CCIPOperations__InvalidTokenAmount\",\"inputs\":[{\"name\":\"invalidAmount\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"CCIPOperations__NotEnoughLink\",\"inputs\":[{\"name\":\"linkBalance\",\"type\":\"uint256\",\"internalType\":\"uint256\"},{\"name\":\"fees\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"EnforcedPause\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ExpectedPause\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"InvalidRouter\",\"inputs\":[{\"name\":\"router\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"ParentPeer__CurrentStrategyOptimal\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ParentPeer__InactiveStrategyAdapter\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ParentPeer__InitialActiveStrategyAlreadySet\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ParentPeer__OnlyRebalancer\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"ParentPeer__StrategyNotSupported\",\"inputs\":[{\"name\":\"protocolId\",\"type\":\"bytes32\",\"internalType\":\"bytes32\"}]},{\"type\":\"error\",\"name\":\"SafeCastOverflowedUintDowncast\",\"inputs\":[{\"name\":\"bits\",\"type\":\"uint8\",\"internalType\":\"uint8\"},{\"name\":\"value\",\"type\":\"uint256\",\"internalType\":\"uint256\"}]},{\"type\":\"error\",\"name\":\"SafeERC20FailedOperation\",\"inputs\":[{\"name\":\"token\",\"type\":\"address\",\"internalType\":\"address\"}]},{\"type\":\"error\",\"name\":\"YieldFees__FeeRateTooHigh\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"YieldFees__NoFeesToWithdraw\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"YieldPeer__ChainNotAllowed\",\"inputs\":[{\"name\":\"chainSelector\",\"type\":\"uint64\",\"internalType\":\"uint64\"}]},{\"type\":\"error\",\"name\":\"YieldPeer__InsufficientAmount\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"YieldPeer__NoZeroAmount\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"YieldPeer__NotStrategyChain\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"YieldPeer__OnlyShare\",\"inputs\":[]},{\"type\":\"error\",\"name\":\"YieldPeer__PeerNotAllowed\",\"inputs\":[{\"name\":\"peer\",\"type\":\"address\",\"internalType\":\"address\"}]}]",
 }
 
 // Structs
@@ -102,20 +102,11 @@ type GetRoleAdminInput struct {
 	Role [32]byte
 }
 
-type GetRoleMemberInput struct {
-	Role  [32]byte
-	Index *big.Int
-}
-
-type GetRoleMemberCountInput struct {
-	Role [32]byte
-}
-
-type GetRoleMembersInput struct {
-	Role [32]byte
-}
-
 type GetStrategyAdapterInput struct {
+	ProtocolId [32]byte
+}
+
+type GetSupportedProtocolInput struct {
 	ProtocolId [32]byte
 }
 
@@ -130,9 +121,13 @@ type HasRoleInput struct {
 }
 
 type OnTokenTransferInput struct {
-	Withdrawer                   common.Address
-	ShareBurnAmount              *big.Int
-	EncodedWithdrawChainSelector []byte
+	Withdrawer      common.Address
+	ShareBurnAmount *big.Int
+	Arg2            []byte
+}
+
+type RebalanceInput struct {
+	NewStrategy IYieldPeerStrategy
 }
 
 type RenounceRoleInput struct {
@@ -171,13 +166,13 @@ type SetRebalancerInput struct {
 	Rebalancer common.Address
 }
 
-type SetStrategyInput struct {
-	ChainSelector uint64
-	ProtocolId    [32]byte
-}
-
 type SetStrategyRegistryInput struct {
 	StrategyRegistry common.Address
+}
+
+type SetSupportedProtocolInput struct {
+	ProtocolId  [32]byte
+	IsSupported bool
 }
 
 type SupportsInterfaceInput struct {
@@ -242,16 +237,20 @@ type InvalidRouter struct {
 	Router common.Address
 }
 
+type ParentPeerCurrentStrategyOptimal struct {
+}
+
 type ParentPeerInactiveStrategyAdapter struct {
 }
 
 type ParentPeerInitialActiveStrategyAlreadySet struct {
 }
 
-type ParentPeerNoStrategyChangeFound struct {
+type ParentPeerOnlyRebalancer struct {
 }
 
-type ParentPeerOnlyRebalancer struct {
+type ParentPeerStrategyNotSupported struct {
+	ProtocolId [32]byte
 }
 
 type SafeCastOverflowedUintDowncast struct {
@@ -357,16 +356,6 @@ type CCIPMessageSentDecoded struct {
 	MessageId [32]byte
 	TxType    uint8
 	Amount    *big.Int
-}
-
-type CurrentStrategyOptimalTopics struct {
-	ChainSelector uint64
-	ProtocolId    [32]byte
-}
-
-type CurrentStrategyOptimalDecoded struct {
-	ChainSelector uint64
-	ProtocolId    [32]byte
 }
 
 type DefaultAdminDelayChangeCanceledTopics struct {
@@ -579,6 +568,16 @@ type StrategyUpdatedDecoded struct {
 	OldChainSelector uint64
 }
 
+type SupportedProtocolSetTopics struct {
+	ProtocolId  [32]byte
+	IsSupported bool
+}
+
+type SupportedProtocolSetDecoded struct {
+	ProtocolId  [32]byte
+	IsSupported bool
+}
+
 type UnpausedTopics struct {
 }
 
@@ -662,8 +661,6 @@ type ParentPeerCodec interface {
 	EncodeDefaultAdminDelayIncreaseWaitMethodCall() ([]byte, error)
 	DecodeDefaultAdminDelayIncreaseWaitMethodOutput(data []byte) (*big.Int, error)
 	EncodeDepositMethodCall(in DepositInput) ([]byte, error)
-	EncodeEmergencyPauseMethodCall() ([]byte, error)
-	EncodeEmergencyUnpauseMethodCall() ([]byte, error)
 	EncodeGetActiveStrategyAdapterMethodCall() ([]byte, error)
 	DecodeGetActiveStrategyAdapterMethodOutput(data []byte) (common.Address, error)
 	EncodeGetAllowedChainMethodCall(in GetAllowedChainInput) ([]byte, error)
@@ -686,12 +683,6 @@ type ParentPeerCodec interface {
 	DecodeGetRebalancerMethodOutput(data []byte) (common.Address, error)
 	EncodeGetRoleAdminMethodCall(in GetRoleAdminInput) ([]byte, error)
 	DecodeGetRoleAdminMethodOutput(data []byte) ([32]byte, error)
-	EncodeGetRoleMemberMethodCall(in GetRoleMemberInput) ([]byte, error)
-	DecodeGetRoleMemberMethodOutput(data []byte) (common.Address, error)
-	EncodeGetRoleMemberCountMethodCall(in GetRoleMemberCountInput) ([]byte, error)
-	DecodeGetRoleMemberCountMethodOutput(data []byte) (*big.Int, error)
-	EncodeGetRoleMembersMethodCall(in GetRoleMembersInput) ([]byte, error)
-	DecodeGetRoleMembersMethodOutput(data []byte) ([]common.Address, error)
 	EncodeGetRouterMethodCall() ([]byte, error)
 	DecodeGetRouterMethodOutput(data []byte) (common.Address, error)
 	EncodeGetShareMethodCall() ([]byte, error)
@@ -702,6 +693,8 @@ type ParentPeerCodec interface {
 	DecodeGetStrategyAdapterMethodOutput(data []byte) (common.Address, error)
 	EncodeGetStrategyRegistryMethodCall() ([]byte, error)
 	DecodeGetStrategyRegistryMethodOutput(data []byte) (common.Address, error)
+	EncodeGetSupportedProtocolMethodCall(in GetSupportedProtocolInput) ([]byte, error)
+	DecodeGetSupportedProtocolMethodOutput(data []byte) (bool, error)
 	EncodeGetThisChainSelectorMethodCall() ([]byte, error)
 	DecodeGetThisChainSelectorMethodOutput(data []byte) (uint64, error)
 	EncodeGetTotalSharesMethodCall() ([]byte, error)
@@ -716,12 +709,14 @@ type ParentPeerCodec interface {
 	EncodeOnTokenTransferMethodCall(in OnTokenTransferInput) ([]byte, error)
 	EncodeOwnerMethodCall() ([]byte, error)
 	DecodeOwnerMethodOutput(data []byte) (common.Address, error)
+	EncodePauseMethodCall() ([]byte, error)
 	EncodePausedMethodCall() ([]byte, error)
 	DecodePausedMethodOutput(data []byte) (bool, error)
 	EncodePendingDefaultAdminMethodCall() ([]byte, error)
 	DecodePendingDefaultAdminMethodOutput(data []byte) (PendingDefaultAdminOutput, error)
 	EncodePendingDefaultAdminDelayMethodCall() ([]byte, error)
 	DecodePendingDefaultAdminDelayMethodOutput(data []byte) (PendingDefaultAdminDelayOutput, error)
+	EncodeRebalanceMethodCall(in RebalanceInput) ([]byte, error)
 	EncodeRenounceRoleMethodCall(in RenounceRoleInput) ([]byte, error)
 	EncodeRevokeRoleMethodCall(in RevokeRoleInput) ([]byte, error)
 	EncodeRollbackDefaultAdminDelayMethodCall() ([]byte, error)
@@ -731,10 +726,11 @@ type ParentPeerCodec interface {
 	EncodeSetFeeRateMethodCall(in SetFeeRateInput) ([]byte, error)
 	EncodeSetInitialActiveStrategyMethodCall(in SetInitialActiveStrategyInput) ([]byte, error)
 	EncodeSetRebalancerMethodCall(in SetRebalancerInput) ([]byte, error)
-	EncodeSetStrategyMethodCall(in SetStrategyInput) ([]byte, error)
 	EncodeSetStrategyRegistryMethodCall(in SetStrategyRegistryInput) ([]byte, error)
+	EncodeSetSupportedProtocolMethodCall(in SetSupportedProtocolInput) ([]byte, error)
 	EncodeSupportsInterfaceMethodCall(in SupportsInterfaceInput) ([]byte, error)
 	DecodeSupportsInterfaceMethodOutput(data []byte) (bool, error)
+	EncodeUnpauseMethodCall() ([]byte, error)
 	EncodeWithdrawFeesMethodCall(in WithdrawFeesInput) ([]byte, error)
 	EncodeClientAny2EVMMessageStruct(in ClientAny2EVMMessage) ([]byte, error)
 	EncodeClientEVMTokenAmountStruct(in ClientEVMTokenAmount) ([]byte, error)
@@ -757,9 +753,6 @@ type ParentPeerCodec interface {
 	CCIPMessageSentLogHash() []byte
 	EncodeCCIPMessageSentTopics(evt abi.Event, values []CCIPMessageSentTopics) ([]*evm.TopicValues, error)
 	DecodeCCIPMessageSent(log *evm.Log) (*CCIPMessageSentDecoded, error)
-	CurrentStrategyOptimalLogHash() []byte
-	EncodeCurrentStrategyOptimalTopics(evt abi.Event, values []CurrentStrategyOptimalTopics) ([]*evm.TopicValues, error)
-	DecodeCurrentStrategyOptimal(log *evm.Log) (*CurrentStrategyOptimalDecoded, error)
 	DefaultAdminDelayChangeCanceledLogHash() []byte
 	EncodeDefaultAdminDelayChangeCanceledTopics(evt abi.Event, values []DefaultAdminDelayChangeCanceledTopics) ([]*evm.TopicValues, error)
 	DecodeDefaultAdminDelayChangeCanceled(log *evm.Log) (*DefaultAdminDelayChangeCanceledDecoded, error)
@@ -826,6 +819,9 @@ type ParentPeerCodec interface {
 	StrategyUpdatedLogHash() []byte
 	EncodeStrategyUpdatedTopics(evt abi.Event, values []StrategyUpdatedTopics) ([]*evm.TopicValues, error)
 	DecodeStrategyUpdated(log *evm.Log) (*StrategyUpdatedDecoded, error)
+	SupportedProtocolSetLogHash() []byte
+	EncodeSupportedProtocolSetTopics(evt abi.Event, values []SupportedProtocolSetTopics) ([]*evm.TopicValues, error)
+	DecodeSupportedProtocolSet(log *evm.Log) (*SupportedProtocolSetDecoded, error)
 	UnpausedLogHash() []byte
 	EncodeUnpausedTopics(evt abi.Event, values []UnpausedTopics) ([]*evm.TopicValues, error)
 	DecodeUnpaused(log *evm.Log) (*UnpausedDecoded, error)
@@ -990,14 +986,6 @@ func (c *Codec) DecodeDefaultAdminDelayIncreaseWaitMethodOutput(data []byte) (*b
 
 func (c *Codec) EncodeDepositMethodCall(in DepositInput) ([]byte, error) {
 	return c.abi.Pack("deposit", in.AmountToDeposit)
-}
-
-func (c *Codec) EncodeEmergencyPauseMethodCall() ([]byte, error) {
-	return c.abi.Pack("emergencyPause")
-}
-
-func (c *Codec) EncodeEmergencyUnpauseMethodCall() ([]byte, error) {
-	return c.abi.Pack("emergencyUnpause")
 }
 
 func (c *Codec) EncodeGetActiveStrategyAdapterMethodCall() ([]byte, error) {
@@ -1242,72 +1230,6 @@ func (c *Codec) DecodeGetRoleAdminMethodOutput(data []byte) ([32]byte, error) {
 	return result, nil
 }
 
-func (c *Codec) EncodeGetRoleMemberMethodCall(in GetRoleMemberInput) ([]byte, error) {
-	return c.abi.Pack("getRoleMember", in.Role, in.Index)
-}
-
-func (c *Codec) DecodeGetRoleMemberMethodOutput(data []byte) (common.Address, error) {
-	vals, err := c.abi.Methods["getRoleMember"].Outputs.Unpack(data)
-	if err != nil {
-		return *new(common.Address), err
-	}
-	jsonData, err := json.Marshal(vals[0])
-	if err != nil {
-		return *new(common.Address), fmt.Errorf("failed to marshal ABI result: %w", err)
-	}
-
-	var result common.Address
-	if err := json.Unmarshal(jsonData, &result); err != nil {
-		return *new(common.Address), fmt.Errorf("failed to unmarshal to common.Address: %w", err)
-	}
-
-	return result, nil
-}
-
-func (c *Codec) EncodeGetRoleMemberCountMethodCall(in GetRoleMemberCountInput) ([]byte, error) {
-	return c.abi.Pack("getRoleMemberCount", in.Role)
-}
-
-func (c *Codec) DecodeGetRoleMemberCountMethodOutput(data []byte) (*big.Int, error) {
-	vals, err := c.abi.Methods["getRoleMemberCount"].Outputs.Unpack(data)
-	if err != nil {
-		return *new(*big.Int), err
-	}
-	jsonData, err := json.Marshal(vals[0])
-	if err != nil {
-		return *new(*big.Int), fmt.Errorf("failed to marshal ABI result: %w", err)
-	}
-
-	var result *big.Int
-	if err := json.Unmarshal(jsonData, &result); err != nil {
-		return *new(*big.Int), fmt.Errorf("failed to unmarshal to *big.Int: %w", err)
-	}
-
-	return result, nil
-}
-
-func (c *Codec) EncodeGetRoleMembersMethodCall(in GetRoleMembersInput) ([]byte, error) {
-	return c.abi.Pack("getRoleMembers", in.Role)
-}
-
-func (c *Codec) DecodeGetRoleMembersMethodOutput(data []byte) ([]common.Address, error) {
-	vals, err := c.abi.Methods["getRoleMembers"].Outputs.Unpack(data)
-	if err != nil {
-		return *new([]common.Address), err
-	}
-	jsonData, err := json.Marshal(vals[0])
-	if err != nil {
-		return *new([]common.Address), fmt.Errorf("failed to marshal ABI result: %w", err)
-	}
-
-	var result []common.Address
-	if err := json.Unmarshal(jsonData, &result); err != nil {
-		return *new([]common.Address), fmt.Errorf("failed to unmarshal to []common.Address: %w", err)
-	}
-
-	return result, nil
-}
-
 func (c *Codec) EncodeGetRouterMethodCall() ([]byte, error) {
 	return c.abi.Pack("getRouter")
 }
@@ -1413,6 +1335,28 @@ func (c *Codec) DecodeGetStrategyRegistryMethodOutput(data []byte) (common.Addre
 	var result common.Address
 	if err := json.Unmarshal(jsonData, &result); err != nil {
 		return *new(common.Address), fmt.Errorf("failed to unmarshal to common.Address: %w", err)
+	}
+
+	return result, nil
+}
+
+func (c *Codec) EncodeGetSupportedProtocolMethodCall(in GetSupportedProtocolInput) ([]byte, error) {
+	return c.abi.Pack("getSupportedProtocol", in.ProtocolId)
+}
+
+func (c *Codec) DecodeGetSupportedProtocolMethodOutput(data []byte) (bool, error) {
+	vals, err := c.abi.Methods["getSupportedProtocol"].Outputs.Unpack(data)
+	if err != nil {
+		return *new(bool), err
+	}
+	jsonData, err := json.Marshal(vals[0])
+	if err != nil {
+		return *new(bool), fmt.Errorf("failed to marshal ABI result: %w", err)
+	}
+
+	var result bool
+	if err := json.Unmarshal(jsonData, &result); err != nil {
+		return *new(bool), fmt.Errorf("failed to unmarshal to bool: %w", err)
 	}
 
 	return result, nil
@@ -1533,7 +1477,7 @@ func (c *Codec) DecodeHasRoleMethodOutput(data []byte) (bool, error) {
 }
 
 func (c *Codec) EncodeOnTokenTransferMethodCall(in OnTokenTransferInput) ([]byte, error) {
-	return c.abi.Pack("onTokenTransfer", in.Withdrawer, in.ShareBurnAmount, in.EncodedWithdrawChainSelector)
+	return c.abi.Pack("onTokenTransfer", in.Withdrawer, in.ShareBurnAmount, in.Arg2)
 }
 
 func (c *Codec) EncodeOwnerMethodCall() ([]byte, error) {
@@ -1556,6 +1500,10 @@ func (c *Codec) DecodeOwnerMethodOutput(data []byte) (common.Address, error) {
 	}
 
 	return result, nil
+}
+
+func (c *Codec) EncodePauseMethodCall() ([]byte, error) {
+	return c.abi.Pack("pause")
 }
 
 func (c *Codec) EncodePausedMethodCall() ([]byte, error) {
@@ -1654,6 +1602,10 @@ func (c *Codec) DecodePendingDefaultAdminDelayMethodOutput(data []byte) (Pending
 	}, nil
 }
 
+func (c *Codec) EncodeRebalanceMethodCall(in RebalanceInput) ([]byte, error) {
+	return c.abi.Pack("rebalance", in.NewStrategy)
+}
+
 func (c *Codec) EncodeRenounceRoleMethodCall(in RenounceRoleInput) ([]byte, error) {
 	return c.abi.Pack("renounceRole", in.Role, in.Account)
 }
@@ -1690,12 +1642,12 @@ func (c *Codec) EncodeSetRebalancerMethodCall(in SetRebalancerInput) ([]byte, er
 	return c.abi.Pack("setRebalancer", in.Rebalancer)
 }
 
-func (c *Codec) EncodeSetStrategyMethodCall(in SetStrategyInput) ([]byte, error) {
-	return c.abi.Pack("setStrategy", in.ChainSelector, in.ProtocolId)
-}
-
 func (c *Codec) EncodeSetStrategyRegistryMethodCall(in SetStrategyRegistryInput) ([]byte, error) {
 	return c.abi.Pack("setStrategyRegistry", in.StrategyRegistry)
+}
+
+func (c *Codec) EncodeSetSupportedProtocolMethodCall(in SetSupportedProtocolInput) ([]byte, error) {
+	return c.abi.Pack("setSupportedProtocol", in.ProtocolId, in.IsSupported)
 }
 
 func (c *Codec) EncodeSupportsInterfaceMethodCall(in SupportsInterfaceInput) ([]byte, error) {
@@ -1718,6 +1670,10 @@ func (c *Codec) DecodeSupportsInterfaceMethodOutput(data []byte) (bool, error) {
 	}
 
 	return result, nil
+}
+
+func (c *Codec) EncodeUnpauseMethodCall() ([]byte, error) {
+	return c.abi.Pack("unpause")
 }
 
 func (c *Codec) EncodeWithdrawFeesMethodCall(in WithdrawFeesInput) ([]byte, error) {
@@ -2196,79 +2152,6 @@ func (c *Codec) DecodeCCIPMessageSent(log *evm.Log) (*CCIPMessageSentDecoded, er
 	}
 	var indexed abi.Arguments
 	for _, arg := range c.abi.Events["CCIPMessageSent"].Inputs {
-		if arg.Indexed {
-			if arg.Type.T == abi.TupleTy {
-				// abigen throws on tuple, so converting to bytes to
-				// receive back the common.Hash as is instead of error
-				arg.Type.T = abi.BytesTy
-			}
-			indexed = append(indexed, arg)
-		}
-	}
-	// Convert [][]byte → []common.Hash
-	topics := make([]common.Hash, len(log.Topics))
-	for i, t := range log.Topics {
-		topics[i] = common.BytesToHash(t)
-	}
-
-	if err := abi.ParseTopics(event, indexed, topics[1:]); err != nil {
-		return nil, err
-	}
-	return event, nil
-}
-
-func (c *Codec) CurrentStrategyOptimalLogHash() []byte {
-	return c.abi.Events["CurrentStrategyOptimal"].ID.Bytes()
-}
-
-func (c *Codec) EncodeCurrentStrategyOptimalTopics(
-	evt abi.Event,
-	values []CurrentStrategyOptimalTopics,
-) ([]*evm.TopicValues, error) {
-	var chainSelectorRule []interface{}
-	for _, v := range values {
-		if reflect.ValueOf(v.ChainSelector).IsZero() {
-			chainSelectorRule = append(chainSelectorRule, common.Hash{})
-			continue
-		}
-		fieldVal, err := bindings.PrepareTopicArg(evt.Inputs[0], v.ChainSelector)
-		if err != nil {
-			return nil, err
-		}
-		chainSelectorRule = append(chainSelectorRule, fieldVal)
-	}
-	var protocolIdRule []interface{}
-	for _, v := range values {
-		if reflect.ValueOf(v.ProtocolId).IsZero() {
-			protocolIdRule = append(protocolIdRule, common.Hash{})
-			continue
-		}
-		fieldVal, err := bindings.PrepareTopicArg(evt.Inputs[1], v.ProtocolId)
-		if err != nil {
-			return nil, err
-		}
-		protocolIdRule = append(protocolIdRule, fieldVal)
-	}
-
-	rawTopics, err := abi.MakeTopics(
-		chainSelectorRule,
-		protocolIdRule,
-	)
-	if err != nil {
-		return nil, err
-	}
-
-	return bindings.PrepareTopics(rawTopics, evt.ID.Bytes()), nil
-}
-
-// DecodeCurrentStrategyOptimal decodes a log into a CurrentStrategyOptimal struct.
-func (c *Codec) DecodeCurrentStrategyOptimal(log *evm.Log) (*CurrentStrategyOptimalDecoded, error) {
-	event := new(CurrentStrategyOptimalDecoded)
-	if err := c.abi.UnpackIntoInterface(event, "CurrentStrategyOptimal", log.Data); err != nil {
-		return nil, err
-	}
-	var indexed abi.Arguments
-	for _, arg := range c.abi.Events["CurrentStrategyOptimal"].Inputs {
 		if arg.Indexed {
 			if arg.Type.T == abi.TupleTy {
 				// abigen throws on tuple, so converting to bytes to
@@ -3801,6 +3684,79 @@ func (c *Codec) DecodeStrategyUpdated(log *evm.Log) (*StrategyUpdatedDecoded, er
 	return event, nil
 }
 
+func (c *Codec) SupportedProtocolSetLogHash() []byte {
+	return c.abi.Events["SupportedProtocolSet"].ID.Bytes()
+}
+
+func (c *Codec) EncodeSupportedProtocolSetTopics(
+	evt abi.Event,
+	values []SupportedProtocolSetTopics,
+) ([]*evm.TopicValues, error) {
+	var protocolIdRule []interface{}
+	for _, v := range values {
+		if reflect.ValueOf(v.ProtocolId).IsZero() {
+			protocolIdRule = append(protocolIdRule, common.Hash{})
+			continue
+		}
+		fieldVal, err := bindings.PrepareTopicArg(evt.Inputs[0], v.ProtocolId)
+		if err != nil {
+			return nil, err
+		}
+		protocolIdRule = append(protocolIdRule, fieldVal)
+	}
+	var isSupportedRule []interface{}
+	for _, v := range values {
+		if reflect.ValueOf(v.IsSupported).IsZero() {
+			isSupportedRule = append(isSupportedRule, common.Hash{})
+			continue
+		}
+		fieldVal, err := bindings.PrepareTopicArg(evt.Inputs[1], v.IsSupported)
+		if err != nil {
+			return nil, err
+		}
+		isSupportedRule = append(isSupportedRule, fieldVal)
+	}
+
+	rawTopics, err := abi.MakeTopics(
+		protocolIdRule,
+		isSupportedRule,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	return bindings.PrepareTopics(rawTopics, evt.ID.Bytes()), nil
+}
+
+// DecodeSupportedProtocolSet decodes a log into a SupportedProtocolSet struct.
+func (c *Codec) DecodeSupportedProtocolSet(log *evm.Log) (*SupportedProtocolSetDecoded, error) {
+	event := new(SupportedProtocolSetDecoded)
+	if err := c.abi.UnpackIntoInterface(event, "SupportedProtocolSet", log.Data); err != nil {
+		return nil, err
+	}
+	var indexed abi.Arguments
+	for _, arg := range c.abi.Events["SupportedProtocolSet"].Inputs {
+		if arg.Indexed {
+			if arg.Type.T == abi.TupleTy {
+				// abigen throws on tuple, so converting to bytes to
+				// receive back the common.Hash as is instead of error
+				arg.Type.T = abi.BytesTy
+			}
+			indexed = append(indexed, arg)
+		}
+	}
+	// Convert [][]byte → []common.Hash
+	topics := make([]common.Hash, len(log.Topics))
+	for i, t := range log.Topics {
+		topics[i] = common.BytesToHash(t)
+	}
+
+	if err := abi.ParseTopics(event, indexed, topics[1:]); err != nil {
+		return nil, err
+	}
+	return event, nil
+}
+
 func (c *Codec) UnpausedLogHash() []byte {
 	return c.abi.Events["Unpaused"].ID.Bytes()
 }
@@ -4709,120 +4665,6 @@ func (c ParentPeer) GetRoleAdmin(
 
 }
 
-func (c ParentPeer) GetRoleMember(
-	runtime cre.Runtime,
-	args GetRoleMemberInput,
-	blockNumber *big.Int,
-) cre.Promise[common.Address] {
-	calldata, err := c.Codec.EncodeGetRoleMemberMethodCall(args)
-	if err != nil {
-		return cre.PromiseFromResult[common.Address](*new(common.Address), err)
-	}
-
-	var bn cre.Promise[*pb.BigInt]
-	if blockNumber == nil {
-		promise := c.client.HeaderByNumber(runtime, &evm.HeaderByNumberRequest{
-			BlockNumber: bindings.FinalizedBlockNumber,
-		})
-
-		bn = cre.Then(promise, func(finalizedBlock *evm.HeaderByNumberReply) (*pb.BigInt, error) {
-			if finalizedBlock == nil || finalizedBlock.Header == nil {
-				return nil, errors.New("failed to get finalized block header")
-			}
-			return finalizedBlock.Header.BlockNumber, nil
-		})
-	} else {
-		bn = cre.PromiseFromResult(pb.NewBigIntFromInt(blockNumber), nil)
-	}
-
-	promise := cre.ThenPromise(bn, func(bn *pb.BigInt) cre.Promise[*evm.CallContractReply] {
-		return c.client.CallContract(runtime, &evm.CallContractRequest{
-			Call:        &evm.CallMsg{To: c.Address.Bytes(), Data: calldata},
-			BlockNumber: bn,
-		})
-	})
-	return cre.Then(promise, func(response *evm.CallContractReply) (common.Address, error) {
-		return c.Codec.DecodeGetRoleMemberMethodOutput(response.Data)
-	})
-
-}
-
-func (c ParentPeer) GetRoleMemberCount(
-	runtime cre.Runtime,
-	args GetRoleMemberCountInput,
-	blockNumber *big.Int,
-) cre.Promise[*big.Int] {
-	calldata, err := c.Codec.EncodeGetRoleMemberCountMethodCall(args)
-	if err != nil {
-		return cre.PromiseFromResult[*big.Int](*new(*big.Int), err)
-	}
-
-	var bn cre.Promise[*pb.BigInt]
-	if blockNumber == nil {
-		promise := c.client.HeaderByNumber(runtime, &evm.HeaderByNumberRequest{
-			BlockNumber: bindings.FinalizedBlockNumber,
-		})
-
-		bn = cre.Then(promise, func(finalizedBlock *evm.HeaderByNumberReply) (*pb.BigInt, error) {
-			if finalizedBlock == nil || finalizedBlock.Header == nil {
-				return nil, errors.New("failed to get finalized block header")
-			}
-			return finalizedBlock.Header.BlockNumber, nil
-		})
-	} else {
-		bn = cre.PromiseFromResult(pb.NewBigIntFromInt(blockNumber), nil)
-	}
-
-	promise := cre.ThenPromise(bn, func(bn *pb.BigInt) cre.Promise[*evm.CallContractReply] {
-		return c.client.CallContract(runtime, &evm.CallContractRequest{
-			Call:        &evm.CallMsg{To: c.Address.Bytes(), Data: calldata},
-			BlockNumber: bn,
-		})
-	})
-	return cre.Then(promise, func(response *evm.CallContractReply) (*big.Int, error) {
-		return c.Codec.DecodeGetRoleMemberCountMethodOutput(response.Data)
-	})
-
-}
-
-func (c ParentPeer) GetRoleMembers(
-	runtime cre.Runtime,
-	args GetRoleMembersInput,
-	blockNumber *big.Int,
-) cre.Promise[[]common.Address] {
-	calldata, err := c.Codec.EncodeGetRoleMembersMethodCall(args)
-	if err != nil {
-		return cre.PromiseFromResult[[]common.Address](*new([]common.Address), err)
-	}
-
-	var bn cre.Promise[*pb.BigInt]
-	if blockNumber == nil {
-		promise := c.client.HeaderByNumber(runtime, &evm.HeaderByNumberRequest{
-			BlockNumber: bindings.FinalizedBlockNumber,
-		})
-
-		bn = cre.Then(promise, func(finalizedBlock *evm.HeaderByNumberReply) (*pb.BigInt, error) {
-			if finalizedBlock == nil || finalizedBlock.Header == nil {
-				return nil, errors.New("failed to get finalized block header")
-			}
-			return finalizedBlock.Header.BlockNumber, nil
-		})
-	} else {
-		bn = cre.PromiseFromResult(pb.NewBigIntFromInt(blockNumber), nil)
-	}
-
-	promise := cre.ThenPromise(bn, func(bn *pb.BigInt) cre.Promise[*evm.CallContractReply] {
-		return c.client.CallContract(runtime, &evm.CallContractRequest{
-			Call:        &evm.CallMsg{To: c.Address.Bytes(), Data: calldata},
-			BlockNumber: bn,
-		})
-	})
-	return cre.Then(promise, func(response *evm.CallContractReply) ([]common.Address, error) {
-		return c.Codec.DecodeGetRoleMembersMethodOutput(response.Data)
-	})
-
-}
-
 func (c ParentPeer) GetRouter(
 	runtime cre.Runtime,
 	blockNumber *big.Int,
@@ -5005,6 +4847,44 @@ func (c ParentPeer) GetStrategyRegistry(
 	})
 	return cre.Then(promise, func(response *evm.CallContractReply) (common.Address, error) {
 		return c.Codec.DecodeGetStrategyRegistryMethodOutput(response.Data)
+	})
+
+}
+
+func (c ParentPeer) GetSupportedProtocol(
+	runtime cre.Runtime,
+	args GetSupportedProtocolInput,
+	blockNumber *big.Int,
+) cre.Promise[bool] {
+	calldata, err := c.Codec.EncodeGetSupportedProtocolMethodCall(args)
+	if err != nil {
+		return cre.PromiseFromResult[bool](*new(bool), err)
+	}
+
+	var bn cre.Promise[*pb.BigInt]
+	if blockNumber == nil {
+		promise := c.client.HeaderByNumber(runtime, &evm.HeaderByNumberRequest{
+			BlockNumber: bindings.FinalizedBlockNumber,
+		})
+
+		bn = cre.Then(promise, func(finalizedBlock *evm.HeaderByNumberReply) (*pb.BigInt, error) {
+			if finalizedBlock == nil || finalizedBlock.Header == nil {
+				return nil, errors.New("failed to get finalized block header")
+			}
+			return finalizedBlock.Header.BlockNumber, nil
+		})
+	} else {
+		bn = cre.PromiseFromResult(pb.NewBigIntFromInt(blockNumber), nil)
+	}
+
+	promise := cre.ThenPromise(bn, func(bn *pb.BigInt) cre.Promise[*evm.CallContractReply] {
+		return c.client.CallContract(runtime, &evm.CallContractRequest{
+			Call:        &evm.CallMsg{To: c.Address.Bytes(), Data: calldata},
+			BlockNumber: bn,
+		})
+	})
+	return cre.Then(promise, func(response *evm.CallContractReply) (bool, error) {
+		return c.Codec.DecodeGetSupportedProtocolMethodOutput(response.Data)
 	})
 
 }
@@ -5738,6 +5618,25 @@ func (e *InvalidRouter) Error() string {
 	return fmt.Sprintf("InvalidRouter error: router=%v;", e.Router)
 }
 
+// DecodeParentPeerCurrentStrategyOptimalError decodes a ParentPeer__CurrentStrategyOptimal error from revert data.
+func (c *ParentPeer) DecodeParentPeerCurrentStrategyOptimalError(data []byte) (*ParentPeerCurrentStrategyOptimal, error) {
+	args := c.ABI.Errors["ParentPeer__CurrentStrategyOptimal"].Inputs
+	values, err := args.Unpack(data[4:])
+	if err != nil {
+		return nil, fmt.Errorf("failed to unpack error: %w", err)
+	}
+	if len(values) != 0 {
+		return nil, fmt.Errorf("expected 0 values, got %d", len(values))
+	}
+
+	return &ParentPeerCurrentStrategyOptimal{}, nil
+}
+
+// Error implements the error interface for ParentPeerCurrentStrategyOptimal.
+func (e *ParentPeerCurrentStrategyOptimal) Error() string {
+	return fmt.Sprintf("ParentPeerCurrentStrategyOptimal error:")
+}
+
 // DecodeParentPeerInactiveStrategyAdapterError decodes a ParentPeer__InactiveStrategyAdapter error from revert data.
 func (c *ParentPeer) DecodeParentPeerInactiveStrategyAdapterError(data []byte) (*ParentPeerInactiveStrategyAdapter, error) {
 	args := c.ABI.Errors["ParentPeer__InactiveStrategyAdapter"].Inputs
@@ -5776,25 +5675,6 @@ func (e *ParentPeerInitialActiveStrategyAlreadySet) Error() string {
 	return fmt.Sprintf("ParentPeerInitialActiveStrategyAlreadySet error:")
 }
 
-// DecodeParentPeerNoStrategyChangeFoundError decodes a ParentPeer__NoStrategyChangeFound error from revert data.
-func (c *ParentPeer) DecodeParentPeerNoStrategyChangeFoundError(data []byte) (*ParentPeerNoStrategyChangeFound, error) {
-	args := c.ABI.Errors["ParentPeer__NoStrategyChangeFound"].Inputs
-	values, err := args.Unpack(data[4:])
-	if err != nil {
-		return nil, fmt.Errorf("failed to unpack error: %w", err)
-	}
-	if len(values) != 0 {
-		return nil, fmt.Errorf("expected 0 values, got %d", len(values))
-	}
-
-	return &ParentPeerNoStrategyChangeFound{}, nil
-}
-
-// Error implements the error interface for ParentPeerNoStrategyChangeFound.
-func (e *ParentPeerNoStrategyChangeFound) Error() string {
-	return fmt.Sprintf("ParentPeerNoStrategyChangeFound error:")
-}
-
 // DecodeParentPeerOnlyRebalancerError decodes a ParentPeer__OnlyRebalancer error from revert data.
 func (c *ParentPeer) DecodeParentPeerOnlyRebalancerError(data []byte) (*ParentPeerOnlyRebalancer, error) {
 	args := c.ABI.Errors["ParentPeer__OnlyRebalancer"].Inputs
@@ -5812,6 +5692,32 @@ func (c *ParentPeer) DecodeParentPeerOnlyRebalancerError(data []byte) (*ParentPe
 // Error implements the error interface for ParentPeerOnlyRebalancer.
 func (e *ParentPeerOnlyRebalancer) Error() string {
 	return fmt.Sprintf("ParentPeerOnlyRebalancer error:")
+}
+
+// DecodeParentPeerStrategyNotSupportedError decodes a ParentPeer__StrategyNotSupported error from revert data.
+func (c *ParentPeer) DecodeParentPeerStrategyNotSupportedError(data []byte) (*ParentPeerStrategyNotSupported, error) {
+	args := c.ABI.Errors["ParentPeer__StrategyNotSupported"].Inputs
+	values, err := args.Unpack(data[4:])
+	if err != nil {
+		return nil, fmt.Errorf("failed to unpack error: %w", err)
+	}
+	if len(values) != 1 {
+		return nil, fmt.Errorf("expected 1 values, got %d", len(values))
+	}
+
+	protocolId, ok0 := values[0].([32]byte)
+	if !ok0 {
+		return nil, fmt.Errorf("unexpected type for protocolId in ParentPeerStrategyNotSupported error")
+	}
+
+	return &ParentPeerStrategyNotSupported{
+		ProtocolId: protocolId,
+	}, nil
+}
+
+// Error implements the error interface for ParentPeerStrategyNotSupported.
+func (e *ParentPeerStrategyNotSupported) Error() string {
+	return fmt.Sprintf("ParentPeerStrategyNotSupported error: protocolId=%v;", e.ProtocolId)
 }
 
 // DecodeSafeCastOverflowedUintDowncastError decodes a SafeCastOverflowedUintDowncast error from revert data.
@@ -6062,14 +5968,16 @@ func (c *ParentPeer) UnpackError(data []byte) (any, error) {
 		return c.DecodeExpectedPauseError(data)
 	case common.Bytes2Hex(c.ABI.Errors["InvalidRouter"].ID.Bytes()[:4]):
 		return c.DecodeInvalidRouterError(data)
+	case common.Bytes2Hex(c.ABI.Errors["ParentPeer__CurrentStrategyOptimal"].ID.Bytes()[:4]):
+		return c.DecodeParentPeerCurrentStrategyOptimalError(data)
 	case common.Bytes2Hex(c.ABI.Errors["ParentPeer__InactiveStrategyAdapter"].ID.Bytes()[:4]):
 		return c.DecodeParentPeerInactiveStrategyAdapterError(data)
 	case common.Bytes2Hex(c.ABI.Errors["ParentPeer__InitialActiveStrategyAlreadySet"].ID.Bytes()[:4]):
 		return c.DecodeParentPeerInitialActiveStrategyAlreadySetError(data)
-	case common.Bytes2Hex(c.ABI.Errors["ParentPeer__NoStrategyChangeFound"].ID.Bytes()[:4]):
-		return c.DecodeParentPeerNoStrategyChangeFoundError(data)
 	case common.Bytes2Hex(c.ABI.Errors["ParentPeer__OnlyRebalancer"].ID.Bytes()[:4]):
 		return c.DecodeParentPeerOnlyRebalancerError(data)
+	case common.Bytes2Hex(c.ABI.Errors["ParentPeer__StrategyNotSupported"].ID.Bytes()[:4]):
+		return c.DecodeParentPeerStrategyNotSupportedError(data)
 	case common.Bytes2Hex(c.ABI.Errors["SafeCastOverflowedUintDowncast"].ID.Bytes()[:4]):
 		return c.DecodeSafeCastOverflowedUintDowncastError(data)
 	case common.Bytes2Hex(c.ABI.Errors["SafeERC20FailedOperation"].ID.Bytes()[:4]):
@@ -6423,62 +6331,6 @@ func (c *ParentPeer) FilterLogsCCIPMessageSent(runtime cre.Runtime, options *bin
 			Addresses: [][]byte{c.Address.Bytes()},
 			Topics: []*evm.Topics{
 				{Topic: [][]byte{c.Codec.CCIPMessageSentLogHash()}},
-			},
-			BlockHash: options.BlockHash,
-			FromBlock: pb.NewBigIntFromInt(options.FromBlock),
-			ToBlock:   pb.NewBigIntFromInt(options.ToBlock),
-		},
-	}), nil
-}
-
-// CurrentStrategyOptimalTrigger wraps the raw log trigger and provides decoded CurrentStrategyOptimalDecoded data
-type CurrentStrategyOptimalTrigger struct {
-	cre.Trigger[*evm.Log, *evm.Log]             // Embed the raw trigger
-	contract                        *ParentPeer // Keep reference for decoding
-}
-
-// Adapt method that decodes the log into CurrentStrategyOptimal data
-func (t *CurrentStrategyOptimalTrigger) Adapt(l *evm.Log) (*bindings.DecodedLog[CurrentStrategyOptimalDecoded], error) {
-	// Decode the log using the contract's codec
-	decoded, err := t.contract.Codec.DecodeCurrentStrategyOptimal(l)
-	if err != nil {
-		return nil, fmt.Errorf("failed to decode CurrentStrategyOptimal log: %w", err)
-	}
-
-	return &bindings.DecodedLog[CurrentStrategyOptimalDecoded]{
-		Log:  l,        // Original log
-		Data: *decoded, // Decoded data
-	}, nil
-}
-
-func (c *ParentPeer) LogTriggerCurrentStrategyOptimalLog(chainSelector uint64, confidence evm.ConfidenceLevel, filters []CurrentStrategyOptimalTopics) (cre.Trigger[*evm.Log, *bindings.DecodedLog[CurrentStrategyOptimalDecoded]], error) {
-	event := c.ABI.Events["CurrentStrategyOptimal"]
-	topics, err := c.Codec.EncodeCurrentStrategyOptimalTopics(event, filters)
-	if err != nil {
-		return nil, fmt.Errorf("failed to encode topics for CurrentStrategyOptimal: %w", err)
-	}
-
-	rawTrigger := evm.LogTrigger(chainSelector, &evm.FilterLogTriggerRequest{
-		Addresses:  [][]byte{c.Address.Bytes()},
-		Topics:     topics,
-		Confidence: confidence,
-	})
-
-	return &CurrentStrategyOptimalTrigger{
-		Trigger:  rawTrigger,
-		contract: c,
-	}, nil
-}
-
-func (c *ParentPeer) FilterLogsCurrentStrategyOptimal(runtime cre.Runtime, options *bindings.FilterOptions) (cre.Promise[*evm.FilterLogsReply], error) {
-	if options == nil {
-		return nil, errors.New("FilterLogs options are required.")
-	}
-	return c.client.FilterLogs(runtime, &evm.FilterLogsRequest{
-		FilterQuery: &evm.FilterQuery{
-			Addresses: [][]byte{c.Address.Bytes()},
-			Topics: []*evm.Topics{
-				{Topic: [][]byte{c.Codec.CurrentStrategyOptimalLogHash()}},
 			},
 			BlockHash: options.BlockHash,
 			FromBlock: pb.NewBigIntFromInt(options.FromBlock),
@@ -7711,6 +7563,62 @@ func (c *ParentPeer) FilterLogsStrategyUpdated(runtime cre.Runtime, options *bin
 			Addresses: [][]byte{c.Address.Bytes()},
 			Topics: []*evm.Topics{
 				{Topic: [][]byte{c.Codec.StrategyUpdatedLogHash()}},
+			},
+			BlockHash: options.BlockHash,
+			FromBlock: pb.NewBigIntFromInt(options.FromBlock),
+			ToBlock:   pb.NewBigIntFromInt(options.ToBlock),
+		},
+	}), nil
+}
+
+// SupportedProtocolSetTrigger wraps the raw log trigger and provides decoded SupportedProtocolSetDecoded data
+type SupportedProtocolSetTrigger struct {
+	cre.Trigger[*evm.Log, *evm.Log]             // Embed the raw trigger
+	contract                        *ParentPeer // Keep reference for decoding
+}
+
+// Adapt method that decodes the log into SupportedProtocolSet data
+func (t *SupportedProtocolSetTrigger) Adapt(l *evm.Log) (*bindings.DecodedLog[SupportedProtocolSetDecoded], error) {
+	// Decode the log using the contract's codec
+	decoded, err := t.contract.Codec.DecodeSupportedProtocolSet(l)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode SupportedProtocolSet log: %w", err)
+	}
+
+	return &bindings.DecodedLog[SupportedProtocolSetDecoded]{
+		Log:  l,        // Original log
+		Data: *decoded, // Decoded data
+	}, nil
+}
+
+func (c *ParentPeer) LogTriggerSupportedProtocolSetLog(chainSelector uint64, confidence evm.ConfidenceLevel, filters []SupportedProtocolSetTopics) (cre.Trigger[*evm.Log, *bindings.DecodedLog[SupportedProtocolSetDecoded]], error) {
+	event := c.ABI.Events["SupportedProtocolSet"]
+	topics, err := c.Codec.EncodeSupportedProtocolSetTopics(event, filters)
+	if err != nil {
+		return nil, fmt.Errorf("failed to encode topics for SupportedProtocolSet: %w", err)
+	}
+
+	rawTrigger := evm.LogTrigger(chainSelector, &evm.FilterLogTriggerRequest{
+		Addresses:  [][]byte{c.Address.Bytes()},
+		Topics:     topics,
+		Confidence: confidence,
+	})
+
+	return &SupportedProtocolSetTrigger{
+		Trigger:  rawTrigger,
+		contract: c,
+	}, nil
+}
+
+func (c *ParentPeer) FilterLogsSupportedProtocolSet(runtime cre.Runtime, options *bindings.FilterOptions) (cre.Promise[*evm.FilterLogsReply], error) {
+	if options == nil {
+		return nil, errors.New("FilterLogs options are required.")
+	}
+	return c.client.FilterLogs(runtime, &evm.FilterLogsRequest{
+		FilterQuery: &evm.FilterQuery{
+			Addresses: [][]byte{c.Address.Bytes()},
+			Topics: []*evm.Topics{
+				{Topic: [][]byte{c.Codec.SupportedProtocolSetLogHash()}},
 			},
 			BlockHash: options.BlockHash,
 			FromBlock: pb.NewBigIntFromInt(options.FromBlock),

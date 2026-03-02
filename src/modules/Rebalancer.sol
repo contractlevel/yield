@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.26;
 
 import {CREReceiver} from "./CREReceiver.sol";
@@ -19,8 +19,6 @@ contract Rebalancer is Initializable, UUPSUpgradeable, CREReceiver {
     struct RebalancerStorage {
         /// @dev ParentPeer contract address
         address s_parentPeer;
-        /// @dev Strategy registry
-        address s_strategyRegistry;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -31,26 +29,17 @@ contract Rebalancer is Initializable, UUPSUpgradeable, CREReceiver {
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
-    // keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.Rebalancer")) - 1)) & ~bytes32(uint256(0xff))
+    // ERC-7201: keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.Rebalancer")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant REBALANCER_STORAGE_LOCATION =
         0xc3b8b4354c99bf0a184f0d594e91e4d4c7908c52392d7f7c7384b5f321e23c00;
-
-    /// @notice Version of the contract logic
-    string public constant VERSION = "1.0.0";
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
-    /// @notice Emitted when a CRE report returns an invalid chain selector
-    event InvalidChainSelectorInReport(uint64 indexed chainSelector);
-    /// @notice Emitted when a CRE report returns an invalid protocol ID
-    event InvalidProtocolIdInReport(bytes32 indexed protocolId);
     /// @notice Emitted when the CRE report is successfully decoded/processed
     event ReportDecoded(uint64 indexed chainSelector, bytes32 indexed protocolId);
     /// @notice Emitted when the ParentPeer contract address is set
     event ParentPeerSet(address indexed parentPeer);
-    /// @notice Emitted when the strategy registry is set
-    event StrategyRegistrySet(address indexed strategyRegistry);
 
     /*//////////////////////////////////////////////////////////////
                            CONSTRUCTOR / INIT
@@ -73,27 +62,12 @@ contract Rebalancer is Initializable, UUPSUpgradeable, CREReceiver {
     /// @notice This implementation of _onReport expects to receive new strategy, checks strategy, and then forwards to parent to update
     /// @param report The CRE report
     function _onReport(bytes calldata report) internal override {
-        IYieldPeer.Strategy memory newStrategy = abi.decode(report, (IYieldPeer.Strategy));
-        uint64 chainSelector = newStrategy.chainSelector;
-        bytes32 protocolId = newStrategy.protocolId;
-
         RebalancerStorage storage $ = _getRebalancerStorage(); /// @dev load Rebalancer storage
-
-        // @review Would it be better to revert on this one?
-        if (!IParentPeer($.s_parentPeer).getAllowedChain(chainSelector)) {
-            emit InvalidChainSelectorInReport(chainSelector);
-            return;
-        }
-
-        // Verify protocol Id from report
-        if (IStrategyRegistry($.s_strategyRegistry).getStrategyAdapter(protocolId) == address(0)) {
-            emit InvalidProtocolIdInReport(protocolId);
-            return;
-        }
+        IYieldPeer.Strategy memory newStrategy = abi.decode(report, (IYieldPeer.Strategy));
 
         emit ReportDecoded(newStrategy.chainSelector, newStrategy.protocolId);
 
-        IParentPeer($.s_parentPeer).setStrategy(chainSelector, protocolId);
+        IParentPeer($.s_parentPeer).rebalance(newStrategy);
     }
 
     /// @notice Authorizes an upgrade to a new implementation
@@ -126,16 +100,6 @@ contract Rebalancer is Initializable, UUPSUpgradeable, CREReceiver {
         emit ParentPeerSet(parentPeer);
     }
 
-    /// @notice Sets the strategy registry
-    /// @param strategyRegistry The address of the strategy registry
-    /// @dev Revert if the caller is not the owner
-    /// @dev Revert if setting to 0 address
-    function setStrategyRegistry(address strategyRegistry) external onlyOwner {
-        if (strategyRegistry == address(0)) revert Rebalancer__NotZeroAddress();
-        _getRebalancerStorage().s_strategyRegistry = strategyRegistry;
-        emit StrategyRegistrySet(strategyRegistry);
-    }
-
     /*//////////////////////////////////////////////////////////////
                                  GETTER
     //////////////////////////////////////////////////////////////*/
@@ -144,20 +108,10 @@ contract Rebalancer is Initializable, UUPSUpgradeable, CREReceiver {
         parentPeer = _getRebalancerStorage().s_parentPeer;
     }
 
-    /// @return strategyRegistry The strategy registry address
-    function getStrategyRegistry() external view returns (address strategyRegistry) {
-        strategyRegistry = _getRebalancerStorage().s_strategyRegistry;
-    }
-
     /// @dev Helper function to expose the Strategy struct for CRE to create Go bindings for encoding
     /// @return currentStrategy The current Strategy (from the Parent peer)
     function getCurrentStrategy() external view returns (IYieldPeer.Strategy memory currentStrategy) {
         address parent = _getRebalancerStorage().s_parentPeer;
         currentStrategy = IParentPeer(parent).getStrategy();
-    }
-
-    /// @return VERSION The version of the contract logic
-    function getVersion() external pure returns (string memory) {
-        return VERSION;
     }
 }

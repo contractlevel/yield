@@ -117,6 +117,9 @@ contract DeployChild is Script {
 
         // Cast Proxy address to ChildPeer type
         deploy.childPeer = ChildPeer(address(childProxy));
+        // @review this will need to also begin transfer the default admin role to a multisig address
+
+        vm.stopBroadcast();
 
         // Grant Share BnM role to Child Peer
         deploy.share.grantMintAndBurnRoles(address(deploy.childPeer));

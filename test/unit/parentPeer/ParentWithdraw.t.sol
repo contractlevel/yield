@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.26;
 
 import {BaseTest, ParentPeer, console2} from "../../BaseTest.t.sol";
@@ -45,9 +45,9 @@ contract ParentWithdrawTest is BaseTest {
         baseParentPeer.onTokenTransfer(msg.sender, DEPOSIT_AMOUNT, "");
     }
 
-    function test_yield_parent_onTokenTransfer_revertsWhen_parentPaused() public {
+    function test_yield_parent_onTokenTransfer_revertsWhen_paused() public {
         _changePrank(emergencyPauser);
-        baseParentPeer.emergencyPause();
+        baseParentPeer.pause();
         _changePrank(depositor);
         vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
         baseParentPeer.onTokenTransfer(msg.sender, DEPOSIT_AMOUNT, "");
@@ -238,9 +238,7 @@ contract ParentWithdrawTest is BaseTest {
 
     /// @notice Withdraw Scenario: Withdraw on Parent, TVL in transit
     function test_yield_parent_withdraw_revertsWhen_strategyPointsToParent_butActiveAdapterIsZero() public {
-        /// @dev Arrange: Set strategy to parent with Aave and make a deposit first
-        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")), SET_CROSS_CHAIN);
-        _selectFork(baseFork);
+        /// @dev Arrange: Strategy is on parent with Aave and make a deposit first
         _changePrank(withdrawer);
         baseParentPeer.deposit(DEPOSIT_AMOUNT);
 

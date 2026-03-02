@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.26;
 
 import {BaseTest} from "../../../BaseTest.t.sol";
@@ -9,5 +9,10 @@ contract GetStrategyPoolTest is BaseTest {
         address aavePoolAddressesProvider = baseNetworkConfig.protocols.aavePoolAddressesProvider;
         address aavePool = IPoolAddressesProvider(aavePoolAddressesProvider).getPool();
         assertEq(baseAaveV3Adapter.getStrategyPool(), aavePool);
+    }
+
+    function test_yield_aaveV3Adapter_getPoolAddressesProvider_success() public view {
+        address aavePoolAddressesProvider = baseNetworkConfig.protocols.aavePoolAddressesProvider;
+        assertEq(baseAaveV3Adapter.getPoolAddressesProvider(), aavePoolAddressesProvider);
     }
 }

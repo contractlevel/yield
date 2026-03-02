@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.26;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -22,17 +22,15 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
         /// @dev total share tokens (YieldCoin) minted across all chains
         // @invariant s_totalShares == ghost_totalSharesMinted - ghost_totalSharesBurned
         uint256 s_totalShares;
+        /// @dev The current strategy: chainSelector and protocol
+        Strategy s_strategy;
         /// @dev This address handles automated CCIP rebalance calls with Log-trigger Automation, based on Function request callbacks
         /// @notice See ./src/modules/Rebalancer.sol
         address s_rebalancer;
         /// @dev Whether the initial active strategy adapter has been set
         bool s_initialActiveStrategySet;
-    }
-
-    /// @custom:storage-location erc7201:yieldcoin.storage.StrategyStorage
-    struct StrategyStorage {
-        /// @dev The current strategy: chainSelector and protocol
-        Strategy s_strategy;
+        /// @dev Whether the protocol is supported across all chains. ie true for CompoundV3 if we support it because it is on Ethereum, but not Avalanche
+        mapping(bytes32 protocolId => bool isSupported) s_supportedProtocols;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -43,26 +41,19 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /// @dev indicates activeStrategyAdapter not set when parent state shows s_strategy.chainSelector == thisChainSelector
     /// activeStrategyAdapter is updated when rebalance TVL transit concludes
     error ParentPeer__InactiveStrategyAdapter();
+    error ParentPeer__CurrentStrategyOptimal();
+    error ParentPeer__StrategyNotSupported(bytes32 protocolId);
 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
-    // keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.ParentPeer")) - 1)) & ~bytes32(uint256(0xff))
+    // ERC-7201: keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.ParentPeer")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant PARENT_PEER_STORAGE_LOCATION =
-        0x603686382b15940b5fa7ef449162bde228a5948ce3b6bdf08bd833ec6ae79500; // @review double check the hash
-
-    // keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.StrategyStorage")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant STRATEGY_STORAGE_LOCATION =
-        0x5202e425b34b6c95645915a460de54125f03aa25697774e32ad8f29e0d7eab00; // @review double check the hash
-
-    /// @notice Version of the contract logic
-    string public constant VERSION = "1.0.0";
+        0x603686382b15940b5fa7ef449162bde228a5948ce3b6bdf08bd833ec6ae79500;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
-    /// @notice Emitted when the current strategy is optimal
-    event CurrentStrategyOptimal(uint64 indexed chainSelector, bytes32 indexed protocolId);
     /// @notice Emitted when the strategy is updated
     event StrategyUpdated(uint64 indexed chainSelector, bytes32 indexed protocolId, uint64 indexed oldChainSelector);
     /// @notice Emitted when the amount of shares minted is updated
@@ -73,12 +64,14 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     event DepositForwardedToStrategy(uint256 indexed depositAmount, uint64 indexed strategyChainSelector);
     /// @notice Emitted when a withdraw is forwarded to the strategy
     event WithdrawForwardedToStrategy(uint256 indexed shareBurnAmount, uint64 indexed strategyChainSelector);
-    /// @notice Emitted when the rebalancer is set
-    event RebalancerSet(address indexed rebalancer);
     /// @notice Emitted when a deposit is ping-pong'd to a child
     event DepositPingPongToChild(uint256 indexed depositAmount, uint64 indexed destChainSelector);
     /// @notice Emitted when a withdraw is pingpong'd to a child
     event WithdrawPingPongToChild(uint256 indexed shareBurnAmount, uint64 indexed destChainSelector);
+    /// @notice Emitted when the rebalancer is set
+    event RebalancerSet(address indexed rebalancer);
+    /// @notice Emitted when a protocol is set as supported or not supported
+    event SupportedProtocolSet(bytes32 indexed protocolId, bool indexed isSupported);
 
     /*//////////////////////////////////////////////////////////////
                            CONSTRUCTOR / INIT
@@ -225,6 +218,22 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
                 strategy.chainSelector, CcipTxType.WithdrawToStrategy, abi.encode(withdrawData), ZERO_BRIDGE_AMOUNT
             );
         }
+    }
+
+    /// @notice Called by Rebalancer::_onReport after getting CRE report from Keystone Forwarder
+    /// @notice It updates state with the new strategy
+    /// @notice Executes rebalance logic
+    /// @param newStrategy The new strategy to rebalance to
+    /// @dev Revert if msg.sender is not the rebalancer
+    /// @dev Revert in _revertIfStrategyIsNotSupported if newStrategy.protocolId is not supported
+    /// @dev Revert in _revertIfStrategyIsNotSupported if newStrategy.chainSelector is not allowed
+    /// @dev Revert in _setStrategy if the current strategy is optimal
+    function rebalance(Strategy calldata newStrategy) external {
+        if (msg.sender != s_rebalancer) revert ParentPeer__OnlyRebalancer();
+        Strategy memory oldStrategy = s_strategy;
+        _revertIfStrategyIsNotSupported(newStrategy);
+        _setStrategy(oldStrategy, newStrategy);
+        _rebalance(oldStrategy, newStrategy);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -425,29 +434,28 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
         _handleCCIPWithdraw(s$.s_strategy, withdrawData);
     }
 
-    /// @notice This function sets the strategy on the parent and triggers appropriate strategy change
-    /// @notice Called by Rebalancer::_onReport after getting CRE report from Keystone Forwarder
-    /// @notice Triggers appropriate strategy rebalance (local, parent to child, child to other)
-    /// @param chainSelector The chain selector of the new strategy
-    /// @param protocolId The protocol ID of the new strategy
-    function _setAndHandleStrategyChange(uint64 chainSelector, bytes32 protocolId) internal {
-        /// @dev load StrategyStorage
-        StrategyStorage storage s$ = _getStrategyStorage();
-
-        Strategy memory oldStrategy = s$.s_strategy;
-        Strategy memory newStrategy = Strategy({chainSelector: chainSelector, protocolId: protocolId});
-
-        /// @dev Compare strategies and return early if optimal
+    /// @dev Compare strategies and return early if optimal
+    /// @dev Update Strategy state and emit StrategyUpdated event
+    /// @param oldStrategy The old strategy
+    /// @param newStrategy The new strategy
+    /// @dev Revert if the current strategy is optimal
+    function _setStrategy(Strategy memory oldStrategy, Strategy calldata newStrategy) internal {
         if (oldStrategy.chainSelector == newStrategy.chainSelector && oldStrategy.protocolId == newStrategy.protocolId)
         {
-            emit CurrentStrategyOptimal(newStrategy.chainSelector, newStrategy.protocolId);
-            return;
+            revert ParentPeer__CurrentStrategyOptimal();
         }
 
         /// @dev Update Strategy state and emit StrategyUpdated event
         s$.s_strategy = newStrategy;
         emit StrategyUpdated(newStrategy.chainSelector, newStrategy.protocolId, oldStrategy.chainSelector);
+    }
 
+    /// @notice This function sets the strategy on the parent and triggers appropriate strategy change
+    /// @notice Called by Rebalancer::_onReport after getting CRE report from Keystone Forwarder
+    /// @notice Triggers appropriate strategy rebalance (local, parent to child, child to other)
+    /// @param oldStrategy The old strategy
+    /// @param newStrategy The new strategy
+    function _rebalance(Strategy memory oldStrategy, Strategy calldata newStrategy) internal {
         /// @dev Handle local strategy change on this parent chain
         if (newStrategy.chainSelector == i_thisChainSelector && oldStrategy.chainSelector == i_thisChainSelector) {
             _rebalanceParentToParent(newStrategy);
@@ -463,18 +471,20 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     }
 
     /// @notice Handles strategy change when both old and new strategies are on this chain
+    /// @notice Called when the strategy is on this chain and is being rebalanced to another strategy on this chain
     /// @param newStrategy The new strategy
-    function _rebalanceParentToParent(Strategy memory newStrategy) internal {
+    function _rebalanceParentToParent(Strategy calldata newStrategy) internal {
         address oldActiveStrategyAdapter = _getActiveStrategyAdapter();
 
         address newActiveStrategyAdapter =
             _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
 
         uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, address(i_usdc));
-        if (totalValue != 0) _withdrawFromStrategy(oldActiveStrategyAdapter, totalValue);
-
-        //slither-disable-next-line reentrancy-events
-        _depositToStrategy(newActiveStrategyAdapter, totalValue);
+        if (totalValue != 0) {
+            _withdrawFromStrategy(oldActiveStrategyAdapter, totalValue);
+            //slither-disable-next-line reentrancy-events
+            _depositToStrategy(newActiveStrategyAdapter, totalValue);
+        }
     }
 
     /// @dev Handle moving strategy (both funds & new strategy info) from this parent chain to a child chain
@@ -526,6 +536,19 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
         if (shareMintAmount == 0) shareMintAmount = 1;
     }
 
+    /// @notice Revert if the strategy is not supported
+    /// @param newStrategy The new strategy
+    /// @dev Revert if the chain selector is not allowed
+    /// @dev Revert if the protocol is not supported
+    function _revertIfStrategyIsNotSupported(Strategy calldata newStrategy) internal view {
+        if (!s_allowedChains[newStrategy.chainSelector]) {
+            revert YieldPeer__ChainNotAllowed(newStrategy.chainSelector);
+        }
+        if (!s_supportedProtocols[newStrategy.protocolId]) {
+            revert ParentPeer__StrategyNotSupported(newStrategy.protocolId);
+        }
+    }
+
     /*//////////////////////////////////////////////////////////////
                          PRIVATE PURE / STORAGE
     //////////////////////////////////////////////////////////////*/
@@ -537,32 +560,9 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
         }
     }
 
-    /// @dev Return the StrategyStorage storage location
-    /// @return $ StrategyStorage storage location
-    function _getStrategyStorage() private pure returns (StrategyStorage storage $) {
-        assembly {
-            $.slot := STRATEGY_STORAGE_LOCATION
-        }
-    }
-
     /*//////////////////////////////////////////////////////////////
                                  SETTER
     //////////////////////////////////////////////////////////////*/
-    /// @notice Called by Rebalancer::_onReport when it gets a CRE report from a Keystone Forwarder
-    /// @notice _setAndHandleStrategyChange() will do the following:
-    /// @notice 1. Update the active s_strategy and emit StrategyUpdated() event
-    /// @notice 2. Trigger appropriate strategy change (local, parent to child, child to other)
-    /// @dev Revert if msg.sender is not the Rebalancer
-    /// @dev Set the strategy
-    /// @param chainSelector The chain selector of the new strategy
-    /// @param protocolId The protocol ID of the new strategy
-    // @review Do we want to make this Pausable?
-    function setStrategy(uint64 chainSelector, bytes32 protocolId) external {
-        ParentPeerStorage storage p$ = _getParentPeerStorage(); /// @dev load ParentPeerStorage
-        if (msg.sender != p$.s_rebalancer) revert ParentPeer__OnlyRebalancer();
-        _setAndHandleStrategyChange(chainSelector, protocolId);
-    }
-
     /// @notice Sets the initial active strategy
     /// @notice Can only be called once by the owner
     /// @notice This is needed because the strategy adapters are deployed separately from the parent peer
@@ -571,15 +571,10 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /// @dev Called in deploy script, immediately after deploying initial strategy adapters, and setting them in YieldPeer::setStrategyAdapter
     /// @param protocolId The protocol ID of the initial active strategy
     function setInitialActiveStrategy(bytes32 protocolId) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        /// @dev load ParentPeerStorage
-        ParentPeerStorage storage p$ = _getParentPeerStorage();
-        /// @dev load StrategyStorage
-        StrategyStorage storage s$ = _getStrategyStorage();
-
-        if (p$.s_initialActiveStrategySet) revert ParentPeer__InitialActiveStrategyAlreadySet();
-
-        p$.s_initialActiveStrategySet = true;
-        s$.s_strategy = Strategy({chainSelector: i_thisChainSelector, protocolId: protocolId});
+        // @review reverting if protocolId is not supported?
+        if (s_initialActiveStrategySet) revert ParentPeer__InitialActiveStrategyAlreadySet();
+        s_initialActiveStrategySet = true;
+        s_strategy = Strategy({chainSelector: i_thisChainSelector, protocolId: protocolId});
         // @review unused-return, returns newActiveStrategyAdapter
         _updateActiveStrategyAdapter(i_thisChainSelector, protocolId);
     }
@@ -591,6 +586,15 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     function setRebalancer(address rebalancer) external onlyRole(Roles.CONFIG_ADMIN_ROLE) {
         _getParentPeerStorage().s_rebalancer = rebalancer;
         emit RebalancerSet(rebalancer);
+    }
+
+    /// @notice Sets the supported protocol
+    /// @dev Revert if msg.sender is not the config admin
+    /// @param protocolId The protocol ID
+    /// @param isSupported Whether the protocol is supported
+    function setSupportedProtocol(bytes32 protocolId, bool isSupported) external onlyRole(Roles.CONFIG_ADMIN_ROLE) {
+        s_supportedProtocols[protocolId] = isSupported;
+        emit SupportedProtocolSet(protocolId, isSupported);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -614,9 +618,10 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
         return _getParentPeerStorage().s_rebalancer;
     }
 
-    /// @notice Get the contract version
-    /// @return version The contract version
-    function getVersion() external pure returns (string memory) {
-        return VERSION;
+    /// @notice Get the supported protocol
+    /// @param protocolId The protocol ID. ie keccak256("aave-v3") or keccak256("compound-v3")
+    /// @return isSupported Whether the protocol is supported across all chains
+    function getSupportedProtocol(bytes32 protocolId) external view returns (bool isSupported) {
+        isSupported = s_supportedProtocols[protocolId];
     }
 }

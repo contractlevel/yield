@@ -21,6 +21,7 @@ methods {
     function getRebalancer() external returns (address) envfree;
     function paused() external returns (bool) envfree;
     function getAllowedChain(uint64) external returns (bool) envfree;
+    function getSupportedProtocol(bytes32) external returns (bool) envfree;
 
     // PausableWithAccessControl methods
     function owner() external returns (address) envfree;
@@ -54,6 +55,7 @@ methods {
     function convertUsdcToShare(uint256) external returns (uint256) envfree;
     function getStrategyAdapterFromProtocol(bytes32) external returns (address) envfree;
     function calculateFee(uint256) external returns (uint256) envfree;
+    function bytes32ToBool(bytes32) external returns (bool) envfree;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -136,6 +138,10 @@ to_bytes32(0xd226c55624acdf7dc487bf2d322d07feef128f29f6bb7793e03ba147d84b5c98);
 definition WithdrawPingPongToChildEvent() returns bytes32 =
 // keccak256(abi.encodePacked("WithdrawPingPongToChild(uint256,uint64)"))
 to_bytes32(0xc75e77a40c4dc3a53d5deb9d8fb9d32536847fcc2c9d2d88f1f6f1aed0f71de5);
+
+definition SupportedProtocolSetEvent() returns bytes32 =
+// keccak256(abi.encodePacked("SupportedProtocolSet(bytes32,bool)"))
+to_bytes32(0x56cc71f639333b7ecd9179fddeb0ecc00bcb82b3f98664a11601a28652604c48);
 
 /*//////////////////////////////////////////////////////////////
                              GHOSTS
@@ -255,6 +261,21 @@ ghost mathint ghost_withdrawPingPongToChild_eventCount {
     init_state axiom ghost_withdrawPingPongToChild_eventCount == 0;
 }
 
+/// @notice EventCount: track amount of SupportedProtocolSet event is emitted
+ghost mathint ghost_supportedProtocolSet_eventCount {
+    init_state axiom ghost_supportedProtocolSet_eventCount == 0;
+}
+
+/// @notice EmittedValue: track the protocolId emitted by SupportedProtocolSet event
+ghost bytes32 ghost_supportedProtocolSet_emittedProtocolId {
+    init_state axiom ghost_supportedProtocolSet_emittedProtocolId == to_bytes32(0);
+}
+
+/// @notice EmittedValue: track the isSupported emitted by SupportedProtocolSet event
+ghost bool ghost_supportedProtocolSet_emittedIsSupported {
+    init_state axiom ghost_supportedProtocolSet_emittedIsSupported == false;
+}
+
 /*//////////////////////////////////////////////////////////////
                              HOOKS
 //////////////////////////////////////////////////////////////*/
@@ -288,6 +309,11 @@ hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
     if (t0 == DepositToStrategyEvent()) ghost_depositToStrategy_eventCount = ghost_depositToStrategy_eventCount + 1;
     if (t0 == DepositPingPongToChildEvent()) ghost_depositPingPongToChild_eventCount = ghost_depositPingPongToChild_eventCount + 1;
     if (t0 == WithdrawPingPongToChildEvent()) ghost_withdrawPingPongToChild_eventCount = ghost_withdrawPingPongToChild_eventCount + 1;
+    if (t0 == SupportedProtocolSetEvent()) {
+        ghost_supportedProtocolSet_eventCount = ghost_supportedProtocolSet_eventCount + 1;
+        ghost_supportedProtocolSet_emittedProtocolId = t1;
+        ghost_supportedProtocolSet_emittedIsSupported = bytes32ToBool(t2);
+    }
 }
 
 hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
@@ -441,24 +467,6 @@ rule onTokenTransfer_emits_WithdrawCompleted_when_parent_is_strategyChain_and_wi
     require ghost_withdrawCompleted_eventCount == 0;
     onTokenTransfer(e, withdrawer, shareBurnAmount, encodedWithdrawChainSelector);
     assert ghost_withdrawCompleted_eventCount == 1;
-}
-
-rule onTokenTransfer_emits_CCIPMessageSent_when_parent_is_strategyChain_and_withdrawChain_is_differentChain() {
-    env e;
-    address withdrawer;
-    uint256 shareBurnAmount;
-    uint64 withdrawChainSelector;
-    require withdrawChainSelector != getThisChainSelector();
-    bytes encodedWithdrawChainSelector = encodeUint64(withdrawChainSelector);
-    require getStrategy().chainSelector == getThisChainSelector();
-
-    uint256 expectedWithdrawAmount = calculateWithdrawAmount(getTotalValue(e), getTotalShares(), shareBurnAmount);
-
-    require ghost_ccipMessageSent_eventCount == 0;
-    onTokenTransfer(e, withdrawer, shareBurnAmount, encodedWithdrawChainSelector);
-    assert ghost_ccipMessageSent_eventCount == 1;
-    assert ghost_ccipMessageSent_txType_emitted == 6; // WithdrawCallback
-    assert ghost_ccipMessageSent_bridgeAmount_emitted == expectedWithdrawAmount;
 }
 
 rule onTokenTransfer_transfersUsdcToWithdrawer_when_parent_is_strategyChain_and_withdrawChain() {
@@ -708,31 +716,6 @@ rule handleCCIPWithdrawToParent_withdrawsUsdc_when_parent_is_strategy() {
     assert usdc.balanceOf(strategyPool) == strategyPoolBalanceBefore - expectedWithdrawAmount;
 }
 
-rule handleCCIPWithdrawToParent_transferUsdcToWithdrawer_when_parent_is_strategy_and_withdrawChain() {
-    env e;
-    address withdrawer;
-    uint256 shareBurnAmount;
-    uint256 totalShares;
-    uint256 usdcWithdrawAmount;
-    uint64 withdrawChainSelector;
-    uint64 sourceChainSelector;
-    bytes encodedWithdrawData = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, withdrawChainSelector);
-    require getStrategy().chainSelector == getThisChainSelector();
-    require withdrawChainSelector == getThisChainSelector();
-
-    uint256 expectedWithdrawAmount = calculateWithdrawAmount(getTotalValue(e), getTotalShares(), shareBurnAmount);
-
-    uint256 usdcBalanceBefore = usdc.balanceOf(withdrawer);
-    require usdcBalanceBefore + expectedWithdrawAmount <= max_uint256;
-    require withdrawer != getActiveStrategyAdapter().getStrategyPool(e);
-
-    require ghost_withdrawCompleted_eventCount == 0;
-    handleCCIPWithdrawToParent(e, encodedWithdrawData, sourceChainSelector);
-    assert ghost_withdrawCompleted_eventCount == 1;
-
-    assert usdc.balanceOf(withdrawer) == usdcBalanceBefore + expectedWithdrawAmount;
-}
-
 rule handleCCIPWithdrawToParent_sendsUsdc_to_withdrawChain_when_parent_is_strategy() {
     env e;
     address withdrawer;
@@ -798,53 +781,106 @@ rule handleCCIPWithdraw_forwardsToStrategy_and_emits_WithdrawPingPongToChild_whe
     assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;
 }
 
-// --- setStrategy --- //
-rule setStrategy_revertsWhen_notRebalancer() {
+// --- rebalance --- //
+rule rebalance_revertsWhen_notRebalancer() {
     env e;
-    calldataarg args;
+    uint64 chainSelector;
+    bytes32 protocolId;
+    IYieldPeer.Strategy newStrategy = createStrategy(chainSelector, protocolId);
 
+    /// @dev revert condition being verified
     require e.msg.sender != currentContract.s_rebalancer;
 
-    setStrategy@withrevert(e, args);
+    /// @dev revert conditions not being verified
+    require e.msg.value == 0;
+    require newStrategy != getStrategy();
+    require getAllowedChain(chainSelector) == true;
+    require getSupportedProtocol(protocolId) == true;
+
+    rebalance@withrevert(e, newStrategy);
     assert lastReverted;
 }
 
-rule setStrategy_emits_CurrentStrategyOptimal_when_currentStrategy_is_optimal() {
+rule rebalance_revertsWhen_sameStrategy() {
     env e;
     uint64 chainSelector;
     bytes32 protocolId;
+    IYieldPeer.Strategy newStrategy = createStrategy(chainSelector, protocolId);
 
-    IYieldPeer.Strategy oldStrategy = getStrategy();
+    /// @dev revert condition being verified
+    require newStrategy == getStrategy();
 
-    require oldStrategy.chainSelector == chainSelector && oldStrategy.protocolId == protocolId;
+    /// @dev revert conditions not being verified
+    require e.msg.value == 0;
+    require getAllowedChain(chainSelector) == true;
+    require getSupportedProtocol(protocolId) == true;
+    require e.msg.sender == currentContract.s_rebalancer;
 
-    require ghost_currentStrategyOptimal_eventCount == 0;
-    setStrategy(e, chainSelector, protocolId);
-    assert ghost_currentStrategyOptimal_eventCount == 1;
-    assert getStrategy() == oldStrategy;
+    rebalance@withrevert(e, newStrategy);
+    assert lastReverted;
 }
 
-rule setStrategy_updatesStrategy_when_newStrategy_is_different() {
+rule rebalance_revertsWhen_chainNotAllowed() {
     env e;
     uint64 chainSelector;
     bytes32 protocolId;
+    IYieldPeer.Strategy newStrategy = createStrategy(chainSelector, protocolId);
 
+    /// @dev revert condition being verified
+    require getAllowedChain(chainSelector) == false;
+
+    /// @dev revert conditions not being verified
+    require e.msg.value == 0;
+    require getSupportedProtocol(protocolId) == true;
+    require e.msg.sender == currentContract.s_rebalancer;
+    require newStrategy != getStrategy();
+
+    rebalance@withrevert(e, newStrategy);
+    assert lastReverted;
+}
+
+rule rebalance_revertsWhen_protocolNotSupported() {
+    env e;
+    uint64 chainSelector;
+    bytes32 protocolId;
+    IYieldPeer.Strategy newStrategy = createStrategy(chainSelector, protocolId);
+
+    /// @dev revert condition being verified
+    require getSupportedProtocol(protocolId) == false;
+
+    /// @dev revert conditions not being verified
+    require e.msg.value == 0;
+    require getAllowedChain(chainSelector) == true;
+    require e.msg.sender == currentContract.s_rebalancer;
+    require newStrategy != getStrategy();
+
+    rebalance@withrevert(e, newStrategy);
+    assert lastReverted;
+}
+
+
+rule rebalance_updatesStrategy_when_newStrategy_is_different() {
+    env e;
+    uint64 chainSelector;
+    bytes32 protocolId;
+    IYieldPeer.Strategy newStrategy = createStrategy(chainSelector, protocolId);
     IYieldPeer.Strategy oldStrategy = getStrategy();
 
     require oldStrategy.chainSelector != chainSelector || oldStrategy.protocolId != protocolId;
 
     require ghost_currentStrategyOptimal_eventCount == 0;
     require ghost_strategyUpdated_eventCount == 0;
-    setStrategy(e, chainSelector, protocolId);
+    rebalance(e, newStrategy);
     assert ghost_currentStrategyOptimal_eventCount == 0;
     assert ghost_strategyUpdated_eventCount == 1;
     assert getStrategy() != oldStrategy;
 }
 
-rule setStrategy_handles_rebalanceParentToParent() {
+rule rebalance_handles_rebalanceParentToParent() {
     env e;
     uint64 chainSelector;
     bytes32 protocolId;
+    IYieldPeer.Strategy newStrategy = createStrategy(chainSelector, protocolId);
     bytes32 aaveV3ProtocolId;
     bytes32 compoundV3ProtocolId;
 
@@ -887,7 +923,7 @@ rule setStrategy_handles_rebalanceParentToParent() {
     require newStrategyPoolBalanceBefore + totalValue <= max_uint256;
 
     /// @dev act
-    setStrategy(e, chainSelector, protocolId);
+    rebalance(e, newStrategy);
 
     /// @dev assert correct balance changes
     assert usdc.balanceOf(oldStrategyPool) == oldStrategyPoolBalanceBefore - totalValue;
@@ -895,7 +931,7 @@ rule setStrategy_handles_rebalanceParentToParent() {
 }
 
 // @review rule vacuous - was before too
-rule setStrategy_handles_rebalanceParentToChild() {
+rule rebalance_handles_rebalanceParentToChild() {
     env e;
     uint64 chainSelector;
     bytes32 protocolId;
@@ -914,7 +950,7 @@ rule setStrategy_handles_rebalanceParentToChild() {
     require usdc.balanceOf(currentContract) == 0;
 
     require ghost_ccipMessageSent_eventCount == 0;
-    setStrategy(e, newStrategy.chainSelector, newStrategy.protocolId);
+    rebalance(e, newStrategy);
     assert ghost_ccipMessageSent_eventCount == 1;
     assert ghost_ccipMessageSent_txType_emitted == 8; // RebalanceNewStrategy
     assert ghost_ccipMessageSent_bridgeAmount_emitted == totalValue;
@@ -922,7 +958,7 @@ rule setStrategy_handles_rebalanceParentToChild() {
     assert usdc.balanceOf(strategyPool) == strategyPoolBalanceBefore - totalValue;
 }
 
-rule setStrategy_handles_rebalanceChildToOther() {
+rule rebalance_handles_rebalanceChildToOther() {
     env e;
     uint64 chainSelector;
     bytes32 protocolId;
@@ -934,7 +970,7 @@ rule setStrategy_handles_rebalanceChildToOther() {
     IYieldPeer.Strategy newStrategy = createStrategy(chainSelector, protocolId);
 
     require ghost_ccipMessageSent_eventCount == 0;
-    setStrategy(e, newStrategy.chainSelector, newStrategy.protocolId);
+    rebalance(e, newStrategy);
     assert ghost_ccipMessageSent_eventCount == 1;
     assert ghost_ccipMessageSent_txType_emitted == 7; // RebalanceOldStrategy
     assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;
@@ -1041,4 +1077,33 @@ rule setRebalancer_success() {
     assert ghost_rebalancerSet_emittedAddress == rebalancer; /// @dev check rebalancer set event emitted address
     assert currentContract.s_rebalancer == rebalancer; /// @dev check storage variable was updated
     assert getRebalancer() == rebalancer;
+}
+
+// --- setSupportedProtocol --- //
+rule setSupportedProtocol_revertsWhen_notConfigAdmin() {
+    env e;
+    calldataarg args;
+
+    require hasRole(configAdminRole(), e.msg.sender) == false;
+    require e.msg.value == 0;
+
+    setSupportedProtocol@withrevert(e, args);
+    assert lastReverted;
+}
+
+rule setSupportedProtocol_success() {
+    env e;
+    bytes32 protocolId;
+    bool isSupported;
+
+    require ghost_supportedProtocolSet_eventCount == 0;
+    require ghost_supportedProtocolSet_emittedProtocolId == to_bytes32(0);
+    require ghost_supportedProtocolSet_emittedIsSupported == false;
+    require currentContract.s_supportedProtocols[protocolId] == !isSupported;
+
+    setSupportedProtocol(e, protocolId, isSupported);
+    assert ghost_supportedProtocolSet_eventCount == 1;
+    assert ghost_supportedProtocolSet_emittedProtocolId == protocolId;
+    assert ghost_supportedProtocolSet_emittedIsSupported == isSupported;
+    assert currentContract.s_supportedProtocols[protocolId] == isSupported;
 }

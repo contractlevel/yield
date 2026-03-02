@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.26;
 
 import {
@@ -69,6 +69,8 @@ contract StrategyRegistry is Initializable, UUPSUpgradeable, IStrategyRegistry, 
     /// @dev bytes32 compoundV3Id = keccak256("compound-v3");
     /// @notice The string hashed for the protocol ID should match what is hashed in the Chainlink Functions source code - see functions/src.js
     /// @param strategyAdapter The strategy adapter address
+    /// @notice This does not explicitly sync with ParentPeer::s_supportedProtocols at the contract level because
+    /// this is also deployed on child chains and this contract is primarily inteded as a registry for adapters.
     function setStrategyAdapter(bytes32 protocolId, address strategyAdapter) external onlyOwner {
         /// @dev load StrategyRegistry storage
         StrategyRegistryStorage storage $ = _getStrategyRegistryStorage();

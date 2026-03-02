@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.26;
 
 import {IYieldFees} from "./IYieldFees.sol";
@@ -50,4 +50,6 @@ interface IYieldPeer is IYieldFees {
     function getAllowedPeer(uint64 chainSelector) external view returns (address);
     function getActiveStrategyAdapter() external view returns (address);
     function getStrategyRegistry() external view returns (address);
+    function pause() external;
+    function unpause() external;
 }

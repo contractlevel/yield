@@ -1,13 +1,18 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.26;
 
 import {LinkTokenInterface} from "@chainlink/contracts/src/v0.8/shared/interfaces/LinkTokenInterface.sol";
 import {CCIPReceiver, IAny2EVMMessageReceiver} from "@chainlink/contracts/src/v0.8/ccip/applications/CCIPReceiver.sol";
 import {IRouterClient, Client} from "@chainlink/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
 import {IERC677Receiver} from "@chainlink/contracts/src/v0.8/shared/interfaces/IERC677Receiver.sol";
+
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {PausableWithAccessControl, Roles, IAccessControlEnumerable} from "../modules/PausableWithAccessControl.sol";
+import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import {
+    AccessControlDefaultAdminRulesUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
+
 import {IShare} from "../interfaces/IShare.sol";
 import {IYieldPeer} from "../interfaces/IYieldPeer.sol";
 import {DataStructures} from "../libraries/DataStructures.sol";
@@ -16,6 +21,7 @@ import {IStrategyAdapter} from "../interfaces/IStrategyAdapter.sol";
 import {IStrategyRegistry} from "../interfaces/IStrategyRegistry.sol";
 import {YieldFees} from "../modules/YieldFees.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {Roles} from "../libraries/Roles.sol";
 
 /// @title YieldPeer
 /// @author @contractlevel
@@ -24,7 +30,8 @@ abstract contract YieldPeer is
     Initializable,
     IAny2EVMMessageReceiver,
     CCIPReceiver,
-    PausableWithAccessControl,
+    PausableUpgradeable,
+    // AccessControlDefaultAdminRulesUpgradeable,
     IERC677Receiver,
     IYieldPeer,
     YieldFees
@@ -71,9 +78,11 @@ abstract contract YieldPeer is
     uint256 internal constant SHARE_DECIMALS = 1e18;
     /// @dev Constant for the initial share precision used to calculate the mint amount for first deposit
     uint256 internal constant INITIAL_SHARE_PRECISION = SHARE_DECIMALS / USDC_DECIMALS;
-    // keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.YieldPeer")) - 1)) & ~bytes32(uint256(0xff))
+    // ERC-7021: keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.YieldPeer")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant YIELD_PEER_STORAGE_LOCATION =
-        0x64ca1a4cbd2b05db1cf2adeaa253c530d3b0a11bd529ef6e3ea9005e6aabd600; // @review double check the hash
+        0x64ca1a4cbd2b05db1cf2adeaa253c530d3b0a11bd529ef6e3ea9005e6aabd600;
+    // /// @dev Constant for the initial default admin role transfer delay
+    // uint48 internal constant INITIAL_DEFAULT_ADMIN_ROLE_TRANSFER_DELAY = 259200 seconds; // 3 days
 
     /// @dev Chainlink token
     LinkTokenInterface internal immutable i_link;
@@ -156,7 +165,6 @@ abstract contract YieldPeer is
 
     /// @dev Initialize the YieldPeer contract
     function __YieldPeer_init(address owner) internal onlyInitializing {
-        __PausableWithAccessControl_init(owner); /// @dev Init the Access Control / Pausable module
         __YieldFees_init(); /// @dev Init the Fees module (Sets the initial 0.1% rate)
     }
 
@@ -556,6 +564,21 @@ abstract contract YieldPeer is
     }
 
     /*//////////////////////////////////////////////////////////////
+                               EMERGENCY
+    //////////////////////////////////////////////////////////////*/
+    /// @notice Pause the contract
+    /// @dev Access control: EMERGENCY_PAUSER_ROLE
+    function pause() external onlyRole(Roles.EMERGENCY_PAUSER_ROLE) {
+        _pause();
+    }
+
+    /// @notice Unpause the contract
+    /// @dev Access control: EMERGENCY_UNPAUSER_ROLE
+    function unpause() external onlyRole(Roles.EMERGENCY_UNPAUSER_ROLE) {
+        _unpause();
+    }
+
+    /*//////////////////////////////////////////////////////////////
                                  GETTER
     //////////////////////////////////////////////////////////////*/
     /// @notice Get the chain selector for this chain
@@ -642,7 +665,8 @@ abstract contract YieldPeer is
         public
         view
         virtual
-        override(CCIPReceiver, PausableWithAccessControl)
+        override(CCIPReceiver /*, AccessControlDefaultAdminRulesUpgradeable*/
+        )
         returns (bool)
     {
         return interfaceId == type(IAny2EVMMessageReceiver).interfaceId || super.supportsInterface(interfaceId);

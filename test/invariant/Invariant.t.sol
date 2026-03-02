@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.26;
 
 import {StdInvariant} from "forge-std/StdInvariant.sol";
@@ -42,10 +42,14 @@ contract Invariant is StdInvariant, BaseTest {
     uint256 internal constant STRATEGY_POOL_USDC_STARTING_BALANCE = 1_000_000_000_000_000_000; // 1T USDC
     uint256 internal constant CCIP_GAS_LIMIT = 1_000_000;
 
+<<<<<<< HEAD
     bytes32 internal constant AAVE_V3_PROTOCOL_ID = keccak256(abi.encodePacked("aave-v3"));
     bytes32 internal constant COMPOUND_V3_PROTOCOL_ID = keccak256(abi.encodePacked("compound-v3"));
 
     /// @dev Handler contract we are running calls to the SBT through
+=======
+    /// @dev Handler contract we are running calls to the system through
+>>>>>>> 370128d858066ec4622ea2425957e63fd17a4655
     Handler internal handler;
     /// @dev provides addresses passed to the contracts based on where we are deploying (locally in this case)
     HelperConfig internal helperConfig;
@@ -97,6 +101,16 @@ contract Invariant is StdInvariant, BaseTest {
         _setCrossChainPeers();
         _setWorkflow();
 
+        /// @notice needed to avoid stack too deep errors
+        Handler.SystemRoles memory systemRoles = Handler.SystemRoles({
+            emergencyPauser: emergencyPauser,
+            emergencyUnpauser: emergencyUnpauser,
+            configAdmin: configAdmin,
+            crossChainAdmin: crossChainAdmin,
+            feeWithdrawer: feeWithdrawer,
+            feeRateSetter: feeRateSetter
+        });
+
         /// @dev deploy handler
         handler = new Handler(
             parent,
@@ -107,7 +121,8 @@ contract Invariant is StdInvariant, BaseTest {
             address(usdc),
             aavePool,
             networkConfig.protocols.comet,
-            rebalancer
+            rebalancer,
+            systemRoles
         );
 
         /// @dev define appropriate function selectors
@@ -186,6 +201,7 @@ contract Invariant is StdInvariant, BaseTest {
             networkConfig.tokens.usdc,
             networkConfig.tokens.share
         );
+<<<<<<< HEAD
         bytes memory parentInit = abi.encodeWithSelector(ParentPeer.initialize.selector);
 
         // Deploy Parent Proxy and cast to ParentPeer type
@@ -200,9 +216,30 @@ contract Invariant is StdInvariant, BaseTest {
         // Deploy Registry & Adapters
         StrategyRegistryProxy strategyRegistryProxy = new StrategyRegistryProxy(registryImpl, registryInit);
         strategyRegistryParent = StrategyRegistry(address(strategyRegistryProxy));
+=======
+        /// @dev temp config admin role granted to deployer/owner to set necessary configs
+        parent.grantRole(Roles.CONFIG_ADMIN_ROLE, parent.owner());
+        parent.setRebalancer(address(rebalancer));
+        parent.setSupportedProtocol(keccak256(abi.encodePacked("aave-v3")), true);
+        parent.setSupportedProtocol(keccak256(abi.encodePacked("compound-v3")), true);
+        _changePrank(rebalancer.owner());
+        rebalancer.setParentPeer(address(parent));
+        _stopPrank();
+>>>>>>> 370128d858066ec4622ea2425957e63fd17a4655
 
         aaveV3AdapterParent = new AaveV3Adapter(address(parent), networkConfig.protocols.aavePoolAddressesProvider);
         compoundV3AdapterParent = new CompoundV3Adapter(address(parent), networkConfig.protocols.comet);
+<<<<<<< HEAD
+=======
+        strategyRegistryParent.setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(aaveV3AdapterParent));
+        strategyRegistryParent.setStrategyAdapter(
+            keccak256(abi.encodePacked("compound-v3")), address(compoundV3AdapterParent)
+        );
+
+        parent.setStrategyRegistry(address(strategyRegistryParent));
+        parent.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")));
+        parent.revokeRole(Roles.CONFIG_ADMIN_ROLE, parent.owner());
+>>>>>>> 370128d858066ec4622ea2425957e63fd17a4655
 
         // Configure Registry
         strategyRegistryParent.setStrategyAdapter(AAVE_V3_PROTOCOL_ID, address(aaveV3AdapterParent));

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.26;
 
 import {BaseTest, ChildPeer} from "../../BaseTest.t.sol";
@@ -44,9 +44,9 @@ contract ChildWithdrawTest is BaseTest {
         optChildPeer.onTokenTransfer(msg.sender, DEPOSIT_AMOUNT, "");
     }
 
-    function test_yield_child_onTokenTransfer_revertsWhen_childPaused() public {
+    function test_yield_child_onTokenTransfer_revertsWhen_paused() public {
         _changePrank(emergencyPauser);
-        optChildPeer.emergencyPause();
+        optChildPeer.pause();
         _changePrank(depositor);
         vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
         optChildPeer.onTokenTransfer(msg.sender, DEPOSIT_AMOUNT, "");
@@ -112,7 +112,6 @@ contract ChildWithdrawTest is BaseTest {
 
     /// @notice Scenario: Withdrawal is initiated from a child chain, Strategy chain is Parent chain, Strategy Protocol is Aave.
     function test_yield_child_withdraw_strategyIsParent_aave() public {
-        _setStrategy(baseChainSelector, keccak256(abi.encodePacked("aave-v3")), SET_CROSS_CHAIN);
         _selectFork(optFork);
         _changePrank(withdrawer);
 

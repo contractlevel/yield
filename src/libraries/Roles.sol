@@ -1,8 +1,11 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.26;
 
-/// @notice Library for YieldCoin custom roles
+/// @title Roles
+/// @author @contractlevel
+/// @notice Library for roles in the Yieldcoin system
 library Roles {
+<<<<<<< HEAD
     /// @dev example for creating a role
     // bytes32 public constant ROLE = keccak256("ROLE");
 
@@ -49,4 +52,18 @@ library Roles {
 
     /// @dev keccak256("UPGRADER_ROLE")
     bytes32 public constant UPGRADER_ROLE = 0x189ab7a9244df0848122154315af71fe140f3db0fe014031783b0946b8c9d2e3; // @review double check this hash
+=======
+    /// @notice Role for pausing the system in case of emergency.
+    bytes32 internal constant EMERGENCY_PAUSER_ROLE = keccak256("EMERGENCY_PAUSER_ROLE");
+    /// @notice Role for unpausing the system in case of emergency.
+    bytes32 internal constant EMERGENCY_UNPAUSER_ROLE = keccak256("EMERGENCY_UNPAUSER_ROLE");
+    /// @notice Role for general configuration settings.
+    bytes32 internal constant CONFIG_ADMIN_ROLE = keccak256("CONFIG_ADMIN_ROLE");
+    /// @notice Role for cross-chain settings.
+    bytes32 internal constant CROSS_CHAIN_ADMIN_ROLE = keccak256("CROSS_CHAIN_ADMIN_ROLE");
+    /// @notice Role for withdrawing fees from the system in YieldFees.sol.
+    bytes32 internal constant FEE_WITHDRAWER_ROLE = keccak256("FEE_WITHDRAWER_ROLE");
+    /// @notice Role for setting the fee rate in YieldFees.sol.
+    bytes32 internal constant FEE_RATE_SETTER_ROLE = keccak256("FEE_RATE_SETTER_ROLE");
+>>>>>>> 370128d858066ec4622ea2425957e63fd17a4655
 }
