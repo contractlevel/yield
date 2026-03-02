@@ -21,12 +21,4 @@ contract GetterTest is BaseTest {
         assertEq(returnedStrategy.chainSelector, expectedStrategy.chainSelector);
         assertEq(returnedStrategy.protocolId, expectedStrategy.protocolId);
     }
-
-    function test_yield_rebalancer_getVersion_returnsVersion() public view {
-        // Arrange & Act
-        string memory version = baseRebalancer.getVersion();
-
-        // Assert
-        assertEq(version, "1.0.0");
-    }
 }

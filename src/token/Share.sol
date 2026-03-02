@@ -51,7 +51,7 @@ contract Share is
     /// @notice The initial delay for transferring the admin role
     uint48 internal constant INITIAL_DEFAULT_ADMIN_ROLE_TRANSFER_DELAY = 259200 seconds; // 3 days
 
-    // keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.Share")) - 1)) & ~bytes32(uint256(0xff))
+    // ERC-7201: keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.Share")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant SHARE_STORAGE_LOCATION =
         0xe4963c679d07e6dc2d227d26eb05e3128d8de183944771ed5ba5665e6ea96200;
 

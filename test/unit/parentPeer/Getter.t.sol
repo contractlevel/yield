@@ -49,12 +49,4 @@ contract GetterTest is BaseTest {
         // Assert
         assertEq(rebalancer, address(baseRebalancer));
     }
-
-    function test_yield_parent_getVersion_returnsVersion() public view {
-        // Arrange & Act
-        string memory version = baseParentPeer.getVersion();
-
-        // Assert
-        assertEq(version, "1.0.0");
-    }
 }

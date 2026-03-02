@@ -17,12 +17,4 @@ contract GetterTest is BaseTest {
         // Assert
         assertEq(selector, baseChainSelector);
     }
-
-    function test_yield_child_getVersion_returnsVersion() public view {
-        // Arrange & Act
-        string memory version = optChildPeer.getVersion();
-
-        // Assert
-        assertEq(version, "1.0.0");
-    }
 }

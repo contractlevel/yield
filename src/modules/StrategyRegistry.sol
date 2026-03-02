@@ -10,7 +10,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {IStrategyRegistry} from "../interfaces/IStrategyRegistry.sol";
 
 /// @title StrategyRegistry
-/// @author @contractlevel/George Gorzhiyev - Judge Finance
+/// @author @contractlevel
 /// @notice Registry for strategy adapters
 /// @dev This contract uses the UUPS upgrade pattern
 /// @dev Uses ERC7201 namespace storage location for upgradability safety
@@ -33,12 +33,9 @@ contract StrategyRegistry is Initializable, UUPSUpgradeable, IStrategyRegistry, 
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
-    // keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.StrategyRegistry")) - 1)) & ~bytes32(uint256(0xff))
+    // ERC-7201: keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.StrategyRegistry")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant STRATEGY_REGISTRY_STORAGE_LOCATION =
         0xff4f32e19ccce71bf80077033cba16a319c7bee7ac2089685e40116337a8fe00; // @review double check the hash
-
-    /// @notice Version of the contract logic
-    string public constant VERSION = "1.0.0";
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -54,8 +51,7 @@ contract StrategyRegistry is Initializable, UUPSUpgradeable, IStrategyRegistry, 
     }
 
     function initialize() external initializer {
-        __Ownable_init(msg.sender); // @review do we want to pass an owner here?
-        __Ownable2Step_init(); /// @dev empty init but OZ best practice pattern
+        __Ownable_init(msg.sender);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -108,11 +104,5 @@ contract StrategyRegistry is Initializable, UUPSUpgradeable, IStrategyRegistry, 
     function getStrategyAdapter(bytes32 protocolId) external view returns (address strategyAdapter) {
         StrategyRegistryStorage storage $ = _getStrategyRegistryStorage(); // load StrategyRegistry storage
         strategyAdapter = $.s_strategyAdapters[protocolId];
-    }
-
-    /// @notice Get the version of the contract logic
-    /// @return VERSION The version of the contract logic
-    function getVersion() external pure returns (string memory) {
-        return VERSION;
     }
 }

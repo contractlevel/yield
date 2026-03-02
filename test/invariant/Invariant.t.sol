@@ -42,14 +42,11 @@ contract Invariant is StdInvariant, BaseTest {
     uint256 internal constant STRATEGY_POOL_USDC_STARTING_BALANCE = 1_000_000_000_000_000_000; // 1T USDC
     uint256 internal constant CCIP_GAS_LIMIT = 1_000_000;
 
-<<<<<<< HEAD
     bytes32 internal constant AAVE_V3_PROTOCOL_ID = keccak256(abi.encodePacked("aave-v3"));
     bytes32 internal constant COMPOUND_V3_PROTOCOL_ID = keccak256(abi.encodePacked("compound-v3"));
 
     /// @dev Handler contract we are running calls to the SBT through
-=======
     /// @dev Handler contract we are running calls to the system through
->>>>>>> 370128d858066ec4622ea2425957e63fd17a4655
     Handler internal handler;
     /// @dev provides addresses passed to the contracts based on where we are deploying (locally in this case)
     HelperConfig internal helperConfig;
@@ -201,7 +198,6 @@ contract Invariant is StdInvariant, BaseTest {
             networkConfig.tokens.usdc,
             networkConfig.tokens.share
         );
-<<<<<<< HEAD
         bytes memory parentInit = abi.encodeWithSelector(ParentPeer.initialize.selector);
 
         // Deploy Parent Proxy and cast to ParentPeer type
@@ -216,7 +212,8 @@ contract Invariant is StdInvariant, BaseTest {
         // Deploy Registry & Adapters
         StrategyRegistryProxy strategyRegistryProxy = new StrategyRegistryProxy(registryImpl, registryInit);
         strategyRegistryParent = StrategyRegistry(address(strategyRegistryProxy));
-=======
+
+        // Set Rebalancer & Supported Protocols in ParentPeer
         /// @dev temp config admin role granted to deployer/owner to set necessary configs
         parent.grantRole(Roles.CONFIG_ADMIN_ROLE, parent.owner());
         parent.setRebalancer(address(rebalancer));
@@ -225,28 +222,16 @@ contract Invariant is StdInvariant, BaseTest {
         _changePrank(rebalancer.owner());
         rebalancer.setParentPeer(address(parent));
         _stopPrank();
->>>>>>> 370128d858066ec4622ea2425957e63fd17a4655
 
+        // Deploy Adapters
         aaveV3AdapterParent = new AaveV3Adapter(address(parent), networkConfig.protocols.aavePoolAddressesProvider);
         compoundV3AdapterParent = new CompoundV3Adapter(address(parent), networkConfig.protocols.comet);
-<<<<<<< HEAD
-=======
-        strategyRegistryParent.setStrategyAdapter(keccak256(abi.encodePacked("aave-v3")), address(aaveV3AdapterParent));
-        strategyRegistryParent.setStrategyAdapter(
-            keccak256(abi.encodePacked("compound-v3")), address(compoundV3AdapterParent)
-        );
 
-        parent.setStrategyRegistry(address(strategyRegistryParent));
-        parent.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")));
-        parent.revokeRole(Roles.CONFIG_ADMIN_ROLE, parent.owner());
->>>>>>> 370128d858066ec4622ea2425957e63fd17a4655
-
-        // Configure Registry
+        // Set adapters in Registry
         strategyRegistryParent.setStrategyAdapter(AAVE_V3_PROTOCOL_ID, address(aaveV3AdapterParent));
         strategyRegistryParent.setStrategyAdapter(COMPOUND_V3_PROTOCOL_ID, address(compoundV3AdapterParent));
 
-        // Link Registry & set Initial Strategy
-        rebalancer.setStrategyRegistry(address(strategyRegistryParent));
+        // Set Registry to Parent Peer, set initial strategy and revoke temp config role
         parent.setStrategyRegistry(address(strategyRegistryParent));
         parent.setInitialActiveStrategy(AAVE_V3_PROTOCOL_ID);
         parent.revokeRole(Roles.CONFIG_ADMIN_ROLE, address(this));
@@ -276,13 +261,14 @@ contract Invariant is StdInvariant, BaseTest {
         aaveV3AdapterChild1 = new AaveV3Adapter(address(child1), networkConfig.protocols.aavePoolAddressesProvider);
         compoundV3AdapterChild1 = new CompoundV3Adapter(address(child1), networkConfig.protocols.comet);
 
-        // Configure Child 1
+        // Set adapters in Registry
+        strategyRegistryChild1.setStrategyAdapter(AAVE_V3_PROTOCOL_ID, address(aaveV3AdapterChild1));
+        strategyRegistryChild1.setStrategyAdapter(COMPOUND_V3_PROTOCOL_ID, address(compoundV3AdapterChild1));
+
+        // Set Registry to Child Peer
         child1.grantRole(Roles.CONFIG_ADMIN_ROLE, address(this));
         child1.setStrategyRegistry(address(strategyRegistryChild1));
         child1.revokeRole(Roles.CONFIG_ADMIN_ROLE, address(this));
-
-        strategyRegistryChild1.setStrategyAdapter(AAVE_V3_PROTOCOL_ID, address(aaveV3AdapterChild1));
-        strategyRegistryChild1.setStrategyAdapter(COMPOUND_V3_PROTOCOL_ID, address(compoundV3AdapterChild1));
     }
 
     /// @dev _deployInfra:: Helper to deploy ChildPeer 2
@@ -309,13 +295,13 @@ contract Invariant is StdInvariant, BaseTest {
         aaveV3AdapterChild2 = new AaveV3Adapter(address(child2), networkConfig.protocols.aavePoolAddressesProvider);
         compoundV3AdapterChild2 = new CompoundV3Adapter(address(child2), networkConfig.protocols.comet);
 
+        strategyRegistryChild2.setStrategyAdapter(AAVE_V3_PROTOCOL_ID, address(aaveV3AdapterChild2));
+        strategyRegistryChild2.setStrategyAdapter(COMPOUND_V3_PROTOCOL_ID, address(compoundV3AdapterChild2));
+
         // Configure Child 2
         child2.grantRole(Roles.CONFIG_ADMIN_ROLE, address(this));
         child2.setStrategyRegistry(address(strategyRegistryChild2));
         child2.revokeRole(Roles.CONFIG_ADMIN_ROLE, address(this));
-
-        strategyRegistryChild2.setStrategyAdapter(AAVE_V3_PROTOCOL_ID, address(aaveV3AdapterChild2));
-        strategyRegistryChild2.setStrategyAdapter(COMPOUND_V3_PROTOCOL_ID, address(compoundV3AdapterChild2));
     }
 
     /// @dev Grants custom roles on all chains (simulated locally)

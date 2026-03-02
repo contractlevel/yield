@@ -64,6 +64,7 @@ contract DeployParent is Script {
 
         // Set Initial Strategy after completion of deployment
         deploy.parentPeer.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")));
+        // @review this will need to also begin transfer the default admin role to a multisig address
 
         vm.stopBroadcast();
     }
@@ -166,19 +167,13 @@ contract DeployParent is Script {
 
         // Link StrategyRegistry to ParentPeer & Rebalancer
         deploy.parentPeer.setStrategyRegistry(address(deploy.strategyRegistry));
-<<<<<<< HEAD
-        deploy.rebalancer.setStrategyRegistry(address(deploy.strategyRegistry));
-=======
         deploy.parentPeer.setSupportedProtocol(keccak256(abi.encodePacked("aave-v3")), true);
         deploy.parentPeer.setSupportedProtocol(keccak256(abi.encodePacked("compound-v3")), true);
-        deploy.parentPeer.setInitialActiveStrategy(keccak256(abi.encodePacked("aave-v3")));
->>>>>>> 370128d858066ec4622ea2425957e63fd17a4655
 
         /// @dev Revoke temp config role
         deploy.parentPeer.revokeRole(Roles.CONFIG_ADMIN_ROLE, deploy.parentPeer.owner());
     }
 
-<<<<<<< HEAD
     /// @dev Deploys strategy registries and registers adapters
     function _deployAdapters(DeploymentConfig memory deploy, HelperConfig.NetworkConfig memory networkConfig) private {
         // Deploy Adapters
@@ -193,10 +188,5 @@ contract DeployParent is Script {
 
         deploy.strategyRegistry
             .setStrategyAdapter(keccak256(abi.encodePacked("compound-v3")), address(deploy.compoundV3Adapter));
-=======
-        // @review this will need to also begin transfer the default admin role to a multisig address
-
-        vm.stopBroadcast();
->>>>>>> 370128d858066ec4622ea2425957e63fd17a4655
     }
 }

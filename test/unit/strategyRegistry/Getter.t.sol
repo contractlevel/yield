@@ -4,14 +4,6 @@ pragma solidity 0.8.26;
 import {BaseTest} from "../../BaseTest.t.sol";
 
 contract GetterTest is BaseTest {
-    function test_yield_strategyRegistry_getVersion_returnsVersion() public view {
-        // Arrange & Act
-        string memory version = baseStrategyRegistry.getVersion();
-
-        // Assert
-        assertEq(version, "1.0.0");
-    }
-
     function test_yield_strategyRegistry_getStrategyAdapter_returnsAdapter() public {
         // Arrange
         // Setup a dummy adapter for testing read

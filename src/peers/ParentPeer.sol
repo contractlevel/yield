@@ -90,7 +90,7 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
 
     /// @notice Initializes the contract and its abstracts
     function initialize() external initializer {
-        __YieldPeer_init(msg.sender); // This sets up AccessControl, Pausable, and YieldFees
+        __YieldPeer_init(); // This sets up AccessControl, Pausable, and YieldFees
         _grantRole(Roles.UPGRADER_ROLE, msg.sender);
     }
 
@@ -110,9 +110,9 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
         amountToDeposit = _initiateDeposit(amountToDeposit);
 
         /// @dev load StrategyStorage
-        StrategyStorage storage s$ = _getStrategyStorage();
+        ParentPeerStorage storage $ = _getParentPeerStorage();
 
-        Strategy memory strategy = s$.s_strategy;
+        Strategy memory strategy = $.s_strategy;
 
         // 1. This Parent is the Strategy. Therefore the deposit is handled here and shares can be minted here.
         if (strategy.chainSelector == i_thisChainSelector) {
@@ -176,20 +176,18 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
         _revertIfZeroAmount(shareBurnAmount);
 
         /// @dev load ParentPeerStorage
-        ParentPeerStorage storage p$ = _getParentPeerStorage();
-        /// @dev load StrategyStorage
-        StrategyStorage storage s$ = _getStrategyStorage();
+        ParentPeerStorage storage $ = _getParentPeerStorage();
 
         /// @dev cache totalShares before updating
-        uint256 totalShares = p$.s_totalShares;
+        uint256 totalShares = $.s_totalShares;
 
         /// @dev update s_totalShares and burn shares from msg.sender
-        p$.s_totalShares -= shareBurnAmount;
+        $.s_totalShares -= shareBurnAmount;
         emit ShareBurnUpdate(shareBurnAmount, i_thisChainSelector, totalShares - shareBurnAmount);
         emit WithdrawInitiated(withdrawer, shareBurnAmount, i_thisChainSelector);
         _burnShares(withdrawer, shareBurnAmount);
 
-        Strategy memory strategy = s$.s_strategy;
+        Strategy memory strategy = $.s_strategy;
 
         // 1. This Parent is the Strategy. Therefore the usdcWithdrawAmount is calculated and withdrawal is handled here.
         if (strategy.chainSelector == i_thisChainSelector) {
@@ -229,8 +227,9 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /// @dev Revert in _revertIfStrategyIsNotSupported if newStrategy.chainSelector is not allowed
     /// @dev Revert in _setStrategy if the current strategy is optimal
     function rebalance(Strategy calldata newStrategy) external {
-        if (msg.sender != s_rebalancer) revert ParentPeer__OnlyRebalancer();
-        Strategy memory oldStrategy = s_strategy;
+        ParentPeerStorage storage $ = _getParentPeerStorage(); /// @dev load ParentPeerStorage
+        if (msg.sender != $.s_rebalancer) revert ParentPeer__OnlyRebalancer();
+        Strategy memory oldStrategy = $.s_strategy;
         _revertIfStrategyIsNotSupported(newStrategy);
         _setStrategy(oldStrategy, newStrategy);
         _rebalance(oldStrategy, newStrategy);
@@ -277,11 +276,10 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     function _handleCCIPDepositToParent(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory encodedDepositData)
         internal
     {
-        /// @dev load StrategyStorage
-        StrategyStorage storage s$ = _getStrategyStorage();
+        ParentPeerStorage storage $ = _getParentPeerStorage(); /// @dev load ParentPeerStorage
 
         DepositData memory depositData = abi.decode(encodedDepositData, (DepositData));
-        Strategy memory strategy = s$.s_strategy;
+        Strategy memory strategy = $.s_strategy;
 
         CCIPOperations._validateTokenAmounts(tokenAmounts, address(i_usdc), depositData.amount);
 
@@ -291,15 +289,12 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
             address activeStrategyAdapter = _getActiveStrategyAdapter();
 
             if (activeStrategyAdapter != address(0)) {
-                /// @dev load ParentPeerStorage
-                ParentPeerStorage storage p$ = _getParentPeerStorage();
-
                 /// @dev get total value from strategy and calculate share mint amount
                 depositData.totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, address(i_usdc));
                 depositData.shareMintAmount = _calculateMintAmount(depositData.totalValue, depositData.amount);
                 /// @dev update s_totalShares
-                p$.s_totalShares += depositData.shareMintAmount;
-                emit ShareMintUpdate(depositData.shareMintAmount, depositData.chainSelector, p$.s_totalShares);
+                $.s_totalShares += depositData.shareMintAmount;
+                emit ShareMintUpdate(depositData.shareMintAmount, depositData.chainSelector, $.s_totalShares);
                 /// @dev deposit to strategy
                 _depositToStrategy(activeStrategyAdapter, depositData.amount);
 
@@ -371,20 +366,17 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /// @param data The encoded WithdrawData
     /// @param sourceChainSelector The chain selector of the chain where the withdraw originated from and shares were burned
     function _handleCCIPWithdrawToParent(bytes memory data, uint64 sourceChainSelector) internal {
-        /// @dev load ParentPeerStorage
-        ParentPeerStorage storage p$ = _getParentPeerStorage();
-        /// @dev load StrategyStorage
-        StrategyStorage storage s$ = _getStrategyStorage();
+        ParentPeerStorage storage $ = _getParentPeerStorage(); /// @dev load ParentPeerStorage
 
         WithdrawData memory withdrawData = _decodeWithdrawData(data);
-        withdrawData.totalShares = p$.s_totalShares;
-        p$.s_totalShares -= withdrawData.shareBurnAmount;
+        withdrawData.totalShares = $.s_totalShares;
+        $.s_totalShares -= withdrawData.shareBurnAmount;
 
         emit ShareBurnUpdate(
             withdrawData.shareBurnAmount, sourceChainSelector, withdrawData.totalShares - withdrawData.shareBurnAmount
         );
 
-        _handleCCIPWithdraw(s$.s_strategy, withdrawData);
+        _handleCCIPWithdraw($.s_strategy, withdrawData);
     }
 
     /// @notice This function handles the withdraw flow logic that is used by both _handleCCIPWithdrawToParent and _handleCCIPWithdrawPingPong
@@ -429,9 +421,9 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /// @notice Forwards withdraw to active strategy without updating state (already updated in original flow)
     /// @notice This only happens when parent is NOT the strategy (if parent were strategy, withdraw would complete in _handleCCIPWithdrawToParent)
     function _handleCCIPWithdrawPingPong(bytes memory data) internal {
-        StrategyStorage storage s$ = _getStrategyStorage(); /// @dev load StrategyStorage
+        ParentPeerStorage storage $ = _getParentPeerStorage(); /// @dev load ParentPeerStorage
         WithdrawData memory withdrawData = _decodeWithdrawData(data);
-        _handleCCIPWithdraw(s$.s_strategy, withdrawData);
+        _handleCCIPWithdraw($.s_strategy, withdrawData);
     }
 
     /// @dev Compare strategies and return early if optimal
@@ -444,9 +436,10 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
         {
             revert ParentPeer__CurrentStrategyOptimal();
         }
+        ParentPeerStorage storage $ = _getParentPeerStorage(); /// @dev load ParentPeerStorage
 
         /// @dev Update Strategy state and emit StrategyUpdated event
-        s$.s_strategy = newStrategy;
+        $.s_strategy = newStrategy;
         emit StrategyUpdated(newStrategy.chainSelector, newStrategy.protocolId, oldStrategy.chainSelector);
     }
 
@@ -524,8 +517,8 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /// @return shareMintAmount The amount of shares/YieldCoin to mint
     /// @notice Returns amount * (SHARE_DECIMALS / USDC_DECIMALS) if there are no shares minted yet
     function _calculateMintAmount(uint256 totalValue, uint256 amount) internal view returns (uint256 shareMintAmount) {
-        ParentPeerStorage storage p$ = _getParentPeerStorage(); /// @dev load ParentPeerStorage
-        uint256 totalShares = p$.s_totalShares;
+        ParentPeerStorage storage $ = _getParentPeerStorage(); /// @dev load ParentPeerStorage
+        uint256 totalShares = $.s_totalShares;
 
         if (totalShares != 0) {
             shareMintAmount = (_convertUsdcToShare(amount) * totalShares) / _convertUsdcToShare(totalValue);
@@ -541,10 +534,12 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /// @dev Revert if the chain selector is not allowed
     /// @dev Revert if the protocol is not supported
     function _revertIfStrategyIsNotSupported(Strategy calldata newStrategy) internal view {
-        if (!s_allowedChains[newStrategy.chainSelector]) {
+        YieldPeerStorage storage y$ = _getYieldPeerStorage(); /// @dev load YieldPeer storage
+        ParentPeerStorage storage p$ = _getParentPeerStorage(); /// @dev load ParentPeerStorage
+        if (!y$.s_allowedChains[newStrategy.chainSelector]) {
             revert YieldPeer__ChainNotAllowed(newStrategy.chainSelector);
         }
-        if (!s_supportedProtocols[newStrategy.protocolId]) {
+        if (!p$.s_supportedProtocols[newStrategy.protocolId]) {
             revert ParentPeer__StrategyNotSupported(newStrategy.protocolId);
         }
     }
@@ -571,10 +566,11 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /// @dev Called in deploy script, immediately after deploying initial strategy adapters, and setting them in YieldPeer::setStrategyAdapter
     /// @param protocolId The protocol ID of the initial active strategy
     function setInitialActiveStrategy(bytes32 protocolId) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        ParentPeerStorage storage $ = _getParentPeerStorage(); /// @dev load ParentPeerStorage
         // @review reverting if protocolId is not supported?
-        if (s_initialActiveStrategySet) revert ParentPeer__InitialActiveStrategyAlreadySet();
-        s_initialActiveStrategySet = true;
-        s_strategy = Strategy({chainSelector: i_thisChainSelector, protocolId: protocolId});
+        if ($.s_initialActiveStrategySet) revert ParentPeer__InitialActiveStrategyAlreadySet();
+        $.s_initialActiveStrategySet = true;
+        $.s_strategy = Strategy({chainSelector: i_thisChainSelector, protocolId: protocolId});
         // @review unused-return, returns newActiveStrategyAdapter
         _updateActiveStrategyAdapter(i_thisChainSelector, protocolId);
     }
@@ -593,7 +589,8 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /// @param protocolId The protocol ID
     /// @param isSupported Whether the protocol is supported
     function setSupportedProtocol(bytes32 protocolId, bool isSupported) external onlyRole(Roles.CONFIG_ADMIN_ROLE) {
-        s_supportedProtocols[protocolId] = isSupported;
+        ParentPeerStorage storage $ = _getParentPeerStorage(); /// @dev load ParentPeerStorage
+        $.s_supportedProtocols[protocolId] = isSupported;
         emit SupportedProtocolSet(protocolId, isSupported);
     }
 
@@ -603,7 +600,7 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /// @notice Get the current strategy
     /// @return strategy The current strategy - chainSelector and protocol
     function getStrategy() external view returns (Strategy memory) {
-        return _getStrategyStorage().s_strategy;
+        return _getParentPeerStorage().s_strategy;
     }
 
     /// @notice Get the total shares minted across all chains
@@ -622,6 +619,7 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /// @param protocolId The protocol ID. ie keccak256("aave-v3") or keccak256("compound-v3")
     /// @return isSupported Whether the protocol is supported across all chains
     function getSupportedProtocol(bytes32 protocolId) external view returns (bool isSupported) {
-        isSupported = s_supportedProtocols[protocolId];
+        ParentPeerStorage storage $ = _getParentPeerStorage(); /// @dev load ParentPeerStorage
+        isSupported = $.s_supportedProtocols[protocolId];
     }
 }

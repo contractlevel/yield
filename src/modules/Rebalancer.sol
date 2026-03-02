@@ -51,7 +51,7 @@ contract Rebalancer is Initializable, UUPSUpgradeable, CREReceiver {
 
     /// @notice Initializes the contract
     function initialize() external initializer {
-        __CREReceiver_init(msg.sender); // Sets owner
+        __CREReceiver_init();
     }
 
     /*//////////////////////////////////////////////////////////////

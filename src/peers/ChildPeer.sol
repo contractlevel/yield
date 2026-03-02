@@ -17,9 +17,6 @@ contract ChildPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /// @dev The CCIP selector of the parent chain
     uint64 internal immutable i_parentChainSelector;
 
-    /// @notice Version of the contract logic
-    string public constant VERSION = "1.0.0";
-
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
@@ -52,7 +49,7 @@ contract ChildPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /// @notice Initializes the contract and its abstracts
     /// @dev This replaces the logic that would normally be in a constructor for state variables
     function initialize() external initializer {
-        __YieldPeer_init(msg.sender); // Inits AccessControl, Pausable, and YieldFees
+        __YieldPeer_init(); // Inits AccessControl, Pausable, and YieldFees
         _grantRole(Roles.UPGRADER_ROLE, msg.sender);
     }
 
@@ -257,11 +254,5 @@ contract ChildPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /// @return The parent chain selector
     function getParentChainSelector() external view returns (uint64) {
         return i_parentChainSelector;
-    }
-
-    /// @notice Get the contract version
-    /// @return version The contract version
-    function getVersion() external pure returns (string memory) {
-        return VERSION;
     }
 }

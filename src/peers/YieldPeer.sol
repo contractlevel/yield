@@ -164,7 +164,7 @@ abstract contract YieldPeer is
     }
 
     /// @dev Initialize the YieldPeer contract
-    function __YieldPeer_init(address owner) internal onlyInitializing {
+    function __YieldPeer_init() internal onlyInitializing {
         __YieldFees_init(); /// @dev Init the Fees module (Sets the initial 0.1% rate)
     }
 
@@ -514,7 +514,7 @@ abstract contract YieldPeer is
     //////////////////////////////////////////////////////////////*/
     /// @notice Get the YieldPeerStorage storage
     /// @return $ The YieldPeerStorage storage
-    function _getYieldPeerStorage() private pure returns (YieldPeerStorage storage $) {
+    function _getYieldPeerStorage() internal pure returns (YieldPeerStorage storage $) {
         assembly {
             $.slot := YIELD_PEER_STORAGE_LOCATION
         }
@@ -665,8 +665,7 @@ abstract contract YieldPeer is
         public
         view
         virtual
-        override(CCIPReceiver /*, AccessControlDefaultAdminRulesUpgradeable*/
-        )
+        override(CCIPReceiver, AccessControlDefaultAdminRulesUpgradeable)
         returns (bool)
     {
         return interfaceId == type(IAny2EVMMessageReceiver).interfaceId || super.supportsInterface(interfaceId);
