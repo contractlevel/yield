@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.26;
 
-import {YieldPeer, Client, IRouterClient, CCIPOperations, IERC20, SafeERC20, Roles} from "./YieldPeer.sol";
+import {YieldPeer, Client, IRouterClient, CCIPOperations, IERC20, SafeERC20, Roles, IYieldPeer} from "./YieldPeer.sol";
+import {IParentPeer} from "../interfaces/IParentPeer.sol";
 
 /// @title YieldCoin ParentPeer
 /// @author @contractlevel
@@ -9,7 +10,7 @@ import {YieldPeer, Client, IRouterClient, CCIPOperations, IERC20, SafeERC20, Rol
 /// @notice This contract is deployed on only one chain
 /// @notice Users can deposit and withdraw USDC to/from the system via this contract
 /// @notice This contract tracks system wide state and acts as a system wide hub for forwarding CCIP messages to the Strategy
-contract ParentPeer is YieldPeer {
+contract ParentPeer is YieldPeer, IParentPeer {
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS
     //////////////////////////////////////////////////////////////*/
@@ -86,7 +87,7 @@ contract ParentPeer is YieldPeer {
     /// @param amountToDeposit The amount of USDC to deposit into the system
     /// @dev Revert if amountToDeposit is less than 1e6 (1 USDC)
     /// @dev Revert if peer is paused
-    function deposit(uint256 amountToDeposit) external override whenNotPaused {
+    function deposit(uint256 amountToDeposit) external override(YieldPeer, IYieldPeer) whenNotPaused {
         /// @dev takes a fee
         amountToDeposit = _initiateDeposit(amountToDeposit);
 
@@ -141,7 +142,7 @@ contract ParentPeer is YieldPeer {
         bytes calldata /* data */
     )
         external
-        override
+        override(YieldPeer)
         whenNotPaused
     {
         _revertIfMsgSenderIsNotShare();
@@ -433,9 +434,9 @@ contract ParentPeer is YieldPeer {
 
         uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, address(i_usdc));
         if (totalValue != 0) {
-            _withdrawFromStrategy(oldActiveStrategyAdapter, totalValue);
+            uint256 totalValueWithdrawn = _withdrawFromStrategy(oldActiveStrategyAdapter, type(uint256).max);
             //slither-disable-next-line reentrancy-events
-            _depositToStrategy(newActiveStrategyAdapter, totalValue);
+            _depositToStrategy(newActiveStrategyAdapter, totalValueWithdrawn);
         }
     }
 
@@ -449,7 +450,7 @@ contract ParentPeer is YieldPeer {
         // @review unused-return, returns newActiveStrategyAdapter
         _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
 
-        if (totalValue != 0) _withdrawFromStrategy(oldActiveStrategyAdapter, totalValue);
+        if (totalValue != 0) totalValue = _withdrawFromStrategy(oldActiveStrategyAdapter, type(uint256).max);
 
         _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, abi.encode(newStrategy), totalValue);
     }

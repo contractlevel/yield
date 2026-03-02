@@ -23,19 +23,19 @@ contract MockComet is IComet {
     }
 
     function withdraw(address asset, uint256 amount) external override {
-        // Calculate interest accrued
         uint256 interestAccrued = _calculateInterest(msg.sender);
         s_balances[msg.sender] += interestAccrued;
 
-        // Check if user has enough balance
-        require(s_balances[msg.sender] >= amount, "Insufficient balance");
+        // Handle MAX sentinel
+        uint256 withdrawAmount = amount;
+        if (amount == type(uint256).max) {
+            withdrawAmount = s_balances[msg.sender];
+        }
 
-        // Update balances and timestamp
-        s_balances[msg.sender] -= amount;
+        require(s_balances[msg.sender] >= withdrawAmount, "Insufficient balance");
+        s_balances[msg.sender] -= withdrawAmount;
         s_lastUpdateTimestamp[msg.sender] = block.timestamp;
-
-        // Transfer USDC back to user
-        IERC20(asset).transfer(msg.sender, amount);
+        IERC20(asset).transfer(msg.sender, withdrawAmount);
     }
 
     function balanceOf(address account) external view override returns (uint256) {

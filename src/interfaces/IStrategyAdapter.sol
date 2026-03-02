@@ -6,7 +6,7 @@ pragma solidity 0.8.26;
 /// @notice Interface for strategy adapters
 interface IStrategyAdapter {
     function deposit(address usdc, uint256 amount) external;
-    function withdraw(address usdc, uint256 amount) external;
+    function withdraw(address usdc, uint256 amount) external returns (uint256 actualWithdrawnAmount);
     function getTotalValue(address usdc) external view returns (uint256 totalValue);
     function getStrategyPool() external returns (address);
 }

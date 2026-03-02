@@ -15,11 +15,8 @@ docs/
 # Dotenv file
 .env
 
-functions/practice
 broadcast/
-script/deploy/DeploySimple.s.sol
 report.md
-src/modules/ThrowCLF.sol
 .notes.md
 .certora_internal/
 flattened/
