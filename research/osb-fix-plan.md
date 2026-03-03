@@ -24,61 +24,162 @@ when `onTokenTransfer()` fires. The fix is therefore straightforward: **don't ca
 
 ## Current Withdrawal Flows (Problem)
 
-### ChildPeer initiated, Parent is strategy
+The following traces are derived directly from the source. `←` marks the bugs.
+
+### Scenario A: ChildPeer initiated, Parent is strategy
+
+**CCIP hops:** Child → Parent (WithdrawToParent), Parent → Child (WithdrawCallback + USDC)
 
 ```
-1. ChildPeer.onTokenTransfer()
-   → BURNS shares immediately ← BUG
-   → sends WithdrawToParent (CCIP)
+1. ChildPeer.onTokenTransfer()                               [ChildPeer.sol:89-105]
+   _burnShares(withdrawer, shareBurnAmount)                  ← BUG: immediate burn
+   withdrawData = _buildWithdrawData(withdrawer, shareBurnAmount, i_thisChainSelector)
+   _ccipSend(i_parentChainSelector, WithdrawToParent, withdrawData, ZERO_BRIDGE_AMOUNT)
+   emit WithdrawInitiated(withdrawer, shareBurnAmount, i_thisChainSelector)
 
-2. ParentPeer._handleCCIPWithdrawToParent()
-   → s_totalShares -= shareBurnAmount
-   → sends WithdrawToStrategy (CCIP, because parent IS strategy, via _handleCCIPWithdraw)
+2. ParentPeer._handleCCIPWithdrawToParent()                  [ParentPeer.sol:334-344]
+   withdrawData.totalShares = s_totalShares
+   s_totalShares -= withdrawData.shareBurnAmount             ← premature state update
+   emit ShareBurnUpdate(shareBurnAmount, sourceChainSelector, ...)
+   → _handleCCIPWithdraw(s_strategy, withdrawData)
 
-3. [Wait: parent IS strategy here, so _handleCCIPWithdraw sends directly]
-   Actually for this path:
-   → _handleCCIPWithdraw (parent is strategy)
-   → _withdrawFromStrategyAndGetUsdcWithdrawAmount()
-   → _ccipSend WithdrawCallback to child with USDC
+3. ParentPeer._handleCCIPWithdraw() — strategy.chainSelector == i_thisChainSelector
+                                                             [ParentPeer.sol:350-374]
+   activeStrategyAdapter = _getActiveStrategyAdapter()       (adapter != 0 path)
+   withdrawData.usdcWithdrawAmount =
+       _withdrawFromStrategyAndGetUsdcWithdrawAmount(activeStrategyAdapter, withdrawData)
+   _ccipSend(withdrawData.chainSelector, WithdrawCallback, withdrawData, usdcWithdrawAmount)
+   (withdrawData.chainSelector == child chain)
 
-4. ChildPeer._handleCCIPWithdrawCallback()
-   → _transferUsdcTo(withdrawer, usdcWithdrawAmount)
+4. YieldPeer._handleCCIPWithdrawCallback()                   [YieldPeer.sol:239-246]
+   (dispatched on ChildPeer via _handleCCIPMessage)
+   CCIPOperations._validateTokenAmounts(tokenAmounts, usdc, usdcWithdrawAmount)
+   _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount)
+   emit WithdrawCompleted(withdrawer, usdcWithdrawAmount)
 ```
 
-### ChildPeer initiated, ChildPeer B is strategy
+### Scenario B: ChildPeer A initiated, ChildPeer B is strategy
+
+**CCIP hops:** Child A → Parent (WithdrawToParent), Parent → Child B (WithdrawToStrategy), Child B → Child A (WithdrawCallback + USDC)
 
 ```
-1. ChildPeer A.onTokenTransfer()
-   → BURNS shares immediately ← BUG
-   → sends WithdrawToParent (CCIP)
+1. ChildPeer A.onTokenTransfer()                             [ChildPeer.sol:89-105]
+   _burnShares(withdrawer, shareBurnAmount)                  ← BUG: immediate burn
+   withdrawData = _buildWithdrawData(withdrawer, shareBurnAmount, i_thisChainSelector)
+   (withdrawData.chainSelector == Child A chain)
+   _ccipSend(i_parentChainSelector, WithdrawToParent, withdrawData, ZERO_BRIDGE_AMOUNT)
+   emit WithdrawInitiated(withdrawer, shareBurnAmount, i_thisChainSelector)
 
-2. ParentPeer._handleCCIPWithdrawToParent()
-   → s_totalShares -= shareBurnAmount
-   → calls _handleCCIPWithdraw → sends WithdrawToStrategy to Child B (CCIP)
+2. ParentPeer._handleCCIPWithdrawToParent()                  [ParentPeer.sol:334-344]
+   withdrawData.totalShares = s_totalShares
+   s_totalShares -= withdrawData.shareBurnAmount             ← premature state update
+   emit ShareBurnUpdate(...)
+   → _handleCCIPWithdraw(s_strategy, withdrawData)
 
-3. ChildPeer B._handleCCIPWithdrawToStrategy()
-   → _withdrawFromStrategyAndGetUsdcWithdrawAmount()
-   → if withdrawData.chainSelector == i_thisChainSelector: direct transfer
-   → else: sends WithdrawCallback to Child A (CCIP) with USDC
+3. ParentPeer._handleCCIPWithdraw() — strategy.chainSelector != i_thisChainSelector
+                                                             [ParentPeer.sol:375-382]
+   emit WithdrawForwardedToStrategy(shareBurnAmount, strategy.chainSelector)
+   _ccipSend(strategy.chainSelector, WithdrawToStrategy, withdrawData, ZERO_BRIDGE_AMOUNT)
+   (strategy.chainSelector == Child B chain)
 
-4. ChildPeer A._handleCCIPWithdrawCallback()
-   → _transferUsdcTo(withdrawer, usdcWithdrawAmount)
+4. ChildPeer B._handleCCIPWithdrawToStrategy()               [ChildPeer.sol:179-203]
+   (adapter != 0, i_thisChainSelector != withdrawData.chainSelector)
+   withdrawData.usdcWithdrawAmount =
+       _withdrawFromStrategyAndGetUsdcWithdrawAmount(activeStrategyAdapter, withdrawData)
+   _ccipSend(withdrawData.chainSelector, WithdrawCallback, withdrawData, usdcWithdrawAmount)
+   (withdrawData.chainSelector == Child A chain)
+
+5. YieldPeer._handleCCIPWithdrawCallback()                   [YieldPeer.sol:239-246]
+   (dispatched on Child A)
+   _validateTokenAmounts(...)
+   _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount)
+   emit WithdrawCompleted(...)
 ```
 
-### ParentPeer initiated, strategy is elsewhere
+### Scenario C: ChildPeer A initiated, ChildPeer A is also strategy
+
+**CCIP hops:** Child A → Parent (WithdrawToParent), Parent → Child A (WithdrawToStrategy), then local completion
 
 ```
-1. ParentPeer.onTokenTransfer()
-   → s_totalShares -= shareBurnAmount
-   → BURNS shares immediately ← BUG
-   → sends WithdrawToStrategy to child (CCIP)
+1. ChildPeer A.onTokenTransfer()                             [ChildPeer.sol:89-105]
+   _burnShares(withdrawer, shareBurnAmount)                  ← BUG: immediate burn
+   withdrawData = _buildWithdrawData(withdrawer, shareBurnAmount, i_thisChainSelector)
+   (withdrawData.chainSelector == Child A chain)
+   _ccipSend(i_parentChainSelector, WithdrawToParent, withdrawData, ZERO_BRIDGE_AMOUNT)
+   emit WithdrawInitiated(...)
 
-2. ChildPeer._handleCCIPWithdrawToStrategy()
-   → _withdrawFromStrategyAndGetUsdcWithdrawAmount()
-   → sends WithdrawCallback to parent (CCIP) with USDC
+2. ParentPeer._handleCCIPWithdrawToParent()                  [ParentPeer.sol:334-344]
+   withdrawData.totalShares = s_totalShares
+   s_totalShares -= withdrawData.shareBurnAmount             ← premature state update
+   emit ShareBurnUpdate(...)
+   → _handleCCIPWithdraw(s_strategy, withdrawData)
 
-3. ParentPeer._handleCCIPWithdrawCallback()
-   → _transferUsdcTo(withdrawer, usdcWithdrawAmount)
+3. ParentPeer._handleCCIPWithdraw() — strategy.chainSelector != i_thisChainSelector
+                                                             [ParentPeer.sol:375-382]
+   (s_strategy.chainSelector == Child A; parent is not strategy)
+   _ccipSend(Child A, WithdrawToStrategy, withdrawData, ZERO_BRIDGE_AMOUNT)
+
+4. ChildPeer A._handleCCIPWithdrawToStrategy()               [ChildPeer.sol:179-203]
+   (adapter != 0, i_thisChainSelector == withdrawData.chainSelector ← same chain)
+   withdrawData.usdcWithdrawAmount =
+       _withdrawFromStrategyAndGetUsdcWithdrawAmount(activeStrategyAdapter, withdrawData)
+   emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount)
+   _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount)
+   (local transfer — no further CCIP)
+```
+
+### Scenario D: ParentPeer initiated, Parent is also strategy
+
+**CCIP hops:** None — fully local
+
+```
+1. ParentPeer.onTokenTransfer()                              [ParentPeer.sol:139-191]
+   totalShares = s_totalShares
+   s_totalShares -= shareBurnAmount                          ← BUG: premature state update
+   emit ShareBurnUpdate(shareBurnAmount, i_thisChainSelector, totalShares - shareBurnAmount)
+   emit WithdrawInitiated(withdrawer, shareBurnAmount, i_thisChainSelector)
+   _burnShares(withdrawer, shareBurnAmount)                  ← BUG: immediate burn
+
+   strategy.chainSelector == i_thisChainSelector (parent IS strategy):
+   activeStrategyAdapter = _getActiveStrategyAdapter()       (reverts if addr(0))
+   totalValue = _getTotalValueFromStrategy(activeStrategyAdapter, usdc)
+   usdcWithdrawAmount = _calculateWithdrawAmount(totalValue, totalShares, shareBurnAmount)
+   if usdcWithdrawAmount != 0: _withdrawFromStrategy(activeStrategyAdapter, usdcWithdrawAmount)
+   emit WithdrawCompleted(withdrawer, usdcWithdrawAmount)
+   if usdcWithdrawAmount != 0: _transferUsdcTo(withdrawer, usdcWithdrawAmount)
+```
+
+### Scenario E: ParentPeer initiated, strategy is on ChildPeer
+
+**CCIP hops:** Parent → Child (WithdrawToStrategy), Child → Parent (WithdrawCallback + USDC)
+
+```
+1. ParentPeer.onTokenTransfer()                              [ParentPeer.sol:139-191]
+   totalShares = s_totalShares
+   s_totalShares -= shareBurnAmount                          ← BUG: premature state update
+   emit ShareBurnUpdate(...)
+   emit WithdrawInitiated(...)
+   _burnShares(withdrawer, shareBurnAmount)                  ← BUG: immediate burn
+
+   strategy.chainSelector != i_thisChainSelector (strategy is on child):
+   withdrawData = _buildWithdrawData(withdrawer, shareBurnAmount, i_thisChainSelector)
+   (withdrawData.chainSelector == parent chain)
+   withdrawData.totalShares = totalShares
+   _ccipSend(strategy.chainSelector, WithdrawToStrategy, withdrawData, ZERO_BRIDGE_AMOUNT)
+   (sent DIRECTLY to child strategy — no WithdrawToParent involved)
+
+2. ChildPeer._handleCCIPWithdrawToStrategy()                 [ChildPeer.sol:179-203]
+   (adapter != 0, i_thisChainSelector != withdrawData.chainSelector)
+   withdrawData.usdcWithdrawAmount =
+       _withdrawFromStrategyAndGetUsdcWithdrawAmount(activeStrategyAdapter, withdrawData)
+   _ccipSend(withdrawData.chainSelector, WithdrawCallback, withdrawData, usdcWithdrawAmount)
+   (withdrawData.chainSelector == parent chain)
+
+3. YieldPeer._handleCCIPWithdrawCallback()                   [YieldPeer.sol:239-246]
+   (dispatched on ParentPeer via _handleCCIPMessage)
+   _validateTokenAmounts(...)
+   _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount)
+   emit WithdrawCompleted(...)
 ```
 
 ---
@@ -86,6 +187,7 @@ when `onTokenTransfer()` fires. The fix is therefore straightforward: **don't ca
 ## New Withdrawal Flows (Fix)
 
 The two-phase approach:
+
 1. **Initiation:** Shares are held (not burned) in the peer contract
 2. **Confirmation:** Shares are burned only after strategy withdrawal succeeds; or returned if it fails
 
@@ -93,113 +195,127 @@ The two-phase approach:
 
 ```solidity
 enum CcipTxType {
-    DepositToParent,          // 0 - unchanged
-    DepositToStrategy,        // 1 - unchanged
-    DepositCallbackParent,    // 2 - unchanged
-    DepositCallbackChild,     // 3 - unchanged
-    WithdrawToParent,         // 4 - unchanged
-    WithdrawToStrategy,       // 5 - unchanged
-    WithdrawCallbackChild,    // 6 - RENAMED from WithdrawCallback (integer value unchanged)
-    RebalanceFromOldStrategy, // 7 - unchanged
-    RebalanceToNewStrategy,   // 8 - unchanged
-    DepositPingPong,          // 9 - unchanged
-    WithdrawPingPong,         // 10 - unchanged
-    WithdrawCallbackParent,   // 11 - NEW (Phase 1)
+    DepositToParent,          // 0  - unchanged
+    DepositToStrategy,        // 1  - unchanged
+    DepositCallbackParent,    // 2  - unchanged
+    DepositCallbackChild,     // 3  - unchanged
+    WithdrawToParent,         // 4  - unchanged
+    WithdrawToStrategy,       // 5  - unchanged
+    WithdrawCallbackChild,    // 6  - RENAMED from WithdrawCallback (integer value unchanged)
+    WithdrawCallbackParent,   // 7  - NEW (Phase 1)
+    RebalanceFromOldStrategy, // 8  - was 7 (integer value +1)
+    RebalanceToNewStrategy,   // 9  - was 8 (integer value +1)
+    DepositPingPong,          // 10 - was 9 (integer value +1)
+    WithdrawPingPong,         // 11 - was 10 (integer value +1)
     WithdrawFail              // 12 - NEW (Phase 2)
 }
 ```
 
-**Important:** `WithdrawCallback` (6) is renamed to `WithdrawCallbackChild` but keeps integer
-value 6. Any in-flight CCIP messages with value 6 are unaffected.
+**Important notes on integer values:**
+- `WithdrawCallback` (6) is renamed to `WithdrawCallbackChild` but keeps integer value 6. Any in-flight CCIP messages with value 6 are unaffected.
+- `RebalanceFromOldStrategy`, `RebalanceToNewStrategy`, `DepositPingPong`, and `WithdrawPingPong` each shift up by 1. Certora specs use hardcoded integers for these — all occurrences must be updated.
 
-### New Flow: ChildPeer initiated, Parent is strategy
+### New Flow: ChildPeer initiated, Parent is strategy (Scenario A)
 
 ```
 1. ChildPeer A.onTokenTransfer()
-   → shares HELD in Child A (not burned)
-   → sends WithdrawToParent (CCIP)
+   shares HELD in Child A (not burned) — already transferred by ERC677
+   withdrawData = _buildWithdrawData(withdrawer, shareBurnAmount, i_thisChainSelector)
+   emit WithdrawInitiated(withdrawer, shareBurnAmount, i_thisChainSelector)
+   _ccipSend(i_parentChainSelector, WithdrawToParent, withdrawData, ZERO_BRIDGE_AMOUNT)
 
 2. ParentPeer._handleCCIPWithdrawToParent()
-   → reads totalShares = s_totalShares (snapshot for calculation, NO decrement)
-   → withdrawData.totalShares = totalShares
-   → calls _handleCCIPWithdraw (parent is strategy)
+   withdrawData.totalShares = s_totalShares   (snapshot for calculation, NO decrement)
+   → _handleCCIPWithdraw(s_strategy, withdrawData)
 
-3. ParentPeer._handleCCIPWithdraw (parent-is-strategy branch)
-   → _withdrawFromStrategyAndGetUsdcWithdrawAmount()
-   → s_totalShares -= shareBurnAmount            ← state update here now
-   → emit ShareBurnUpdate(...)
-   → sends WithdrawCallbackChild to Child A WITH USDC (CCIP)
+3. ParentPeer._handleCCIPWithdraw() — parent IS strategy
+   _withdrawFromStrategyAndGetUsdcWithdrawAmount(activeStrategyAdapter, withdrawData)
+   s_totalShares -= withdrawData.shareBurnAmount         ← state update moved here
+   emit ShareBurnUpdate(shareBurnAmount, withdrawData.chainSelector, s_totalShares)
+   _ccipSend(withdrawData.chainSelector, WithdrawCallbackChild, withdrawData, usdcWithdrawAmount)
 
 4. ChildPeer A._handleCCIPWithdrawCallbackChild()
-   → validates tokenAmounts
-   → _burnShares(withdrawer, shareBurnAmount)    ← burn happens here now
-   → _transferUsdcTo(withdrawer, usdcWithdrawAmount)
-   → emit WithdrawCompleted
+   CCIPOperations._validateTokenAmounts(tokenAmounts, usdc, usdcWithdrawAmount)
+   _burnShares(withdrawData.withdrawer, withdrawData.shareBurnAmount)  ← burn moved here
+   _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount)
+   emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount)
 ```
 
-### New Flow: ChildPeer A initiated, ChildPeer B is strategy (different chains)
-
-```
-1. ChildPeer A.onTokenTransfer()
-   → shares HELD in Child A (not burned)
-   → sends WithdrawToParent (CCIP)
-
-2. ParentPeer._handleCCIPWithdrawToParent()
-   → reads totalShares = s_totalShares (NO decrement)
-   → withdrawData.totalShares = totalShares
-   → calls _handleCCIPWithdraw → sends WithdrawToStrategy to Child B (CCIP)
-
-3. ChildPeer B._handleCCIPWithdrawToStrategy()
-   → _withdrawFromStrategyAndGetUsdcWithdrawAmount()
-   → withdrawData.chainSelector != i_thisChainSelector (Child A != Child B)
-   → sends WithdrawCallbackParent to Parent WITH USDC (CCIP)  ← routes through parent now
-
-4. ParentPeer._handleCCIPWithdrawCallbackParent()
-   → s_totalShares -= shareBurnAmount            ← state update here now
-   → emit ShareBurnUpdate(...)
-   → withdrawData.chainSelector != i_thisChainSelector
-   → bridgeAmount = tokenAmounts[0].amount (USDC came with message)
-   → sends WithdrawCallbackChild to Child A WITH USDC (CCIP)
-
-5. ChildPeer A._handleCCIPWithdrawCallbackChild()
-   → validates tokenAmounts
-   → _burnShares(withdrawer, shareBurnAmount)    ← burn happens here now
-   → _transferUsdcTo(withdrawer, usdcWithdrawAmount)
-   → emit WithdrawCompleted
-```
-
-### New Flow: ChildPeer initiated, same chain is strategy (same-chain optimisation)
-
-When strategy chain == withdraw chain (both on the same child), USDC stays on that child —
-it does not need to bounce to parent and back.
+### New Flow: ChildPeer A initiated, ChildPeer B is strategy (Scenario B)
 
 ```
 1. ChildPeer A.onTokenTransfer()
-   → shares HELD in Child A (not burned)
-   → sends WithdrawToParent (CCIP)
+   shares HELD in Child A (not burned)
+   withdrawData = _buildWithdrawData(withdrawer, shareBurnAmount, i_thisChainSelector)
+   emit WithdrawInitiated(...)
+   _ccipSend(i_parentChainSelector, WithdrawToParent, withdrawData, ZERO_BRIDGE_AMOUNT)
 
 2. ParentPeer._handleCCIPWithdrawToParent()
-   → reads totalShares = s_totalShares (NO decrement)
-   → calls _handleCCIPWithdraw → sends WithdrawToStrategy to Child A (CCIP)
+   withdrawData.totalShares = s_totalShares   (NO decrement)
+   → _handleCCIPWithdraw(s_strategy, withdrawData)
 
-3. ChildPeer A._handleCCIPWithdrawToStrategy()
-   → _withdrawFromStrategyAndGetUsdcWithdrawAmount()
-   → USDC now sits in Child A's contract balance
-   → withdrawData.chainSelector == i_thisChainSelector (same chain optimisation)
-   → sends WithdrawCallbackParent to Parent with ZERO_BRIDGE_AMOUNT  ← no USDC bridged
+3. ParentPeer._handleCCIPWithdraw() — parent NOT strategy
+   emit WithdrawForwardedToStrategy(...)
+   _ccipSend(Child B, WithdrawToStrategy, withdrawData, ZERO_BRIDGE_AMOUNT)
 
-4. ParentPeer._handleCCIPWithdrawCallbackParent()
-   → s_totalShares -= shareBurnAmount
-   → emit ShareBurnUpdate(...)
-   → withdrawData.chainSelector != i_thisChainSelector
-   → bridgeAmount = ZERO_BRIDGE_AMOUNT (no USDC in tokenAmounts)
-   → sends WithdrawCallbackChild to Child A with ZERO_BRIDGE_AMOUNT (CCIP)
+4. ChildPeer B._handleCCIPWithdrawToStrategy()
+   _withdrawFromStrategyAndGetUsdcWithdrawAmount(...)
+   i_thisChainSelector != withdrawData.chainSelector (Child B != Child A)
+   _ccipSend(i_parentChainSelector, WithdrawCallbackParent, withdrawData, usdcWithdrawAmount)
 
-5. ChildPeer A._handleCCIPWithdrawCallbackChild()
-   → tokenAmounts.length == 0: skip validation
-   → _burnShares(withdrawer, shareBurnAmount)
-   → _transferUsdcTo(withdrawer, usdcWithdrawAmount)  ← from Child A's local balance
-   → emit WithdrawCompleted
+5. ParentPeer._handleCCIPWithdrawCallbackParent()
+   s_totalShares -= withdrawData.shareBurnAmount         ← state update moved here
+   emit ShareBurnUpdate(shareBurnAmount, withdrawData.chainSelector, s_totalShares)
+   withdrawData.chainSelector != i_thisChainSelector (Child A != parent)
+   CCIPOperations._validateTokenAmounts(tokenAmounts, usdc, usdcWithdrawAmount)
+   _ccipSend(Child A, WithdrawCallbackChild, withdrawData, usdcWithdrawAmount)
+
+6. ChildPeer A._handleCCIPWithdrawCallbackChild()
+   CCIPOperations._validateTokenAmounts(tokenAmounts, usdc, usdcWithdrawAmount)
+   _burnShares(withdrawData.withdrawer, withdrawData.shareBurnAmount)  ← burn moved here
+   _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount)
+   emit WithdrawCompleted(...)
+```
+
+### New Flow: ChildPeer initiated, same chain is strategy — same-chain optimisation (Scenario C)
+
+When `withdrawData.chainSelector == i_thisChainSelector` on the strategy child, USDC stays
+in that child — it does not need to bounce to parent and back.
+
+```
+1. ChildPeer A.onTokenTransfer()
+   shares HELD in Child A (not burned)
+   withdrawData = _buildWithdrawData(withdrawer, shareBurnAmount, i_thisChainSelector)
+   emit WithdrawInitiated(...)
+   _ccipSend(i_parentChainSelector, WithdrawToParent, withdrawData, ZERO_BRIDGE_AMOUNT)
+
+2. ParentPeer._handleCCIPWithdrawToParent()
+   withdrawData.totalShares = s_totalShares   (NO decrement)
+   → _handleCCIPWithdraw(s_strategy, withdrawData)
+
+3. ParentPeer._handleCCIPWithdraw() — parent NOT strategy (Child A is strategy)
+   _ccipSend(Child A, WithdrawToStrategy, withdrawData, ZERO_BRIDGE_AMOUNT)
+
+4. ChildPeer A._handleCCIPWithdrawToStrategy()
+   _withdrawFromStrategyAndGetUsdcWithdrawAmount(...)
+   USDC now sits in Child A's contract balance
+   i_thisChainSelector == withdrawData.chainSelector ← same-chain optimisation
+   _ccipSend(i_parentChainSelector, WithdrawCallbackParent, withdrawData, ZERO_BRIDGE_AMOUNT)
+   (no USDC bridged — it stays in Child A)
+
+5. ParentPeer._handleCCIPWithdrawCallbackParent()
+   s_totalShares -= withdrawData.shareBurnAmount
+   emit ShareBurnUpdate(...)
+   withdrawData.chainSelector != i_thisChainSelector (Child A != parent)
+   tokenAmounts.length == 0 (no USDC was bridged) → bridgeAmount = ZERO_BRIDGE_AMOUNT
+   _ccipSend(Child A, WithdrawCallbackChild, withdrawData, ZERO_BRIDGE_AMOUNT)
+
+6. ChildPeer A._handleCCIPWithdrawCallbackChild()
+   tokenAmounts.length == 0 → skip _validateTokenAmounts
+   _burnShares(withdrawData.withdrawer, withdrawData.shareBurnAmount)
+   _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount)
+   (from Child A's local balance — withdrawn in step 4)
+   emit WithdrawCompleted(...)
 ```
 
 **Why is the USDC safe during the parent round-trip?**
@@ -207,31 +323,34 @@ The rebalance flow (`_handleCCIPRebalanceFromOldStrategy`) drains from the strat
 adapter (Aave/Compound), not from the peer contract's USDC balance. The withdrawn
 USDC sits in the peer contract's balance, untouched by rebalance.
 
-### New Flow: ParentPeer initiated, strategy is a child
+### New Flow: ParentPeer initiated, strategy is a child (Scenario E)
 
 ```
 1. ParentPeer.onTokenTransfer()
-   → shares HELD in Parent (not burned)
-   → reads totalShares = s_totalShares (NO decrement)
-   → withdrawData.totalShares = totalShares
-   → sends WithdrawToStrategy to child (CCIP)  ← direct, not via _handleCCIPWithdraw
+   shares HELD in Parent (not burned)
+   totalShares = s_totalShares   (NO decrement)
+   emit WithdrawInitiated(withdrawer, shareBurnAmount, i_thisChainSelector)
+   withdrawData = _buildWithdrawData(withdrawer, shareBurnAmount, i_thisChainSelector)
+   (withdrawData.chainSelector == parent chain)
+   withdrawData.totalShares = totalShares
+   _ccipSend(strategy.chainSelector, WithdrawToStrategy, withdrawData, ZERO_BRIDGE_AMOUNT)
 
 2. ChildPeer._handleCCIPWithdrawToStrategy()
-   → _withdrawFromStrategyAndGetUsdcWithdrawAmount()
-   → withdrawData.chainSelector != i_thisChainSelector (parent != child strategy)
-   → sends WithdrawCallbackParent to Parent WITH USDC (CCIP)
+   _withdrawFromStrategyAndGetUsdcWithdrawAmount(...)
+   i_thisChainSelector != withdrawData.chainSelector (child != parent)
+   _ccipSend(i_parentChainSelector, WithdrawCallbackParent, withdrawData, usdcWithdrawAmount)
 
 3. ParentPeer._handleCCIPWithdrawCallbackParent()
-   → s_totalShares -= shareBurnAmount
-   → emit ShareBurnUpdate(...)
-   → withdrawData.chainSelector == i_thisChainSelector  ← parent is the withdraw chain
-   → validates tokenAmounts
-   → _burnShares(withdrawer, shareBurnAmount)    ← burns shares held in parent
-   → _transferUsdcTo(withdrawer, usdcWithdrawAmount)
-   → emit WithdrawCompleted
+   s_totalShares -= withdrawData.shareBurnAmount         ← state update moved here
+   emit ShareBurnUpdate(...)
+   withdrawData.chainSelector == i_thisChainSelector ← parent IS the withdraw chain
+   CCIPOperations._validateTokenAmounts(tokenAmounts, usdc, usdcWithdrawAmount)
+   _burnShares(withdrawData.withdrawer, withdrawData.shareBurnAmount)  ← burn moved here
+   _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount)
+   emit WithdrawCompleted(...)
 ```
 
-### Local Flow: ParentPeer initiated, Parent is also strategy (Phase 1: unchanged)
+### Local Flow: ParentPeer initiated, Parent is also strategy (Scenario D, Phase 1: unchanged)
 
 This case — where the parent is both the withdraw chain and the strategy — has no CCIP
 involved. **This case is not changed in Phase 1.** The optimistic burn remains for now.
@@ -244,7 +363,10 @@ Phase 2 adds try/catch here. See Phase 2 section below.
 ### 1. `IYieldPeer.sol`
 
 - Rename `WithdrawCallback` (6) → `WithdrawCallbackChild` (stays at 6)
-- Add `WithdrawCallbackParent` (11) at end of enum
+- Insert `WithdrawCallbackParent` at position 7 (immediately after `WithdrawCallbackChild`)
+- `RebalanceFromOldStrategy` shifts 7 → 8, `RebalanceToNewStrategy` shifts 8 → 9,
+  `DepositPingPong` shifts 9 → 10, `WithdrawPingPong` shifts 10 → 11
+- Add `WithdrawFail` (12) at end (Phase 2)
 
 ### 2. `YieldPeer.sol`
 
@@ -265,11 +387,12 @@ _burnShares(withdrawer, shareBurnAmount);
 
 #### `_handleCCIPWithdrawToStrategy()`
 
-Add the same-chain optimisation: if `withdrawData.chainSelector == i_thisChainSelector`,
-USDC stays in the child contract — send `WithdrawCallbackParent` with `ZERO_BRIDGE_AMOUNT`.
-Otherwise, bridge the USDC with the message to parent.
+Replace the existing body with the same-chain optimisation: if
+`withdrawData.chainSelector == i_thisChainSelector`, USDC stays in the child — send
+`WithdrawCallbackParent` with `ZERO_BRIDGE_AMOUNT`. Otherwise bridge the USDC with the
+message to parent.
 
-Also: the old direct-transfer local path (`if (i_thisChainSelector == withdrawData.chainSelector) _transferUsdcTo(...)`) is removed — we always route through parent now for state update.
+The old direct-transfer local path (`if (i_thisChainSelector == withdrawData.chainSelector) _transferUsdcTo(...)`) is removed — we always route through parent now for state update.
 
 ```solidity
 function _handleCCIPWithdrawToStrategy(bytes memory data) internal {
@@ -346,14 +469,13 @@ Remove `s_totalShares -= shareBurnAmount`, its `ShareBurnUpdate` emit, and
 decremented here anymore.
 
 ```solidity
-// REMOVE these lines from the else branch:
+// REMOVE these lines:
 s_totalShares -= shareBurnAmount;
 emit ShareBurnUpdate(shareBurnAmount, i_thisChainSelector, totalShares - shareBurnAmount);
-emit WithdrawInitiated(withdrawer, shareBurnAmount, i_thisChainSelector);
 _burnShares(withdrawer, shareBurnAmount);
 
 // KEEP:
-uint256 totalShares = s_totalShares;  // snapshot for calculation
+uint256 totalShares = s_totalShares;                  // snapshot for calculation
 emit WithdrawInitiated(withdrawer, shareBurnAmount, i_thisChainSelector);
 // withdrawData.totalShares = totalShares — still set as before
 // _ccipSend to strategy — unchanged
@@ -371,7 +493,7 @@ The `totalShares` snapshot is still read and set on `withdrawData` for calculati
 ```solidity
 function _handleCCIPWithdrawToParent(bytes memory data, uint64 sourceChainSelector) internal {
     WithdrawData memory withdrawData = _decodeWithdrawData(data);
-    withdrawData.totalShares = s_totalShares;  // KEEP: snapshot for calculation
+    withdrawData.totalShares = s_totalShares;         // KEEP: snapshot for calculation
     // REMOVE: s_totalShares -= withdrawData.shareBurnAmount;
     // REMOVE: emit ShareBurnUpdate(...);
     _handleCCIPWithdraw(s_strategy, withdrawData);
@@ -527,7 +649,6 @@ function _handleCCIPWithdrawToStrategy(bytes memory data) internal {
             }
         } else {
             // usdcWithdrawAmount == 0: treat as success — see known issues
-            bool sameChain = i_thisChainSelector == withdrawData.chainSelector;
             _ccipSend(
                 i_parentChainSelector,
                 CcipTxType.WithdrawCallbackParent,
@@ -637,6 +758,7 @@ if (strategy.chainSelector == i_thisChainSelector) {
 ### `_handleCCIPMessage()` dispatch updates (both peers)
 
 Add to ChildPeer and ParentPeer:
+
 ```solidity
 if (txType == CcipTxType.WithdrawFail) _handleCCIPWithdrawFail(data);
 ```
@@ -651,20 +773,20 @@ paths inline the withdrawal logic to accommodate try/catch.
 
 ## `s_totalShares` Update: Where it moves
 
-| Scenario | Old location | New location |
-|---|---|---|
-| Child initiated, parent is strategy | `_handleCCIPWithdrawToParent` | `_handleCCIPWithdraw` (parent-is-strategy branch) |
-| Child initiated, child strategy | `_handleCCIPWithdrawToParent` | `_handleCCIPWithdrawCallbackParent` |
-| Child initiated, same-chain strategy | `_handleCCIPWithdrawToParent` | `_handleCCIPWithdrawCallbackParent` |
-| Parent initiated, strategy is child | `onTokenTransfer` | `_handleCCIPWithdrawCallbackParent` |
-| Parent initiated, parent is strategy | `onTokenTransfer` | `onTokenTransfer` (Phase 2: after successful try) |
+| Scenario                             | Old location                  | New location                                      |
+| ------------------------------------ | ----------------------------- | ------------------------------------------------- |
+| Child initiated, parent is strategy  | `_handleCCIPWithdrawToParent` | `_handleCCIPWithdraw` (parent-is-strategy branch) |
+| Child initiated, child B strategy    | `_handleCCIPWithdrawToParent` | `_handleCCIPWithdrawCallbackParent`               |
+| Child initiated, same-chain strategy | `_handleCCIPWithdrawToParent` | `_handleCCIPWithdrawCallbackParent`               |
+| Parent initiated, strategy is child  | `onTokenTransfer`             | `_handleCCIPWithdrawCallbackParent`               |
+| Parent initiated, parent is strategy | `onTokenTransfer`             | `onTokenTransfer` (Phase 2: after successful try) |
 
 ## Share Burn: Where it moves
 
-| Scenario | Old location | New location |
-|---|---|---|
-| Child initiated (any strategy) | `ChildPeer.onTokenTransfer` | `ChildPeer._handleCCIPWithdrawCallbackChild` |
-| Parent initiated, strategy is child | `ParentPeer.onTokenTransfer` | `ParentPeer._handleCCIPWithdrawCallbackParent` |
+| Scenario                             | Old location                 | New location                                                 |
+| ------------------------------------ | ---------------------------- | ------------------------------------------------------------ |
+| Child initiated (any strategy)       | `ChildPeer.onTokenTransfer`  | `ChildPeer._handleCCIPWithdrawCallbackChild`                 |
+| Parent initiated, strategy is child  | `ParentPeer.onTokenTransfer` | `ParentPeer._handleCCIPWithdrawCallbackParent`               |
 | Parent initiated, parent is strategy | `ParentPeer.onTokenTransfer` | `ParentPeer.onTokenTransfer` (Phase 2: after successful try) |
 
 ---
@@ -700,28 +822,33 @@ paths inline the withdrawal logic to accommodate try/catch.
 New test files / additions needed:
 
 **`ParentWithdraw.t.sol`**
+
 - `test_yield_parent_withdraw_strategyIsNotParent_*`: verify shares are NOT burned in `onTokenTransfer`, are burned in `_handleCCIPWithdrawCallbackParent`
 - `test_yield_parent_handleCCIPWithdrawCallbackParent_updatesState`: verify `s_totalShares` decrements, `ShareBurnUpdate` emitted
 - `test_yield_parent_handleCCIPWithdrawCallbackParent_localCompletion`: parent is withdraw chain — burns shares, transfers USDC
 - `test_yield_parent_handleCCIPWithdrawCallbackParent_forwardsToChild`: verify `WithdrawCallbackChild` sent with correct bridge amount
 
 **`ChildWithdraw.t.sol`**
+
 - `test_yield_child_onTokenTransfer_doesNotBurnShares`: verify share balance stays in child contract
 - `test_yield_child_handleCCIPWithdrawCallbackChild_burnsShares_transfersUsdc`
 - `test_yield_child_handleCCIPWithdrawCallbackChild_sameChainOptimisation`: no USDC in tokenAmounts, transfers from local balance
 
 **Integration tests** — update existing tests to route through the new CCIP message types:
+
 - All existing `test_yield_child_withdraw_*` and `test_yield_parent_withdraw_*` scenarios
 - PingPong tests should pass without changes (verify)
 
 ### Phase 2 Unit Tests
 
 **New `ChildWithdrawFail.t.sol`**
+
 - `test_yield_child_withdraw_fail_strategyReverts_returnsShares`
 - `test_yield_child_withdraw_fail_strategyReverts_doesNotUpdateTotalShares`
 - `test_yield_child_withdraw_fail_strategyReverts_emitsNoSharesBurned`
 
 **New `ParentWithdrawFail.t.sol`**
+
 - `test_yield_parent_withdraw_fail_strategyReverts_returnsShares` (local case)
 - `test_yield_parent_withdraw_fail_crosschain_returnsShares`
 - `test_yield_parent_withdraw_fail_doesNotUpdateTotalShares`
@@ -733,15 +860,21 @@ New test files / additions needed:
 The Certora specs use hardcoded integers for `CcipTxType`. Required updates:
 
 **`Child.spec`**
+
 - Comment update: `// CcipTxType.WithdrawCallback` → `// CcipTxType.WithdrawCallbackChild` (integer 6 unchanged)
-- New rules for `WithdrawCallbackParent` (11) being sent from `handleCCIPWithdrawToStrategy`
+- `RebalanceFromOldStrategy`: any `== 7` → `== 8`
+- `RebalanceToNewStrategy`: any `== 8` → `== 9`
+- `DepositPingPong`: any `== 9` → `== 10`
+- `WithdrawPingPong`: any `== 10` → `== 11`
+- New rules for `WithdrawCallbackParent` (7) being sent from `_handleCCIPWithdrawToStrategy`
 - Update `handleCCIPMessage_WithdrawCallback` rule → `handleCCIPMessage_WithdrawCallbackChild`
 - Ghost + hook for `WithdrawCallbackParent` sent event
 - Add `handleCCIPMessage_WithdrawFail` rule (Phase 2)
 
 **`Parent.spec`**
-- Same comment updates for `WithdrawCallbackChild` (6)
-- New rules for `handleCCIPWithdrawCallbackParent`: state update, routing
+
+- Same integer shifts for `RebalanceFromOldStrategy` (7→8), `RebalanceToNewStrategy` (8→9), `DepositPingPong` (9→10), `WithdrawPingPong` (10→11)
+- New rules for `_handleCCIPWithdrawCallbackParent`: state update, routing
 - Update `handleCCIPMessage_WithdrawCallback` rule → `handleCCIPMessage_WithdrawCallbackParent`
 - Add `handleCCIPMessage_WithdrawFail` rule (Phase 2)
 
