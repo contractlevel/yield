@@ -35,7 +35,7 @@ contract StrategyRegistry is Initializable, UUPSUpgradeable, IStrategyRegistry, 
     //////////////////////////////////////////////////////////////*/
     // ERC-7201: keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.StrategyRegistry")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant STRATEGY_REGISTRY_STORAGE_LOCATION =
-        0xff4f32e19ccce71bf80077033cba16a319c7bee7ac2089685e40116337a8fe00; // @review double check the hash
+        0xff4f32e19ccce71bf80077033cba16a319c7bee7ac2089685e40116337a8fe00;
 
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
@@ -68,8 +68,7 @@ contract StrategyRegistry is Initializable, UUPSUpgradeable, IStrategyRegistry, 
     /// @notice This does not explicitly sync with ParentPeer::s_supportedProtocols at the contract level because
     /// this is also deployed on child chains and this contract is primarily inteded as a registry for adapters.
     function setStrategyAdapter(bytes32 protocolId, address strategyAdapter) external onlyOwner {
-        /// @dev load StrategyRegistry storage
-        StrategyRegistryStorage storage $ = _getStrategyRegistryStorage();
+        StrategyRegistryStorage storage $ = _getStrategyRegistryStorage(); // load StrategyRegistry storage
 
         $.s_strategyAdapters[protocolId] = strategyAdapter;
         emit StrategyAdapterSet(protocolId, strategyAdapter);

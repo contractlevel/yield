@@ -46,7 +46,6 @@ contract Invariant is StdInvariant, BaseTest {
     bytes32 internal constant AAVE_V3_PROTOCOL_ID = keccak256(abi.encodePacked("aave-v3"));
     bytes32 internal constant COMPOUND_V3_PROTOCOL_ID = keccak256(abi.encodePacked("compound-v3"));
 
-    /// @dev Handler contract we are running calls to the SBT through
     /// @dev Handler contract we are running calls to the system through
     Handler internal handler;
     /// @dev Manual mock CCIP router used for all peers (replaces MockCCIPRouter)
@@ -156,6 +155,7 @@ contract Invariant is StdInvariant, BaseTest {
         usdc = IERC20(networkConfig.tokens.usdc);
         share = Share(networkConfig.tokens.share);
         aavePool = IPoolAddressesProvider(networkConfig.protocols.aavePoolAddressesProvider).getPool();
+        ccipRouter = new ManualMockRouter();
 
         // Prepare Strategy Registry Implementation (passed to deploy helpers)
         StrategyRegistry registryImpl = new StrategyRegistry();
@@ -196,16 +196,10 @@ contract Invariant is StdInvariant, BaseTest {
     /// @param registryInit The strategy registry init data
     function _deployParentInfra(address registryImpl, bytes memory registryInit) private {
         // Deploy Parent Impl and create init data
-        ParentPeer parentImpl = new ParentPeer(
-            networkConfig.ccip.ccipRouter,
-    }
-        ccipRouter = new ManualMockRouter();
-
         /// @dev since we are not forking mainnets, we will deploy contracts locally
         /// the deployed peers will interact via the ccip local simulator as if they were crosschain
         /// this is a context we need to be aware of in this test suite
-        /// @dev deploy the parent contract
-        parent = new ParentPeer(
+        ParentPeer parentImpl = new ParentPeer(
             address(ccipRouter),
             networkConfig.tokens.link,
             PARENT_SELECTOR,
@@ -257,9 +251,6 @@ contract Invariant is StdInvariant, BaseTest {
     function _deployChild1Infra(address registryImpl, bytes memory registryInit) private {
         // Deploy Proxy
         ChildPeer child1Impl = new ChildPeer(
-            networkConfig.ccip.ccipRouter,
-        /// @dev deploy at least 2 child peers to cover all CCIP tx types
-        child1 = new ChildPeer(
             address(ccipRouter),
             networkConfig.tokens.link,
             CHILD1_SELECTOR,
@@ -294,8 +285,6 @@ contract Invariant is StdInvariant, BaseTest {
     function _deployChild2Infra(address registryImpl, bytes memory registryInit) private {
         // Deploy Proxy
         ChildPeer child2Impl = new ChildPeer(
-            networkConfig.ccip.ccipRouter,
-        child2 = new ChildPeer(
             address(ccipRouter),
             networkConfig.tokens.link,
             CHILD2_SELECTOR,

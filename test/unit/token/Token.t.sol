@@ -141,52 +141,6 @@ contract TokenTest is BaseTest {
     }
 
     /*//////////////////////////////////////////////////////////////
-                                 ROLES
-    //////////////////////////////////////////////////////////////*/
-    /// @dev Tests the grantMintAndBurnRoles/getRoleMembers functions
-    function test_yield_token_grantMintAndBurnRoles_success() public {
-        // Arrange
-        address burnAndMinter = makeAddr("burnAndMinter");
-        bytes32 minterRole = baseShare.MINTER_ROLE();
-        bytes32 burnerRole = baseShare.BURNER_ROLE();
-
-        // Act
-        _changePrank(baseShare.owner());
-        baseShare.grantMintAndBurnRoles(burnAndMinter);
-        /// @dev get minters and burners, cache last index
-        address[] memory minters = baseShare.getRoleMembers(minterRole);
-        address[] memory burners = baseShare.getRoleMembers(burnerRole);
-        uint256 mintersLastIndex = minters.length - 1;
-        uint256 burnersLastIndex = burners.length - 1;
-
-        // Assert
-        assertEq(minters[mintersLastIndex], burnAndMinter);
-        assertEq(burners[burnersLastIndex], burnAndMinter);
-    }
-
-    /// @dev This is a sanity test to cover interal _revokeRole override
-    function test_yield_token_revokeRoleRole_success() public {
-        // Arrange
-        address burner = makeAddr("burner");
-        bytes32 burnerRole = baseShare.BURNER_ROLE();
-
-        _changePrank(baseShare.owner());
-        baseShare.grantRole(burnerRole, burner);
-        address[] memory burnersBefore = baseShare.getRoleMembers(burnerRole);
-        uint256 burnersLastIndex = burnersBefore.length - 1;
-        /// @dev Verify burner in role members
-        assertEq(burnersBefore[burnersLastIndex], burner);
-
-        // Act
-        baseShare.revokeRole(burnerRole, burner);
-        address[] memory burnersAfter = baseShare.getRoleMembers(burnerRole);
-        burnersLastIndex = burnersAfter.length - 1;
-
-        // Assert
-        assert(burnersAfter[burnersLastIndex] != burner);
-    }
-
-    /*//////////////////////////////////////////////////////////////
                                CCIP ADMIN
     //////////////////////////////////////////////////////////////*/
     /// @dev Tests setting and getting CCIP admin

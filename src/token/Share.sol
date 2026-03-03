@@ -17,9 +17,8 @@ import {IERC677Receiver} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 import {IBurnMintERC677Upgradeable, IERC20} from "./interfaces/IBurnMintERC677Upgradeable.sol";
 
 /// @title Share
-/// @author George Gorzhiye | Judge Finance
+/// @author George Gorzhiyev | Judge Finance
 /// @notice Upgradeable ERC677 token with access control
-/// @notice Deployer must grant mint and burn roles to (crosschain) Yield contracts
 contract Share is
     Initializable,
     UUPSUpgradeable,
@@ -84,8 +83,6 @@ contract Share is
     /// @dev Token decimals are fixed at 18 inside of ERC20Upgradeable
     function initialize() external initializer {
         __ERC20_init("YieldCoin", "YIELD");
-        __ERC20Burnable_init();
-        __AccessControl_init();
         __AccessControlDefaultAdminRules_init(INITIAL_DEFAULT_ADMIN_ROLE_TRANSFER_DELAY, msg.sender);
         _grantRole(UPGRADER_ROLE, msg.sender);
         _getShareStorage().s_ccipAdmin = msg.sender; // @review ccipAdmin should be passed or transferred in deploy script
@@ -209,7 +206,7 @@ contract Share is
     /// @param newAdmin The address to transfer the CCIPAdmin role to. Setting to address(0) is a valid way to revoke
     /// the role
     function setCCIPAdmin(address newAdmin) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        ShareStorage storage $ = _getShareStorage();
+        ShareStorage storage $ = _getShareStorage(); // Load Share storage
         address currentAdmin = $.s_ccipAdmin;
 
         $.s_ccipAdmin = newAdmin;

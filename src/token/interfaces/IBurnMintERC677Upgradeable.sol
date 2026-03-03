@@ -5,8 +5,7 @@ import {IERC677} from "@chainlink/contracts/src/v0.8/shared/token/ERC677/IERC677
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 /**
- * @title IBurnMintERC677
- * @author Judge Finance
+ * @title IBurnMintERC677Upgradeable
  * @notice Interface for a basic burn/mint ERC677 token
  * @dev Burn/mint functions are declared here rather than imported
  * from 'IBurnMintERC20.sol' to avoid inheritance conflicts
