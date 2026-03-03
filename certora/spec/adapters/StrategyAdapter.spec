@@ -25,6 +25,7 @@ methods {
     // Harness helper methods
     function bytes32ToUint256(bytes32) external returns (uint256) envfree;
     function bytes32ToAddress(bytes32) external returns (address) envfree;
+    function isReentrancyGuardLocked() external returns (bool) envfree;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -95,6 +96,22 @@ rule onlyYieldPeer_revertsWhen_notYieldPeer(method f) filtered { f -> onlyYieldP
 }
 
 // --- deposit --- //
+rule deposit_revertsWhen_reentrant() {
+    env e;
+    uint256 amount;
+
+    /// @dev revert condition being verified
+    require isReentrancyGuardLocked() == true;
+
+    /// @dev revert conditions not being verified
+    require e.msg.sender == currentContract.i_yieldPeer;
+    require e.msg.value == 0;
+    require amount > 0;
+
+    deposit@withrevert(e, usdc, amount);
+    assert lastReverted;
+}
+
 rule deposit_increases_strategy_balance() {
     env e;
     uint256 amount;
@@ -152,6 +169,21 @@ rule deposit_emits_event() {
 }
 
 // --- withdraw --- //
+rule withdraw_revertsWhen_reentrant() {
+    env e;
+    uint256 amount;
+
+    /// @dev revert condition being verified
+    require isReentrancyGuardLocked() == true;
+
+    /// @dev revert conditions not being verified
+    require e.msg.sender == currentContract.i_yieldPeer;
+    require e.msg.value == 0;
+
+    withdraw@withrevert(e, usdc, amount);
+    assert lastReverted;
+}
+
 rule withdraw_decreases_strategy_balance() {
     env e;
     uint256 amount;

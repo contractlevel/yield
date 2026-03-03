@@ -87,7 +87,7 @@ contract ParentPeer is YieldPeer, IParentPeer {
     /// @param amountToDeposit The amount of USDC to deposit into the system
     /// @dev Revert if amountToDeposit is less than 1e6 (1 USDC)
     /// @dev Revert if peer is paused
-    function deposit(uint256 amountToDeposit) external override(YieldPeer, IYieldPeer) whenNotPaused {
+    function deposit(uint256 amountToDeposit) external override(YieldPeer, IYieldPeer) whenNotPaused nonReentrant {
         /// @dev takes a fee
         amountToDeposit = _initiateDeposit(amountToDeposit);
 
@@ -144,6 +144,7 @@ contract ParentPeer is YieldPeer, IParentPeer {
         external
         override(YieldPeer)
         whenNotPaused
+        nonReentrant
     {
         _revertIfMsgSenderIsNotShare();
 
