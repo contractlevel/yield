@@ -16,10 +16,7 @@ import {Rebalancer} from "../../src/modules/Rebalancer.sol";
 import {StrategyRegistry} from "../../src/modules/StrategyRegistry.sol";
 import {AaveV3Adapter} from "../../src/adapters/AaveV3Adapter.sol";
 import {CompoundV3Adapter} from "../../src/adapters/CompoundV3Adapter.sol";
-import {ShareProxy} from "../../src/proxies/ShareProxy.sol";
-import {ParentProxy} from "../../src/proxies/ParentProxy.sol";
-import {RebalancerProxy} from "../../src/proxies/RebalancerProxy.sol";
-import {StrategyRegistryProxy} from "../../src/proxies/StrategyRegistryProxy.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /// @title DeployParent
 /// @notice Deployment script for the Parent architecture
@@ -83,7 +80,7 @@ contract DeployParent is Script {
 
         // Create Share Proxy init data and deploy proxy
         bytes memory shareInitData = abi.encodeWithSelector(Share.initialize.selector);
-        ShareProxy shareProxy = new ShareProxy(address(shareImpl), shareInitData);
+        ERC1967Proxy shareProxy = new ERC1967Proxy(address(shareImpl), shareInitData);
 
         // Cast Proxy address to Share type
         deploy.share = Share(address(shareProxy));
@@ -113,7 +110,7 @@ contract DeployParent is Script {
 
         // Create Rebalancer Proxy init data and deploy Proxy
         bytes memory rebalancerInitData = abi.encodeWithSelector(Rebalancer.initialize.selector);
-        RebalancerProxy rebalancerProxy = new RebalancerProxy(address(rebalancerImpl), rebalancerInitData);
+        ERC1967Proxy rebalancerProxy = new ERC1967Proxy(address(rebalancerImpl), rebalancerInitData);
 
         // Cast Proxy address to Rebalancer type
         deploy.rebalancer = Rebalancer(address(rebalancerProxy));
@@ -135,7 +132,7 @@ contract DeployParent is Script {
 
         // Create ParentPeer Proxy init data and deploy Proxy
         bytes memory parentInitData = abi.encodeWithSelector(ParentPeer.initialize.selector);
-        ParentProxy parentProxy = new ParentProxy(address(parentPeerImpl), parentInitData);
+        ERC1967Proxy parentProxy = new ERC1967Proxy(address(parentPeerImpl), parentInitData);
 
         // Cast Proxy address to ParentPeer type
         deploy.parentPeer = ParentPeer(address(parentProxy));
@@ -159,8 +156,7 @@ contract DeployParent is Script {
 
         // Create StrategyRegistry Proxy init data and deploy Proxy
         bytes memory strategyRegistryInitData = abi.encodeWithSelector(StrategyRegistry.initialize.selector);
-        StrategyRegistryProxy strategyRegistryProxy =
-            new StrategyRegistryProxy(address(strategyRegistryImpl), strategyRegistryInitData);
+        ERC1967Proxy strategyRegistryProxy = new ERC1967Proxy(address(strategyRegistryImpl), strategyRegistryInitData);
 
         // Cast Proxy address to StrategyRegistry type
         deploy.strategyRegistry = StrategyRegistry(address(strategyRegistryProxy));

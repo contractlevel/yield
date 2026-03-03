@@ -16,10 +16,7 @@ import {SharePool} from "../src/token/SharePool.sol";
 import {ParentPeer} from "../src/peers/ParentPeer.sol";
 import {ChildPeer} from "../src/peers/ChildPeer.sol";
 import {Rebalancer} from "../src/modules/Rebalancer.sol";
-import {ShareProxy} from "../src/proxies/ShareProxy.sol";
-import {ParentProxy} from "../src/proxies/ParentProxy.sol";
-import {ChildProxy} from "../src/proxies/ChildProxy.sol";
-import {RebalancerProxy} from "../src/proxies/RebalancerProxy.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 contract HelperConfig is Script {
     /*//////////////////////////////////////////////////////////////
@@ -562,7 +559,7 @@ contract HelperConfig is Script {
         Share shareImpl = new Share();
         // Create init data and deploy Share proxy
         bytes memory shareInit = abi.encodeWithSelector(Share.initialize.selector);
-        ShareProxy shareProxy = new ShareProxy(address(shareImpl), shareInit);
+        ERC1967Proxy shareProxy = new ERC1967Proxy(address(shareImpl), shareInit);
         // Wrap proxy address around Share type
         share = Share(address(shareProxy));
 
@@ -575,7 +572,7 @@ contract HelperConfig is Script {
         Rebalancer rebalancerImpl = new Rebalancer();
         // Create init data and deploy Rebalancer proxy
         bytes memory rebalancerInit = abi.encodeWithSelector(Rebalancer.initialize.selector);
-        RebalancerProxy rebalancerProxy = new RebalancerProxy(address(rebalancerImpl), rebalancerInit);
+        ERC1967Proxy rebalancerProxy = new ERC1967Proxy(address(rebalancerImpl), rebalancerInit);
         // Wrap proxy address around Rebalancer type
         rebalancer = Rebalancer(address(rebalancerProxy));
 
@@ -584,7 +581,7 @@ contract HelperConfig is Script {
         ParentPeer parentImpl = new ParentPeer(address(ccipRouter), address(link), 1, address(usdc), address(share));
         // Create init data and deploy Parent proxy
         bytes memory parentInit = abi.encodeWithSelector(ParentPeer.initialize.selector);
-        ParentProxy parentProxy = new ParentProxy(address(parentImpl), parentInit);
+        ERC1967Proxy parentProxy = new ERC1967Proxy(address(parentImpl), parentInit);
         // Wrap proxy address around Parent type
         parent = ParentPeer(address(parentProxy));
 
@@ -593,7 +590,7 @@ contract HelperConfig is Script {
         ChildPeer childImpl = new ChildPeer(address(ccipRouter), address(link), 2, address(usdc), address(share), 1);
         // Create init data and deploy Child proxy
         bytes memory childInit = abi.encodeWithSelector(ChildPeer.initialize.selector);
-        ChildProxy childProxy = new ChildProxy(address(childImpl), childInit);
+        ERC1967Proxy childProxy = new ERC1967Proxy(address(childImpl), childInit);
         // Wrap proxy address around Child type
         child = ChildPeer(address(childProxy));
 

@@ -15,9 +15,7 @@ import {ChildPeer} from "../../src/peers/ChildPeer.sol";
 import {StrategyRegistry} from "../../src/modules/StrategyRegistry.sol";
 import {AaveV3Adapter} from "../../src/adapters/AaveV3Adapter.sol";
 import {CompoundV3Adapter} from "../../src/adapters/CompoundV3Adapter.sol";
-import {ShareProxy} from "../../src/proxies/ShareProxy.sol";
-import {ChildProxy} from "../../src/proxies/ChildProxy.sol";
-import {StrategyRegistryProxy} from "../../src/proxies/StrategyRegistryProxy.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /// @title DeployChild
 /// @notice Deployment script for the Child architecture
@@ -76,7 +74,7 @@ contract DeployChild is Script {
 
         // Create Share Proxy init data and deploy Proxy
         bytes memory shareInitData = abi.encodeWithSelector(Share.initialize.selector);
-        ShareProxy shareProxy = new ShareProxy(address(shareImpl), shareInitData);
+        ERC1967Proxy shareProxy = new ERC1967Proxy(address(shareImpl), shareInitData);
 
         // Cast Proxy address to Share type
         deploy.share = Share(address(shareProxy));
@@ -115,7 +113,7 @@ contract DeployChild is Script {
 
         // Create ChildPeer Proxy init data and deploy Proxy
         bytes memory childInitData = abi.encodeWithSelector(ChildPeer.initialize.selector);
-        ChildProxy childProxy = new ChildProxy(address(childPeerImpl), childInitData);
+        ERC1967Proxy childProxy = new ERC1967Proxy(address(childPeerImpl), childInitData);
 
         // Cast Proxy address to ChildPeer type
         deploy.childPeer = ChildPeer(address(childProxy));
@@ -132,8 +130,7 @@ contract DeployChild is Script {
 
         // Create Strategy Registry Proxy init data and deploy Proxy
         bytes memory strategyRegistryInitData = abi.encodeWithSelector(StrategyRegistry.initialize.selector);
-        StrategyRegistryProxy strategyRegistryProxy =
-            new StrategyRegistryProxy(address(strategyRegistryImpl), strategyRegistryInitData);
+        ERC1967Proxy strategyRegistryProxy = new ERC1967Proxy(address(strategyRegistryImpl), strategyRegistryInitData);
 
         // Cast Proxy address to StrategyRegistry type
         deploy.strategyRegistry = StrategyRegistry(address(strategyRegistryProxy));

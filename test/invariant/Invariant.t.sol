@@ -26,11 +26,7 @@ import {CompoundV3Adapter} from "../../src/adapters/CompoundV3Adapter.sol";
 import {StrategyRegistry} from "../../src/modules/StrategyRegistry.sol";
 import {IStrategyAdapter} from "../../src/interfaces/IStrategyAdapter.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ShareProxy} from "../../src/proxies/ShareProxy.sol";
-import {ParentProxy} from "../../src/proxies/ParentProxy.sol";
-import {ChildProxy} from "../../src/proxies/ChildProxy.sol";
-import {RebalancerProxy} from "../../src/proxies/RebalancerProxy.sol";
-import {StrategyRegistryProxy} from "../../src/proxies/StrategyRegistryProxy.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /// @notice We are making the assumption that the gasLimit set for CCIP works correctly
 contract Invariant is StdInvariant, BaseTest {
@@ -157,15 +153,15 @@ contract Invariant is StdInvariant, BaseTest {
         aavePool = IPoolAddressesProvider(networkConfig.protocols.aavePoolAddressesProvider).getPool();
         ccipRouter = new ManualMockRouter();
 
-        // Prepare Strategy Registry Implementation (passed to deploy helpers)
-        StrategyRegistry registryImpl = new StrategyRegistry();
+        // Create init data for ChildPeer and Strategy Registry (used by multiple peers)
+        bytes memory childInit = abi.encodeWithSelector(ChildPeer.initialize.selector);
         bytes memory registryInit = abi.encodeWithSelector(StrategyRegistry.initialize.selector);
 
         // Deploy Rebalancer, Parent & Children
         _deployRebalancer();
-        _deployParentInfra(address(registryImpl), registryInit);
-        _deployChild1Infra(address(registryImpl), registryInit);
-        _deployChild2Infra(address(registryImpl), registryInit);
+        _deployParentInfra(registryInit);
+        _deployChild1Infra(childInit, registryInit);
+        _deployChild2Infra(childInit, registryInit);
 
         // Roles & Liquidity
         /// @dev Grant Share Roles to Proxies (prank Share owner)
@@ -187,14 +183,12 @@ contract Invariant is StdInvariant, BaseTest {
         bytes memory rebalancerInit = abi.encodeWithSelector(Rebalancer.initialize.selector);
 
         // Deploy Rebalancer Proxy and cast to Rebalancer type
-        RebalancerProxy rebalancerProxy = new RebalancerProxy(address(rebalancerImpl), rebalancerInit);
+        ERC1967Proxy rebalancerProxy = new ERC1967Proxy(address(rebalancerImpl), rebalancerInit);
         rebalancer = Rebalancer(address(rebalancerProxy));
     }
 
     /// @dev _deployInfra:: Helper to deploy ParentPeer
-    /// @param registryImpl The strategy registry impl address
-    /// @param registryInit The strategy registry init data
-    function _deployParentInfra(address registryImpl, bytes memory registryInit) private {
+    function _deployParentInfra(bytes memory registryInit) private {
         // Deploy Parent Impl and create init data
         /// @dev since we are not forking mainnets, we will deploy contracts locally
         /// the deployed peers will interact via the ccip local simulator as if they were crosschain
@@ -209,7 +203,7 @@ contract Invariant is StdInvariant, BaseTest {
         bytes memory parentInit = abi.encodeWithSelector(ParentPeer.initialize.selector);
 
         // Deploy Parent Proxy and cast to ParentPeer type
-        ParentProxy parentProxy = new ParentProxy(address(parentImpl), parentInit);
+        ERC1967Proxy parentProxy = new ERC1967Proxy(address(parentImpl), parentInit);
         parent = ParentPeer(address(parentProxy));
 
         // Connect Rebalancer & Parent
@@ -217,9 +211,12 @@ contract Invariant is StdInvariant, BaseTest {
         parent.setRebalancer(address(rebalancer));
         rebalancer.setParentPeer(address(parent));
 
-        // Deploy Registry & Adapters
-        StrategyRegistryProxy strategyRegistryProxy = new StrategyRegistryProxy(registryImpl, registryInit);
-        strategyRegistryParent = StrategyRegistry(address(strategyRegistryProxy));
+        // Deploy Strategy Registry Impl
+        StrategyRegistry parentStrategyRegistryImpl = new StrategyRegistry();
+
+        // Deploy Registry Proxy & Adapters
+        ERC1967Proxy parentStrategyRegistryProxy = new ERC1967Proxy(address(parentStrategyRegistryImpl), registryInit);
+        strategyRegistryParent = StrategyRegistry(address(parentStrategyRegistryProxy));
 
         // Set Rebalancer & Supported Protocols in ParentPeer
         /// @dev temp config admin role granted to deployer/owner to set necessary configs
@@ -246,9 +243,9 @@ contract Invariant is StdInvariant, BaseTest {
     }
 
     /// @dev _deployInfra:: Helper to deploy ChildPeer 1
-    /// @param registryImpl The strategy registry impl address
+    /// @param childInit The child peer init data
     /// @param registryInit The strategy registry init data
-    function _deployChild1Infra(address registryImpl, bytes memory registryInit) private {
+    function _deployChild1Infra(bytes memory childInit, bytes memory registryInit) private {
         // Deploy Proxy
         ChildPeer child1Impl = new ChildPeer(
             address(ccipRouter),
@@ -258,13 +255,15 @@ contract Invariant is StdInvariant, BaseTest {
             networkConfig.tokens.share,
             PARENT_SELECTOR
         );
-        bytes memory child1Init = abi.encodeWithSelector(ChildPeer.initialize.selector);
-        ChildProxy childProxy = new ChildProxy(address(child1Impl), child1Init);
+        ERC1967Proxy childProxy = new ERC1967Proxy(address(child1Impl), childInit);
         child1 = ChildPeer(address(childProxy)); /// @dev cast Proxy to ChildPeer type
 
+        // Deploy Strategy Registry Impl
+        StrategyRegistry child1StrategyRegistryImpl = new StrategyRegistry();
+
         // Deploy Registry & Adapters
-        StrategyRegistryProxy strategyRegistryProxy = new StrategyRegistryProxy(registryImpl, registryInit);
-        strategyRegistryChild1 = StrategyRegistry(address(strategyRegistryProxy));
+        ERC1967Proxy child1StrategyRegistryProxy = new ERC1967Proxy(address(child1StrategyRegistryImpl), registryInit);
+        strategyRegistryChild1 = StrategyRegistry(address(child1StrategyRegistryProxy));
 
         aaveV3AdapterChild1 = new AaveV3Adapter(address(child1), networkConfig.protocols.aavePoolAddressesProvider);
         compoundV3AdapterChild1 = new CompoundV3Adapter(address(child1), networkConfig.protocols.comet);
@@ -280,9 +279,9 @@ contract Invariant is StdInvariant, BaseTest {
     }
 
     /// @dev _deployInfra:: Helper to deploy ChildPeer 2
-    /// @param registryImpl The strategy registry impl address
+    /// @param childInit The child peer init data
     /// @param registryInit The strategy registry init data
-    function _deployChild2Infra(address registryImpl, bytes memory registryInit) private {
+    function _deployChild2Infra(bytes memory childInit, bytes memory registryInit) private {
         // Deploy Proxy
         ChildPeer child2Impl = new ChildPeer(
             address(ccipRouter),
@@ -292,21 +291,24 @@ contract Invariant is StdInvariant, BaseTest {
             networkConfig.tokens.share,
             PARENT_SELECTOR
         );
-        bytes memory child2Init = abi.encodeWithSelector(ChildPeer.initialize.selector);
-        ChildProxy childProxy = new ChildProxy(address(child2Impl), child2Init);
+        ERC1967Proxy childProxy = new ERC1967Proxy(address(child2Impl), childInit);
         child2 = ChildPeer(address(childProxy)); /// @dev cast Proxy to ChildPeer type
 
+        // Deploy Strategy Registry Impl
+        StrategyRegistry child2StrategyRegistryImpl = new StrategyRegistry();
+
         // Deploy Registry & Adapters
-        StrategyRegistryProxy strategyRegistryProxy = new StrategyRegistryProxy(registryImpl, registryInit);
-        strategyRegistryChild2 = StrategyRegistry(address(strategyRegistryProxy));
+        ERC1967Proxy child2StrategyRegistryProxy = new ERC1967Proxy(address(child2StrategyRegistryImpl), registryInit);
+        strategyRegistryChild2 = StrategyRegistry(address(child2StrategyRegistryProxy));
 
         aaveV3AdapterChild2 = new AaveV3Adapter(address(child2), networkConfig.protocols.aavePoolAddressesProvider);
         compoundV3AdapterChild2 = new CompoundV3Adapter(address(child2), networkConfig.protocols.comet);
 
+        // Set adapters in Registry
         strategyRegistryChild2.setStrategyAdapter(AAVE_V3_PROTOCOL_ID, address(aaveV3AdapterChild2));
         strategyRegistryChild2.setStrategyAdapter(COMPOUND_V3_PROTOCOL_ID, address(compoundV3AdapterChild2));
 
-        // Configure Child 2
+        // Set Registry to Child Peer
         child2.grantRole(Roles.CONFIG_ADMIN_ROLE, address(this));
         child2.setStrategyRegistry(address(strategyRegistryChild2));
         child2.revokeRole(Roles.CONFIG_ADMIN_ROLE, address(this));
