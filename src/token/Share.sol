@@ -17,7 +17,7 @@ import {IERC677Receiver} from "@chainlink/contracts/src/v0.8/shared/interfaces/I
 import {IBurnMintERC677Upgradeable, IERC20} from "./interfaces/IBurnMintERC677Upgradeable.sol";
 
 /// @title Share
-/// @author Judge Finance
+/// @author George Gorzhiye | Judge Finance
 /// @notice Upgradeable ERC677 token with access control
 /// @notice Deployer must grant mint and burn roles to (crosschain) Yield contracts
 contract Share is
@@ -31,12 +31,9 @@ contract Share is
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS
     //////////////////////////////////////////////////////////////*/
-    using EnumerableSet for EnumerableSet.AddressSet;
-
     /// @custom:storage-location erc7201:yieldcoin.storage.Share
     struct ShareStorage {
         address s_ccipAdmin;
-        mapping(bytes32 role => EnumerableSet.AddressSet) s_roleMembers;
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -55,6 +52,7 @@ contract Share is
     bytes32 private constant SHARE_STORAGE_LOCATION =
         0xe4963c679d07e6dc2d227d26eb05e3128d8de183944771ed5ba5665e6ea96200;
 
+    // @review built in here or in roles file?
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
     bytes32 public constant BURNER_ROLE = keccak256("BURNER_ROLE");
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
@@ -90,7 +88,7 @@ contract Share is
         __AccessControl_init();
         __AccessControlDefaultAdminRules_init(INITIAL_DEFAULT_ADMIN_ROLE_TRANSFER_DELAY, msg.sender);
         _grantRole(UPGRADER_ROLE, msg.sender);
-        _getShareStorage().s_ccipAdmin = msg.sender;
+        _getShareStorage().s_ccipAdmin = msg.sender; // @review ccipAdmin should be passed or transferred in deploy script
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -170,22 +168,6 @@ contract Share is
     /*//////////////////////////////////////////////////////////////
                                 INTERNAL
     //////////////////////////////////////////////////////////////*/
-    /// @inheritdoc AccessControlDefaultAdminRulesUpgradeable
-    function _grantRole(bytes32 role, address account) internal override returns (bool granted) {
-        granted = super._grantRole(role, account);
-        if (granted) {
-            _getShareStorage().s_roleMembers[role].add(account);
-        }
-    }
-
-    /// @inheritdoc AccessControlDefaultAdminRulesUpgradeable
-    function _revokeRole(bytes32 role, address account) internal override returns (bool revoked) {
-        revoked = super._revokeRole(role, account);
-        if (revoked) {
-            _getShareStorage().s_roleMembers[role].remove(account);
-        }
-    }
-
     /// @dev Disallows minting and transferring to address(this).
     function _update(address from, address to, uint256 value) internal virtual override notToSelf(to) {
         super._update(from, to, value);
@@ -242,12 +224,5 @@ contract Share is
     /// @notice Returns the current CCIPAdmin address
     function getCCIPAdmin() external view override returns (address) {
         return _getShareStorage().s_ccipAdmin;
-    }
-
-    /// @notice This function returns the members of a role
-    /// @param role The role to get the members of
-    /// @return roleMembers members of the role
-    function getRoleMembers(bytes32 role) public view returns (address[] memory) {
-        return _getShareStorage().s_roleMembers[role].values();
     }
 }

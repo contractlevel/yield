@@ -4,9 +4,6 @@ pragma solidity 0.8.26;
 import {BaseTest, Vm, Roles} from "../../BaseTest.t.sol";
 
 contract GrantRoleTest is BaseTest {
-    uint256 internal constant ROLE_MEMBER_EMPTY = 0; /// @dev count for getRoleMember - 0 since role index is initially empty
-    uint256 internal constant ROLE_MEMBER_INDEX = 0; /// @dev index used for getRoleMember - 0 since only one member is being added (to empty role index)
-    uint256 internal constant ROLE_MEMBER_COUNT = 1; /// @dev count used for getRoleMemberCount - 1 since only one member is being added (to empty role index)
     bytes32 internal constant DEFAULT_ADMIN_ROLE = 0x00;
 
     address newConfigAdmin = makeAddr("newConfigAdmin");
