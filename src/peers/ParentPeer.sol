@@ -107,7 +107,7 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer, IParentPeer {
     /// @dev Revert if amountToDeposit is less than 1e6 (1 USDC)
     /// @dev Revert if not called through a proxy
     /// @dev Revert if peer is paused
-    function deposit(uint256 amountToDeposit) external override(YieldPeer, IYieldPeer) whenNotPaused {
+    function deposit(uint256 amountToDeposit) external override(YieldPeer, IYieldPeer) nonReentrant whenNotPaused {
         /// @dev takes a fee
         amountToDeposit = _initiateDeposit(amountToDeposit);
 
@@ -170,6 +170,7 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer, IParentPeer {
     )
         external
         override(YieldPeer)
+        nonReentrant
         whenNotPaused
         onlyProxy
     {
@@ -247,7 +248,7 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer, IParentPeer {
     /// - CcipTxType DepositCallbackParent: A tx from the strategy to parent to calculate shareMintAmount and mint shares to the depositor on this chain or another child chain
     /// - CcipTxType WithdrawToParent: A tx from the withdraw chain to forward to the strategy chain
     /// - CcipTxType WithdrawCallback: A tx from the strategy chain to send USDC to the withdrawer
-    /// - CcipTxType RebalanceNewStrategy: A tx from the old strategy, sending rebalanced funds to the new strategy
+    /// - CcipTxType RebalanceToNewStrategy: A tx from the old strategy, sending rebalanced funds to the new strategy
     /// @param tokenAmounts The token amounts received in the CCIP message
     /// @param data The data received in the CCIP message
     /// @param sourceChainSelector The chain selector of the chain where the message originated from
@@ -266,7 +267,7 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer, IParentPeer {
         if (txType == CcipTxType.WithdrawPingPong) _handleCCIPWithdrawPingPong(data);
         if (txType == CcipTxType.WithdrawCallback) _handleCCIPWithdrawCallback(tokenAmounts, data);
         //slither-disable-next-line reentrancy-events
-        if (txType == CcipTxType.RebalanceNewStrategy) _handleCCIPRebalanceNewStrategy(tokenAmounts, data);
+        if (txType == CcipTxType.RebalanceToNewStrategy) _handleCCIPRebalanceToNewStrategy(tokenAmounts, data);
     }
 
     /// @notice This function handles a deposit from a child to this parent and the 2 strategy cases:
@@ -494,7 +495,7 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer, IParentPeer {
 
         if (totalValue != 0) totalValue = _withdrawFromStrategy(oldActiveStrategyAdapter, type(uint256).max);
 
-        _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, abi.encode(newStrategy), totalValue);
+        _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceToNewStrategy, abi.encode(newStrategy), totalValue);
     }
 
     /// @dev Handle rebalancing on a child chain by sending it new Strategy info
@@ -502,7 +503,7 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer, IParentPeer {
     /// @param oldChainSelector The chain selector of the old strategy
     /// @param newStrategy The new strategy
     function _rebalanceChildToOther(uint64 oldChainSelector, Strategy memory newStrategy) internal {
-        _ccipSend(oldChainSelector, CcipTxType.RebalanceOldStrategy, abi.encode(newStrategy), ZERO_BRIDGE_AMOUNT);
+        _ccipSend(oldChainSelector, CcipTxType.RebalanceFromOldStrategy, abi.encode(newStrategy), ZERO_BRIDGE_AMOUNT);
     }
 
     /// @notice Authorizes an upgrade to a new implementation

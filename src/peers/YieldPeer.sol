@@ -12,6 +12,7 @@ import {PausableUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/Pau
 import {
     AccessControlDefaultAdminRulesUpgradeable
 } from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
 import {IShare} from "../interfaces/IShare.sol";
 import {IYieldPeer} from "../interfaces/IYieldPeer.sol";
@@ -31,10 +32,11 @@ abstract contract YieldPeer is
     IAny2EVMMessageReceiver,
     CCIPReceiver,
     PausableUpgradeable,
-    // AccessControlDefaultAdminRulesUpgradeable,
+    AccessControlDefaultAdminRulesUpgradeable,
     IERC677Receiver,
     IYieldPeer,
-    YieldFees
+    YieldFees,
+    ReentrancyGuardTransient
 {
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS
@@ -264,7 +266,9 @@ abstract contract YieldPeer is
     /// @dev Deposits USDC totalValue of the system into the new strategy
     /// @param tokenAmounts The token amounts received in the CCIP message
     /// @param data The data to decode - decodes to Strategy (chainSelector, protocolId)
-    function _handleCCIPRebalanceNewStrategy(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data) internal {
+    function _handleCCIPRebalanceToNewStrategy(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data)
+        internal
+    {
         /// @dev update strategy pool to protocol on this chain
         Strategy memory newStrategy = abi.decode(data, (Strategy));
         address newActiveStrategyAdapter =

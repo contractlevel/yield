@@ -44,7 +44,7 @@ contract CompoundV3Adapter is StrategyAdapter {
     /// @param usdc The USDC token address
     /// @param amount The amount of USDC to deposit
     /// @dev Deposits the USDC to the Compound V3 pool
-    function deposit(address usdc, uint256 amount) external onlyYieldPeer {
+    function deposit(address usdc, uint256 amount) external nonReentrant onlyYieldPeer {
         emit Deposit(usdc, amount);
 
         IERC20(usdc).safeIncreaseAllowance(i_comet, amount);
@@ -57,7 +57,12 @@ contract CompoundV3Adapter is StrategyAdapter {
     /// @return actualWithdrawnAmount The actual withdrawn amount
     /// @dev Transfers the actual withdrawn amount to the yield peer
     /// @dev Prevents borrowing by ensuring amount <= balance when not using MAX sentinel
-    function withdraw(address usdc, uint256 amount) external onlyYieldPeer returns (uint256 actualWithdrawnAmount) {
+    function withdraw(address usdc, uint256 amount)
+        external
+        nonReentrant
+        onlyYieldPeer
+        returns (uint256 actualWithdrawnAmount)
+    {
         // Get balance before withdraw to calculate actual withdrawn amount
         uint256 balanceBefore = IERC20(usdc).balanceOf(address(this));
 

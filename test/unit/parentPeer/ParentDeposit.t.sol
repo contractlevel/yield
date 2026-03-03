@@ -281,7 +281,7 @@ contract ParentDepositTest is BaseTest {
         assertEq(activeStrategyAdapter, address(baseAaveV3Adapter), "ActiveStrategyAdapter should be Aave adapter");
 
         /// @dev Simulate the rebalance window: manually set activeStrategyAdapter to 0
-        /// @dev This simulates the state where s_strategy was updated but _handleCCIPRebalanceNewStrategy hasn't been called yet
+        /// @dev This simulates the state where s_strategy was updated but _handleCCIPRebalanceToNewStrategy hasn't been called yet
         stdstore.target(address(baseParentPeer)).sig("getActiveStrategyAdapter()").checked_write(address(0));
 
         /// @dev Verify activeStrategyAdapter is now 0
