@@ -952,7 +952,7 @@ rule rebalance_handles_rebalanceParentToChild() {
     require ghost_ccipMessageSent_eventCount == 0;
     rebalance(e, newStrategy);
     assert ghost_ccipMessageSent_eventCount == 1;
-    assert ghost_ccipMessageSent_txType_emitted == 8; // RebalanceNewStrategy
+    assert ghost_ccipMessageSent_txType_emitted == 8; // RebalanceToNewStrategy
     assert ghost_ccipMessageSent_bridgeAmount_emitted == totalValue;
 
     assert usdc.balanceOf(strategyPool) == strategyPoolBalanceBefore - totalValue;
@@ -972,7 +972,7 @@ rule rebalance_handles_rebalanceChildToOther() {
     require ghost_ccipMessageSent_eventCount == 0;
     rebalance(e, newStrategy);
     assert ghost_ccipMessageSent_eventCount == 1;
-    assert ghost_ccipMessageSent_txType_emitted == 7; // RebalanceOldStrategy
+    assert ghost_ccipMessageSent_txType_emitted == 7; // RebalanceFromOldStrategy
     assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;
 }
 

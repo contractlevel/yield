@@ -251,7 +251,7 @@ abstract contract YieldPeer is
     /// @dev Deposits USDC totalValue of the system into the new strategy
     /// @param tokenAmounts The token amounts received in the CCIP message
     /// @param data The data to decode - decodes to Strategy (chainSelector, protocolId)
-    function _handleCCIPRebalanceNewStrategy(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data) internal {
+    function _handleCCIPRebalanceToNewStrategy(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data) internal {
         /// @dev update strategy pool to protocol on this chain
         Strategy memory newStrategy = abi.decode(data, (Strategy));
         address newActiveStrategyAdapter =

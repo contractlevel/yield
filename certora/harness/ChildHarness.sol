@@ -30,8 +30,8 @@ contract ChildHarness is ChildPeer, HelperHarness {
         _handleCCIPWithdrawToStrategy(data);
     }
 
-    function handleCCIPRebalanceOldStrategy(bytes memory data) public {
-        _handleCCIPRebalanceOldStrategy(data);
+    function handleCCIPRebalanceFromOldStrategy(bytes memory data) public {
+        _handleCCIPRebalanceFromOldStrategy(data);
     }
 
     function handleCCIPMessage(

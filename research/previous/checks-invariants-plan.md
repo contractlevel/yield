@@ -33,7 +33,7 @@ Both adapters now handle two cases:
 Now passing `type(uint256).max` instead of `totalValue` during rebalancing. The return value from `_withdrawFromStrategy` is now captured and used in:
 - `ParentPeer._rebalanceParentToParent`
 - `ParentPeer._rebalanceParentToChild`
-- `ChildPeer._handleCCIPRebalanceOldStrategy`
+- `ChildPeer._handleCCIPRebalanceFromOldStrategy`
 
 **4. Existing Invariant**
 
