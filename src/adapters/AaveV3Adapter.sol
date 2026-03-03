@@ -45,7 +45,7 @@ contract AaveV3Adapter is StrategyAdapter {
     /// @param usdc The USDC token address
     /// @param amount The amount of USDC to deposit
     /// @dev Deposits the USDC to the Aave V3 pool
-    function deposit(address usdc, uint256 amount) external onlyYieldPeer {
+    function deposit(address usdc, uint256 amount) external onlyYieldPeer nonReentrant {
         emit Deposit(usdc, amount);
 
         address aavePool = _getAavePool();
@@ -58,7 +58,12 @@ contract AaveV3Adapter is StrategyAdapter {
     /// @param amount The amount of USDC to withdraw (use type(uint256).max to withdraw all)
     /// @return actualWithdrawnAmount The actual withdrawn amount
     /// @dev Transfers the actual withdrawn amount to the yield peer
-    function withdraw(address usdc, uint256 amount) external onlyYieldPeer returns (uint256 actualWithdrawnAmount) {
+    function withdraw(address usdc, uint256 amount)
+        external
+        onlyYieldPeer
+        nonReentrant
+        returns (uint256 actualWithdrawnAmount)
+    {
         address aavePool = _getAavePool();
 
         // Case 1: Rebalance Withdraw (MAX sentinel)

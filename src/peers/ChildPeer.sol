@@ -53,7 +53,7 @@ contract ChildPeer is YieldPeer {
     /// @dev Revert if amountToDeposit is less than 1e6 (1 USDC)
     /// @dev Revert if peer is paused
     /// @notice User must approve this contract to spend their stablecoin
-    function deposit(uint256 amountToDeposit) external override whenNotPaused {
+    function deposit(uint256 amountToDeposit) external override whenNotPaused nonReentrant {
         /// @dev takes a fee
         /// same var name ==== confusing!
         amountToDeposit = _initiateDeposit(amountToDeposit);
@@ -94,6 +94,7 @@ contract ChildPeer is YieldPeer {
         external
         override
         whenNotPaused
+        nonReentrant
     {
         _revertIfMsgSenderIsNotShare();
         _revertIfZeroAmount(shareBurnAmount);

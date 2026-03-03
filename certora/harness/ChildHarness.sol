@@ -47,4 +47,9 @@ contract ChildHarness is ChildPeer, HelperHarness {
     function calculateFee(uint256 stablecoinDepositAmount) public view returns (uint256) {
         return _calculateFee(stablecoinDepositAmount);
     }
+
+    // @review:certora this can be modularized across peer harnesses
+    function isReentrancyGuardLocked() public view returns (bool) {
+        return _reentrancyGuardEntered();
+    }
 }

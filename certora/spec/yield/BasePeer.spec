@@ -14,8 +14,6 @@ methods {
     function getThisChainSelector() external returns (uint64) envfree;
     function getActiveStrategyAdapter() external returns (address) envfree;
     function getMaxFeeRate() external returns (uint256) envfree;
-    
-    // PausableWithAccessControl methods
     function owner() external returns (address) envfree;
     function paused() external returns (bool) envfree;  
     function hasRole(bytes32, address) external returns (bool) envfree;
@@ -37,6 +35,7 @@ methods {
     function bytes32ToBool(bytes32 value) external returns (bool) envfree;
     function bytes32ToAddress(bytes32 value) external returns (address) envfree;
     function addressToBytes32(address value) external returns (bytes32) envfree;
+    function isReentrancyGuardLocked() external returns (bool) envfree;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -428,6 +427,7 @@ rule deposit_revertsWhen_paused() {
     /// @dev revert conditions not being verified
     require amountToDeposit >= 1000000, "amountToDeposit must be greater than or equal to 1e6";
     require e.msg.value == 0;
+    require isReentrancyGuardLocked() == false;
 
     deposit@withrevert(e, amountToDeposit);
     assert lastReverted;
@@ -443,10 +443,27 @@ rule deposit_revertsWhen_amountLessThan1e6() {
     /// @dev revert conditions not being verified
     require e.msg.value == 0;
     require !paused();
+    require isReentrancyGuardLocked() == false;
 
     deposit@withrevert(e, amountToDeposit);
     assert lastReverted;
 }
+
+rule deposit_revertsWhen_reentrant() {
+      env e;
+      uint256 amountToDeposit;
+
+      /// @dev revert condition being verified
+      require isReentrancyGuardLocked() == true;
+
+      /// @dev revert conditions not being verified
+      require e.msg.value == 0;
+      require !paused();
+      require amountToDeposit >= 1000000;
+
+      deposit@withrevert(e, amountToDeposit);
+      assert lastReverted;
+  }
 
 rule deposit_transfersUsdcFromMsgSender() {
     env e;
@@ -487,6 +504,7 @@ rule onTokenTransfer_revertsWhen_paused() {
     require e.msg.value == 0;
     require shareBurnAmount > 0;
     require getAllowedChain(chainSelector) || chainSelector == getThisChainSelector();
+    require isReentrancyGuardLocked() == false;
 
     /// @dev action
     onTokenTransfer@withrevert(e, withdrawer, shareBurnAmount, encodedWithdrawChainSelector);
@@ -510,6 +528,7 @@ rule onTokenTransfer_revertsWhen_msgSenderIsNotShare() {
     require !paused();
     require shareBurnAmount > 0;
     require getAllowedChain(chainSelector) || chainSelector == getThisChainSelector();
+    require isReentrancyGuardLocked() == false;
 
     /// @dev action
     onTokenTransfer@withrevert(e, withdrawer, shareBurnAmount, encodedWithdrawChainSelector);
@@ -533,10 +552,30 @@ rule onTokenTransfer_revertsWhen_zeroAmount() {
     require getAllowedChain(chainSelector) || chainSelector == getThisChainSelector();
     require e.msg.value == 0;
     require !paused();
+    require isReentrancyGuardLocked() == false;
 
     onTokenTransfer@withrevert(e, withdrawer, shareBurnAmount, encodedWithdrawChainSelector); 
     assert lastReverted;
 }
+
+rule onTokenTransfer_revertsWhen_reentrant() {
+      env e;
+      address withdrawer;
+      uint256 shareBurnAmount;
+      bytes encodedWithdrawChainSelector;
+
+      /// @dev revert condition being verified
+      require isReentrancyGuardLocked() == true;
+
+      /// @dev revert conditions not being verified
+      require e.msg.value == 0;
+      require !paused();
+      require shareBurnAmount > 0;
+      require e.msg.sender == currentContract.i_share;
+
+      onTokenTransfer@withrevert(e, withdrawer, shareBurnAmount, encodedWithdrawChainSelector);
+      assert lastReverted;
+  }
 
 rule onTokenTransfer_emits_WithdrawInitiated_and_SharesBurned() {
     env e;

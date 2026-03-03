@@ -12,6 +12,7 @@ import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 import {
     AccessControlDefaultAdminRules
 } from "@openzeppelin/contracts/access/extensions/AccessControlDefaultAdminRules.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
 
 import {IShare} from "../interfaces/IShare.sol";
 import {IYieldPeer} from "../interfaces/IYieldPeer.sol";
@@ -29,10 +30,11 @@ abstract contract YieldPeer is
     IAny2EVMMessageReceiver,
     CCIPReceiver,
     Pausable,
-    // AccessControlDefaultAdminRules,
+    AccessControlDefaultAdminRules,
     IERC677Receiver,
     IYieldPeer,
-    YieldFees
+    YieldFees,
+    ReentrancyGuardTransient
 {
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS

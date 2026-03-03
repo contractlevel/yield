@@ -10,4 +10,9 @@ contract AaveV3AdapterHarness is AaveV3Adapter, HelperHarness {
         address yieldPeer,
         address aavePoolAddressesProvider
     ) AaveV3Adapter(yieldPeer, aavePoolAddressesProvider) {}
+
+    // @review:certora this can be modularized across adapter harnesses
+    function isReentrancyGuardLocked() public view returns (bool) {
+        return _reentrancyGuardEntered();
+    }
 }
