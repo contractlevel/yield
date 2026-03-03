@@ -212,6 +212,7 @@ enum CcipTxType {
 ```
 
 **Important notes on integer values:**
+
 - `WithdrawCallback` (6) is renamed to `WithdrawCallbackChild` but keeps integer value 6. Any in-flight CCIP messages with value 6 are unaffected.
 - `RebalanceFromOldStrategy`, `RebalanceToNewStrategy`, `DepositPingPong`, and `WithdrawPingPong` each shift up by 1. Certora specs use hardcoded integers for these — all occurrences must be updated.
 
@@ -277,10 +278,11 @@ enum CcipTxType {
    emit WithdrawCompleted(...)
 ```
 
-### New Flow: ChildPeer initiated, same chain is strategy — same-chain optimisation (Scenario C)
+### New Flow: ChildPeer initiated, same chain is strategy (Scenario C)
 
-When `withdrawData.chainSelector == i_thisChainSelector` on the strategy child, USDC stays
-in that child — it does not need to bounce to parent and back.
+USDC is always bridged to parent immediately — there is no same-chain shortcut. Although
+`withdrawData.chainSelector == i_thisChainSelector`, USDC follows the same path as all
+other child-initiated withdrawals. See Known Issue #5 for the gas/cost trade-off.
 
 ```
 1. ChildPeer A.onTokenTransfer()
@@ -298,30 +300,22 @@ in that child — it does not need to bounce to parent and back.
 
 4. ChildPeer A._handleCCIPWithdrawToStrategy()
    _withdrawFromStrategyAndGetUsdcWithdrawAmount(...)
-   USDC now sits in Child A's contract balance
-   i_thisChainSelector == withdrawData.chainSelector ← same-chain optimisation
-   _ccipSend(i_parentChainSelector, WithdrawCallbackParent, withdrawData, ZERO_BRIDGE_AMOUNT)
-   (no USDC bridged — it stays in Child A)
+   USDC bridged to parent immediately (never held in peer balance)
+   _ccipSend(i_parentChainSelector, WithdrawCallbackParent, withdrawData, usdcWithdrawAmount)
 
 5. ParentPeer._handleCCIPWithdrawCallbackParent()
    s_totalShares -= withdrawData.shareBurnAmount
    emit ShareBurnUpdate(...)
    withdrawData.chainSelector != i_thisChainSelector (Child A != parent)
-   tokenAmounts.length == 0 (no USDC was bridged) → bridgeAmount = ZERO_BRIDGE_AMOUNT
-   _ccipSend(Child A, WithdrawCallbackChild, withdrawData, ZERO_BRIDGE_AMOUNT)
+   CCIPOperations._validateTokenAmounts(tokenAmounts, usdc, usdcWithdrawAmount)
+   _ccipSend(Child A, WithdrawCallbackChild, withdrawData, usdcWithdrawAmount)
 
 6. ChildPeer A._handleCCIPWithdrawCallbackChild()
-   tokenAmounts.length == 0 → skip _validateTokenAmounts
+   CCIPOperations._validateTokenAmounts(tokenAmounts, usdc, usdcWithdrawAmount)
    _burnShares(withdrawData.withdrawer, withdrawData.shareBurnAmount)
    _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount)
-   (from Child A's local balance — withdrawn in step 4)
    emit WithdrawCompleted(...)
 ```
-
-**Why is the USDC safe during the parent round-trip?**
-The rebalance flow (`_handleCCIPRebalanceFromOldStrategy`) drains from the strategy
-adapter (Aave/Compound), not from the peer contract's USDC balance. The withdrawn
-USDC sits in the peer contract's balance, untouched by rebalance.
 
 ### New Flow: ParentPeer initiated, strategy is a child (Scenario E)
 
@@ -387,12 +381,10 @@ _burnShares(withdrawer, shareBurnAmount);
 
 #### `_handleCCIPWithdrawToStrategy()`
 
-Replace the existing body with the same-chain optimisation: if
-`withdrawData.chainSelector == i_thisChainSelector`, USDC stays in the child — send
-`WithdrawCallbackParent` with `ZERO_BRIDGE_AMOUNT`. Otherwise bridge the USDC with the
-message to parent.
-
-The old direct-transfer local path (`if (i_thisChainSelector == withdrawData.chainSelector) _transferUsdcTo(...)`) is removed — we always route through parent now for state update.
+Replace the existing body. USDC is always bridged to parent with `WithdrawCallbackParent`,
+regardless of whether the withdraw chain is this chain or another. The old direct-transfer
+local path (`if (i_thisChainSelector == withdrawData.chainSelector) _transferUsdcTo(...)`)
+is removed entirely.
 
 ```solidity
 function _handleCCIPWithdrawToStrategy(bytes memory data) internal {
@@ -401,17 +393,11 @@ function _handleCCIPWithdrawToStrategy(bytes memory data) internal {
     if (activeStrategyAdapter != address(0)) {
         withdrawData.usdcWithdrawAmount =
             _withdrawFromStrategyAndGetUsdcWithdrawAmount(activeStrategyAdapter, withdrawData);
-
-        // Same-chain optimisation: if withdraw chain == this chain, USDC stays here.
-        // No need to bridge USDC to parent and back. Parent only needs the state message.
-        bool sameChain = i_thisChainSelector == withdrawData.chainSelector;
-        uint256 bridgeAmount = sameChain ? ZERO_BRIDGE_AMOUNT : withdrawData.usdcWithdrawAmount;
-
         _ccipSend(
             i_parentChainSelector,
             CcipTxType.WithdrawCallbackParent,
             abi.encode(withdrawData),
-            bridgeAmount
+            withdrawData.usdcWithdrawAmount
         );
     } else {
         emit WithdrawPingPongToParent(withdrawData.shareBurnAmount);
@@ -424,25 +410,21 @@ function _handleCCIPWithdrawToStrategy(bytes memory data) internal {
 
 #### New `_handleCCIPWithdrawCallbackChild()`
 
-Receives `WithdrawCallbackChild` from parent. Burns shares (held in this contract).
-Transfers USDC to user — whether USDC came via CCIP token transfer (cross-chain case)
-or is sitting in the contract already (same-chain optimisation case). The child doesn't
-need to distinguish: the USDC is in its balance either way.
+Receives `WithdrawCallbackChild` from parent. Burns shares (held in this contract since
+`onTokenTransfer`). USDC always arrives via CCIP token transfer when `usdcWithdrawAmount > 0`.
 
 ```solidity
 /// @notice Handles the CCIP message for a withdraw callback to this child chain
 /// @notice Burns shares (held in this contract since onTokenTransfer) and sends USDC to withdrawer
-/// @notice USDC is in this contract either from CCIP token transfer (cross-chain) or from a
-///         local strategy withdrawal (same-chain optimisation — withdrawData.chainSelector == i_thisChainSelector)
-/// @param tokenAmounts The token amounts in the message (empty for same-chain optimisation)
+/// @notice USDC always arrives via CCIP token transfer when usdcWithdrawAmount > 0
+/// @param tokenAmounts The token amounts in the message
 /// @param data The message data - decodes to WithdrawData
 function _handleCCIPWithdrawCallbackChild(
     Client.EVMTokenAmount[] memory tokenAmounts,
     bytes memory data
 ) internal {
     WithdrawData memory withdrawData = _decodeWithdrawData(data);
-    // Only validate if USDC was bridged with this message (cross-chain case)
-    if (tokenAmounts.length > 0) {
+    if (withdrawData.usdcWithdrawAmount != 0) {
         CCIPOperations._validateTokenAmounts(tokenAmounts, address(i_usdc), withdrawData.usdcWithdrawAmount);
     }
     _burnShares(withdrawData.withdrawer, withdrawData.shareBurnAmount);
@@ -533,8 +515,8 @@ either: completes the withdrawal locally (if parent is the withdraw chain), or f
 ```solidity
 /// @notice Handles the CCIP callback from a child strategy confirming withdrawal succeeded
 /// @notice Updates s_totalShares and either completes locally or forwards to withdraw chain
-/// @param tokenAmounts The token amounts (USDC) — present if strategy != withdraw chain,
-///         empty for the same-chain optimisation (strategy == withdraw chain == child)
+/// @notice USDC always arrives via CCIP token transfer when usdcWithdrawAmount > 0
+/// @param tokenAmounts The token amounts (USDC)
 /// @param data The message data - decodes to WithdrawData
 function _handleCCIPWithdrawCallbackParent(
     Client.EVMTokenAmount[] memory tokenAmounts,
@@ -555,13 +537,16 @@ function _handleCCIPWithdrawCallbackParent(
         }
         emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
     } else {
-        // Withdraw chain is a child: forward to it
-        // Bridge USDC only if it came with this message (non-zero tokenAmounts)
-        uint256 bridgeAmount = tokenAmounts.length > 0 ? tokenAmounts[0].amount : ZERO_BRIDGE_AMOUNT;
-        if (bridgeAmount > 0) {
+        // Withdraw chain is a child: validate USDC and forward
+        if (withdrawData.usdcWithdrawAmount != 0) {
             CCIPOperations._validateTokenAmounts(tokenAmounts, address(i_usdc), withdrawData.usdcWithdrawAmount);
         }
-        _ccipSend(withdrawData.chainSelector, CcipTxType.WithdrawCallbackChild, data, bridgeAmount);
+        _ccipSend(
+            withdrawData.chainSelector,
+            CcipTxType.WithdrawCallbackChild,
+            data,
+            withdrawData.usdcWithdrawAmount
+        );
     }
 }
 ```
@@ -631,21 +616,24 @@ function _handleCCIPWithdrawToStrategy(bytes memory data) internal {
                 returns (uint256 actualWithdrawn)
             {
                 withdrawData.usdcWithdrawAmount = actualWithdrawn;
-                bool sameChain = i_thisChainSelector == withdrawData.chainSelector;
-                uint256 bridgeAmount = sameChain ? ZERO_BRIDGE_AMOUNT : actualWithdrawn;
                 _ccipSend(
                     i_parentChainSelector,
                     CcipTxType.WithdrawCallbackParent,
                     abi.encode(withdrawData),
-                    bridgeAmount
+                    actualWithdrawn
                 );
             } catch {
-                _ccipSend(
-                    withdrawData.chainSelector,
-                    CcipTxType.WithdrawFail,
-                    abi.encode(withdrawData),
-                    ZERO_BRIDGE_AMOUNT
-                );
+                // If the withdraw chain is this chain, cannot CCIP to self — return shares directly
+                if (withdrawData.chainSelector == i_thisChainSelector) {
+                    i_share.transfer(withdrawData.withdrawer, withdrawData.shareBurnAmount);
+                } else {
+                    _ccipSend(
+                        withdrawData.chainSelector,
+                        CcipTxType.WithdrawFail,
+                        abi.encode(withdrawData),
+                        ZERO_BRIDGE_AMOUNT
+                    );
+                }
             }
         } else {
             // usdcWithdrawAmount == 0: treat as success — see known issues
@@ -904,6 +892,15 @@ withdrawals are in flight simultaneously, both may capture the same `totalShares
 leading to slightly over-proportional USDC calculations. In practice this is bounded by
 the liquidity in Aave/Compound (which is deep). Phase 2's try/catch is the safety net for
 the extreme case where the pool cannot satisfy both withdrawals.
+
+### 5. Same-chain withdrawal incurs extra CCIP hops (gas/cost trade-off)
+
+When the strategy and withdraw chain are the same child (Scenario C), the withdrawal
+now makes 4 CCIP hops: Child A→Parent, Parent→Child A, Child A→Parent (with USDC),
+Parent→Child A (with USDC). A same-chain optimisation could reduce this to 2 hops by
+holding USDC locally during the parent round-trip. This was deliberately removed for code
+simplicity and to keep a uniform code path for all child-initiated withdrawals. If CCIP
+costs become a concern for this scenario, the optimisation can be reintroduced.
 
 ### 4. Rebalance paths do not use try/catch (future work)
 
