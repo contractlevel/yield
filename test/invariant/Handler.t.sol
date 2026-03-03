@@ -112,6 +112,7 @@ contract Handler is Events {
 
         vm.prank(rebalancer.owner());
         rebalancer.setKeystoneForwarder(forwarder);
+        vm.stopPrank();
 
         parentChainSelector = parent.getThisChainSelector();
         child1ChainSelector = child1.getThisChainSelector();
@@ -510,6 +511,7 @@ contract Handler is Events {
         parent.deposit(INITIAL_DEPOSIT_AMOUNT);
         _handleLogs();
         _updateDepositStateGhosts(admin, INITIAL_DEPOSIT_AMOUNT);
+        _stopPrank();
     }
 
     /// @notice deal USDC to the pools to ensure they have enough liquidity and we dont get insufficient balance errors
