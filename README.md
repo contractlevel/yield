@@ -221,8 +221,8 @@ CCIP faciliates secure crosschain communication and value transfer for rebalance
 - **4 - WithdrawToParent**: A withdraw from a `ChildPeer` to the `ParentPeer`. This forwards the withdrawal to the active strategy and updates `s_totalShares` to reflect the amount of YieldCoin burned when initiating the withdrawal.
 - **5 - WithdrawToStrategy**: A withdraw from the `ParentPeer` to the active Strategy. This calculates the `usdcWithdrawAmount` and withdraws it from the active Strategy.
 - **6 - WithdrawCallback**: A callback from the active Strategy to the withdraw chain. This sends the withdrawn USDC to the withdrawer.
-- **7 - RebalanceOldStrategy**: A message from the `ParentPeer` to the old Strategy. This is to withdraw funds from the old Strategy to move to the new Strategy.
-- **8 - RebalanceNewStrategy**: A value transfer from the old Strategy to the new Strategy. This is to deposit funds into the new Strategy.
+- **7 - RebalanceFromOldStrategy**: A message from the `ParentPeer` to the old Strategy. This is to withdraw funds from the old Strategy to move to the new Strategy.
+- **8 - RebalanceToNewStrategy**: A value transfer from the old Strategy to the new Strategy. This is to deposit funds into the new Strategy.
 
 ## Transaction Flows
 
