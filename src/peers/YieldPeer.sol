@@ -37,6 +37,7 @@ abstract contract YieldPeer is
                                  ERRORS
     //////////////////////////////////////////////////////////////*/
     error YieldPeer__OnlyShare();
+    error YieldPeer__OnlySelf();
     error YieldPeer__ChainNotAllowed(uint64 chainSelector);
     error YieldPeer__PeerNotAllowed(address peer);
     error YieldPeer__NoZeroAmount();
@@ -77,6 +78,22 @@ abstract contract YieldPeer is
     /// @dev The active strategy adapter
     address internal s_activeStrategyAdapter;
 
+    /// @dev Failed CCIP messages (messageId => FailedMessage) for audit and recovery
+    mapping(bytes32 messageId => FailedMessage) internal s_failedMessages;
+    /// @dev Processed WithdrawFail messageIds to prevent double-return of shares
+    mapping(bytes32 messageId => bool) internal s_processedWithdrawFails;
+
+    /*//////////////////////////////////////////////////////////////
+                              STRUCTS
+    //////////////////////////////////////////////////////////////*/
+    struct FailedMessage {
+        CcipTxType txType;
+        uint64 sourceChainSelector;
+        bytes32 dataHash;
+        bytes err;
+        uint40 timestamp;
+    }
+
     /*//////////////////////////////////////////////////////////////
                                  EVENTS
     //////////////////////////////////////////////////////////////*/
@@ -105,11 +122,17 @@ abstract contract YieldPeer is
     event WithdrawInitiated(address indexed withdrawer, uint256 indexed amount, uint64 indexed thisChainSelector);
     /// @notice Emitted when a withdrawal is completed and the USDC is sent to the user
     event WithdrawCompleted(address indexed withdrawer, uint256 indexed amount);
+    /// @notice Emitted when a user initiated withdrawal fails to withdraw USDC from the system
+    event WithdrawFailed(address indexed withdrawer, uint256 indexed amount, uint64 indexed thisChainSelector);
 
     /// @notice Emitted when a CCIP message is sent to the parent chain
     event CCIPMessageSent(bytes32 indexed messageId, CcipTxType indexed txType, uint256 indexed amount);
     /// @notice Emitted when a CCIP message is received from the parent chain
     event CCIPMessageReceived(bytes32 indexed messageId, CcipTxType indexed txType, uint64 indexed sourceChainSelector);
+    /// @notice Emitted when a CCIP message fails during processing
+    event CCIPMessageFailed(
+        bytes32 indexed messageId, CcipTxType indexed txType, uint64 sourceChainSelector, bytes err
+    );
 
     /// @notice Emitted when shares are minted
     event SharesMinted(address indexed to, uint256 indexed amount);
@@ -175,7 +198,7 @@ abstract contract YieldPeer is
     /// @notice Receives a CCIP message from a peer
     /// @dev Revert if message came from a chain that is not allowed
     /// @dev Revert if message came from a contract that is not allowed
-    /// @dev _handleCCIPMessage is overridden and implemented in the ChildPeer and ParentPeer contracts
+    /// @dev Never reverts on handler failure; stores failed messages and (for WithdrawToStrategy) sends WithdrawFail
     /// @param message The CCIP message received
     function _ccipReceive(Client.Any2EVMMessage memory message)
         internal
@@ -185,7 +208,56 @@ abstract contract YieldPeer is
         (CcipTxType txType, bytes memory data) = abi.decode(message.data, (CcipTxType, bytes));
         emit CCIPMessageReceived(message.messageId, txType, message.sourceChainSelector);
 
-        _handleCCIPMessage(txType, message.destTokenAmounts, data, message.sourceChainSelector);
+        try this.handleCCIPMessage(txType, message.destTokenAmounts, data, message.sourceChainSelector) {
+        // Success - no action needed
+        }
+        catch (bytes memory err) {
+            // Store failed message
+            s_failedMessages[message.messageId] = FailedMessage({
+                txType: txType,
+                sourceChainSelector: message.sourceChainSelector,
+                dataHash: keccak256(data),
+                err: err,
+                timestamp: uint40(block.timestamp)
+            });
+            emit CCIPMessageFailed(message.messageId, txType, message.sourceChainSelector, err);
+
+            // Store + Refund: for WithdrawToStrategy, send WithdrawFail to withdraw chain (at most once per messageId)
+            if (txType == CcipTxType.WithdrawToStrategy && !s_processedWithdrawFails[message.messageId]) {
+                try this.decodeWithdrawData(data) returns (WithdrawData memory withdrawData) {
+                    _ccipSend(
+                        withdrawData.chainSelector,
+                        CcipTxType.WithdrawFail,
+                        abi.encode(message.messageId, withdrawData),
+                        ZERO_BRIDGE_AMOUNT
+                    );
+                    s_processedWithdrawFails[message.messageId] = true; // Only after successful send
+                } catch {
+                    // Decode failed; already stored and emitted, skip WithdrawFail
+                }
+            }
+        }
+    }
+
+    /// @notice External entry point for CCIP message processing (used for try/catch; only self can call)
+    /// @param txType The type of transaction
+    /// @param tokenAmounts The token amounts in the message
+    /// @param data The message data
+    /// @param sourceChainSelector The chain selector of the source
+    function handleCCIPMessage(
+        CcipTxType txType,
+        Client.EVMTokenAmount[] calldata tokenAmounts,
+        bytes calldata data,
+        uint64 sourceChainSelector
+    ) external {
+        if (msg.sender != address(this)) revert YieldPeer__OnlySelf();
+        _handleCCIPMessage(txType, tokenAmounts, data, sourceChainSelector);
+    }
+
+    /// @notice Decodes WithdrawData from bytes (external for try/catch)
+    function decodeWithdrawData(bytes calldata data) external view returns (WithdrawData memory) {
+        if (msg.sender != address(this)) revert YieldPeer__OnlySelf();
+        return abi.decode(data, (WithdrawData));
     }
 
     /// @notice Handles CCIP messages based on transaction type
@@ -233,6 +305,19 @@ abstract contract YieldPeer is
             _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
         }
         emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
+    }
+
+    function _handleCCIPWithdrawFail(bytes memory data) internal {
+        (bytes32 messageId, WithdrawData memory withdrawData) = abi.decode(data, (bytes32, WithdrawData));
+        if (s_processedWithdrawFails[messageId]) return; // Idempotency: avoid double-return of shares
+        s_processedWithdrawFails[messageId] = true;
+
+        // Return shares to user if we hold them (Child holds; Parent burns, so may have none)
+        uint256 balance = i_share.balanceOf(address(this));
+        if (balance >= withdrawData.shareBurnAmount) {
+            i_share.transfer(withdrawData.withdrawer, withdrawData.shareBurnAmount);
+        }
+        emit WithdrawFailed(withdrawData.withdrawer, withdrawData.shareBurnAmount, withdrawData.chainSelector);
     }
 
     /// @notice Handles the CCIP message for a rebalance new strategy

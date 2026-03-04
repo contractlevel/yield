@@ -20,6 +20,8 @@ methods {
 
     // External methods
     function share.totalSupply() external returns (uint256) envfree;
+    function share.balanceOf(address) external returns (uint256) envfree;
+    function share.transfer(address, uint256) external;
     function usdc.balanceOf(address) external returns (uint256) envfree;
     function strategyRegistry.getStrategyAdapter(bytes32) external returns (address) envfree;
 
@@ -35,6 +37,10 @@ methods {
     function bytes32ToUint256(bytes32 value) external returns (uint256) envfree;
     function buildEncodedDepositData(address,uint256,uint256,uint256,uint64) external returns (bytes memory) envfree;
     function buildEncodedWithdrawData(address,uint256,uint256,uint256,uint64) external returns (bytes memory) envfree;
+    function buildEncodedWithdrawFailData(bytes32,address,uint256,uint256,uint256,uint64) external returns (bytes memory) envfree;
+    function handleCCIPWithdrawFail(bytes memory) external;
+    function isProcessedWithdrawFail(bytes32) external returns (bool) envfree;
+    function handleCCIPMessage(IYieldPeer.CcipTxType, Client.EVMTokenAmount[], bytes memory, uint64) external;
     function calculateWithdrawAmount(uint256,uint256,uint256) external returns (uint256) envfree;
     function calculateFee(uint256) external returns (uint256) envfree;
 }
@@ -85,6 +91,10 @@ definition DepositPingPongEvent() returns bytes32 =
 definition WithdrawPingPongEvent() returns bytes32 =
 // keccak256(abi.encodePacked("WithdrawPingPongToParent(uint256)"))
     to_bytes32(0x92fdcaf7d7e4ba9fb2e6b7aaa33ab45a3464542db1f0f314eb75be8130d37e56);
+
+definition WithdrawFailedEvent() returns bytes32 =
+// keccak256("WithdrawFailed(address,uint256,uint64)")
+    to_bytes32(0x10817ca442982c2c41dec6d1983e37fb6b849ce9320d6c6d996c4bf0e44688c4);
 
 /*//////////////////////////////////////////////////////////////
                              GHOSTS
@@ -154,6 +164,11 @@ ghost mathint ghost_withdrawPingPong_eventCount {
     init_state axiom ghost_withdrawPingPong_eventCount == 0;
 }
 
+/// @notice EventCount: track amount of WithdrawFailed event is emitted
+ghost mathint ghost_withdrawFailed_eventCount {
+    init_state axiom ghost_withdrawFailed_eventCount == 0;
+}
+
 /*//////////////////////////////////////////////////////////////
                              HOOKS
 //////////////////////////////////////////////////////////////*/
@@ -166,6 +181,7 @@ hook LOG4(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2, bytes32 
         ghost_ccipMessageSent_txType_emitted = bytes32ToUint8(t2);
         ghost_ccipMessageSent_bridgeAmount_emitted = bytes32ToUint256(t3);
     }
+    if (t0 == WithdrawFailedEvent()) ghost_withdrawFailed_eventCount = ghost_withdrawFailed_eventCount + 1;
 }
 
 hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
@@ -317,6 +333,121 @@ rule handleCCIPDepositCallbackChild_emits_SharesMinted() {
     assert ghost_sharesMinted_eventCount == 1;
 }
 
+// --- handleCCIPWithdrawCallbackChild --- //
+rule handleCCIPWithdrawCallbackChild_emits_SharesBurned() {
+    env e;
+    calldataarg args;
+    require ghost_sharesBurned_eventCount == 0;
+    handleCCIPWithdrawCallbackChild(e, args);
+    assert ghost_sharesBurned_eventCount == 1;
+}
+
+// --- handleCCIPWithdrawFail --- //
+rule handleCCIPWithdrawFail_emits_WithdrawFailed() {
+    env e;
+    bytes32 messageId;
+    address withdrawer;
+    uint256 shareBurnAmount;
+    uint256 totalShares;
+    uint256 usdcWithdrawAmount;
+    uint64 chainSelector;
+    bytes data = buildEncodedWithdrawFailData(messageId, withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
+
+    require withdrawer != currentContract;
+    require withdrawer != 0;
+    require !isProcessedWithdrawFail(messageId);
+    require ghost_withdrawFailed_eventCount == 0;
+    handleCCIPWithdrawFail(e, data);
+    assert ghost_withdrawFailed_eventCount == 1;
+}
+
+/// @notice Full flow: withdrawer transfers shares to contract, then handleCCIPWithdrawFail returns them
+rule handleCCIPWithdrawFail_returnsSharesToWithdrawer() {
+    // simulate withdrawer inside e_transfer
+    env e_transfer;
+    // simulate ccip handler inside e_fail
+    env e_fail;
+    bytes32 messageId;
+    address withdrawer;
+    uint256 shareBurnAmount;
+    uint256 totalShares;
+    uint256 usdcWithdrawAmount;
+    uint64 chainSelector;
+
+    require withdrawer != currentContract;
+    require withdrawer != 0;
+    uint256 withdrawerBalanceBefore = share.balanceOf(withdrawer);
+    require withdrawerBalanceBefore >= shareBurnAmount;
+    require shareBurnAmount <= max_uint256 - withdrawerBalanceBefore;
+    // Ensure message is not already processed
+    require !isProcessedWithdrawFail(messageId);
+    require ghost_withdrawFailed_eventCount == 0;
+
+    // simulate withdrawer_transfer prior to cross-chain failure
+    require e_transfer.msg.sender == withdrawer;
+    share.transfer(e_transfer, currentContract, shareBurnAmount);
+
+    // balances after transfer and before failure
+    uint256 contractBalanceBefore = share.balanceOf(currentContract);
+    uint256 totalSupplyBefore = share.totalSupply();
+    require contractBalanceBefore >= shareBurnAmount;
+
+    bytes data = buildEncodedWithdrawFailData(messageId, withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
+    // switch to ccip handler
+    handleCCIPWithdrawFail(e_fail, data);
+
+    // assertions
+    assert ghost_withdrawFailed_eventCount == 1;
+    assert share.balanceOf(withdrawer) == withdrawerBalanceBefore;
+    assert share.balanceOf(currentContract) == contractBalanceBefore - shareBurnAmount;
+    assert share.totalSupply() == totalSupplyBefore;
+}
+
+rule handleCCIPWithdrawFail_idempotent_secondCallNoTransfer() {
+    env e;
+    bytes32 messageId;
+    address withdrawer;
+    uint256 shareBurnAmount;
+    uint256 totalShares;
+    uint256 usdcWithdrawAmount;
+    uint64 chainSelector;
+    bytes data = buildEncodedWithdrawFailData(messageId, withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
+
+    require withdrawer != currentContract;
+    require withdrawer != 0;
+    require share.balanceOf(currentContract) >= shareBurnAmount;
+    require !isProcessedWithdrawFail(messageId);
+
+    handleCCIPWithdrawFail(e, data);
+    uint256 withdrawerBalanceAfterFirst = share.balanceOf(withdrawer);
+    uint256 contractBalanceAfterFirst = share.balanceOf(currentContract);
+
+    handleCCIPWithdrawFail(e, data);
+
+    assert share.balanceOf(withdrawer) == withdrawerBalanceAfterFirst;
+    assert share.balanceOf(currentContract) == contractBalanceAfterFirst;
+}
+
+rule handleCCIPWithdrawFail_atMostShareBurnAmount() {
+    env e;
+    bytes32 messageId;
+    address withdrawer;
+    uint256 shareBurnAmount;
+    uint256 totalShares;
+    uint256 usdcWithdrawAmount;
+    uint64 chainSelector;
+    bytes data = buildEncodedWithdrawFailData(messageId, withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
+
+    require withdrawer != currentContract;
+    require withdrawer != 0;
+    require !isProcessedWithdrawFail(messageId);
+    uint256 withdrawerBalanceBefore = share.balanceOf(withdrawer);
+    require ghost_withdrawFailed_eventCount == 0;
+    handleCCIPWithdrawFail(e, data);
+    uint256 withdrawerBalanceAfter = share.balanceOf(withdrawer);
+    assert withdrawerBalanceAfter <= withdrawerBalanceBefore + shareBurnAmount;
+}
+
 // --- handleCCIPWithdrawToStrategy --- //
 rule handleCCIPWithdrawToStrategy_withdrawsFromStrategy() {
     env e;
@@ -352,6 +483,7 @@ rule handleCCIPWithdrawToStrategy_withdrawsFromStrategy() {
         ghost_withdrawPingPong_eventCount == 1;
 }
 
+/// @notice consider changing rule name to not imply withdrawal is complete
 rule handleCCIPWithdrawToStrategy_completesWithdrawal_when_sameChain() {
     env e;
     address withdrawer;
@@ -518,6 +650,7 @@ rule handleCCIPMessage_DepositToStrategy() {
     bytes data;
     uint64 sourceChainSelector;
 
+    require e.msg.sender == currentContract;
     require ghost_ccipMessageSent_eventCount == 0;
     require ghost_depositPingPong_eventCount == 0;
 
@@ -538,6 +671,7 @@ rule handleCCIPMessage_DepositToStrategyPingPongs() {
     bytes data;
     uint64 sourceChainSelector;
 
+    require e.msg.sender == currentContract;
     require ghost_ccipMessageSent_eventCount == 0;
     require ghost_depositPingPong_eventCount == 0;
     require getActiveStrategyAdapter() == 0;
@@ -556,6 +690,7 @@ rule handleCCIPMessage_DepositCallbackChild() {
     bytes data;
     uint64 sourceChainSelector;
 
+    require e.msg.sender == currentContract;
     require ghost_ccipMessageSent_eventCount == 0;
     require ghost_sharesMinted_eventCount == 0;
     handleCCIPMessage(e, txType, tokenAmounts, data, sourceChainSelector);
@@ -570,6 +705,7 @@ rule handleCCIPMessage_WithdrawToStrategy() {
     bytes data;
     uint64 sourceChainSelector;
 
+    require e.msg.sender == currentContract;
     require ghost_ccipMessageSent_eventCount == 0;
     require ghost_withdrawCompleted_eventCount == 0;
     handleCCIPMessage(e, txType, tokenAmounts, data, sourceChainSelector);
@@ -588,6 +724,7 @@ rule handleCCIPMessage_WithdrawToStrategyPingPongs() {
     bytes data = buildEncodedWithdrawData(withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
     uint64 sourceChainSelector;
 
+    require e.msg.sender == currentContract;
     require getActiveStrategyAdapter() == 0;
     require ghost_ccipMessageSent_eventCount == 0;
     require ghost_withdrawCompleted_eventCount == 0;
@@ -599,13 +736,14 @@ rule handleCCIPMessage_WithdrawToStrategyPingPongs() {
     assert ghost_ccipMessageSent_txType_emitted == 12; // WithdrawPingPong (10 is RebalanceNewStrategy)
 }
 
-rule handleCCIPMessage_WithdrawCallback() {
+rule handleCCIPMessage_WithdrawCallbackChild() {
     env e;
     IYieldPeer.CcipTxType txType = IYieldPeer.CcipTxType.WithdrawCallbackChild;
     Client.EVMTokenAmount[] tokenAmounts;
     bytes data;
     uint64 sourceChainSelector;
 
+    require e.msg.sender == currentContract;
     require ghost_withdrawCompleted_eventCount == 0;
     handleCCIPMessage(e, txType, tokenAmounts, data, sourceChainSelector);
     assert ghost_withdrawCompleted_eventCount == 1;
@@ -618,6 +756,7 @@ rule handleCCIPMessage_RebalanceOldStrategy() {
     bytes data;
     uint64 sourceChainSelector;
 
+    require e.msg.sender == currentContract;
     uint256 totalValue = getTotalValue(e);
     require totalValue > 0;
     uint256 usdcBalance = usdc.balanceOf(currentContract);
@@ -640,6 +779,7 @@ rule handleCCIPMessage_RebalanceNewStrategy() {
     bytes data;
     uint64 sourceChainSelector;
 
+    require e.msg.sender == currentContract;
     require tokenAmounts.length > 0 && tokenAmounts[0].token == usdc && tokenAmounts[0].amount > 0;
 
     require ghost_depositToStrategy_eventCount == 0;

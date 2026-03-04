@@ -131,6 +131,7 @@ contract ChildPeer is YieldPeer {
             _handleCCIPWithdrawToStrategy(data);
         }
         if (txType == CcipTxType.WithdrawCallbackChild) _handleCCIPWithdrawCallbackChild(tokenAmounts, data);
+        if (txType == CcipTxType.WithdrawFail) _handleCCIPWithdrawFail(data);
         //slither-disable-next-line reentrancy-no-eth
         if (txType == CcipTxType.RebalanceOldStrategy) _handleCCIPRebalanceOldStrategy(data);
         if (txType == CcipTxType.RebalanceNewStrategy) _handleCCIPRebalanceNewStrategy(tokenAmounts, data);

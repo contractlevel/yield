@@ -380,12 +380,33 @@ contract Invariant is StdInvariant, BaseTest {
         );
     }
 
-    /// @notice Event Consistency: The number of WithdrawCompleted events should be equal to the number of ShareBurnUpdate events
-    function invariant_withdrawCompleted_shareBurnUpdate_consistency() public view {
+    /// @notice Invariant 1: Completion vs burn 1:1. Each ShareBurnUpdate leads to exactly one of WithdrawCompleted or WithdrawFailed.
+    function invariant_withdrawCompleted_or_withdrawFailed_per_burn() public view {
+        uint256 completed = handler.ghost_event_withdrawCompleted_emissions();
+        uint256 failed = handler.ghost_event_withdrawFailed_emissions();
+        uint256 burns = handler.ghost_event_shareBurnUpdate_emissions();
         assertEq(
-            handler.ghost_event_withdrawCompleted_emissions(),
-            handler.ghost_event_shareBurnUpdate_emissions(),
-            "Invariant violated: The number of WithdrawCompleted events should be equal to the number of ShareBurnUpdate events"
+            completed + failed,
+            burns,
+            "Invariant violated: WithdrawCompleted + WithdrawFailed should equal ShareBurnUpdate count"
+        );
+    }
+
+    /// @notice Invariant 2: USDC conservation. Total USDC withdrawn equals redemption implied by share burns.
+    function invariant_usdc_conservation() public view {
+        assertEq(
+            handler.ghost_event_totalUsdcWithdrawn(),
+            handler.ghost_expectedUsdcFromBurns(),
+            "Invariant violated: Total USDC withdrawn should equal expected USDC from share burns"
+        );
+    }
+
+    /// @notice Invariant 7: Child callback burns. Shares burned on Child peers via WithdrawCallbackChild equal shareBurnAmount for child completions.
+    function invariant_child_callback_burns() public view {
+        assertEq(
+            handler.ghost_event_sharesBurnedOnChildCallbacks(),
+            handler.ghost_event_shareBurnAmountForChildCompletions(),
+            "Invariant violated: Shares burned on Child callbacks should equal shareBurnAmount for child withdrawals"
         );
     }
 

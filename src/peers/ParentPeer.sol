@@ -132,9 +132,8 @@ contract ParentPeer is YieldPeer {
     /// @dev Revert if msg.sender is not the YieldCoin/share token
     /// @dev Revert if shareBurnAmount is 0
     /// @dev Revert if peer is paused
-    /// @dev Update s_totalShares and burn shares from msg.sender
-    /// @dev Handle the case where the parent is the strategy
-    /// @dev Handle the case where the parent is not the strategy
+    /// @dev For cross-chain withdrawals, shares are held (not burned) until WithdrawCallbackParent; burn happens there.
+    /// @dev For local withdrawals (parent is strategy), shares are burned immediately (same-chain tx).
     function onTokenTransfer(
         address withdrawer,
         uint256 shareBurnAmount,
@@ -149,12 +148,13 @@ contract ParentPeer is YieldPeer {
         _revertIfZeroAmount(shareBurnAmount);
 
         emit WithdrawInitiated(withdrawer, shareBurnAmount, i_thisChainSelector);
-        _burnShares(withdrawer, shareBurnAmount);
 
         Strategy memory strategy = s_strategy;
 
         // 1. This Parent is the Strategy. Therefore the usdcWithdrawAmount is calculated and withdrawal is handled here.
         if (strategy.chainSelector == i_thisChainSelector) {
+            /// @dev Local case: parent is strategy. Burn shares and withdraw here (same-chain tx).
+            _burnShares(withdrawer, shareBurnAmount);
             /// @dev update s_totalShares when parent is strategy (optimistic but it's same chain tx)
             uint256 totalShares = s_totalShares;
             s_totalShares -= shareBurnAmount;
@@ -230,6 +230,7 @@ contract ParentPeer is YieldPeer {
         if (txType == CcipTxType.WithdrawToParent) _handleCCIPWithdrawToParent(data, sourceChainSelector);
         if (txType == CcipTxType.WithdrawPingPong) _handleCCIPWithdrawPingPong(data);
         if (txType == CcipTxType.WithdrawCallbackParent) _handleCCIPWithdrawCallbackParent(tokenAmounts, data);
+        if (txType == CcipTxType.WithdrawFail) _handleCCIPWithdrawFail(data);
         //slither-disable-next-line reentrancy-events
         if (txType == CcipTxType.RebalanceNewStrategy) _handleCCIPRebalanceNewStrategy(tokenAmounts, data);
     }
@@ -408,10 +409,11 @@ contract ParentPeer is YieldPeer {
         }
 
         s_totalShares -= withdrawData.shareBurnAmount;
-        // @review ShareBurnUpdate is misleading, this is only accounting and burns occur on withdrawChain
         emit ShareBurnUpdate(withdrawData.shareBurnAmount, withdrawData.chainSelector, s_totalShares);
 
         if (withdrawData.chainSelector == i_thisChainSelector) {
+            /// @dev Parent is the withdraw chain: burn shares held since onTokenTransfer, then transfer USDC
+            _burnShares(withdrawData.withdrawer, withdrawData.shareBurnAmount);
             _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
             emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
         } else {

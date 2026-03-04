@@ -1,3 +1,4 @@
+using Share as share;
 using MockUsdc as usdc;
 using MockAToken as aUsdc;
 using MockComet as compound;
@@ -25,14 +26,20 @@ methods {
     function strategyRegistry.getStrategyAdapter(bytes32) external returns (address) envfree;
 
     // Wildcard dispatcher summaries
-    function _.withdraw(address,uint256) external => DISPATCHER(true);
-    function _.deposit(address,uint256) external => DISPATCHER(true);
+    function _.withdraw(address, uint256) external => DISPATCHER(true);
+    function _.deposit(address, uint256) external => DISPATCHER(true);
     function _.getTotalValue(address) external => DISPATCHER(true);
-    
+
     // Harness helper methods
     function decodeAddress(bytes) external returns (address) envfree;
-    function buildEncodedWithdrawData(address,uint256,uint256,uint256,uint64) external returns (bytes) envfree;
-    function encodeStrategy(uint64,bytes32) external returns (bytes) envfree;
+    function buildEncodedWithdrawData(address, uint256, uint256, uint256, uint64) external returns (bytes) envfree;
+    function buildEncodedWithdrawFailData(bytes32, address, uint256, uint256, uint256, uint64) external returns (bytes) envfree;
+    function handleCCIPWithdrawFail(bytes memory) external;
+    function isProcessedWithdrawFail(bytes32) external returns (bool) envfree;
+    function share.balanceOf(address) external returns (uint256) envfree;
+    function share.totalSupply() external returns (uint256) envfree;
+    function share.transfer(address, uint256) external;
+    function encodeStrategy(uint64, bytes32) external returns (bytes) envfree;
     function encodeUint64(uint64) external returns (bytes) envfree;
 }
 
@@ -41,23 +48,27 @@ methods {
 //////////////////////////////////////////////////////////////*/
 definition CCIPMessageReceivedEvent() returns bytes32 =
 // keccak256(abi.encodePacked("CCIPMessageReceived(bytes32,uint8,uint64)"))
-    to_bytes32(0xcde62365c77ee9372df921a4ee8f4bff64fc3b4cc39417c70fc4a6d358c12f6e);
+to_bytes32(0xcde62365c77ee9372df921a4ee8f4bff64fc3b4cc39417c70fc4a6d358c12f6e);
 
 definition WithdrawCompletedEvent() returns bytes32 =
 // keccak256(abi.encodePacked("WithdrawCompleted(address,uint256)"))
-    to_bytes32(0x60188009b974c2fa66ee3b916d93f64d6534ea2204e0c466f9784ace689e8e49);     
+to_bytes32(0x60188009b974c2fa66ee3b916d93f64d6534ea2204e0c466f9784ace689e8e49);
 
 definition ActiveStrategyAdapterUpdatedEvent() returns bytes32 =
 // keccak256(abi.encodePacked("ActiveStrategyAdapterUpdated(address)"))
-    to_bytes32(0xebe96b449bfdb3f1ed534cb774b9a9b0954447b489e45e828c81a03fec492cc7);
+to_bytes32(0xebe96b449bfdb3f1ed534cb774b9a9b0954447b489e45e828c81a03fec492cc7);
 
 definition DepositToStrategyEvent() returns bytes32 =
 // keccak256(abi.encodePacked("DepositToStrategy(address,uint256)"))
-    to_bytes32(0x8125d05f0839eec6c1f6b1674833e01f11ab362bd9c60eb2e3b274fa3b47e4f4);
+to_bytes32(0x8125d05f0839eec6c1f6b1674833e01f11ab362bd9c60eb2e3b274fa3b47e4f4);
 
 definition WithdrawFromStrategyEvent() returns bytes32 =
 // keccak256(abi.encodePacked("WithdrawFromStrategy(address,uint256)"))
-    to_bytes32(0xb28e99afed98b3607aeea074f84c346dc4135d86f35b1c28bc35ab6782e7ce30);
+to_bytes32(0xb28e99afed98b3607aeea074f84c346dc4135d86f35b1c28bc35ab6782e7ce30);
+
+definition WithdrawFailedEvent() returns bytes32 =
+// keccak256("WithdrawFailed(address,uint256,uint64)")
+to_bytes32(0x10817ca442982c2c41dec6d1983e37fb6b849ce9320d6c6d996c4bf0e44688c4);
 
 /*//////////////////////////////////////////////////////////////
                              GHOSTS
@@ -87,6 +98,11 @@ ghost mathint ghost_withdrawFromStrategy_eventCount {
     init_state axiom ghost_withdrawFromStrategy_eventCount == 0;
 }
 
+/// @notice track amount of WithdrawFailed event is emitted
+ghost mathint ghost_withdrawFailed_eventCount {
+    init_state axiom ghost_withdrawFailed_eventCount == 0;
+}
+
 // /// @notice track the storage mapping for strategy adapters
 // ghost mapping(IYieldPeer.Protocol => address) ghost_storage_strategyAdapters {
 //     init_state axiom forall IYieldPeer.Protocol p. ghost_storage_strategyAdapters[p] == 0;
@@ -98,6 +114,7 @@ ghost mathint ghost_withdrawFromStrategy_eventCount {
 /// @notice hook onto emitted events and increment relevant ghosts
 hook LOG4(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2, bytes32 t3) {
     if (t0 == CCIPMessageReceivedEvent()) ghost_ccipMessageReceived_eventCount = ghost_ccipMessageReceived_eventCount + 1;
+    if (t0 == WithdrawFailedEvent()) ghost_withdrawFailed_eventCount = ghost_withdrawFailed_eventCount + 1;
 }
 
 hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
@@ -107,8 +124,7 @@ hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
 }
 
 hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
-    if (t0 == ActiveStrategyAdapterUpdatedEvent())
-        ghost_activeStrategyAdapterUpdated_eventCount = ghost_activeStrategyAdapterUpdated_eventCount + 1;
+    if (t0 == ActiveStrategyAdapterUpdatedEvent()) ghost_activeStrategyAdapterUpdated_eventCount = ghost_activeStrategyAdapterUpdated_eventCount + 1;
 }
 
 // @review:certora commented code? why is this commented and not deleted or uncommented?
@@ -139,8 +155,7 @@ rule strategyAdapter_eventConsistency(method f) {
 
     f(e, args);
 
-    assert getActiveStrategyAdapter() != strategyAdapterBefore => 
-        ghost_activeStrategyAdapterUpdated_eventCount == eventCountBefore + 1;
+    assert getActiveStrategyAdapter() != strategyAdapterBefore => ghost_activeStrategyAdapterUpdated_eventCount == eventCountBefore + 1;
 }
 
 // --- ccipReceive --- //
@@ -148,9 +163,8 @@ rule ccipReceive_revertsWhen_notAllowedChain() {
     env e;
     Client.Any2EVMMessage message;
     require e.msg.sender == currentContract.i_ccipRouter;
-    
-    require !getAllowedChain(message.sourceChainSelector),
-        "ccipReceive should revert when the chain selector is not allowed";
+
+    require !getAllowedChain(message.sourceChainSelector), "ccipReceive should revert when the chain selector is not allowed";
 
     ccipReceive@withrevert(e, message);
     assert lastReverted;
@@ -163,8 +177,7 @@ rule ccipReceive_revertsWhen_notAllowedPeer() {
     require getAllowedChain(message.sourceChainSelector);
 
     address invalidPeer = decodeAddress(message.sender);
-    require invalidPeer != getAllowedPeer(message.sourceChainSelector),
-        "ccipReceive should revert when the peer is not allowed";
+    require invalidPeer != getAllowedPeer(message.sourceChainSelector), "ccipReceive should revert when the peer is not allowed";
 
     ccipReceive@withrevert(e, message);
     assert lastReverted;
@@ -249,6 +262,108 @@ rule handleCCIPWithdrawCallback_revertsWhen_invalidToken() {
     assert lastReverted;
 }
 
+// --- handleCCIPWithdrawFail --- //
+
+/// @notice check message is processed only once and withdrawer receives shares
+rule handleCCIPWithdrawFail_idempotency() {
+    env e;
+    bytes32 messageId;
+    address withdrawer;
+    uint256 shareBurnAmount;
+    uint256 totalShares;
+    uint256 usdcWithdrawAmount;
+    uint64 chainSelector;
+    bytes data = buildEncodedWithdrawFailData(messageId, withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
+
+    require withdrawer != currentContract;
+    require withdrawer != 0;
+    require !isProcessedWithdrawFail(messageId);
+    require ghost_withdrawFailed_eventCount == 0;
+    handleCCIPWithdrawFail(e, data);
+    assert ghost_withdrawFailed_eventCount == 1;
+
+    uint256 withdrawerBalanceAfterFirst = share.balanceOf(withdrawer);
+    handleCCIPWithdrawFail(e, data);
+    assert ghost_withdrawFailed_eventCount == 1;
+    assert share.balanceOf(withdrawer) == withdrawerBalanceAfterFirst;
+}
+
+rule handleCCIPWithdrawFail_transfersAtMostShareBurnAmount() {
+    env e;
+    bytes32 messageId;
+    address withdrawer;
+    uint256 shareBurnAmount;
+    uint256 totalShares;
+    uint256 usdcWithdrawAmount;
+    uint64 chainSelector;
+    bytes data = buildEncodedWithdrawFailData(messageId, withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
+
+    require withdrawer != currentContract;
+    require withdrawer != 0;
+    require !isProcessedWithdrawFail(messageId);
+    uint256 withdrawerBalanceBefore = share.balanceOf(withdrawer);
+    require shareBurnAmount <= max_uint256 - withdrawerBalanceBefore;
+    uint256 totalSupplyBefore = share.totalSupply();
+    handleCCIPWithdrawFail(e, data);
+    assert share.balanceOf(withdrawer) <= withdrawerBalanceBefore + shareBurnAmount;
+    assert share.totalSupply() == totalSupplyBefore;
+}
+
+rule handleCCIPWithdrawFail_noTransferWhenInsufficientBalance() {
+    env e;
+    bytes32 messageId;
+    address withdrawer;
+    uint256 shareBurnAmount;
+    uint256 totalShares;
+    uint256 usdcWithdrawAmount;
+    uint64 chainSelector;
+    bytes data = buildEncodedWithdrawFailData(messageId, withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
+
+    require withdrawer != currentContract;
+    require withdrawer != 0;
+    require share.balanceOf(currentContract) < shareBurnAmount;
+    require !isProcessedWithdrawFail(messageId);
+    require ghost_withdrawFailed_eventCount == 0;
+    uint256 withdrawerBalanceBefore = share.balanceOf(withdrawer);
+    handleCCIPWithdrawFail(e, data);
+    assert ghost_withdrawFailed_eventCount == 1;
+    assert share.balanceOf(withdrawer) == withdrawerBalanceBefore;
+}
+
+/// @notice Full flow: withdrawer transfers shares to contract (simulating pre-fail state), then handleCCIPWithdrawFail returns them
+rule handleCCIPWithdrawFail_fullFlow_fromTransfer() {
+    // simulate withdrawer inside e_transfer
+    env e_transfer;
+    // simulate ccip handler inside e_fail
+    env e_fail;
+    bytes32 messageId;
+    address withdrawer;
+    uint256 shareBurnAmount;
+    uint256 totalShares;
+    uint256 usdcWithdrawAmount;
+    uint64 chainSelector;
+
+    require withdrawer != currentContract;
+    require withdrawer != 0;
+    uint256 withdrawerBalanceBefore = share.balanceOf(withdrawer);
+    require withdrawerBalanceBefore >= shareBurnAmount;
+    require shareBurnAmount <= max_uint256 - withdrawerBalanceBefore;
+    require !isProcessedWithdrawFail(messageId);
+    require ghost_withdrawFailed_eventCount == 0;
+
+    // Step 1: Withdrawer sends shares to this contract (simulates transfer that precedes failed withdraw)
+    require e_transfer.msg.sender == withdrawer;
+    share.transfer(e_transfer, currentContract, shareBurnAmount);
+
+    require share.balanceOf(currentContract) >= shareBurnAmount;
+
+    bytes data = buildEncodedWithdrawFailData(messageId, withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
+    handleCCIPWithdrawFail(e_fail, data);
+
+    assert ghost_withdrawFailed_eventCount == 1;
+    assert share.balanceOf(withdrawer) == withdrawerBalanceBefore;
+}
+
 // --- handleCCIPRebalanceNewStrategy --- //
 rule handleCCIPRebalanceNewStrategy_emits_ActiveStrategyAdapterUpdated() {
     env e;
@@ -272,7 +387,7 @@ rule handleCCIPRebalanceNewStrategy_depositsToNewStrategy_and_updatesActiveStrat
     uint256 tokenAmountsValueBefore = tokenAmounts[0].amount;
 
     /// @dev require the storage mappings for active strategy adapters to be the correct contracts
-    require strategyRegistry.getStrategyAdapter(aaveV3ProtocolId)     == aaveV3Adapter;
+    require strategyRegistry.getStrategyAdapter(aaveV3ProtocolId) == aaveV3Adapter;
     require strategyRegistry.getStrategyAdapter(compoundV3ProtocolId) == compoundV3Adapter;
 
     uint256 totalValueBefore = tokenAmounts[0].amount;
@@ -283,12 +398,9 @@ rule handleCCIPRebalanceNewStrategy_depositsToNewStrategy_and_updatesActiveStrat
     assert protocolId == aaveV3ProtocolId => getActiveStrategyAdapter() == aaveV3Adapter;
     assert protocolId == compoundV3ProtocolId => getActiveStrategyAdapter() == compoundV3Adapter;
 
-    assert tokenAmounts.length > 0 && tokenAmountsValueBefore > 0 && protocolId == aaveV3ProtocolId 
-        => aUsdc.balanceOf(e, getActiveStrategyAdapter()) >= tokenAmountsValueBefore;
-    assert tokenAmounts.length > 0 && tokenAmountsValueBefore > 0 && protocolId == compoundV3ProtocolId 
-        => compound.balanceOf(e, getActiveStrategyAdapter()) >= tokenAmountsValueBefore;
-    assert tokenAmounts.length > 0 && tokenAmountsValueBefore > 0 
-        => ghost_depositToStrategy_eventCount == depositToStrategy_eventCountBefore + 1;
+    assert tokenAmounts.length > 0 && tokenAmountsValueBefore > 0 && protocolId == aaveV3ProtocolId => aUsdc.balanceOf(e, getActiveStrategyAdapter()) >= tokenAmountsValueBefore;
+    assert tokenAmounts.length > 0 && tokenAmountsValueBefore > 0 && protocolId == compoundV3ProtocolId => compound.balanceOf(e, getActiveStrategyAdapter()) >= tokenAmountsValueBefore;
+    assert tokenAmounts.length > 0 && tokenAmountsValueBefore > 0 => ghost_depositToStrategy_eventCount == depositToStrategy_eventCountBefore + 1;
 }
 
 // --- depositToStrategy --- //
@@ -318,7 +430,7 @@ rule depositToStrategy_depositsToStrategy() {
 
     depositToStrategy(e, strategyAdapter, amount);
 
-    assert strategyAdapter ==     aaveV3Adapter =>    aUsdc.balanceOf(e,     aaveV3Adapter) >= amount;
+    assert strategyAdapter == aaveV3Adapter => aUsdc.balanceOf(e, aaveV3Adapter) >= amount;
     assert strategyAdapter == compoundV3Adapter => compound.balanceOf(e, compoundV3Adapter) >= amount;
 }
 
@@ -335,13 +447,12 @@ rule withdrawFromStrategy_withdrawsFromStrategy(env e) {
     address strategyAdapter = getActiveStrategyAdapter();
     uint256 amount;
 
-    uint256 aUsdcBalanceBefore    =    aUsdc.balanceOf(e, strategyAdapter);
+    uint256 aUsdcBalanceBefore = aUsdc.balanceOf(e, strategyAdapter);
     uint256 compoundBalanceBefore = compound.balanceOf(e, strategyAdapter);
+    require amount <= aUsdcBalanceBefore && amount <= compoundBalanceBefore, "amount must be less than or equal to the balance of the strategy adapter";
+    require amount > 0, "amount must be greater than 0";
+    withdrawFromStrategy(e, strategyAdapter, amount);
 
-    withdrawFromStrategy(   e, strategyAdapter, amount);
-
-    assert strategyAdapter == aaveV3Adapter => 
-            aUsdc.balanceOf(e, strategyAdapter) == aUsdcBalanceBefore - amount;
-    assert strategyAdapter == compoundV3Adapter => 
-         compound.balanceOf(e, strategyAdapter) == compoundBalanceBefore - amount;
+    assert strategyAdapter == aaveV3Adapter => aUsdc.balanceOf(e, strategyAdapter) == aUsdcBalanceBefore - amount;
+    assert strategyAdapter == compoundV3Adapter => compound.balanceOf(e, strategyAdapter) == compoundBalanceBefore - amount;
 }

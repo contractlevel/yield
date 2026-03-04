@@ -40,6 +40,14 @@ contract YieldHarness is YieldPeer, HelperHarness {
         _handleCCIPRebalanceNewStrategy(tokenAmounts, data);
     }
 
+    function handleCCIPWithdrawFail(bytes memory data) public {
+        _handleCCIPWithdrawFail(data);
+    }
+
+    function isProcessedWithdrawFail(bytes32 messageId) external view returns (bool) {
+        return s_processedWithdrawFails[messageId];
+    }
+
     function depositToStrategy(address strategyAdapter, uint256 amount) public {
         _depositToStrategy(strategyAdapter, amount);
     }

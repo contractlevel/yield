@@ -40,6 +40,7 @@ methods {
     function bytes32ToBool(bytes32 value) external returns (bool) envfree;
     function bytes32ToAddress(bytes32 value) external returns (address) envfree;
     function addressToBytes32(address value) external returns (bytes32) envfree;
+    function buildEncodedWithdrawFailData(bytes32, address, uint256, uint256, uint256, uint64) external returns (bytes memory) envfree;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -140,6 +141,14 @@ definition CCIPGasLimitSetEvent() returns bytes32 =
 definition StrategyRegistrySetEvent() returns bytes32 =
 // keccak256(abi.encodePacked("StrategyRegistrySet(address)"))
     to_bytes32(0xc8f6f976c20221cfca1498913573ed2bc921d8f3c6e4b7d1fcf4d228628bbd10);
+
+definition WithdrawFailedEvent() returns bytes32 =
+// keccak256("WithdrawFailed(address,uint256,uint64)")
+    to_bytes32(0x10817ca442982c2c41dec6d1983e37fb6b849ce9320d6c6d996c4bf0e44688c4);
+
+definition CCIPMessageFailedEvent() returns bytes32 =
+// keccak256("CCIPMessageFailed(bytes32,uint8,uint64,bytes)")
+    to_bytes32(0x2fc0e0d91b0a0aaf0ef6b3735d5b7342693c395d07d3387e3733770f3b84b8be);
 
 /*//////////////////////////////////////////////////////////////
                              GHOSTS
@@ -264,6 +273,26 @@ ghost address ghost_strategyRegistrySet_strategyRegistry_emitted {
     init_state axiom ghost_strategyRegistrySet_strategyRegistry_emitted == 0;
 }
 
+/// @notice EventCount: track amount of WithdrawFailed event is emitted
+ghost mathint ghost_withdrawFailed_eventCount {
+    init_state axiom ghost_withdrawFailed_eventCount == 0;
+}
+
+/// @notice EmittedValue: track the amount emitted by WithdrawFailed event
+ghost mathint ghost_withdrawFailed_amount_emitted {
+    init_state axiom ghost_withdrawFailed_amount_emitted == 0;
+}
+
+/// @notice EventCount: track amount of CCIPMessageFailed event is emitted
+ghost mathint ghost_ccipMessageFailed_eventCount {
+    init_state axiom ghost_ccipMessageFailed_eventCount == 0;
+}
+
+/// @notice EmittedValue: track the txType emitted by CCIPMessageFailed event
+ghost mathint ghost_ccipMessageFailed_txType_emitted {
+    init_state axiom ghost_ccipMessageFailed_txType_emitted == 0;
+}
+
 /*//////////////////////////////////////////////////////////////
                              HOOKS
 //////////////////////////////////////////////////////////////*/
@@ -275,6 +304,14 @@ hook LOG4(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2, bytes32 
         ghost_ccipMessageSent_eventCount = ghost_ccipMessageSent_eventCount + 1;
         ghost_ccipMessageSent_txType_emitted = bytes32ToUint8(t2);
         ghost_ccipMessageSent_bridgeAmount_emitted = bytes32ToUint256(t3);
+    }
+    if (t0 == WithdrawFailedEvent()) {
+        ghost_withdrawFailed_eventCount = ghost_withdrawFailed_eventCount + 1;
+        ghost_withdrawFailed_amount_emitted = ghost_withdrawFailed_amount_emitted + bytes32ToUint256(t2);
+    }
+    if (t0 == CCIPMessageFailedEvent()) {
+        ghost_ccipMessageFailed_eventCount = ghost_ccipMessageFailed_eventCount + 1;
+        ghost_ccipMessageFailed_txType_emitted = bytes32ToUint8(t2);
     }
 }
 

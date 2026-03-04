@@ -107,6 +107,20 @@ contract Handler is Test {
     uint256 public ghost_event_withdrawCompleted_emissions;
     /// @dev incremented by 1 everytime a ShareBurnUpdate event is emitted
     uint256 public ghost_event_shareBurnUpdate_emissions;
+    /// @dev incremented by 1 everytime a WithdrawFailed event is emitted (invariant 1)
+    uint256 public ghost_event_withdrawFailed_emissions;
+
+    /// @dev expected USDC from share burns: sum of shareBurnAmount * totalValue / totalShares per ShareBurnUpdate (invariant 2)
+    uint256 public ghost_expectedUsdcFromBurns;
+
+    /// @dev shares burned on Child peers via WithdrawCallbackChild (invariant 7)
+    uint256 public ghost_event_sharesBurnedOnChildCallbacks;
+    /// @dev shareBurnAmount from ShareBurnUpdate when withdraw chain is a Child (invariant 7)
+    uint256 public ghost_event_shareBurnAmountForChildCompletions;
+
+    /// @dev snapshot of (totalValue, totalShares) taken at start of each withdraw() for USDC conservation check
+    uint256 internal _withdrawSnapshotTotalValue;
+    uint256 internal _withdrawSnapshotTotalShares;
 
     /// @dev tracks the total shares minted per user - based on ShareMintUpdate events
     mapping(address user => uint256 totalSharesMinted) public ghost_event_totalSharesMintedPerUser;
@@ -272,6 +286,12 @@ contract Handler is Test {
         shareBurnAmount = bound(shareBurnAmount, 1, withdrawerShareBalance);
         /// @dev bind the fuzzed chain selectors to the range of valid values
         uint64 chainSelector = uint64(bound(chainSelectorSeed, 1, 3));
+
+        /// @dev snapshot strategy state for USDC conservation invariant (invariant 2)
+        IYieldPeer.Strategy memory strategy = parent.getStrategy();
+        address strategyPeer = chainSelectorsToPeers[strategy.chainSelector];
+        _withdrawSnapshotTotalValue = strategyPeer != address(0) ? IYieldPeer(strategyPeer).getTotalValue() : 0;
+        _withdrawSnapshotTotalShares = parent.getTotalShares();
 
         vm.recordLogs();
 
@@ -469,8 +489,11 @@ contract Handler is Test {
     function _handleWithdrawLogs() internal {
         bytes32 withdrawCompletedEvent = keccak256("WithdrawCompleted(address,uint256)");
         bytes32 shareBurnUpdateEvent = keccak256("ShareBurnUpdate(uint256,uint64,uint256)");
+        bytes32 withdrawFailedEvent = keccak256("WithdrawFailed(address,uint256,uint64)");
+        bytes32 sharesBurnedEvent = keccak256("SharesBurned(address,uint256)");
         bool withdrawCompletedEventFound = false;
         bool shareBurnUpdateEventFound = false;
+        bool withdrawFailedEventFound = false;
 
         Vm.Log[] memory logs = vm.getRecordedLogs();
         for (uint256 i = 0; i < logs.length; i++) {
@@ -487,11 +510,33 @@ contract Handler is Test {
             if (logs[i].topics[0] == shareBurnUpdateEvent) {
                 shareBurnUpdateEventFound = true;
                 uint256 shareBurnAmount = uint256(logs[i].topics[1]);
+                uint64 chainSelector = uint64(uint256(logs[i].topics[2]));
                 ghost_event_shareBurnUpdate_emissions++;
                 ghost_event_totalSharesBurned += shareBurnAmount;
+
+                /// @dev invariant 2: expected USDC = shareBurnAmount * totalValue / totalShares
+                if (_withdrawSnapshotTotalShares > 0) {
+                    ghost_expectedUsdcFromBurns += (shareBurnAmount * _withdrawSnapshotTotalValue) / _withdrawSnapshotTotalShares;
+                }
+
+                /// @dev invariant 7: track shareBurnAmount when withdraw chain is a Child
+                if (chainSelector == child1ChainSelector || chainSelector == child2ChainSelector) {
+                    ghost_event_shareBurnAmountForChildCompletions += shareBurnAmount;
+                }
+            }
+            if (logs[i].topics[0] == withdrawFailedEvent) {
+                withdrawFailedEventFound = true;
+                ghost_event_withdrawFailed_emissions++;
+            }
+            /// @dev invariant 7: track SharesBurned emitted by Child peers (callback burns)
+            if (logs[i].topics[0] == sharesBurnedEvent) {
+                if (logs[i].emitter == address(child1) || logs[i].emitter == address(child2)) {
+                    uint256 amount = uint256(logs[i].topics[2]);
+                    ghost_event_sharesBurnedOnChildCallbacks += amount;
+                }
             }
         }
-        assertTrue(withdrawCompletedEventFound, "WithdrawCompleted log not found");
+        assertTrue(withdrawCompletedEventFound || withdrawFailedEventFound, "WithdrawCompleted or WithdrawFailed log not found");
     }
 
     function _handleOnReportLogs() internal {

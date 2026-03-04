@@ -10,4 +10,15 @@ runs = 3000
 depth = 15
 fail_on_revert = true
 
+[lint]
+ignored_warnings_from = ["test"]
+# Disable all note-level lints (style/naming, unused imports, etc.)
+exclude_lints = [
+    "mixed-case-variable",
+    "mixed-case-function",
+    "unused-import",
+    "screaming-snake-case-immutable",
+    "pascal-case-struct",
+    "unwrapped-modifier-logic",
+]
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

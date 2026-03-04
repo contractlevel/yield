@@ -30,17 +30,20 @@ contract ChildHarness is ChildPeer, HelperHarness {
         _handleCCIPWithdrawToStrategy(data);
     }
 
+    function handleCCIPWithdrawCallbackChild(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data) public {
+        _handleCCIPWithdrawCallbackChild(tokenAmounts, data);
+    }
+
     function handleCCIPRebalanceOldStrategy(bytes memory data) public {
         _handleCCIPRebalanceOldStrategy(data);
     }
 
-    function handleCCIPMessage(
-        CcipTxType txType,
-        Client.EVMTokenAmount[] memory tokenAmounts,
-        bytes memory data,
-        uint64 sourceChainSelector
-    ) public {
-        _handleCCIPMessage(txType, tokenAmounts, data, sourceChainSelector);
+    function handleCCIPWithdrawFail(bytes memory data) public {
+        _handleCCIPWithdrawFail(data);
+    }
+
+    function isProcessedWithdrawFail(bytes32 messageId) external view returns (bool) {
+        return s_processedWithdrawFails[messageId];
     }
 
     // @review:certora this can be modularized across peer harnesses

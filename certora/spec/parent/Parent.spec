@@ -30,6 +30,7 @@ methods {
     // External methods
     function share.totalSupply() external returns (uint256) envfree;
     function share.balanceOf(address) external returns (uint256) envfree;
+    function share.transfer(address, uint256) external;
     function usdc.balanceOf(address) external returns (uint256) envfree;
     function strategyRegistry.getStrategyAdapter(bytes32) external returns (address) envfree;
 
@@ -45,6 +46,9 @@ methods {
     function bytes32ToUint256(bytes32) external returns (uint256) envfree;
     function bytes32ToUint8(bytes32) external returns (uint8) envfree;
     function buildEncodedWithdrawData(address, uint256, uint256, uint256, uint64) external returns (bytes memory) envfree;
+    function buildEncodedWithdrawFailData(bytes32, address, uint256, uint256, uint256, uint64) external returns (bytes memory) envfree;
+    function handleCCIPWithdrawFail(bytes memory) external;
+    function isProcessedWithdrawFail(bytes32) external returns (bool) envfree;
     function encodeUint64(uint64) external returns (bytes memory) envfree;
     function calculateWithdrawAmount(uint256, uint256, uint256) external returns (uint256) envfree;
     function buildEncodedDepositData(address, uint256, uint256, uint256, uint64) external returns (bytes memory) envfree;
@@ -142,6 +146,10 @@ to_bytes32(0xc75e77a40c4dc3a53d5deb9d8fb9d32536847fcc2c9d2d88f1f6f1aed0f71de5);
 definition SupportedProtocolSetEvent() returns bytes32 =
 // keccak256(abi.encodePacked("SupportedProtocolSet(bytes32,bool)"))
 to_bytes32(0x56cc71f639333b7ecd9179fddeb0ecc00bcb82b3f98664a11601a28652604c48);
+
+definition WithdrawFailedEvent() returns bytes32 =
+// keccak256("WithdrawFailed(address,uint256,uint64)")
+to_bytes32(0x10817ca442982c2c41dec6d1983e37fb6b849ce9320d6c6d996c4bf0e44688c4);
 
 /*//////////////////////////////////////////////////////////////
                              GHOSTS
@@ -276,6 +284,11 @@ ghost bool ghost_supportedProtocolSet_emittedIsSupported {
     init_state axiom ghost_supportedProtocolSet_emittedIsSupported == false;
 }
 
+/// @notice EventCount: track amount of WithdrawFailed event is emitted
+ghost mathint ghost_withdrawFailed_eventCount {
+    init_state axiom ghost_withdrawFailed_eventCount == 0;
+}
+
 /*//////////////////////////////////////////////////////////////
                              HOOKS
 //////////////////////////////////////////////////////////////*/
@@ -296,6 +309,7 @@ hook LOG4(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2, bytes32 
         ghost_ccipMessageSent_bridgeAmount_emitted = bytes32ToUint256(t3);
     }
     if (t0 == StrategyUpdatedEvent()) ghost_strategyUpdated_eventCount = ghost_strategyUpdated_eventCount + 1;
+    if (t0 == WithdrawFailedEvent()) ghost_withdrawFailed_eventCount = ghost_withdrawFailed_eventCount + 1;
 }
 
 hook LOG3(uint offset, uint length, bytes32 t0, bytes32 t1, bytes32 t2) {
@@ -329,7 +343,10 @@ hook LOG2(uint offset, uint length, bytes32 t0, bytes32 t1) {
                            INVARIANTS
 //////////////////////////////////////////////////////////////*/
 invariant totalShares_consistency()
-    getTotalShares() == ghost_shareMintUpdate_totalAmount_emitted - ghost_shareBurnUpdate_totalAmount_emitted;
+    getTotalShares() == ghost_shareMintUpdate_totalAmount_emitted - ghost_shareBurnUpdate_totalAmount_emitted
+{
+    preserved handleCCIPWithdrawFail(bytes data) with (env e) { }
+}
 
 /*//////////////////////////////////////////////////////////////
                              RULES
@@ -853,6 +870,71 @@ rule handleCCIPWithdraw_forwardsToStrategy_and_emits_WithdrawPingPongToChild_whe
     assert ghost_ccipMessageSent_eventCount == 1;
     assert ghost_ccipMessageSent_txType_emitted == 12; // WithdrawPingPong
     assert ghost_ccipMessageSent_bridgeAmount_emitted == 0;
+}
+
+// --- handleCCIPWithdrawFail --- //
+rule handleCCIPWithdrawFail_emits_WithdrawFailed() {
+    env e;
+    bytes32 messageId;
+    address withdrawer;
+    uint256 shareBurnAmount;
+    uint256 totalShares;
+    uint256 usdcWithdrawAmount;
+    uint64 chainSelector;
+    bytes data = buildEncodedWithdrawFailData(messageId, withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
+
+    require withdrawer != currentContract;
+    require withdrawer != 0;
+    require !isProcessedWithdrawFail(messageId);
+    require ghost_withdrawFailed_eventCount == 0;
+    handleCCIPWithdrawFail(e, data);
+    assert ghost_withdrawFailed_eventCount == 1;
+}
+
+rule handleCCIPWithdrawFail_doesNotIncrease_totalShares() {
+    env e;
+    bytes32 messageId;
+    address withdrawer;
+    uint256 shareBurnAmount;
+    uint256 totalShares;
+    uint256 usdcWithdrawAmount;
+    uint64 chainSelector;
+    bytes data = buildEncodedWithdrawFailData(messageId, withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
+
+    require withdrawer != currentContract;
+    require withdrawer != 0;
+    require !isProcessedWithdrawFail(messageId);
+    uint256 totalSharesBefore = getTotalShares();
+    handleCCIPWithdrawFail(e, data);
+    assert getTotalShares() == totalSharesBefore;
+}
+
+rule handleCCIPWithdrawFail_transfersOnlyWhenBalanceSufficient() {
+    env e;
+    bytes32 messageId;
+    address withdrawer;
+    uint256 shareBurnAmount;
+    uint256 totalShares;
+    uint256 usdcWithdrawAmount;
+    uint64 chainSelector;
+    bytes data = buildEncodedWithdrawFailData(messageId, withdrawer, shareBurnAmount, totalShares, usdcWithdrawAmount, chainSelector);
+
+    require withdrawer != currentContract;
+    require withdrawer != 0;
+    require !isProcessedWithdrawFail(messageId);
+    uint256 withdrawerBalanceBefore = share.balanceOf(withdrawer);
+    uint256 contractBalance = share.balanceOf(currentContract);
+
+    require contractBalance < shareBurnAmount || shareBurnAmount <= max_uint256 - withdrawerBalanceBefore;
+    require ghost_withdrawFailed_eventCount == 0;
+    handleCCIPWithdrawFail(e, data);
+    assert ghost_withdrawFailed_eventCount == 1;
+
+    if (contractBalance >= shareBurnAmount) {
+        assert share.balanceOf(withdrawer) == withdrawerBalanceBefore + shareBurnAmount;
+    } else {
+        assert share.balanceOf(withdrawer) == withdrawerBalanceBefore;
+    }
 }
 
 // --- rebalance --- //

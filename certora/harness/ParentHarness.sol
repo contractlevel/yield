@@ -45,12 +45,7 @@ contract ParentHarness is ParentPeer, HelperHarness {
         _handleCCIPWithdraw(s_strategy, withdrawData);
     }
 
-    function handleCCIPWithdrawCallbackParent(
-        Client.EVMTokenAmount[] memory tokenAmounts,
-        bytes memory data
-    )
-        public
-    {
+    function handleCCIPWithdrawCallbackParent(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data) public {
         _handleCCIPWithdrawCallbackParent(tokenAmounts, data);
     }
 
@@ -58,6 +53,14 @@ contract ParentHarness is ParentPeer, HelperHarness {
 
     function handleCCIPWithdrawPingPong(bytes memory data) public {
         _handleCCIPWithdrawPingPong(data);
+    }
+
+    function handleCCIPWithdrawFail(bytes memory data) public {
+        _handleCCIPWithdrawFail(data);
+    }
+
+    function isProcessedWithdrawFail(bytes32 messageId) external view returns (bool) {
+        return s_processedWithdrawFails[messageId];
     }
 
     function calculateMintAmount(uint256 totalValue, uint256 amount) public view returns (uint256) {

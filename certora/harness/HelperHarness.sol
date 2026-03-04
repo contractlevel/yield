@@ -27,6 +27,24 @@ contract HelperHarness {
         return abi.encode(withdrawData);
     }
 
+    function buildEncodedWithdrawFailData(
+        bytes32 messageId,
+        address withdrawer,
+        uint256 shareBurnAmount,
+        uint256 totalShares,
+        uint256 usdcWithdrawAmount,
+        uint64 chainSelector
+    ) public pure returns (bytes memory) {
+        IYieldPeer.WithdrawData memory withdrawData = IYieldPeer.WithdrawData({
+            withdrawer: withdrawer,
+            shareBurnAmount: shareBurnAmount,
+            totalShares: totalShares,
+            usdcWithdrawAmount: usdcWithdrawAmount,
+            chainSelector: chainSelector
+        });
+        return abi.encode(messageId, withdrawData);
+    }
+
     function buildEncodedDepositData(
         address depositor,
         uint256 amount,
