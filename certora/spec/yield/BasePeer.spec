@@ -14,14 +14,9 @@ methods {
     function getThisChainSelector() external returns (uint64) envfree;
     function getActiveStrategyAdapter() external returns (address) envfree;
     function getMaxFeeRate() external returns (uint256) envfree;
-    
-    // PausableWithAccessControl methods
     function owner() external returns (address) envfree;
     function paused() external returns (bool) envfree;  
     function hasRole(bytes32, address) external returns (bool) envfree;
-    function getRoleMember(bytes32, uint256) external returns (address) envfree;
-    function getRoleMemberCount(bytes32) external returns (uint256) envfree;
-    function getRoleMembers(bytes32) external returns (address[] memory) envfree;
 
     // External methods
     function share.totalSupply() external returns (uint256) envfree;
@@ -41,6 +36,7 @@ methods {
     function bytes32ToAddress(bytes32 value) external returns (address) envfree;
     function addressToBytes32(address value) external returns (bytes32) envfree;
     function buildEncodedWithdrawFailData(bytes32, address, uint256, uint256, uint256, uint64) external returns (bytes memory) envfree;
+    function isReentrancyGuardLocked() external returns (bool) envfree;
 }
 
 /*//////////////////////////////////////////////////////////////
@@ -361,8 +357,8 @@ hook LOG1(uint offset, uint length, bytes32 t0) {
 /*//////////////////////////////////////////////////////////////
                              RULES
 //////////////////////////////////////////////////////////////*/
-// --- emergency pause --- //
-rule emergencyPause_success() {
+// --- pause --- //
+rule pause_success() {
     env e;
 
     require ghost_paused_eventCount == 0;
@@ -370,14 +366,14 @@ rule emergencyPause_success() {
     require hasRole(emergencyPauserRole(), e.msg.sender) == true;
     require e.msg.value == 0;
 
-    emergencyPause@withrevert(e);
+    pause@withrevert(e);
 
     assert !lastReverted;
     assert paused() == true;
     assert ghost_paused_eventCount == 1;
 }
 
-rule emergencyPause_revertsWhen_noPauserRole() {
+rule pause_revertsWhen_noPauserRole() {
     env e;
 
     /// @dev revert condition being verified
@@ -387,13 +383,13 @@ rule emergencyPause_revertsWhen_noPauserRole() {
     require paused() == false;
     require e.msg.value == 0;
 
-    emergencyPause@withrevert(e);
+    pause@withrevert(e);
 
     assert lastReverted;
     assert paused() == false;
 }
 
-rule emergencyPause_revertsWhen_alreadyPaused() {
+rule pause_revertsWhen_alreadyPaused() {
     env e;
 
     /// @dev revert condition being verified
@@ -403,14 +399,14 @@ rule emergencyPause_revertsWhen_alreadyPaused() {
     require hasRole(emergencyPauserRole(), e.msg.sender) == true;
     require e.msg.value == 0;
 
-    emergencyPause@withrevert(e);
+    pause@withrevert(e);
 
     assert lastReverted;
     assert paused() == true;
 }
 
-// --- emergency unpause --- //
-rule emergencyUnpause_success() {
+// --- unpause --- //
+rule unpause_success() {
     env e;
 
     require ghost_unpaused_eventCount == 0;
@@ -418,14 +414,14 @@ rule emergencyUnpause_success() {
     require hasRole(emergencyUnpauserRole(), e.msg.sender) == true;
     require e.msg.value == 0;
 
-    emergencyUnpause@withrevert(e);
+    unpause@withrevert(e);
 
     assert !lastReverted;
     assert paused() == false;
     assert ghost_unpaused_eventCount == 1;
 }
 
-rule emergencyUnpause_revertsWhen_noUnpauserRole() {
+rule unpause_revertsWhen_noUnpauserRole() {
     env e;
 
     /// @dev revert condition being verified
@@ -435,13 +431,13 @@ rule emergencyUnpause_revertsWhen_noUnpauserRole() {
     require paused() == true;
     require e.msg.value == 0;
 
-    emergencyUnpause@withrevert(e);
+    unpause@withrevert(e);
 
     assert lastReverted;
     assert paused() == true;
 }
 
-rule emergencyUnpause_revertsWhen_notPaused() {
+rule unpause_revertsWhen_notPaused() {
     env e;
 
     /// @dev revert condition being verified
@@ -451,7 +447,7 @@ rule emergencyUnpause_revertsWhen_notPaused() {
     require hasRole(emergencyUnpauserRole(), e.msg.sender) == true;
     require e.msg.value == 0;
 
-    emergencyUnpause@withrevert(e);
+    unpause@withrevert(e);
 
     assert lastReverted;
     assert paused() == false;
@@ -468,6 +464,7 @@ rule deposit_revertsWhen_paused() {
     /// @dev revert conditions not being verified
     require amountToDeposit >= 1000000, "amountToDeposit must be greater than or equal to 1e6";
     require e.msg.value == 0;
+    require isReentrancyGuardLocked() == false;
 
     deposit@withrevert(e, amountToDeposit);
     assert lastReverted;
@@ -483,10 +480,27 @@ rule deposit_revertsWhen_amountLessThan1e6() {
     /// @dev revert conditions not being verified
     require e.msg.value == 0;
     require !paused();
+    require isReentrancyGuardLocked() == false;
 
     deposit@withrevert(e, amountToDeposit);
     assert lastReverted;
 }
+
+rule deposit_revertsWhen_reentrant() {
+      env e;
+      uint256 amountToDeposit;
+
+      /// @dev revert condition being verified
+      require isReentrancyGuardLocked() == true;
+
+      /// @dev revert conditions not being verified
+      require e.msg.value == 0;
+      require !paused();
+      require amountToDeposit >= 1000000;
+
+      deposit@withrevert(e, amountToDeposit);
+      assert lastReverted;
+  }
 
 rule deposit_transfersUsdcFromMsgSender() {
     env e;
@@ -527,6 +541,7 @@ rule onTokenTransfer_revertsWhen_paused() {
     require e.msg.value == 0;
     require shareBurnAmount > 0;
     require getAllowedChain(chainSelector) || chainSelector == getThisChainSelector();
+    require isReentrancyGuardLocked() == false;
 
     /// @dev action
     onTokenTransfer@withrevert(e, withdrawer, shareBurnAmount, encodedWithdrawChainSelector);
@@ -550,6 +565,7 @@ rule onTokenTransfer_revertsWhen_msgSenderIsNotShare() {
     require !paused();
     require shareBurnAmount > 0;
     require getAllowedChain(chainSelector) || chainSelector == getThisChainSelector();
+    require isReentrancyGuardLocked() == false;
 
     /// @dev action
     onTokenTransfer@withrevert(e, withdrawer, shareBurnAmount, encodedWithdrawChainSelector);
@@ -573,10 +589,30 @@ rule onTokenTransfer_revertsWhen_zeroAmount() {
     require getAllowedChain(chainSelector) || chainSelector == getThisChainSelector();
     require e.msg.value == 0;
     require !paused();
+    require isReentrancyGuardLocked() == false;
 
     onTokenTransfer@withrevert(e, withdrawer, shareBurnAmount, encodedWithdrawChainSelector); 
     assert lastReverted;
 }
+
+rule onTokenTransfer_revertsWhen_reentrant() {
+      env e;
+      address withdrawer;
+      uint256 shareBurnAmount;
+      bytes encodedWithdrawChainSelector;
+
+      /// @dev revert condition being verified
+      require isReentrancyGuardLocked() == true;
+
+      /// @dev revert conditions not being verified
+      require e.msg.value == 0;
+      require !paused();
+      require shareBurnAmount > 0;
+      require e.msg.sender == currentContract.i_share;
+
+      onTokenTransfer@withrevert(e, withdrawer, shareBurnAmount, encodedWithdrawChainSelector);
+      assert lastReverted;
+  }
 
 rule onTokenTransfer_emits_WithdrawInitiated_and_SharesBurned() {
     env e;
@@ -847,7 +883,7 @@ rule grantRole_revertsWhen_msgSenderIsNotDefaultAdmin() {
     assert lastReverted;
 }
 
-rule grantRole_revertsWhen_grantedRoleIsDefaultAdmin() {
+rule grantRole_revertsWhen_roleIsDefaultAdmin() {
     env e;
     bytes32 role;
     address account;
@@ -869,15 +905,10 @@ rule grantRole_success() {
     address account;
 
     require hasRole(role, account) == false;
-    require getRoleMemberCount(role) == 0;
-    require currentContract.s_roleMembers[role]._inner._positions[addressToBytes32(account)] == 0;
 
     grantRole(e, role, account);
 
     assert hasRole(role, account) == true;
-    assert getRoleMemberCount(role) == 1;
-    assert getRoleMember(role, 0) == account;
-    assert currentContract.s_roleMembers[role]._inner._positions[addressToBytes32(account)] == 1;
 }
 
 // --- revokeRole --- //
@@ -899,7 +930,7 @@ rule revokeRole_revertsWhen_msgSenderIsNotDefaultAdmin() {
     assert lastReverted;
 }
 
-rule revokeRole_revertsWhen_revokeRoleIsDefaultAdmin() {
+rule revokeRole_revertsWhen_roleIsDefaultAdmin() {
     env e;
     bytes32 role;
     address account;
@@ -921,169 +952,8 @@ rule revokeRole_success() {
     address account;
 
     require hasRole(role, account) == true;
-    require getRoleMemberCount(role) == 1;
-    require getRoleMember(role, 0) == account;
-    require currentContract.s_roleMembers[role]._inner._positions[addressToBytes32(account)] == 1;
 
     revokeRole(e, role, account);
 
     assert hasRole(role, account) == false;
-    assert getRoleMemberCount(role) == 0;
-    assert currentContract.s_roleMembers[role]._inner._positions[addressToBytes32(account)] == 0;
-}
-
-// --- getRole --- // 
-rule getRoleMember_returns_roleMember() {
-    env e;
-    address crossChainAdmin1;
-    address crossChainAdmin2;
-    address crossChainAdmin3;
-    address pauser1;
-    address pauser2;
-
-    require crossChainAdmin1 != crossChainAdmin2;
-    require crossChainAdmin3 != crossChainAdmin1;
-    require crossChainAdmin2 != crossChainAdmin3;
-    require pauser1 != pauser2;
-
-    require getRoleMemberCount(crossChainAdminRole()) == 0;
-    require getRoleMemberCount(emergencyPauserRole()) == 0;
-
-    require hasRole(crossChainAdminRole(), crossChainAdmin1) == false;
-    require hasRole(crossChainAdminRole(), crossChainAdmin2) == false;
-    require hasRole(crossChainAdminRole(), crossChainAdmin3) == false;
-    require currentContract.s_roleMembers[crossChainAdminRole()]._inner._positions[addressToBytes32(crossChainAdmin1)] == 0;
-    require currentContract.s_roleMembers[crossChainAdminRole()]._inner._positions[addressToBytes32(crossChainAdmin2)] == 0;
-    require currentContract.s_roleMembers[crossChainAdminRole()]._inner._positions[addressToBytes32(crossChainAdmin3)] == 0; 
-
-    require hasRole(emergencyPauserRole(), pauser1) == false;
-    require hasRole(emergencyPauserRole(), pauser2) == false;
-    require currentContract.s_roleMembers[emergencyPauserRole()]._inner._positions[addressToBytes32(pauser1)] == 0;
-    require currentContract.s_roleMembers[emergencyPauserRole()]._inner._positions[addressToBytes32(pauser2)] == 0;
-
-    grantRole(e, crossChainAdminRole(), crossChainAdmin1);
-    grantRole(e, crossChainAdminRole(), crossChainAdmin2);
-    grantRole(e, crossChainAdminRole(), crossChainAdmin3);
-    grantRole(e, emergencyPauserRole(), pauser1);    
-    grantRole(e, emergencyPauserRole(), pauser2);
-
-    assert getRoleMember(crossChainAdminRole(), 0) == crossChainAdmin1;
-    assert getRoleMember(crossChainAdminRole(), 1) == crossChainAdmin2;
-    assert getRoleMember(crossChainAdminRole(), 2) == crossChainAdmin3;
-    assert getRoleMember(emergencyPauserRole(), 0) == pauser1;
-    assert getRoleMember(emergencyPauserRole(), 1) == pauser2;
-}
-
-rule getRoleMemberCount_returns_roleMemberCount() {
-    env e;
-    /// @dev we are adding a random assortment of role users to test numbers
-    address configAdmin;
-    address crossChainAdmin1;
-    address crossChainAdmin2;
-    address crossChainAdmin3;
-    address pauser1;
-    address pauser2;
-    address unpauser1;
-    address unpauser2;
-    address feeSetter;
-    address feeWithdrawer;
-
-    require crossChainAdmin1 != crossChainAdmin2;
-    require crossChainAdmin3 != crossChainAdmin1;
-    require crossChainAdmin2 != crossChainAdmin3;
-    require pauser1 != pauser2;
-    require unpauser1 != unpauser2;
-
-    require getRoleMemberCount(configAdminRole()) == 0;
-    require getRoleMemberCount(crossChainAdminRole()) == 0;
-    require getRoleMemberCount(emergencyPauserRole()) == 0;
-    require getRoleMemberCount(emergencyUnpauserRole()) == 0;
-    require getRoleMemberCount(feeRateSetterRole()) == 0;
-    require getRoleMemberCount(feeWithdrawerRole()) == 0;
-
-    // config admin
-    require hasRole(configAdminRole(), configAdmin) == false;
-    require currentContract.s_roleMembers[configAdminRole()]._inner._positions[addressToBytes32(configAdmin)] == 0;
-    // cross chain admin
-    require hasRole(crossChainAdminRole(), crossChainAdmin1) == false;
-    require hasRole(crossChainAdminRole(), crossChainAdmin2) == false;
-    require hasRole(crossChainAdminRole(), crossChainAdmin3) == false;
-    require currentContract.s_roleMembers[crossChainAdminRole()]._inner._positions[addressToBytes32(crossChainAdmin1)] == 0;
-    require currentContract.s_roleMembers[crossChainAdminRole()]._inner._positions[addressToBytes32(crossChainAdmin2)] == 0;
-    require currentContract.s_roleMembers[crossChainAdminRole()]._inner._positions[addressToBytes32(crossChainAdmin3)] == 0; 
-    // pauser
-    require hasRole(emergencyPauserRole(), pauser1) == false;
-    require hasRole(emergencyPauserRole(), pauser2) == false;
-    require currentContract.s_roleMembers[emergencyPauserRole()]._inner._positions[addressToBytes32(pauser1)] == 0;
-    require currentContract.s_roleMembers[emergencyPauserRole()]._inner._positions[addressToBytes32(pauser2)] == 0;
-    // unpauser
-    require hasRole(emergencyUnpauserRole(), unpauser1) == false;
-    require hasRole(emergencyUnpauserRole(), unpauser2) == false;
-    require currentContract.s_roleMembers[emergencyUnpauserRole()]._inner._positions[addressToBytes32(unpauser1)] == 0;
-    require currentContract.s_roleMembers[emergencyUnpauserRole()]._inner._positions[addressToBytes32(unpauser2)] == 0;
-    // fee rate setter
-    require hasRole(feeRateSetterRole(), feeSetter) == false;
-    require currentContract.s_roleMembers[feeRateSetterRole()]._inner._positions[addressToBytes32(feeSetter)] == 0;
-    // fee withdrawer
-    require hasRole(feeWithdrawerRole(), feeWithdrawer) == false;
-    require currentContract.s_roleMembers[feeWithdrawerRole()]._inner._positions[addressToBytes32(feeWithdrawer)] == 0;
-
-    grantRole(e, configAdminRole(), configAdmin);
-    grantRole(e, crossChainAdminRole(), crossChainAdmin1);
-    grantRole(e, crossChainAdminRole(), crossChainAdmin2);
-    grantRole(e, crossChainAdminRole(), crossChainAdmin3);
-    grantRole(e, emergencyPauserRole(), pauser1);    
-    grantRole(e, emergencyPauserRole(), pauser2);
-    grantRole(e, emergencyUnpauserRole(), unpauser1);    
-    grantRole(e, emergencyUnpauserRole(), unpauser2);
-    grantRole(e, feeRateSetterRole(), feeSetter);
-    grantRole(e, feeWithdrawerRole(), feeWithdrawer);
-
-    assert getRoleMemberCount(configAdminRole()) == 1;
-    assert getRoleMemberCount(crossChainAdminRole()) == 3;
-    assert getRoleMemberCount(emergencyPauserRole()) == 2;
-    assert getRoleMemberCount(emergencyUnpauserRole()) == 2;
-    assert getRoleMemberCount(feeRateSetterRole()) == 1;
-    assert getRoleMemberCount(feeWithdrawerRole()) == 1;
-}
-
-rule getRoleMembers_returns_roleMembers() {
-    env e1;
-    env e2;
-    address pauser1;
-    address pauser2;
-    address crossChainAdmin1;
-    address crossChainAdmin2;
-
-    require pauser1 != pauser2;
-    require crossChainAdmin1 != crossChainAdmin2;
-
-    require getRoleMemberCount(emergencyPauserRole()) == 0;
-    require getRoleMemberCount(crossChainAdminRole()) == 0;
-
-    require hasRole(emergencyPauserRole(), pauser1) == false;
-    require hasRole(emergencyPauserRole(), pauser2) == false;
-    require hasRole(crossChainAdminRole(), crossChainAdmin1) == false;
-    require hasRole(crossChainAdminRole(), crossChainAdmin2) == false;
-     
-    require currentContract.s_roleMembers[emergencyPauserRole()]._inner._positions[addressToBytes32(pauser1)] == 0;
-    require currentContract.s_roleMembers[emergencyPauserRole()]._inner._positions[addressToBytes32(pauser2)] == 0;   
-    require currentContract.s_roleMembers[crossChainAdminRole()]._inner._positions[addressToBytes32(crossChainAdmin1)] == 0;
-    require currentContract.s_roleMembers[crossChainAdminRole()]._inner._positions[addressToBytes32(crossChainAdmin2)] == 0;
-
-    require e2.block.timestamp > e1.block.timestamp;
-
-    grantRole(e1, emergencyPauserRole(), pauser1);
-    grantRole(e2, emergencyPauserRole(), pauser2);
-    grantRole(e1, crossChainAdminRole(), crossChainAdmin1);
-    grantRole(e2, crossChainAdminRole(), crossChainAdmin2);
-
-    address[] actualPauserMembers = getRoleMembers(emergencyPauserRole());
-    address[] actualCrossChainMembers = getRoleMembers(crossChainAdminRole());
-    assert actualPauserMembers.length == 2;
-    assert actualPauserMembers[0] == pauser1;
-    assert actualPauserMembers[1] == pauser2;
-    assert actualCrossChainMembers.length == 2;
-    assert actualCrossChainMembers[0] == crossChainAdmin1;
-    assert actualCrossChainMembers[1] == crossChainAdmin2;
 }

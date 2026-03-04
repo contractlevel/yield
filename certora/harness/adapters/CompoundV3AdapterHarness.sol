@@ -9,4 +9,9 @@ contract CompoundV3AdapterHarness is CompoundV3Adapter, HelperHarness {
         address yieldPeer,
         address comet
     ) CompoundV3Adapter(yieldPeer, comet) {}
+
+    // @review:certora this can be modularized across adapter harnesses
+    function isReentrancyGuardLocked() public view returns (bool) {
+        return _reentrancyGuardEntered();
+    }
 }

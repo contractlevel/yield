@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.26;
 
 import {BurnMintERC677} from "@chainlink/contracts/src/v0.8/shared/token/ERC677/BurnMintERC677.sol";
@@ -22,6 +22,7 @@ contract Share is BurnMintERC677, IGetCCIPAdmin {
     /*//////////////////////////////////////////////////////////////
                               CONSTRUCTOR
     //////////////////////////////////////////////////////////////*/
+    // @review ccipAdmin should be passed or transferred in deploy script
     constructor() BurnMintERC677("YieldCoin", "YIELD", 18, 0) {
         s_ccipAdmin = msg.sender;
     }

@@ -56,6 +56,8 @@ contract DeployChild is Script {
         childPeer.setStrategyRegistry(address(strategyRegistry));
         childPeer.revokeRole(Roles.CONFIG_ADMIN_ROLE, childPeer.owner());
 
+        // @review this will need to also begin transfer the default admin role to a multisig address
+
         vm.stopBroadcast();
 
         return (share, sharePool, childPeer, config, strategyRegistry, aaveV3Adapter, compoundV3Adapter);

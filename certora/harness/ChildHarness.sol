@@ -34,8 +34,8 @@ contract ChildHarness is ChildPeer, HelperHarness {
         _handleCCIPWithdrawCallbackChild(tokenAmounts, data);
     }
 
-    function handleCCIPRebalanceOldStrategy(bytes memory data) public {
-        _handleCCIPRebalanceOldStrategy(data);
+    function handleCCIPRebalanceFromOldStrategy(bytes memory data) public {
+        _handleCCIPRebalanceFromOldStrategy(data);
     }
 
     function handleCCIPWithdrawFail(bytes memory data) public {
@@ -49,5 +49,10 @@ contract ChildHarness is ChildPeer, HelperHarness {
     // @review:certora this can be modularized across peer harnesses
     function calculateFee(uint256 stablecoinDepositAmount) public view returns (uint256) {
         return _calculateFee(stablecoinDepositAmount);
+    }
+
+    // @review:certora this can be modularized across peer harnesses
+    function isReentrancyGuardLocked() public view returns (bool) {
+        return _reentrancyGuardEntered();
     }
 }

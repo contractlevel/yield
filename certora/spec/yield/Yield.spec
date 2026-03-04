@@ -364,17 +364,17 @@ rule handleCCIPWithdrawFail_fullFlow_fromTransfer() {
     assert share.balanceOf(withdrawer) == withdrawerBalanceBefore;
 }
 
-// --- handleCCIPRebalanceNewStrategy --- //
-rule handleCCIPRebalanceNewStrategy_emits_ActiveStrategyAdapterUpdated() {
+// --- handleCCIPRebalanceToNewStrategy --- //
+rule handleCCIPRebalanceToNewStrategy_emits_ActiveStrategyAdapterUpdated() {
     env e;
     calldataarg args;
 
     require ghost_activeStrategyAdapterUpdated_eventCount == 0;
-    handleCCIPRebalanceNewStrategy(e, args);
+    handleCCIPRebalanceToNewStrategy(e, args);
     assert ghost_activeStrategyAdapterUpdated_eventCount == 1;
 }
 
-rule handleCCIPRebalanceNewStrategy_depositsToNewStrategy_and_updatesActiveStrategyAdapter() {
+rule handleCCIPRebalanceToNewStrategy_depositsToNewStrategy_and_updatesActiveStrategyAdapter() {
     env e;
     Client.EVMTokenAmount[] tokenAmounts;
     bytes32 protocolId;
@@ -382,7 +382,7 @@ rule handleCCIPRebalanceNewStrategy_depositsToNewStrategy_and_updatesActiveStrat
     bytes32 compoundV3ProtocolId;
     bytes strategyData = encodeStrategy(getThisChainSelector(), protocolId);
 
-    /// @dev _handleCCIPRebalanceNewStrategy handles cases where TVL is 0, but an optimal strategy change occurs
+    /// @dev _handleCCIPRebalanceToNewStrategy handles cases where TVL is 0, but an optimal strategy change occurs
     require tokenAmounts[0].token == usdc;
     uint256 tokenAmountsValueBefore = tokenAmounts[0].amount;
 
@@ -393,7 +393,7 @@ rule handleCCIPRebalanceNewStrategy_depositsToNewStrategy_and_updatesActiveStrat
     uint256 totalValueBefore = tokenAmounts[0].amount;
     mathint depositToStrategy_eventCountBefore = ghost_depositToStrategy_eventCount;
 
-    handleCCIPRebalanceNewStrategy(e, tokenAmounts, strategyData);
+    handleCCIPRebalanceToNewStrategy(e, tokenAmounts, strategyData);
 
     assert protocolId == aaveV3ProtocolId => getActiveStrategyAdapter() == aaveV3Adapter;
     assert protocolId == compoundV3ProtocolId => getActiveStrategyAdapter() == compoundV3Adapter;
@@ -443,7 +443,8 @@ rule withdrawFromStrategy_emit_WithdrawFromStrategy() {
     assert ghost_withdrawFromStrategy_eventCount == 1;
 }
 
-rule withdrawFromStrategy_withdrawsFromStrategy(env e) {
+rule withdrawFromStrategy_withdrawsFromStrategy() {
+    env e;
     address strategyAdapter = getActiveStrategyAdapter();
     uint256 amount;
 
@@ -453,6 +454,17 @@ rule withdrawFromStrategy_withdrawsFromStrategy(env e) {
     require amount > 0, "amount must be greater than 0";
     withdrawFromStrategy(e, strategyAdapter, amount);
 
-    assert strategyAdapter == aaveV3Adapter => aUsdc.balanceOf(e, strategyAdapter) == aUsdcBalanceBefore - amount;
-    assert strategyAdapter == compoundV3Adapter => compound.balanceOf(e, strategyAdapter) == compoundBalanceBefore - amount;
+    /// @dev rebalance withdraw from aaveV3
+    assert amount == max_uint256 && strategyAdapter == aaveV3Adapter =>
+        aUsdc.balanceOf(e, strategyAdapter) == 0;
+    /// @dev user withdraw from aaveV3
+    assert amount != max_uint256 && strategyAdapter == aaveV3Adapter =>
+        aUsdc.balanceOf(e, strategyAdapter) == aUsdcBalanceBefore - amount;
+
+    /// @dev rebalance withdraw from compoundV3
+    assert amount == max_uint256 && strategyAdapter == compoundV3Adapter =>
+        compound.balanceOf(e, strategyAdapter) == 0;
+    /// @dev user withdraw from compoundV3
+    assert amount != max_uint256 && strategyAdapter == compoundV3Adapter =>
+        compound.balanceOf(e, strategyAdapter) == compoundBalanceBefore - amount;
 }

@@ -545,8 +545,8 @@ rule handleCCIPWithdrawToStrategy_emits_CCIPMessageSent_when_differentChain() {
     assert ghost_ccipMessageSent_bridgeAmount_emitted == expectedBridgeAmount;
 }
 
-// --- handleCCIPRebalanceOldStrategy --- //
-rule handleCCIPRebalanceOldStrategy_withdrawsFromOldStrategy() {
+// --- handleCCIPRebalanceFromOldStrategy --- //
+rule handleCCIPRebalanceFromOldStrategy_withdrawsFromOldStrategy() {
     env e;
     uint256 totalValue = getTotalValue(e);
     address oldStrategyPool = getActiveStrategyAdapter().getStrategyPool(e);
@@ -576,7 +576,7 @@ rule handleCCIPRebalanceOldStrategy_withdrawsFromOldStrategy() {
     require aaveBalanceBefore - totalValue >= 0, "should not cause underflow";
     require compoundBalanceBefore - totalValue >= 0, "should not cause underflow";
 
-    handleCCIPRebalanceOldStrategy(e, newStrategy);
+    handleCCIPRebalanceFromOldStrategy(e, newStrategy);
 
     assert oldStrategyPool == aavePool => 
         usdc.balanceOf(aavePool) == aaveBalanceBefore - totalValue;
@@ -584,7 +584,7 @@ rule handleCCIPRebalanceOldStrategy_withdrawsFromOldStrategy() {
         usdc.balanceOf(compoundPool) == compoundBalanceBefore - totalValue;
 }
 
-rule handleCCIPRebalanceOldStrategy_depositsToNewStrategy_when_sameChain() {
+rule handleCCIPRebalanceFromOldStrategy_depositsToNewStrategy_when_sameChain() {
     env e;
     uint256 totalValue = getTotalValue(e);
     address oldStrategyPool = getActiveStrategyAdapter().getStrategyPool(e);
@@ -617,7 +617,7 @@ rule handleCCIPRebalanceOldStrategy_depositsToNewStrategy_when_sameChain() {
 
     require usdc.balanceOf(currentContract) == 0;
 
-    handleCCIPRebalanceOldStrategy(e, newStrategy);
+    handleCCIPRebalanceFromOldStrategy(e, newStrategy);
 
     assert oldStrategyPool == compoundPool
         => usdc.balanceOf(compoundPool) == compoundBalanceBefore - totalValue &&
@@ -627,7 +627,7 @@ rule handleCCIPRebalanceOldStrategy_depositsToNewStrategy_when_sameChain() {
         usdc.balanceOf(compoundPool) == compoundBalanceBefore + totalValue;
 }
 
-rule handleCCIPRebalanceOldStrategy_emits_CCIPMessageSent_when_differentChain() {
+rule handleCCIPRebalanceFromOldStrategy_emits_CCIPMessageSent_when_differentChain() {
     env e;
     uint256 totalValue = getTotalValue(e);
     uint64 chainSelector;
@@ -636,9 +636,9 @@ rule handleCCIPRebalanceOldStrategy_emits_CCIPMessageSent_when_differentChain() 
     bytes newStrategy = encodeStrategy(chainSelector, protocolId);
     require usdc.balanceOf(currentContract) == 0;
     require ghost_ccipMessageSent_eventCount == 0;
-    handleCCIPRebalanceOldStrategy(e, newStrategy);
+    handleCCIPRebalanceFromOldStrategy(e, newStrategy);
     assert ghost_ccipMessageSent_eventCount == 1;
-    assert ghost_ccipMessageSent_txType_emitted == 10; // CcipTxType.RebalanceNewStrategy
+    assert ghost_ccipMessageSent_txType_emitted == 10; // CcipTxType.RebalanceToNewStrategy
     assert ghost_ccipMessageSent_bridgeAmount_emitted == totalValue;
 }
 
@@ -749,9 +749,9 @@ rule handleCCIPMessage_WithdrawCallbackChild() {
     assert ghost_withdrawCompleted_eventCount == 1;
 }
 
-rule handleCCIPMessage_RebalanceOldStrategy() {
+rule handleCCIPMessage_RebalanceFromOldStrategy() {
     env e;
-    IYieldPeer.CcipTxType txType = IYieldPeer.CcipTxType.RebalanceOldStrategy;
+    IYieldPeer.CcipTxType txType = IYieldPeer.CcipTxType.RebalanceFromOldStrategy;
     Client.EVMTokenAmount[] tokenAmounts;
     bytes data;
     uint64 sourceChainSelector;
@@ -772,9 +772,9 @@ rule handleCCIPMessage_RebalanceOldStrategy() {
     assert ghost_depositToStrategy_eventCount == 1 || ghost_ccipMessageSent_eventCount == 1;
 }
 
-rule handleCCIPMessage_RebalanceNewStrategy() {
+rule handleCCIPMessage_RebalanceToNewStrategy() {
     env e;
-    IYieldPeer.CcipTxType txType = IYieldPeer.CcipTxType.RebalanceNewStrategy;
+    IYieldPeer.CcipTxType txType = IYieldPeer.CcipTxType.RebalanceToNewStrategy;
     Client.EVMTokenAmount[] tokenAmounts;
     bytes data;
     uint64 sourceChainSelector;

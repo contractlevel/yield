@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.26;
 
 import {YieldPeer, Client, IRouterClient, CCIPOperations} from "./YieldPeer.sol";
@@ -53,7 +53,7 @@ contract ChildPeer is YieldPeer {
     /// @dev Revert if amountToDeposit is less than 1e6 (1 USDC)
     /// @dev Revert if peer is paused
     /// @notice User must approve this contract to spend their stablecoin
-    function deposit(uint256 amountToDeposit) external override whenNotPaused {
+    function deposit(uint256 amountToDeposit) external override nonReentrant whenNotPaused {
         /// @dev takes a fee
         /// same var name ==== confusing!
         amountToDeposit = _initiateDeposit(amountToDeposit);
@@ -93,6 +93,7 @@ contract ChildPeer is YieldPeer {
     )
         external
         override
+        nonReentrant
         whenNotPaused
     {
         _revertIfMsgSenderIsNotShare();
@@ -112,8 +113,8 @@ contract ChildPeer is YieldPeer {
     /// - CcipTxType DepositCallbackChild: A tx from parent to this-child to mint shares to the depositor
     /// - CcipTxType WithdrawToStrategy: A tx from parent to this-child-strategy to withdraw USDC from strategy and get usdcWithdrawAmount
     /// - CcipTxType WithdrawCallbackChild: A tx from parent to this-child (withdraw chain) to burn shares and transfer USDC to withdrawer
-    /// - CcipTxType RebalanceOldStrategy: A tx from parent to this-old-strategy to rebalance funds to the new strategy
-    /// - CcipTxType RebalanceNewStrategy: A tx from the old strategy, sending rebalanced funds to this new strategy
+    /// - CcipTxType RebalanceFromOldStrategy: A tx from parent to this-old-strategy to rebalance funds to the new strategy
+    /// - CcipTxType RebalanceToNewStrategy: A tx from the old strategy, sending rebalanced funds to this new strategy
     /// @param tokenAmounts The token amounts received in the CCIP message
     /// @param data The data received in the CCIP message. It will be either DepositData, WithdrawData, or the encoded Strategy struct.
     function _handleCCIPMessage(
@@ -133,8 +134,8 @@ contract ChildPeer is YieldPeer {
         if (txType == CcipTxType.WithdrawCallbackChild) _handleCCIPWithdrawCallbackChild(tokenAmounts, data);
         if (txType == CcipTxType.WithdrawFail) _handleCCIPWithdrawFail(data);
         //slither-disable-next-line reentrancy-no-eth
-        if (txType == CcipTxType.RebalanceOldStrategy) _handleCCIPRebalanceOldStrategy(data);
-        if (txType == CcipTxType.RebalanceNewStrategy) _handleCCIPRebalanceNewStrategy(tokenAmounts, data);
+        if (txType == CcipTxType.RebalanceFromOldStrategy) _handleCCIPRebalanceFromOldStrategy(data);
+        if (txType == CcipTxType.RebalanceToNewStrategy) _handleCCIPRebalanceToNewStrategy(tokenAmounts, data);
     }
 
     /// @notice This function handles a deposit sent from Parent to this Strategy-Child
@@ -215,7 +216,7 @@ contract ChildPeer is YieldPeer {
     /// @notice This function should only be executed when this chain is the (old) strategy
     /// @dev Rebalances funds from the old strategy to the new strategy
     /// @param data The data to decode - decodes to Strategy (chainSelector, protocolId)
-    function _handleCCIPRebalanceOldStrategy(bytes memory data) internal {
+    function _handleCCIPRebalanceFromOldStrategy(bytes memory data) internal {
         /// @dev cache the old active strategy adapter
         address oldActiveStrategyAdapter = _getActiveStrategyAdapter();
 
@@ -226,8 +227,7 @@ contract ChildPeer is YieldPeer {
 
         /// @dev withdraw from the old strategy
         uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, address(i_usdc));
-        // @review consider returning actualWithdrawn to be used in deposit to newActiveStrategyAdapter or ccipSend
-        if (totalValue != 0) _withdrawFromStrategy(oldActiveStrategyAdapter, type(uint256).max);
+        if (totalValue != 0) totalValue = _withdrawFromStrategy(oldActiveStrategyAdapter, type(uint256).max);
 
         // if the new strategy is this chain, but different protocol, then we need to deposit to the new strategy
         if (newStrategy.chainSelector == i_thisChainSelector) {
@@ -236,7 +236,7 @@ contract ChildPeer is YieldPeer {
         }
         // if the new strategy is a different chain, then we need to send the usdc we just withdrew to the new strategy
         else {
-            _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, data, totalValue);
+            _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceToNewStrategy, data, totalValue);
         }
     }
 

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.26;
 
 import {IYieldFees} from "./IYieldFees.sol";
@@ -18,9 +18,9 @@ interface IYieldPeer is IYieldFees {
         WithdrawToStrategy, // 5 - withdraw from parent to strategy (to withdraw from strategy and get usdcWithdrawAmount)
         WithdrawCallbackChild, // 6 - withdraw callback from parent to withdraw-child (to burn shares and send USDC)
         WithdrawCallbackParent, // 7 - withdraw callback from strategy to parent (to update s_totalShares and forward or transfer)
-        WithdrawFail, // 8 - withdraw failed on strategy; return shares to withdrawer (Phase 2)
-        RebalanceOldStrategy, // 9 - message from parent to old strategy (to move funds to new strategy)
-        RebalanceNewStrategy, // 10 - reallocate funds from old strategy to new strategy
+        WithdrawFail, // 8 - withdraw failed on strategy; return shares to withdrawer
+        RebalanceFromOldStrategy, // 9 - message from parent to old strategy (to move funds to new strategy)
+        RebalanceToNewStrategy, // 10 - reallocate funds from old strategy to new strategy
         DepositPingPong, // 11 - pingpong deposit Tx from child to parent (to allow TVL to reach strategy chain)
         WithdrawPingPong // 12 - pingpong withdraw Tx from parent to child (to allow TVL to reach strategy chain)
     }
@@ -51,4 +51,7 @@ interface IYieldPeer is IYieldFees {
     function getAllowedPeer(uint64 chainSelector) external view returns (address);
     function getActiveStrategyAdapter() external view returns (address);
     function getStrategyRegistry() external view returns (address);
+    function getThisChainSelector() external view returns (uint64);
+    function pause() external;
+    function unpause() external;
 }

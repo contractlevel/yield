@@ -1,5 +1,7 @@
 # YieldCoin aka Contract Level Yield (CLY)
 
+**Note:** _This README is significantly out of date. Automation and Functions have been replaced by CRE._
+
 This project has been built for the Chainlink Chromion Hackathon, and is an automated, crosschain, stablecoin yield optimizer, powered by Chainlink Automation, Functions, and CCIP.
 
 Whatever the highest yield is for stablecoins across chains is what users can earn in one click with Contract Level Yield (YieldCoin).
@@ -219,8 +221,8 @@ CCIP faciliates secure crosschain communication and value transfer for rebalance
 - **4 - WithdrawToParent**: A withdraw from a `ChildPeer` to the `ParentPeer`. This forwards the withdrawal to the active strategy and updates `s_totalShares` to reflect the amount of YieldCoin burned when initiating the withdrawal.
 - **5 - WithdrawToStrategy**: A withdraw from the `ParentPeer` to the active Strategy. This calculates the `usdcWithdrawAmount` and withdraws it from the active Strategy.
 - **6 - WithdrawCallback**: A callback from the active Strategy to the withdraw chain. This sends the withdrawn USDC to the withdrawer.
-- **7 - RebalanceOldStrategy**: A message from the `ParentPeer` to the old Strategy. This is to withdraw funds from the old Strategy to move to the new Strategy.
-- **8 - RebalanceNewStrategy**: A value transfer from the old Strategy to the new Strategy. This is to deposit funds into the new Strategy.
+- **7 - RebalanceFromOldStrategy**: A message from the `ParentPeer` to the old Strategy. This is to withdraw funds from the old Strategy to move to the new Strategy.
+- **8 - RebalanceToNewStrategy**: A value transfer from the old Strategy to the new Strategy. This is to deposit funds into the new Strategy.
 
 ## Transaction Flows
 

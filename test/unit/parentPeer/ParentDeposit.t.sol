@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.26;
 
 import {BaseTest, IERC20, Vm, console2} from "../../BaseTest.t.sol";
@@ -36,9 +36,9 @@ contract ParentDepositTest is BaseTest {
         baseParentPeer.deposit(1e6 - 1);
     }
 
-    function test_yield_parent_deposit_revertsWhen_parentPaused() public {
+    function test_yield_parent_deposit_revertsWhen_paused() public {
         _changePrank(emergencyPauser);
-        baseParentPeer.emergencyPause();
+        baseParentPeer.pause();
         _changePrank(depositor);
         vm.expectRevert(abi.encodeWithSignature("EnforcedPause()"));
         baseParentPeer.deposit(DEPOSIT_AMOUNT);
@@ -268,7 +268,7 @@ contract ParentDepositTest is BaseTest {
         assertEq(activeStrategyAdapter, address(baseAaveV3Adapter), "ActiveStrategyAdapter should be Aave adapter");
 
         /// @dev Simulate the rebalance window: manually set activeStrategyAdapter to 0
-        /// @dev This simulates the state where s_strategy was updated but _handleCCIPRebalanceNewStrategy hasn't been called yet
+        /// @dev This simulates the state where s_strategy was updated but _handleCCIPRebalanceToNewStrategy hasn't been called yet
         stdstore.target(address(baseParentPeer)).sig("getActiveStrategyAdapter()").checked_write(address(0));
 
         /// @dev Verify activeStrategyAdapter is now 0

@@ -1,7 +1,8 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.26;
 
-import {YieldPeer, Client, IRouterClient, CCIPOperations, IERC20, SafeERC20, Roles} from "./YieldPeer.sol";
+import {YieldPeer, Client, IRouterClient, CCIPOperations, IERC20, SafeERC20, Roles, IYieldPeer} from "./YieldPeer.sol";
+import {IParentPeer} from "../interfaces/IParentPeer.sol";
 
 /// @title YieldCoin ParentPeer
 /// @author @contractlevel
@@ -9,7 +10,7 @@ import {YieldPeer, Client, IRouterClient, CCIPOperations, IERC20, SafeERC20, Rol
 /// @notice This contract is deployed on only one chain
 /// @notice Users can deposit and withdraw USDC to/from the system via this contract
 /// @notice This contract tracks system wide state and acts as a system wide hub for forwarding CCIP messages to the Strategy
-contract ParentPeer is YieldPeer {
+contract ParentPeer is YieldPeer, IParentPeer {
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS
     //////////////////////////////////////////////////////////////*/
@@ -86,7 +87,7 @@ contract ParentPeer is YieldPeer {
     /// @param amountToDeposit The amount of USDC to deposit into the system
     /// @dev Revert if amountToDeposit is less than 1e6 (1 USDC)
     /// @dev Revert if peer is paused
-    function deposit(uint256 amountToDeposit) external override whenNotPaused {
+    function deposit(uint256 amountToDeposit) external override(YieldPeer, IYieldPeer) nonReentrant whenNotPaused {
         /// @dev takes a fee
         amountToDeposit = _initiateDeposit(amountToDeposit);
 
@@ -140,7 +141,8 @@ contract ParentPeer is YieldPeer {
         bytes calldata /* data */
     )
         external
-        override
+        override(YieldPeer)
+        nonReentrant
         whenNotPaused
     {
         _revertIfMsgSenderIsNotShare();
@@ -212,7 +214,7 @@ contract ParentPeer is YieldPeer {
     /// - CcipTxType DepositCallbackParent: A tx from the strategy to parent to calculate shareMintAmount and mint shares to the depositor on this chain or another child chain
     /// - CcipTxType WithdrawToParent: A tx from the withdraw chain to forward to the strategy chain
     /// - CcipTxType WithdrawCallbackParent: A tx from the strategy chain; parent updates s_totalShares and forwards WithdrawCallbackChild or transfers
-    /// - CcipTxType RebalanceNewStrategy: A tx from the old strategy, sending rebalanced funds to the new strategy
+    /// - CcipTxType RebalanceToNewStrategy: A tx from the old strategy, sending rebalanced funds to the new strategy
     /// @param tokenAmounts The token amounts received in the CCIP message
     /// @param data The data received in the CCIP message
     /// @param sourceChainSelector The chain selector of the chain where the message originated from
@@ -232,7 +234,7 @@ contract ParentPeer is YieldPeer {
         if (txType == CcipTxType.WithdrawCallbackParent) _handleCCIPWithdrawCallbackParent(tokenAmounts, data);
         if (txType == CcipTxType.WithdrawFail) _handleCCIPWithdrawFail(data);
         //slither-disable-next-line reentrancy-events
-        if (txType == CcipTxType.RebalanceNewStrategy) _handleCCIPRebalanceNewStrategy(tokenAmounts, data);
+        if (txType == CcipTxType.RebalanceToNewStrategy) _handleCCIPRebalanceToNewStrategy(tokenAmounts, data);
     }
 
     /// @notice This function handles a deposit from a child to this parent and the 2 strategy cases:
@@ -480,10 +482,9 @@ contract ParentPeer is YieldPeer {
 
         uint256 totalValue = _getTotalValueFromStrategy(oldActiveStrategyAdapter, address(i_usdc));
         if (totalValue != 0) {
-            // @review consider returning actualWithdrawn to be used in deposit to newActiveStrategyAdapter
-            _withdrawFromStrategy(oldActiveStrategyAdapter, type(uint256).max);
+            uint256 totalValueWithdrawn = _withdrawFromStrategy(oldActiveStrategyAdapter, type(uint256).max);
             //slither-disable-next-line reentrancy-events
-            _depositToStrategy(newActiveStrategyAdapter, totalValue);
+            _depositToStrategy(newActiveStrategyAdapter, totalValueWithdrawn);
         }
     }
 
@@ -497,10 +498,9 @@ contract ParentPeer is YieldPeer {
         // @review unused-return, returns newActiveStrategyAdapter
         _updateActiveStrategyAdapter(newStrategy.chainSelector, newStrategy.protocolId);
 
-        // @review consider returning actualWithdrawn to be used as bridgeAmount in ccipSend
-        if (totalValue != 0) _withdrawFromStrategy(oldActiveStrategyAdapter, type(uint256).max);
+        if (totalValue != 0) totalValue = _withdrawFromStrategy(oldActiveStrategyAdapter, type(uint256).max);
 
-        _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceNewStrategy, abi.encode(newStrategy), totalValue);
+        _ccipSend(newStrategy.chainSelector, CcipTxType.RebalanceToNewStrategy, abi.encode(newStrategy), totalValue);
     }
 
     /// @dev Handle rebalancing on a child chain by sending it new Strategy info
@@ -508,7 +508,7 @@ contract ParentPeer is YieldPeer {
     /// @param oldChainSelector The chain selector of the old strategy
     /// @param newStrategy The new strategy
     function _rebalanceChildToOther(uint64 oldChainSelector, Strategy memory newStrategy) internal {
-        _ccipSend(oldChainSelector, CcipTxType.RebalanceOldStrategy, abi.encode(newStrategy), ZERO_BRIDGE_AMOUNT);
+        _ccipSend(oldChainSelector, CcipTxType.RebalanceFromOldStrategy, abi.encode(newStrategy), ZERO_BRIDGE_AMOUNT);
     }
 
     /*//////////////////////////////////////////////////////////////

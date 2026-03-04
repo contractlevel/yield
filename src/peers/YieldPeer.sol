@@ -1,13 +1,19 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.26;
 
 import {LinkTokenInterface} from "@chainlink/contracts/src/v0.8/shared/interfaces/LinkTokenInterface.sol";
 import {CCIPReceiver, IAny2EVMMessageReceiver} from "@chainlink/contracts/src/v0.8/ccip/applications/CCIPReceiver.sol";
 import {IRouterClient, Client} from "@chainlink/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
 import {IERC677Receiver} from "@chainlink/contracts/src/v0.8/shared/interfaces/IERC677Receiver.sol";
+
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {PausableWithAccessControl, Roles, IAccessControlEnumerable} from "../modules/PausableWithAccessControl.sol";
+import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
+import {
+    AccessControlDefaultAdminRules
+} from "@openzeppelin/contracts/access/extensions/AccessControlDefaultAdminRules.sol";
+import {ReentrancyGuardTransient} from "@openzeppelin/contracts/utils/ReentrancyGuardTransient.sol";
+
 import {IShare} from "../interfaces/IShare.sol";
 import {IYieldPeer} from "../interfaces/IYieldPeer.sol";
 import {DataStructures} from "../libraries/DataStructures.sol";
@@ -15,6 +21,7 @@ import {CCIPOperations} from "../libraries/CCIPOperations.sol";
 import {IStrategyAdapter} from "../interfaces/IStrategyAdapter.sol";
 import {IStrategyRegistry} from "../interfaces/IStrategyRegistry.sol";
 import {YieldFees} from "../modules/YieldFees.sol";
+import {Roles} from "../libraries/Roles.sol";
 
 /// @title YieldPeer
 /// @author @contractlevel
@@ -22,10 +29,12 @@ import {YieldFees} from "../modules/YieldFees.sol";
 abstract contract YieldPeer is
     IAny2EVMMessageReceiver,
     CCIPReceiver,
-    PausableWithAccessControl,
+    Pausable,
+    AccessControlDefaultAdminRules,
     IERC677Receiver,
     IYieldPeer,
-    YieldFees
+    YieldFees,
+    ReentrancyGuardTransient
 {
     /*//////////////////////////////////////////////////////////////
                            TYPE DECLARATIONS
@@ -55,6 +64,8 @@ abstract contract YieldPeer is
     uint256 internal constant SHARE_DECIMALS = 1e18;
     /// @dev Constant for the initial share precision used to calculate the mint amount for first deposit
     uint256 internal constant INITIAL_SHARE_PRECISION = SHARE_DECIMALS / USDC_DECIMALS;
+    // /// @dev Constant for the initial default admin role transfer delay
+    // uint48 internal constant INITIAL_DEFAULT_ADMIN_ROLE_TRANSFER_DELAY = 259200 seconds; // 3 days
 
     /// @dev Chainlink token
     LinkTokenInterface internal immutable i_link;
@@ -162,7 +173,6 @@ abstract contract YieldPeer is
     //slither-disable-next-line missing-zero-check
     constructor(address ccipRouter, address link, uint64 thisChainSelector, address usdc, address share)
         CCIPReceiver(ccipRouter)
-        PausableWithAccessControl(msg.sender)
     {
         i_link = LinkTokenInterface(link);
         i_thisChainSelector = thisChainSelector;
@@ -326,7 +336,7 @@ abstract contract YieldPeer is
     /// @dev Deposits USDC totalValue of the system into the new strategy
     /// @param tokenAmounts The token amounts received in the CCIP message
     /// @param data The data to decode - decodes to Strategy (chainSelector, protocolId)
-    function _handleCCIPRebalanceNewStrategy(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data) internal {
+    function _handleCCIPRebalanceToNewStrategy(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data) internal {
         /// @dev update strategy pool to protocol on this chain
         Strategy memory newStrategy = abi.decode(data, (Strategy));
         address newActiveStrategyAdapter =
@@ -369,11 +379,15 @@ abstract contract YieldPeer is
     /// @notice Internal helper to withdraw from the strategy
     /// @param strategyAdapter The strategy adapter to withdraw from
     /// @param amount The amount of USDC to withdraw
+    /// @return actualWithdrawnAmount The actual withdrawn amount
     /// @dev Emit WithdrawFromStrategy event
     // @review:stablecoins passing this an address asset param instead of address(i_usdc) - additional/modular stablecoins task
-    function _withdrawFromStrategy(address strategyAdapter, uint256 amount) internal {
+    function _withdrawFromStrategy(address strategyAdapter, uint256 amount)
+        internal
+        returns (uint256 actualWithdrawnAmount)
+    {
         emit WithdrawFromStrategy(strategyAdapter, amount);
-        IStrategyAdapter(strategyAdapter).withdraw(address(i_usdc), amount);
+        actualWithdrawnAmount = IStrategyAdapter(strategyAdapter).withdraw(address(i_usdc), amount);
     }
 
     /// @notice Deposits USDC to the strategy and returns the total value of the system
@@ -610,6 +624,21 @@ abstract contract YieldPeer is
     }
 
     /*//////////////////////////////////////////////////////////////
+                               EMERGENCY
+    //////////////////////////////////////////////////////////////*/
+    /// @notice Pause the contract
+    /// @dev Access control: EMERGENCY_PAUSER_ROLE
+    function pause() external onlyRole(Roles.EMERGENCY_PAUSER_ROLE) {
+        _pause();
+    }
+
+    /// @notice Unpause the contract
+    /// @dev Access control: EMERGENCY_UNPAUSER_ROLE
+    function unpause() external onlyRole(Roles.EMERGENCY_UNPAUSER_ROLE) {
+        _unpause();
+    }
+
+    /*//////////////////////////////////////////////////////////////
                                  GETTER
     //////////////////////////////////////////////////////////////*/
     /// @notice Get the chain selector for this chain
@@ -696,7 +725,7 @@ abstract contract YieldPeer is
         public
         view
         virtual
-        override(CCIPReceiver, PausableWithAccessControl)
+        override(CCIPReceiver, AccessControlDefaultAdminRules)
         returns (bool)
     {
         return interfaceId == type(IAny2EVMMessageReceiver).interfaceId || super.supportsInterface(interfaceId);

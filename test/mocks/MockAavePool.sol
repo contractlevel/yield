@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.26;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -34,7 +34,6 @@ contract MockAavePool {
     }
 
     function withdraw(address asset, uint256 amount, address to) external returns (uint256) {
-    
         // Calculate interest accrued for the caller
         uint256 interestAccrued = _calculateInterest(msg.sender);
         s_balances[msg.sender] += interestAccrued;
@@ -60,7 +59,6 @@ contract MockAavePool {
         // Transfer asset to recipient (to)
         IERC20(asset).transfer(to, amountToWithdraw);
 
-        
         return amountToWithdraw;
     }
 

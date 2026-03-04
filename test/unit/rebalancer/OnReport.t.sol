@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.26;
 
 import {BaseTest, Vm, IYieldPeer, WorkflowHelpers} from "../../BaseTest.t.sol";
@@ -21,8 +21,8 @@ contract OnReportTest is BaseTest {
     bytes32 internal ccipMessageSentEvent = keccak256("CCIPMessageSent(bytes32,uint8,uint256)");
 
     // CCIP Tx Types
-    uint8 internal rebalanceNewStrategyTxType = uint8(IYieldPeer.CcipTxType.RebalanceNewStrategy);
-    uint8 internal rebalanceOldStrategyTxType = uint8(IYieldPeer.CcipTxType.RebalanceOldStrategy);
+    uint8 internal rebalanceToNewStrategyTxType = uint8(IYieldPeer.CcipTxType.RebalanceToNewStrategy);
+    uint8 internal rebalanceFromOldStrategyTxType = uint8(IYieldPeer.CcipTxType.RebalanceFromOldStrategy);
 
     /*//////////////////////////////////////////////////////////////
                                  TESTS
@@ -216,12 +216,12 @@ contract OnReportTest is BaseTest {
         }
 
         /// @dev Assert: Check for CCIPMessageSent event with correct tx type and value
-        /// @dev Tx type should be RebalanceNewStrategy as strategy is moving
+        /// @dev Tx type should be RebalanceToNewStrategy as strategy is moving
         /// @dev from Parent > Child and handled by ParentPeer::_rebalanceParentToChild
         assertTrue(ccipMessageSentEventFound, "CCIPMessageSent log not found");
         assertEq(strategyState.chainSelector, newStrategy.chainSelector);
         assertEq(strategyState.protocolId, newStrategy.protocolId);
-        assertEq(emittedTxType, rebalanceNewStrategyTxType);
+        assertEq(emittedTxType, rebalanceToNewStrategyTxType);
         assertEq(emittedValue, totalValue);
     }
 
@@ -258,12 +258,12 @@ contract OnReportTest is BaseTest {
         }
 
         /// @dev Assert: Check for CCIPMessageSent event with correct tx type
-        /// @dev Tx type should be RebalanceOldStrategy as strategy is moving
+        /// @dev Tx type should be RebalanceFromOldStrategy as strategy is moving
         /// @dev from Child > Other (Child) and handled by ParentPeer::_rebalanceChildToOther
         assertTrue(ccipMessageSentEventFound, "CCIPMessageSent log not found");
         assertEq(strategyState.chainSelector, newStrategy.chainSelector);
         assertEq(strategyState.protocolId, newStrategy.protocolId);
-        assertEq(emittedTxType, rebalanceOldStrategyTxType);
+        assertEq(emittedTxType, rebalanceFromOldStrategyTxType);
         assertEq(emittedValue, 0); // No value is sent as TVL is not on Parent
     }
 }

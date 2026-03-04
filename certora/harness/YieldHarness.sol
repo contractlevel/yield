@@ -36,8 +36,8 @@ contract YieldHarness is YieldPeer, HelperHarness {
         _handleCCIPWithdrawCallback(tokenAmounts, data);
     }
 
-    function handleCCIPRebalanceNewStrategy(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data) public {
-        _handleCCIPRebalanceNewStrategy(tokenAmounts, data);
+    function handleCCIPRebalanceToNewStrategy(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data) public {
+        _handleCCIPRebalanceToNewStrategy(tokenAmounts, data);
     }
 
     function handleCCIPWithdrawFail(bytes memory data) public {
