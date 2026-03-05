@@ -41,7 +41,7 @@ The following traces are derived directly from the source. `←` marks the bugs.
    withdrawData.totalShares = s_totalShares
    s_totalShares -= withdrawData.shareBurnAmount             ← premature state update
    emit ShareBurnUpdate(shareBurnAmount, sourceChainSelector, ...)
-   → _handleCCIPWithdraw(s_strategy, withdrawData)
+   → _routeWithdraw(s_strategy, withdrawData)
 
 3. ParentPeer._handleCCIPWithdraw() — strategy.chainSelector == i_thisChainSelector
                                                              [ParentPeer.sol:350-374]
@@ -74,7 +74,7 @@ The following traces are derived directly from the source. `←` marks the bugs.
    withdrawData.totalShares = s_totalShares
    s_totalShares -= withdrawData.shareBurnAmount             ← premature state update
    emit ShareBurnUpdate(...)
-   → _handleCCIPWithdraw(s_strategy, withdrawData)
+   → _routeWithdraw(s_strategy, withdrawData)
 
 3. ParentPeer._handleCCIPWithdraw() — strategy.chainSelector != i_thisChainSelector
                                                              [ParentPeer.sol:375-382]
@@ -112,7 +112,7 @@ The following traces are derived directly from the source. `←` marks the bugs.
    withdrawData.totalShares = s_totalShares
    s_totalShares -= withdrawData.shareBurnAmount             ← premature state update
    emit ShareBurnUpdate(...)
-   → _handleCCIPWithdraw(s_strategy, withdrawData)
+   → _routeWithdraw(s_strategy, withdrawData)
 
 3. ParentPeer._handleCCIPWithdraw() — strategy.chainSelector != i_thisChainSelector
                                                              [ParentPeer.sol:375-382]
@@ -227,9 +227,9 @@ enum CcipTxType {
 
 2. ParentPeer._handleCCIPWithdrawToParent()
    withdrawData.totalShares = s_totalShares   (snapshot for calculation, NO decrement)
-   → _handleCCIPWithdraw(s_strategy, withdrawData)
+   → _routeWithdraw(s_strategy, withdrawData)
 
-3. ParentPeer._handleCCIPWithdraw() — parent IS strategy
+3. ParentPeer._routeWithdraw() — parent IS strategy
    _withdrawFromStrategyAndGetUsdcWithdrawAmount(activeStrategyAdapter, withdrawData)
    s_totalShares -= withdrawData.shareBurnAmount         ← state update moved here
    emit ShareBurnUpdate(shareBurnAmount, withdrawData.chainSelector, s_totalShares)
@@ -253,9 +253,9 @@ enum CcipTxType {
 
 2. ParentPeer._handleCCIPWithdrawToParent()
    withdrawData.totalShares = s_totalShares   (NO decrement)
-   → _handleCCIPWithdraw(s_strategy, withdrawData)
+   → _routeWithdraw(s_strategy, withdrawData)
 
-3. ParentPeer._handleCCIPWithdraw() — parent NOT strategy
+3. ParentPeer._routeWithdraw() — parent NOT strategy
    emit WithdrawForwardedToStrategy(...)
    _ccipSend(Child B, WithdrawToStrategy, withdrawData, ZERO_BRIDGE_AMOUNT)
 
@@ -293,9 +293,9 @@ other child-initiated withdrawals. See Known Issue #5 for the gas/cost trade-off
 
 2. ParentPeer._handleCCIPWithdrawToParent()
    withdrawData.totalShares = s_totalShares   (NO decrement)
-   → _handleCCIPWithdraw(s_strategy, withdrawData)
+   → _routeWithdraw(s_strategy, withdrawData)
 
-3. ParentPeer._handleCCIPWithdraw() — parent NOT strategy (Child A is strategy)
+3. ParentPeer._routeWithdraw() — parent NOT strategy (Child A is strategy)
    _ccipSend(Child A, WithdrawToStrategy, withdrawData, ZERO_BRIDGE_AMOUNT)
 
 4. ChildPeer A._handleCCIPWithdrawToStrategy()
@@ -478,11 +478,11 @@ function _handleCCIPWithdrawToParent(bytes memory data, uint64 sourceChainSelect
     withdrawData.totalShares = s_totalShares;         // KEEP: snapshot for calculation
     // REMOVE: s_totalShares -= withdrawData.shareBurnAmount;
     // REMOVE: emit ShareBurnUpdate(...);
-    _handleCCIPWithdraw(s_strategy, withdrawData);
+    _routeWithdraw(s_strategy, withdrawData);
 }
 ```
 
-#### `_handleCCIPWithdraw()` — parent-is-strategy branch
+#### `_routeWithdraw()` — parent-is-strategy branch
 
 Change from sending `WithdrawCallback` to: updating state and sending `WithdrawCallbackChild`.
 Since the parent IS the strategy handler here, no `WithdrawCallbackParent` round-trip is needed.
@@ -563,9 +563,11 @@ function _handleCCIPWithdrawCallbackParent(
 
 1. `totalShares` is captured in `_handleCCIPWithdrawToParent` and stored in `withdrawData.totalShares`
 2. Strategy child receives `WithdrawToStrategy`, strategy adapter is zero → sends `WithdrawPingPong`
-3. Parent `_handleCCIPWithdrawPingPong` decodes the `withdrawData` (already has `totalShares` set) and calls `_handleCCIPWithdraw` — it does NOT re-read `s_totalShares`
+3. Parent `_handleCCIPWithdrawPingPong` decodes the `withdrawData` (already has `totalShares` set) and calls `_routeWithdraw(s_strategy, withdrawData)` — it does NOT re-read `s_totalShares`, but it DOES re-read `s_strategy` live
 4. Shares remain held on the withdraw chain throughout the ping-pong
-5. `_handleCCIPWithdrawPingPong` correctly re-routes the existing `withdrawData` unchanged
+5. `_handleCCIPWithdrawPingPong` correctly re-routes the existing `withdrawData` to the CURRENT strategy
+
+**TOCTOU mitigation:** If `s_strategy` changes (via `rebalance()`) between the initial `_handleCCIPWithdrawToParent` call and a subsequent `_handleCCIPWithdrawPingPong` call, the ping-pong correctly routes to the new strategy on the next parent callback. This is the intended mitigation for withdraw-during-rebalance. The `totalShares` snapshot remains from the original `_handleCCIPWithdrawToParent` call (stale, accepted trade-off — see Known Issue #3 and Design Decisions), but funds are always withdrawn from the current strategy.
 
 ---
 
@@ -584,14 +586,29 @@ Placed in the base `YieldPeer` because both Parent and Child may be the withdraw
 ```solidity
 /// @notice Handles a failed withdrawal by returning held shares to the user
 /// @notice Shares were held in this contract since onTokenTransfer — they are not burned
+/// @notice s_totalShares is NOT updated: it was never decremented for this withdrawal (deferred decrement design)
 /// @param data The message data - decodes to WithdrawData
 function _handleCCIPWithdrawFail(bytes memory data) internal {
     WithdrawData memory withdrawData = _decodeWithdrawData(data);
     i_share.transfer(withdrawData.withdrawer, withdrawData.shareBurnAmount);
+    emit WithdrawFailed(withdrawData.withdrawer, withdrawData.shareBurnAmount);
 }
 ```
 
-Note: no `s_totalShares` update is needed here because it was never decremented for this withdrawal.
+**`WithdrawFailed` event** — add to `YieldPeer.sol` alongside `WithdrawCompleted`:
+
+```solidity
+/// @notice Emitted when a withdrawal fails and shares are returned to the user
+event WithdrawFailed(address indexed withdrawer, uint256 indexed shareBurnAmount);
+```
+
+**Observable event sequence:**
+- Success: `WithdrawInitiated` → `ShareBurnUpdate` (parent) → `WithdrawCompleted`
+- Failure: `WithdrawInitiated` → `WithdrawFailed`
+
+No `ShareBurnUpdate` is emitted on the failure path. This is correct: `s_totalShares` was never
+decremented, so there is nothing to record. The absence of `ShareBurnUpdate` on failure is
+intentional and consistent with the deferred decrement design (see Design Decisions).
 
 ### Changes to `ChildPeer._handleCCIPWithdrawToStrategy()`
 
@@ -653,7 +670,7 @@ function _handleCCIPWithdrawToStrategy(bytes memory data) internal {
 }
 ```
 
-### Changes to `ParentPeer._handleCCIPWithdraw()` — parent-is-strategy branch
+### Changes to `ParentPeer._routeWithdraw()` — parent-is-strategy branch
 
 Same try/catch pattern. Since parent is the strategy and state handler, failure sends
 `WithdrawFail` directly to the withdraw chain.
@@ -763,7 +780,7 @@ paths inline the withdrawal logic to accommodate try/catch.
 
 | Scenario                             | Old location                  | New location                                      |
 | ------------------------------------ | ----------------------------- | ------------------------------------------------- |
-| Child initiated, parent is strategy  | `_handleCCIPWithdrawToParent` | `_handleCCIPWithdraw` (parent-is-strategy branch) |
+| Child initiated, parent is strategy  | `_handleCCIPWithdrawToParent` | `_routeWithdraw` (parent-is-strategy branch)      |
 | Child initiated, child B strategy    | `_handleCCIPWithdrawToParent` | `_handleCCIPWithdrawCallbackParent`               |
 | Child initiated, same-chain strategy | `_handleCCIPWithdrawToParent` | `_handleCCIPWithdrawCallbackParent`               |
 | Parent initiated, strategy is child  | `onTokenTransfer`             | `_handleCCIPWithdrawCallbackParent`               |
@@ -885,13 +902,18 @@ This is intentional: the `withdraw()` call is never made (so there is nothing to
 and returning shares would create an infinite retry loop with the same result. Future work
 may consider a minimum withdrawal amount guard earlier in the flow.
 
-### 3. `usdcWithdrawAmount` staleness in concurrent withdrawals
+### 3. `totalShares` snapshot staleness in concurrent withdrawals
 
-In the new flow, `s_totalShares` is not decremented until withdrawal confirmation. If two
-withdrawals are in flight simultaneously, both may capture the same `totalShares` snapshot,
-leading to slightly over-proportional USDC calculations. In practice this is bounded by
-the liquidity in Aave/Compound (which is deep). Phase 2's try/catch is the safety net for
-the extreme case where the pool cannot satisfy both withdrawals.
+In the deferred decrement design, `s_totalShares` is not decremented until withdrawal
+confirmation. If two withdrawals are in flight simultaneously, both capture the same
+`totalShares` snapshot at `_handleCCIPWithdrawToParent`, leading to slightly
+over-proportional USDC calculations for the second withdrawal.
+
+The maximum over-payment is bounded by `shareBurnAmount_1 / totalShares × totalValue` —
+small relative to total system value. Phase 2's try/catch is the safety net for the
+extreme case where the strategy pool genuinely cannot satisfy both.
+
+**Why early decrement was evaluated and rejected:** See Design Decisions below.
 
 ### 5. Same-chain withdrawal incurs extra CCIP hops (gas/cost trade-off)
 
@@ -908,3 +930,50 @@ costs become a concern for this scenario, the optimisation can be reintroduced.
 `_handleCCIPRebalanceFromOldStrategy()`. These paths do not yet have try/catch protection.
 If a rebalance withdrawal fails, funds could be stuck. This should be addressed in a
 dedicated rebalance-safety task.
+
+---
+
+## Design Decisions
+
+### `s_totalShares` decrement timing: deferred vs. early
+
+**The rejected approach (early decrement + re-increment on fail):**
+
+Proposed: decrement `s_totalShares` at `_handleCCIPWithdrawToParent`, and if the strategy
+withdrawal fails, send `WithdrawFailParent` to re-increment `s_totalShares` then
+`WithdrawFailChild` to return shares to the user.
+
+**Why it was rejected:**
+
+1. **`WithdrawFailParent` is a CCIP message and can fail to deliver.** If it does,
+   `s_totalShares` is permanently decremented without a corresponding burn:
+   `s_totalShares < totalSharesMinted - totalSharesBurned`. This is a broken global
+   invariant affecting every user in the system — all future deposit and withdrawal
+   calculations become incorrect. This is strictly worse than the deferred approach's
+   failure mode, where only one user's shares are temporarily locked in the peer.
+
+2. **Accounting manipulation window.** Between decrement and re-increment, `s_totalShares`
+   is artificially low. Any deposit during this window calculates a higher `shareMintAmount`
+   than correct; any concurrent withdrawal calculates a higher `usdcWithdrawAmount`. This
+   window is observable and exploitable under adversarial conditions.
+
+3. **Two CCIP messages on the failure path instead of one.** Both can fail independently,
+   creating two distinct stuck states. Complexity compounds failure modes.
+
+4. **Does not cleanly apply to all scenarios.** Scenario D (parent is both strategy and
+   withdraw chain) bypasses `_handleCCIPWithdrawToParent` entirely. To apply early decrement
+   consistently, `onTokenTransfer` would need the decrement before the try/catch — which is
+   exactly the original optimistic burn bug.
+
+5. **The staleness problem is not eliminated by early decrement.** `withdrawData.totalShares`
+   is a snapshot shipped in the CCIP message. By the time it reaches the strategy chain
+   (minutes later), more withdrawals may have arrived at parent. The snapshot is stale
+   regardless of when the decrement occurs. The real staleness is in `withdrawData.totalShares`,
+   not in the decrement timing.
+
+**The chosen approach (deferred decrement):**
+
+`s_totalShares` is only decremented when the withdrawal is confirmed (shares burned).
+`s_totalShares` is therefore always equal to `totalSharesMinted - totalSharesBurned` — the
+invariant is never broken. The staleness in `withdrawData.totalShares` is bounded, documented
+in Known Issue #3, and covered by the Phase 2 try/catch safety net.
