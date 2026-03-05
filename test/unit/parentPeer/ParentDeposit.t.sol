@@ -305,7 +305,7 @@ contract ParentDepositTest is BaseTest {
 }
 
 contract ParentWrapper is ParentPeer {
-    constructor() ParentPeer(address(1), address(1), 1, address(1), address(1)) {}
+    constructor() ParentPeer(address(1), address(1), address(1), address(1), 1, address(1), address(1)) {}
 
     // keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.ParentPeer")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant ParentPeerStorageLocation =

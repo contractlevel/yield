@@ -14,7 +14,7 @@ contract AuthorizeUpgradeTest is BaseTest {
 
         // select fork where Rebalancer is deployed
         _selectFork(baseFork);
-        newImplementation = new RebalancerV2Mock();
+        newImplementation = new RebalancerV2Mock(address(baseParentPeer));
     }
 
     function test_yield_rebalancer_authorizeUpgrade_success() public {
@@ -88,7 +88,7 @@ contract AuthorizeUpgradeTest is BaseTest {
 
 /// @dev Mock "V2" Rebalancer implementation to verify upgrade success
 contract RebalancerV2Mock is Rebalancer {
-    constructor() {
+    constructor(address parentPeer) Rebalancer(parentPeer) {
         _disableInitializers();
     }
 

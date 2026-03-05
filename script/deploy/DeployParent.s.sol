@@ -17,6 +17,7 @@ import {StrategyRegistry} from "../../src/modules/StrategyRegistry.sol";
 import {AaveV3Adapter} from "../../src/adapters/AaveV3Adapter.sol";
 import {CompoundV3Adapter} from "../../src/adapters/CompoundV3Adapter.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {EmptyImpl} from "./emptyImpl/EmptyImpl.sol";
 
 /// @title DeployParent
 /// @notice Deployment script for the Parent architecture
@@ -54,9 +55,10 @@ contract DeployParent is Script {
 
         // Deployment & Configuration
         _deployShareInfra(deploy, networkConfig); /// @dev BnM role granted to Pool
-        _deployRebalancer(deploy);
-        _deployParentPeer(deploy, networkConfig); /// @dev BnM role granted to ParentPeer, Parent+Rebalancer linked
         _deployStrategyRegistry(deploy); /// @dev Registry set on Parent+Rebalancer
+        _deployRebalancerAndParentProxies(deploy); /// @dev Temp empty impls deployed for ParentPeer and Rebalancer, Proxies deployed pointing to empty impls
+        _upgradeRebalancer(deploy);
+        _upgradeParentPeer(deploy, networkConfig); /// @dev BnM role granted to ParentPeer, Parent+Rebalancer linked
         _deployAdapters(deploy, networkConfig); /// @dev Adapters set in Registry
 
         // Set Initial Strategy after completion of deployment
@@ -102,52 +104,6 @@ contract DeployParent is Script {
         deploy.share.grantMintAndBurnRoles(address(deploy.sharePool));
     }
 
-    /// @dev Deploys the Rebalancer Impl and Proxy
-    function _deployRebalancer(DeploymentConfig memory deploy) private {
-        // Deploy Rebalancer Impl and cache address for testing
-        Rebalancer rebalancerImpl = new Rebalancer();
-        deploy.rebalancerImplAddr = address(rebalancerImpl);
-
-        // Create Rebalancer Proxy init data and deploy Proxy
-        bytes memory rebalancerInitData = abi.encodeWithSelector(Rebalancer.initialize.selector);
-        ERC1967Proxy rebalancerProxy = new ERC1967Proxy(address(rebalancerImpl), rebalancerInitData);
-
-        // Cast Proxy address to Rebalancer type
-        deploy.rebalancer = Rebalancer(address(rebalancerProxy));
-    }
-
-    /// @dev Deploys the Parent Peer Impl and Proxy
-    function _deployParentPeer(DeploymentConfig memory deploy, HelperConfig.NetworkConfig memory networkConfig)
-        private
-    {
-        // Deploy ParentPeer Impl and cache address for testing
-        ParentPeer parentPeerImpl = new ParentPeer(
-            networkConfig.ccip.ccipRouter,
-            networkConfig.tokens.link,
-            networkConfig.ccip.thisChainSelector,
-            networkConfig.tokens.usdc,
-            address(deploy.share)
-        );
-        deploy.parentPeerImplAddr = address(parentPeerImpl);
-
-        // Create ParentPeer Proxy init data and deploy Proxy
-        bytes memory parentInitData = abi.encodeWithSelector(ParentPeer.initialize.selector);
-        ERC1967Proxy parentProxy = new ERC1967Proxy(address(parentPeerImpl), parentInitData);
-
-        // Cast Proxy address to ParentPeer type
-        deploy.parentPeer = ParentPeer(address(parentProxy));
-
-        // Grant BnM role to ParentPeer
-        deploy.share.grantMintAndBurnRoles(address(deploy.parentPeer));
-
-        // Link ParentPeer & Rebalancer
-        /// @dev Temp config role granted
-        deploy.parentPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, deploy.parentPeer.owner());
-
-        deploy.rebalancer.setParentPeer(address(deploy.parentPeer));
-        deploy.parentPeer.setRebalancer(address(deploy.rebalancer));
-    }
-
     /// @dev Deploys the Strategy Registry module Impl and Proxy
     function _deployStrategyRegistry(DeploymentConfig memory deploy) private {
         // Deploy Strategy Registry Impl and cache address for testing
@@ -160,17 +116,70 @@ contract DeployParent is Script {
 
         // Cast Proxy address to StrategyRegistry type
         deploy.strategyRegistry = StrategyRegistry(address(strategyRegistryProxy));
+    }
 
-        // Link StrategyRegistry to ParentPeer & Rebalancer
-        deploy.parentPeer.setStrategyRegistry(address(deploy.strategyRegistry));
+    function _deployRebalancerAndParentProxies(DeploymentConfig memory deploy) private {
+        // Deploy empty impls for ParentPeer and Rebalancer proxies to point to for now, since they need to be deployed together
+        EmptyImpl emptyImpl = new EmptyImpl();
+
+        // Deploy ParentPeer Proxy with empty impl
+        ERC1967Proxy parentProxy = new ERC1967Proxy(address(emptyImpl), "");
+
+        // Cast Proxy address to ParentPeer type and store in deploy config
+        deploy.parentPeer = ParentPeer(address(parentProxy));
+
+        // Deploy Rebalancer Proxy with empty impl
+        ERC1967Proxy rebalancerProxy = new ERC1967Proxy(address(emptyImpl), "");
+
+        // Cast Proxy address to Rebalancer type and store in deploy config
+        deploy.rebalancer = Rebalancer(address(rebalancerProxy));
+    }
+
+    /// @dev Deploys the Rebalancer Impl and Proxy
+    function _upgradeRebalancer(DeploymentConfig memory deploy) private {
+        // Deploy Rebalancer Impl and cache address for testing
+        Rebalancer rebalancerImpl = new Rebalancer(address(deploy.parentPeer));
+        deploy.rebalancerImplAddr = address(rebalancerImpl);
+
+        // Create Rebalancer Proxy init data and upgrade Rebalancer Proxy to point to Rebalancer Impl
+        bytes memory rebalancerInitData = abi.encodeWithSelector(Rebalancer.initialize.selector);
+        deploy.rebalancer.upgradeToAndCall(address(rebalancerImpl), rebalancerInitData);
+    }
+
+    /// @dev Deploys the Parent Peer Impl and Proxy
+    function _upgradeParentPeer(DeploymentConfig memory deploy, HelperConfig.NetworkConfig memory networkConfig)
+        private
+    {
+        // Deploy ParentPeer Impl and cache address for testing
+        ParentPeer parentPeerImpl = new ParentPeer(
+            address(deploy.rebalancer),
+            address(deploy.strategyRegistry),
+            networkConfig.ccip.ccipRouter,
+            networkConfig.tokens.link,
+            networkConfig.ccip.thisChainSelector,
+            networkConfig.tokens.usdc,
+            address(deploy.share)
+        );
+        deploy.parentPeerImplAddr = address(parentPeerImpl);
+
+        // Create ParentPeer Proxy init data and upgrade Parent Proxy to point to ParentPeer Impl
+        bytes memory parentInitData = abi.encodeWithSelector(ParentPeer.initialize.selector);
+        deploy.parentPeer.upgradeToAndCall(address(parentPeerImpl), parentInitData);
+
+        // Grant BnM role to ParentPeer
+        deploy.share.grantMintAndBurnRoles(address(deploy.parentPeer));
+
+        /// @dev Grant/revoke temp config role to set supported protocols
+        // Set supported protocols on ParentPeer
+        deploy.parentPeer.grantRole(Roles.CONFIG_ADMIN_ROLE, deploy.parentPeer.owner());
+
         deploy.parentPeer.setSupportedProtocol(keccak256(abi.encodePacked("aave-v3")), true);
         deploy.parentPeer.setSupportedProtocol(keccak256(abi.encodePacked("compound-v3")), true);
 
-        /// @dev Revoke temp config role
         deploy.parentPeer.revokeRole(Roles.CONFIG_ADMIN_ROLE, deploy.parentPeer.owner());
     }
 
-    /// @dev Deploys strategy registries and registers adapters
+    /// @dev Deploys & registers strategy adapters
     function _deployAdapters(DeploymentConfig memory deploy, HelperConfig.NetworkConfig memory networkConfig) private {
         // Deploy Adapters
         deploy.aaveV3Adapter =

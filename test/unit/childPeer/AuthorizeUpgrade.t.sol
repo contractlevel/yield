@@ -17,6 +17,7 @@ contract AuthorizeUpgradeTest is BaseTest {
         // select fork where ChildPeer is deployed
         _selectFork(optFork);
         newImplementation = new ChildPeerV2Mock(
+            address(optStrategyRegistry),
             optNetworkConfig.ccip.ccipRouter,
             optNetworkConfig.tokens.link,
             optChainSelector,
@@ -104,13 +105,14 @@ contract AuthorizeUpgradeTest is BaseTest {
 /// @dev Mock implementation V2 to verify upgrade success
 contract ChildPeerV2Mock is ChildPeer {
     constructor(
+        address strategyRegistry,
         address ccipRouter,
         address link,
         uint64 thisChainSelector,
         address usdc,
         address share,
         uint64 parentChainSelector
-    ) ChildPeer(ccipRouter, link, thisChainSelector, usdc, share, parentChainSelector) {
+    ) ChildPeer(strategyRegistry, ccipRouter, link, thisChainSelector, usdc, share, parentChainSelector) {
         _disableInitializers();
     }
 

@@ -483,6 +483,7 @@ contract HelperConfig is Script {
     /*//////////////////////////////////////////////////////////////
                                  LOCAL
     //////////////////////////////////////////////////////////////*/
+    // @review with all of the changes we've been making, I wonder if this needs to be updated
     function getOrCreateAnvilEthConfig() public returns (NetworkConfig memory) {
         _deployLocalInfra();
 
@@ -567,6 +568,8 @@ contract HelperConfig is Script {
         ccipLocalSimulator.supportNewTokenViaOwner(address(usdc));
         ccipLocalSimulator.supportNewTokenViaGetCCIPAdmin(address(share));
 
+        // @review Not sure we need the bottom portion anymore. Everything works fine without it. Leftover from previous test versions?
+        /*
         // --- Rebalancer Proxy Deployment --- //
         // Deploy Rebalancer implementation
         Rebalancer rebalancerImpl = new Rebalancer();
@@ -598,5 +601,6 @@ contract HelperConfig is Script {
         parent.grantRole(Roles.CONFIG_ADMIN_ROLE, parent.owner());
         parent.setRebalancer(address(rebalancer));
         parent.revokeRole(Roles.CONFIG_ADMIN_ROLE, parent.owner());
+        */
     }
 }

@@ -3,7 +3,6 @@ pragma solidity 0.8.26;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {YieldPeer, Client, IRouterClient, CCIPOperations, IERC20, SafeERC20, Roles} from "./YieldPeer.sol";
 import {YieldPeer, Client, IRouterClient, CCIPOperations, IERC20, SafeERC20, Roles, IYieldPeer} from "./YieldPeer.sol";
 import {IParentPeer} from "../interfaces/IParentPeer.sol";
 
@@ -26,9 +25,6 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer, IParentPeer {
         uint256 s_totalShares;
         /// @dev The current strategy: chainSelector and protocol
         Strategy s_strategy;
-        /// @dev This address handles automated CCIP rebalance calls with Log-trigger Automation, based on Function request callbacks
-        /// @notice See ./src/modules/Rebalancer.sol
-        address s_rebalancer;
         /// @dev Whether the initial active strategy adapter has been set
         bool s_initialActiveStrategySet;
         /// @dev Whether the protocol is supported across all chains. ie true for CompoundV3 if we support it because it is on Ethereum, but not Avalanche
@@ -49,6 +45,9 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer, IParentPeer {
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
+    /// @dev This address handles automated CCIP rebalance calls with Log-trigger Automation, based on Function request callbacks
+    /// @notice See ./src/modules/Rebalancer.sol
+    address internal immutable i_rebalancer;
     // ERC-7201: keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.ParentPeer")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant PARENT_PEER_STORAGE_LOCATION =
         0x603686382b15940b5fa7ef449162bde228a5948ce3b6bdf08bd833ec6ae79500;
@@ -70,8 +69,6 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer, IParentPeer {
     event DepositPingPongToChild(uint256 indexed depositAmount, uint64 indexed destChainSelector);
     /// @notice Emitted when a withdraw is pingpong'd to a child
     event WithdrawPingPongToChild(uint256 indexed shareBurnAmount, uint64 indexed destChainSelector);
-    /// @notice Emitted when the rebalancer is set
-    event RebalancerSet(address indexed rebalancer);
     /// @notice Emitted when a protocol is set as supported or not supported
     event SupportedProtocolSet(bytes32 indexed protocolId, bool indexed isSupported);
 
@@ -84,9 +81,16 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer, IParentPeer {
     /// @param usdc The address of the USDC token
     /// @param share The address of the share token native to this system that is minted in exchange for USDC deposits (YieldCoin)
     /// @custom:oz-upgrades-unsafe-allow constructor
-    constructor(address ccipRouter, address link, uint64 thisChainSelector, address usdc, address share)
-        YieldPeer(ccipRouter, link, thisChainSelector, usdc, share)
-    {
+    constructor(
+        address rebalancer,
+        address strategyRegistry,
+        address ccipRouter,
+        address link,
+        uint64 thisChainSelector,
+        address usdc,
+        address share
+    ) YieldPeer(strategyRegistry, ccipRouter, link, thisChainSelector, usdc, share) {
+        i_rebalancer = rebalancer;
         _disableInitializers();
     }
 
@@ -236,8 +240,8 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer, IParentPeer {
     /// @dev Revert in _revertIfStrategyIsNotSupported if newStrategy.chainSelector is not allowed
     /// @dev Revert in _setStrategy if the current strategy is optimal
     function rebalance(Strategy calldata newStrategy) external {
+        if (msg.sender != i_rebalancer) revert ParentPeer__OnlyRebalancer();
         ParentPeerStorage storage $ = _getParentPeerStorage(); /// @dev load ParentPeerStorage
-        if (msg.sender != $.s_rebalancer) revert ParentPeer__OnlyRebalancer();
         Strategy memory oldStrategy = $.s_strategy;
         _revertIfStrategyIsNotSupported(newStrategy);
         _setStrategy(oldStrategy, newStrategy);
@@ -584,15 +588,6 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer, IParentPeer {
         _updateActiveStrategyAdapter(i_thisChainSelector, protocolId);
     }
 
-    /// @notice Sets the rebalancer
-    /// @dev Revert if msg.sender is not the config admin
-    /// @param rebalancer The address of the rebalancer
-    //slither-disable-next-line missing-zero-check
-    function setRebalancer(address rebalancer) external onlyRole(Roles.CONFIG_ADMIN_ROLE) {
-        _getParentPeerStorage().s_rebalancer = rebalancer;
-        emit RebalancerSet(rebalancer);
-    }
-
     /// @notice Sets the supported protocol
     /// @dev Revert if msg.sender is not the config admin
     /// @param protocolId The protocol ID
@@ -621,7 +616,7 @@ contract ParentPeer is Initializable, UUPSUpgradeable, YieldPeer, IParentPeer {
     /// @notice Get the current rebalancer
     /// @return rebalancer The current rebalancer
     function getRebalancer() external view returns (address) {
-        return _getParentPeerStorage().s_rebalancer;
+        return i_rebalancer;
     }
 
     /// @notice Get the supported protocol

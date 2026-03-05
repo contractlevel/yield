@@ -14,7 +14,7 @@ import {IGetCCIPAdmin} from "@chainlink/contracts/src/v0.8/ccip/interfaces/IGetC
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
 import {IERC677} from "@chainlink/contracts/src/v0.8/shared/token/ERC677/IERC677.sol";
 import {IERC677Receiver} from "@chainlink/contracts/src/v0.8/shared/interfaces/IERC677Receiver.sol";
-import {IBurnMintERC677Upgradeable, IERC20} from "./interfaces/IBurnMintERC677Upgradeable.sol";
+import {IBurnMintERC677Upgradeable, IERC20} from "src/interfaces/IBurnMintERC677Upgradeable.sol";
 
 /// @title Share
 /// @author George Gorzhiyev | Judge Finance

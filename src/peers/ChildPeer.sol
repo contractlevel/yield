@@ -34,13 +34,14 @@ contract ChildPeer is Initializable, UUPSUpgradeable, YieldPeer {
     /// @param usdc The address of the USDC token
     /// @param share The address of the Share token, native to this system that is minted in return for deposits
     constructor(
+        address strategyRegistry,
         address ccipRouter,
         address link,
         uint64 thisChainSelector,
         address usdc,
         address share,
         uint64 parentChainSelector
-    ) YieldPeer(ccipRouter, link, thisChainSelector, usdc, share) {
+    ) YieldPeer(strategyRegistry, ccipRouter, link, thisChainSelector, usdc, share) {
         i_parentChainSelector = parentChainSelector;
 
         _disableInitializers();

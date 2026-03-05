@@ -53,8 +53,6 @@ abstract contract YieldPeer is
         mapping(uint64 chainSelector => bool isAllowed) s_allowedChains;
         /// @dev Mapping of peers (ie other Yield contracts)
         mapping(uint64 chainSelector => address peer) s_peers;
-        /// @dev The strategy registry
-        address s_strategyRegistry;
         /// @dev The active strategy adapter
         address s_activeStrategyAdapter;
     }
@@ -86,6 +84,8 @@ abstract contract YieldPeer is
     // /// @dev Constant for the initial default admin role transfer delay
     // uint48 internal constant INITIAL_DEFAULT_ADMIN_ROLE_TRANSFER_DELAY = 259200 seconds; // 3 days
 
+    /// @dev The strategy registry
+    address internal immutable i_strategyRegistry;
     /// @dev Chainlink token
     LinkTokenInterface internal immutable i_link;
     /// @dev Chain selector for this chain
@@ -104,8 +104,6 @@ abstract contract YieldPeer is
     event AllowedPeerSet(uint64 indexed chainSelector, address indexed peer);
     /// @notice Emitted when the CCIP gas limit is set
     event CCIPGasLimitSet(uint256 indexed gasLimit);
-    /// @notice Emitted when the strategy registry is set
-    event StrategyRegistrySet(address indexed strategyRegistry);
 
     /// @notice Emitted when the strategy pool is updated
     event ActiveStrategyAdapterUpdated(address indexed activeStrategyAdapter);
@@ -156,9 +154,15 @@ abstract contract YieldPeer is
     /// @param usdc The address of the USDC token
     /// @param share The address of the YieldCoin Share token, native to this system that is minted in return for deposits
     //slither-disable-next-line missing-zero-check
-    constructor(address ccipRouter, address link, uint64 thisChainSelector, address usdc, address share)
-        CCIPReceiver(ccipRouter)
-    {
+    constructor(
+        address strategyRegistry,
+        address ccipRouter,
+        address link,
+        uint64 thisChainSelector,
+        address usdc,
+        address share
+    ) CCIPReceiver(ccipRouter) {
+        i_strategyRegistry = strategyRegistry;
         i_link = LinkTokenInterface(link);
         i_thisChainSelector = thisChainSelector;
         i_usdc = IERC20(usdc);
@@ -167,7 +171,7 @@ abstract contract YieldPeer is
 
     /// @dev Initialize the YieldPeer contract
     function __YieldPeer_init() internal onlyInitializing {
-        __YieldFees_init(); /// @dev Init the Fees module (Sets the initial 0.1% rate)
+        __YieldFees_init(); /// @dev Init the Fees module (sets init fee rate and admin)
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -441,8 +445,7 @@ abstract contract YieldPeer is
     /// @param protocolId The protocol ID to get the strategy adapter from
     /// @return strategyAdapter The strategy adapter address
     function _getStrategyAdapterFromProtocol(bytes32 protocolId) internal view returns (address strategyAdapter) {
-        address strategyRegistry = _getYieldPeerStorage().s_strategyRegistry;
-        strategyAdapter = IStrategyRegistry(strategyRegistry).getStrategyAdapter(protocolId);
+        strategyAdapter = IStrategyRegistry(i_strategyRegistry).getStrategyAdapter(protocolId);
     }
 
     /// @notice Helper function to get the active strategy adapter
@@ -518,7 +521,7 @@ abstract contract YieldPeer is
     }
 
     /*//////////////////////////////////////////////////////////////
-                         PRIVATE PURE / STORAGE
+                        INTERNAL PURE / STORAGE
     //////////////////////////////////////////////////////////////*/
     /// @notice Get the YieldPeerStorage storage
     /// @return $ The YieldPeerStorage storage
@@ -560,15 +563,6 @@ abstract contract YieldPeer is
     function setCCIPGasLimit(uint256 gasLimit) external onlyRole(Roles.CROSS_CHAIN_ADMIN_ROLE) {
         _getYieldPeerStorage().s_ccipGasLimit = gasLimit;
         emit CCIPGasLimitSet(gasLimit);
-    }
-
-    /// @notice Set the strategy registry
-    /// @param strategyRegistry The strategy registry to set
-    /// @dev Access control: CONFIG_ADMIN_ROLE
-    //slither-disable-next-line missing-zero-check
-    function setStrategyRegistry(address strategyRegistry) external onlyRole(Roles.CONFIG_ADMIN_ROLE) {
-        _getYieldPeerStorage().s_strategyRegistry = strategyRegistry;
-        emit StrategyRegistrySet(strategyRegistry);
     }
 
     /*//////////////////////////////////////////////////////////////
@@ -661,7 +655,7 @@ abstract contract YieldPeer is
     /// @notice Get the strategy registry
     /// @return strategyRegistry The strategy registry address
     function getStrategyRegistry() external view returns (address strategyRegistry) {
-        strategyRegistry = _getYieldPeerStorage().s_strategyRegistry;
+        strategyRegistry = i_strategyRegistry;
     }
 
     /// @dev Used to override/resolve conflict of multiple contracts implementing this.

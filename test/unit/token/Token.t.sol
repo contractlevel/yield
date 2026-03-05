@@ -5,7 +5,7 @@ import {BaseTest, Share} from "../../BaseTest.t.sol";
 import {Client, IRouterClient} from "@chainlink/contracts/src/v0.8/ccip/interfaces/IRouterClient.sol";
 import {LinkTokenInterface} from "@chainlink/contracts/src/v0.8/shared/interfaces/LinkTokenInterface.sol";
 import {IERC165} from "@openzeppelin/contracts/utils/introspection/IERC165.sol";
-import {IBurnMintERC677Upgradeable, IERC677, IERC20} from "src/token/interfaces/IBurnMintERC677Upgradeable.sol";
+import {IBurnMintERC677Upgradeable, IERC677, IERC20} from "src/interfaces/IBurnMintERC677Upgradeable.sol";
 import {IGetCCIPAdmin} from "@chainlink/contracts/src/v0.8/ccip/interfaces/IGetCCIPAdmin.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 

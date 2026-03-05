@@ -47,7 +47,7 @@ abstract contract CREReceiver is Initializable, IReceiver, Ownable2StepUpgradeab
     /*//////////////////////////////////////////////////////////////
                                VARIABLES
     //////////////////////////////////////////////////////////////*/
-    // ERC-7201: keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.CREReceiver")) - 1)) & ~bytes32(uint256(0xff))
+    /// @dev ERC-7201: keccak256(abi.encode(uint256(keccak256("yieldcoin.storage.CREReceiver")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant CRE_RECEIVER_STORAGE_LOCATION =
         0xf60800be5819a5efc7c1c9a92eb1fcc54ca0efa1fb3fa2b66ea649407eaffa00;
 
