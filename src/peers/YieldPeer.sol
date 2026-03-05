@@ -232,26 +232,15 @@ abstract contract YieldPeer is
         emit CCIPMessageSent(ccipMessageId, txType, bridgeAmount);
     }
 
-    /// @notice Handles the CCIP message for a withdraw callback
-    /// @notice This function is called as the last step in the withdraw flow and sends USDC to the withdrawer
-    /// @param tokenAmounts The token amounts in the message
-    /// @param data The message data - decodes to WithdrawData
-    function _handleCCIPWithdrawCallback(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data) internal {
-        WithdrawData memory withdrawData = _decodeWithdrawData(data);
-        if (withdrawData.usdcWithdrawAmount != 0) {
-            CCIPOperations._validateTokenAmounts(tokenAmounts, address(i_usdc), withdrawData.usdcWithdrawAmount);
-            _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
-        }
-        emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
-    }
-
     /// @notice Handles the CCIP message for a rebalance new strategy
     /// @notice The message this function handles is sent by the old strategy when the strategy is updated
     /// @dev Updates the strategy pool to the new strategy
     /// @dev Deposits USDC totalValue of the system into the new strategy
     /// @param tokenAmounts The token amounts received in the CCIP message
     /// @param data The data to decode - decodes to Strategy (chainSelector, protocolId)
-    function _handleCCIPRebalanceToNewStrategy(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data) internal {
+    function _handleCCIPRebalanceToNewStrategy(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data)
+        internal
+    {
         /// @dev update strategy pool to protocol on this chain
         Strategy memory newStrategy = abi.decode(data, (Strategy));
         address newActiveStrategyAdapter =

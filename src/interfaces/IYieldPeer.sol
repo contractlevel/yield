@@ -14,13 +14,14 @@ interface IYieldPeer is IYieldFees {
         DepositToStrategy, // 1 - deposit from parent to strategy (to deposit to strategy and get totalValue)
         DepositCallbackParent, // 2 - deposit callback from strategy to parent (to calculate shareMintAmount and update totalShares)
         DepositCallbackChild, // 3 - deposit callback from parent to child (to mint shares)
-        WithdrawToParent, // 4 - withdraw from child to parent (to get strategy chain and update totalShares)
+        WithdrawToParent, // 4 - withdraw from child to parent (to get strategy chain)
         WithdrawToStrategy, // 5 - withdraw from parent to strategy (to withdraw from strategy and get usdcWithdrawAmount)
-        WithdrawCallback, // 6 - withdraw callback from strategy to withdraw chain (to send USDC to withdrawer)
-        RebalanceFromOldStrategy, // 7 - message from parent to old strategy (to move funds to new strategy)
-        RebalanceToNewStrategy, // 8 - reallocate funds from old strategy to new strategy
-        DepositPingPong, // 9 - pingpong deposit Tx from child to parent (to allow TVL to reach strategy chain)
-        WithdrawPingPong // 10 - pingpong withdraw Tx from parent to child (to allow TVL to reach strategy chain)
+        WithdrawCallbackParent, // 6 - withdraw callback from strategy to parent (to update totalShares and route payment to withdrawer)
+        WithdrawCallbackChild, // 7 - withdraw callback from parent to withdraw chain (to burn shares and send USDC to withdrawer)
+        RebalanceFromOldStrategy, // 8 - message from parent to old strategy (to move funds to new strategy)
+        RebalanceToNewStrategy, // 9 - reallocate funds from old strategy to new strategy
+        DepositPingPong, // 10 - pingpong deposit Tx from child to parent (to allow TVL to reach strategy chain)
+        WithdrawPingPong // 11 - pingpong withdraw Tx from parent to child (to allow TVL to reach strategy chain)
     }
 
     struct DepositData {

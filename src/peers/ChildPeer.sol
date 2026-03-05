@@ -98,7 +98,6 @@ contract ChildPeer is YieldPeer {
     {
         _revertIfMsgSenderIsNotShare();
         _revertIfZeroAmount(shareBurnAmount);
-        _burnShares(withdrawer, shareBurnAmount);
         WithdrawData memory withdrawData = _buildWithdrawData(withdrawer, shareBurnAmount, i_thisChainSelector);
         _ccipSend(i_parentChainSelector, CcipTxType.WithdrawToParent, abi.encode(withdrawData), ZERO_BRIDGE_AMOUNT);
         emit WithdrawInitiated(withdrawer, shareBurnAmount, i_thisChainSelector);
@@ -132,7 +131,7 @@ contract ChildPeer is YieldPeer {
         if (txType == CcipTxType.WithdrawToStrategy || txType == CcipTxType.WithdrawPingPong) {
             _handleCCIPWithdrawToStrategy(data);
         }
-        if (txType == CcipTxType.WithdrawCallback) _handleCCIPWithdrawCallback(tokenAmounts, data);
+        if (txType == CcipTxType.WithdrawCallbackChild) _handleCCIPWithdrawCallbackChild(tokenAmounts, data);
         //slither-disable-next-line reentrancy-no-eth
         if (txType == CcipTxType.RebalanceFromOldStrategy) _handleCCIPRebalanceFromOldStrategy(data);
         if (txType == CcipTxType.RebalanceToNewStrategy) _handleCCIPRebalanceToNewStrategy(tokenAmounts, data);
@@ -172,9 +171,8 @@ contract ChildPeer is YieldPeer {
     }
 
     /// @notice This function handles a withdraw request from the parent chain to this Strategy-Child
-    /// @notice The purpose of this tx is to withdraw USDC from the strategy and then send it back to the withdraw chain
-    /// withdraw -> parent -> strategy (HERE) -> callback to withdraw chain
-    /// @notice If this strategy chain is the same as the withdraw chain, we transfer the USDC to the withdrawer, concluding the withdrawal process.
+    /// @notice The purpose of this tx is to withdraw USDC from the strategy and send it back to the parent for routing
+    /// withdraw -> parent -> strategy (HERE) -> callback to parent -> callback to withdraw chain
     /// @param data The encoded WithdrawData
     function _handleCCIPWithdrawToStrategy(bytes memory data) internal {
         WithdrawData memory withdrawData = _decodeWithdrawData(data);
@@ -183,23 +181,33 @@ contract ChildPeer is YieldPeer {
         if (activeStrategyAdapter != address(0)) {
             withdrawData.usdcWithdrawAmount =
                 _withdrawFromStrategyAndGetUsdcWithdrawAmount(activeStrategyAdapter, withdrawData);
-
-            if (i_thisChainSelector == withdrawData.chainSelector) {
-                //slither-disable-next-line reentrancy-events
-                emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
-                _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
-            } else {
-                _ccipSend(
-                    withdrawData.chainSelector,
-                    CcipTxType.WithdrawCallback,
-                    abi.encode(withdrawData), // @review solady calldata compression for all encoded crosschain data?
-                    withdrawData.usdcWithdrawAmount
-                );
-            }
+            _ccipSend(
+                i_parentChainSelector,
+                CcipTxType.WithdrawCallbackParent,
+                abi.encode(withdrawData),
+                withdrawData.usdcWithdrawAmount
+            );
         } else {
             emit WithdrawPingPongToParent(withdrawData.shareBurnAmount);
             _ccipSend(i_parentChainSelector, CcipTxType.WithdrawPingPong, abi.encode(withdrawData), ZERO_BRIDGE_AMOUNT);
         }
+    }
+
+    /// @notice This function handles the final step of a withdrawal on this child chain
+    /// @notice Burns held shares and transfers USDC to the withdrawer
+    /// withdraw -> parent -> strategy -> callback to parent -> callback to child (HERE)
+    /// @param tokenAmounts The token amounts received in the CCIP message
+    /// @param data The encoded WithdrawData
+    function _handleCCIPWithdrawCallbackChild(Client.EVMTokenAmount[] memory tokenAmounts, bytes memory data) internal {
+        WithdrawData memory withdrawData = _decodeWithdrawData(data);
+        if (withdrawData.usdcWithdrawAmount != 0) {
+            CCIPOperations._validateTokenAmounts(tokenAmounts, address(i_usdc), withdrawData.usdcWithdrawAmount);
+        }
+        _burnShares(withdrawData.withdrawer, withdrawData.shareBurnAmount);
+        if (withdrawData.usdcWithdrawAmount != 0) {
+            _transferUsdcTo(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
+        }
+        emit WithdrawCompleted(withdrawData.withdrawer, withdrawData.usdcWithdrawAmount);
     }
 
     /// @notice Handles the CCIP message for a rebalance old strategy

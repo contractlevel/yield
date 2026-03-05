@@ -20,6 +20,25 @@ contract ChildWithdrawTest is BaseTest {
         optUsdc.approve(address(optChildPeer), DEPOSIT_AMOUNT);
     }
 
+    /// @notice Verifies that shares are held by the peer (not burned) immediately after onTokenTransfer in a cross-chain scenario
+    /// @notice Phase 1 guarantee: deferred burn - shares are only burned after strategy withdrawal is confirmed
+    function test_yield_child_onTokenTransfer_sharesHeldByPeer_notBurned() public {
+        /// @dev arrange: deposit and complete CCIP hops to receive shares
+        optChildPeer.deposit(DEPOSIT_AMOUNT);
+        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
+
+        uint256 expectedShareBalance = DEPOSIT_AMOUNT * INITIAL_SHARE_PRECISION;
+
+        /// @dev act: initiate withdrawal - do NOT route any CCIP messages
+        optShare.transferAndCall(address(optChildPeer), expectedShareBalance, "");
+
+        /// @dev assert: shares held by peer, not burned
+        assertEq(optShare.balanceOf(withdrawer), 0, "Withdrawer should have no shares");
+        assertEq(optShare.balanceOf(address(optChildPeer)), expectedShareBalance, "Peer should hold shares");
+        assertEq(optShare.totalSupply(), expectedShareBalance, "Total supply should not have decreased");
+    }
+
     function test_yield_child_onTokenTransfer_revertsWhen_notShare() public {
         /// @dev arrange
         optChildPeer.deposit(DEPOSIT_AMOUNT);
@@ -39,7 +58,8 @@ contract ChildWithdrawTest is BaseTest {
         optChildPeer.onTokenTransfer(msg.sender, DEPOSIT_AMOUNT, "");
     }
 
-    // Scenario: Strategy is on the same chain as the child the withdrawal was initiated. Strategy is Aave.
+    /// @notice Scenario C: Child (opt) initiates withdrawal, strategy is on the same child chain (opt), Protocol: Aave
+    /// @notice CCIP hops: opt->base (WithdrawToParent), base->opt (WithdrawToStrategy), opt->base (WithdrawCallbackParent), base->opt (WithdrawCallbackChild)
     function test_yield_child_withdraw_strategyIsChild_aave() public {
         _setStrategy(optChainSelector, keccak256(abi.encodePacked("aave-v3")), SET_CROSS_CHAIN);
         _selectFork(optFork);
@@ -56,6 +76,8 @@ contract ChildWithdrawTest is BaseTest {
         optShare.transferAndCall(address(optChildPeer), expectedShareBalance, "");
         ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
+        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
 
         /// @dev assert
         assertEq(optShare.balanceOf(withdrawer), 0);
@@ -68,7 +90,8 @@ contract ChildWithdrawTest is BaseTest {
         );
     }
 
-    // Scenario: Strategy is on the same chain as the child the withdrawal was initiated. Strategy is Compound.
+    /// @notice Scenario C: Child (opt) initiates withdrawal, strategy is on the same child chain (opt), Protocol: Compound
+    /// @notice CCIP hops: opt->base (WithdrawToParent), base->opt (WithdrawToStrategy), opt->base (WithdrawCallbackParent), base->opt (WithdrawCallbackChild)
     function test_yield_child_withdraw_strategyIsChild_compound() public {
         _setStrategy(optChainSelector, keccak256(abi.encodePacked("compound-v3")), SET_CROSS_CHAIN);
         _selectFork(optFork);
@@ -85,6 +108,8 @@ contract ChildWithdrawTest is BaseTest {
         optShare.transferAndCall(address(optChildPeer), expectedShareBalance, "");
         ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(optFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
+        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
 
         /// @dev assert
         assertEq(optShare.balanceOf(withdrawer), 0);
@@ -97,7 +122,8 @@ contract ChildWithdrawTest is BaseTest {
         );
     }
 
-    /// @notice Scenario: Withdrawal is initiated from a child chain, Strategy chain is Parent chain, Strategy Protocol is Aave.
+    /// @notice Scenario A: Child (opt) initiates withdrawal, strategy is on parent (base), Protocol: Aave
+    /// @notice CCIP hops: opt->base (WithdrawToParent), base->opt (WithdrawCallbackChild)
     function test_yield_child_withdraw_strategyIsParent_aave() public {
         _selectFork(optFork);
         _changePrank(withdrawer);
@@ -125,7 +151,8 @@ contract ChildWithdrawTest is BaseTest {
         );
     }
 
-    /// @notice Scenario: Withdrawal is initiated from a child chain, Strategy chain is Parent chain, Strategy Protocol is Compound.
+    /// @notice Scenario A: Child (opt) initiates withdrawal, strategy is on parent (base), Protocol: Compound
+    /// @notice CCIP hops: opt->base (WithdrawToParent), base->opt (WithdrawCallbackChild)
     function test_yield_child_withdraw_strategyIsParent_compound() public {
         _setStrategy(baseChainSelector, keccak256(abi.encodePacked("compound-v3")), SET_CROSS_CHAIN);
         _selectFork(optFork);
@@ -154,7 +181,8 @@ contract ChildWithdrawTest is BaseTest {
         );
     }
 
-    /// @notice Scenario: Withdrawal is initiated from a child chain, Strategy chain is another child chain, Strategy Protocol is Aave.
+    /// @notice Scenario B: Child (opt) initiates withdrawal, strategy is on another child (eth), Protocol: Aave
+    /// @notice CCIP hops: opt->base (WithdrawToParent), base->eth (WithdrawToStrategy), eth->base (WithdrawCallbackParent), base->opt (WithdrawCallbackChild)
     function test_yield_child_withdraw_strategyIsChainC_aave() public {
         _setStrategy(ethChainSelector, keccak256(abi.encodePacked("aave-v3")), SET_CROSS_CHAIN);
         _selectFork(optFork);
@@ -173,6 +201,7 @@ contract ChildWithdrawTest is BaseTest {
         optShare.transferAndCall(address(optChildPeer), expectedShareBalance, "");
         ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(ethFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
 
         /// @dev assert
@@ -186,7 +215,8 @@ contract ChildWithdrawTest is BaseTest {
         );
     }
 
-    /// @notice Scenario: Withdrawal is initiated from a child chain, Strategy chain is another child chain, Strategy Protocol is Compound.
+    /// @notice Scenario B: Child (opt) initiates withdrawal, strategy is on another child (eth), Protocol: Compound
+    /// @notice CCIP hops: opt->base (WithdrawToParent), base->eth (WithdrawToStrategy), eth->base (WithdrawCallbackParent), base->opt (WithdrawCallbackChild)
     function test_yield_child_withdraw_strategyIsChainC_compound() public {
         _setStrategy(ethChainSelector, keccak256(abi.encodePacked("compound-v3")), SET_CROSS_CHAIN);
         _selectFork(optFork);
@@ -205,6 +235,7 @@ contract ChildWithdrawTest is BaseTest {
         optShare.transferAndCall(address(optChildPeer), expectedShareBalance, "");
         ccipLocalSimulatorFork.switchChainAndRouteMessage(baseFork);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(ethFork);
+        ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(baseFork, attesters, attesterPks);
         ccipLocalSimulatorFork.switchChainAndRouteMessageWithUSDC(optFork, attesters, attesterPks);
 
         /// @dev assert
