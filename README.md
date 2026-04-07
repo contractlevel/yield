@@ -1,5 +1,9 @@
 # YieldCoin aka Contract Level Yield (CLY)
 
+**WARNING: This codebase is unfinished and still has significant issues that severely affect user funds. It is NOT recommended that this project is deployed to production. Please see [Yieldcoin v2](https://github.com/contractlevel/yield-v2) for a more efficient and secure implementation.**
+
+---
+
 **Note:** _This README is significantly out of date. Automation and Functions have been replaced by CRE._
 
 This project has been built for the Chainlink Chromion Hackathon, and is an automated, crosschain, stablecoin yield optimizer, powered by Chainlink Automation, Functions, and CCIP.
